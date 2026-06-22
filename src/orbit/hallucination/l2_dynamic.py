@@ -133,9 +133,7 @@ class L2DynamicTracer:
             return ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L2_DYNAMIC,
-                errors=[
-                    f"Dynamic calls not found in code graph: {', '.join(untracked)}"
-                ],
+                errors=[f"Dynamic calls not found in code graph: {', '.join(untracked)}"],
                 metadata={
                     "untracked_calls": untracked,
                     "traced_calls": user_calls,
@@ -161,7 +159,7 @@ class L2DynamicTracer:
         for line in stdout.splitlines():
             if line.startswith(_RESULT_MARKER):
                 try:
-                    return json.loads(line[len(_RESULT_MARKER):])
+                    return json.loads(line[len(_RESULT_MARKER) :])
                 except json.JSONDecodeError:
                     logger.warning("l2_trace_result_parse_failed")
                     return []

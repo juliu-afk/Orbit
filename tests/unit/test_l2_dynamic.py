@@ -41,9 +41,7 @@ def tracer(mock_sandbox, mock_engine):
 @pytest.mark.asyncio
 async def test_l2_traces_and_verifies_calls(tracer, mock_sandbox, mock_engine):
     """正向：追踪到函数调用，全部在图谱中存在 → passed=True。"""
-    mock_sandbox.run.return_value = (
-        "some output\n__L2_TRACE_RESULT__[\"add\", \"compute\"]\n"
-    )
+    mock_sandbox.run.return_value = 'some output\n__L2_TRACE_RESULT__["add", "compute"]\n'
     code = "def add(a, b): return a + b\nresult = add(1, 2)"
     result = await tracer.validate(code)
     assert result.passed is True
@@ -58,9 +56,7 @@ async def test_l2_traces_and_verifies_calls(tracer, mock_sandbox, mock_engine):
 @pytest.mark.asyncio
 async def test_l2_untracked_call_blocked(tracer, mock_sandbox, mock_engine):
     """审查 P2 修复：追踪到的调用不在图谱中 → passed=False。"""
-    mock_sandbox.run.return_value = (
-        "__L2_TRACE_RESULT__[\"legit_func\", \"phantom_func\"]\n"
-    )
+    mock_sandbox.run.return_value = '__L2_TRACE_RESULT__["legit_func", "phantom_func"]\n'
 
     # phantom_func 不在图谱中
     async def fake_exists(name):
@@ -130,9 +126,7 @@ async def test_l2_trace_code_injected(tracer, mock_sandbox):
 @pytest.mark.asyncio
 async def test_l2_filters_internal_trace_funcs(tracer, mock_sandbox, mock_engine):
     """L2 自身注入的 _l2_trace 函数被过滤，不参与图谱验证。"""
-    mock_sandbox.run.return_value = (
-        "__L2_TRACE_RESULT__[\"_l2_trace\", \"user_func\"]\n"
-    )
+    mock_sandbox.run.return_value = '__L2_TRACE_RESULT__["_l2_trace", "user_func"]\n'
     code = "def user_func(): pass\nuser_func()"
     result = await tracer.validate(code)
     assert result.passed is True

@@ -1,10 +1,10 @@
 """健康检查路由（Step 1.1 AC1：/health 返回 status=ok）。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter
 
 from orbit.api.schemas.task import HealthResponse
-from orbit.core.config import settings
 
 # WHY 版本号集中管理：避免散落多处，发版时只改一处。
 # 读自 importlib.metadata（打包后生效），fallback 到硬编码（开发态）。

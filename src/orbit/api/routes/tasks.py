@@ -3,12 +3,11 @@
 MVP 阶段：仅定义路由 + 请求/响应校验，返回 mock 响应。
 真实调度逻辑在 Step 5.x 接入。
 """
+
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -18,7 +17,6 @@ from orbit.api.schemas.task import (
     TaskState,
     TaskStatusResponse,
 )
-from orbit.core.config import settings
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -35,7 +33,7 @@ _mock_store: dict[str, TaskStatusResponse] = {}
     description="提交 PRD 创建任务，返回初始 IDLE 状态。prd 长度 10-5000。",
 )
 async def create_task(req: TaskCreateRequest) -> TaskStatusResponse:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     resp = TaskStatusResponse(
         task_id=uuid.uuid4().hex,
         state=TaskState.IDLE,
@@ -66,7 +64,7 @@ async def get_task(task_id: str) -> TaskStatusResponse:
             detail={
                 "detail": f"任务 {task_id} 不存在",
                 "error_code": "TASK_NOT_FOUND",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
     return task
@@ -89,22 +87,21 @@ async def cancel_task(task_id: str) -> TaskStatusResponse:
             detail={
                 "detail": f"任务 {task_id} 不存在",
                 "error_code": "TASK_NOT_FOUND",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
     # WHY 终态不可取消：DONE/FAILED 是不可逆状态，取消已完成的任务语义错误。
     # 调度器（Step 5.x）也必须遵守此契约。
     if task.state in (TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED):
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "detail": f"任务 {task_id} 处于终态 {task.state.value}，无法取消",
                 "error_code": "INVALID_STATE",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
         )
     task.state = TaskState.CANCELLED
-    task.updated_at = datetime.now(timezone.utc)
+    task.updated_at = datetime.now(UTC)
     _mock_store[task_id] = task
     return task

@@ -6,6 +6,7 @@
 - 创建任务返回 IDLE
 - 查询不存在任务返回 404
 """
+
 from __future__ import annotations
 
 import pytest
@@ -80,9 +81,7 @@ async def test_get_task_not_found(client):
 @pytest.mark.asyncio
 async def test_cancel_task(client):
     """创建后可取消，状态变更为 CANCELLED。"""
-    create = await client.post(
-        "/api/v1/tasks", json={"prd": "write a sum function"}
-    )
+    create = await client.post("/api/v1/tasks", json={"prd": "write a sum function"})
     task_id = create.json()["task_id"]
     cancel = await client.post(f"/api/v1/tasks/{task_id}/cancel")
     assert cancel.status_code == 200
@@ -96,9 +95,7 @@ async def test_cancel_task(client):
 @pytest.mark.asyncio
 async def test_cancel_already_cancelled(client):
     """重复取消已取消任务返回 409。"""
-    create = await client.post(
-        "/api/v1/tasks", json={"prd": "write a sum function"}
-    )
+    create = await client.post("/api/v1/tasks", json={"prd": "write a sum function"})
     task_id = create.json()["task_id"]
     await client.post(f"/api/v1/tasks/{task_id}/cancel")
     second = await client.post(f"/api/v1/tasks/{task_id}/cancel")
@@ -125,6 +122,7 @@ async def test_openapi_schema(client):
     assert "/api/v1/tasks/{task_id}" in paths
     assert "/api/v1/tasks/{task_id}/cancel" in paths
     assert "/health" in paths
+
 
 @pytest.mark.asyncio
 async def test_prd_boundary_min_length(client):

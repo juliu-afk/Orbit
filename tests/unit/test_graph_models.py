@@ -6,6 +6,7 @@
 - 边表联合索引存在
 - 无外键约束（物理隔离）
 """
+
 from __future__ import annotations
 
 from sqlalchemy import inspect
@@ -56,9 +57,7 @@ def test_config_node_specific_fields():
 def test_edge_node_type_fields():
     """边表含 source/target_node_type（跨图谱软关联）。"""
     cols = {c.name for c in inspect(Edge).columns}
-    assert {"source_id", "source_node_type", "target_id", "target_node_type"}.issubset(
-        cols
-    )
+    assert {"source_id", "source_node_type", "target_id", "target_node_type"}.issubset(cols)
 
 
 def test_no_foreign_keys():

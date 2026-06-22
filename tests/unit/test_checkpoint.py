@@ -6,16 +6,16 @@
 - SC3: Redis 不可用降级 PG（用内存 mock PG）
 - SC4: 版本号乐观锁防覆盖
 """
+
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from orbit.checkpoint.manager import (
-    CheckpointCorruptedError,
     CheckpointData,
     CheckpointManager,
 )
-
 
 # ---- 内存 mock：Redis / PG 行为 ----
 
@@ -85,9 +85,7 @@ def fake_pg():
 
 @pytest.fixture
 def mgr(fake_redis, fake_pg):
-    return CheckpointManager(
-        redis_client=fake_redis, pg_pool=fake_pg, env="test"
-    )
+    return CheckpointManager(redis_client=fake_redis, pg_pool=fake_pg, env="test")
 
 
 # ---- 测试 ----
@@ -209,14 +207,14 @@ async def test_checkpoint_data_defaults():
 @pytest.mark.asyncio
 async def test_progress_validation():
     """progress 超出范围抛 ValidationError。"""
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CheckpointData(task_id="t", state="X", progress=1.5)
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CheckpointData(task_id="t", state="X", progress=-0.1)
 
 
 @pytest.mark.asyncio
 async def test_version_validation():
     """version < 1 抛 ValidationError。"""
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         CheckpointData(task_id="t", state="X", version=0)

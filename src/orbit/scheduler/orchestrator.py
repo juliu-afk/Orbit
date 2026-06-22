@@ -6,6 +6,7 @@ Step 5.1 会扩展为 DAG 并发执行 + 拓扑排序。
 Agent 循环：思考（LLM 生成计划/代码）→ 行动（执行）→ 观察（收集结果）→ 状态转换。
 每次状态转换后保存检查点（崩溃可恢复）。
 """
+
 from __future__ import annotations
 
 import uuid
@@ -98,18 +99,12 @@ class Scheduler:
     def _transition(self, current: TaskState) -> TaskState:
         """执行状态转换。非法转换抛 InvalidStateTransitionError。"""
         if current in TERMINAL_STATES:
-            raise InvalidStateTransitionError(
-                f"终态 {current.value} 不可转换"
-            )
+            raise InvalidStateTransitionError(f"终态 {current.value} 不可转换")
         if current not in STATE_TRANSITIONS:
-            raise InvalidStateTransitionError(
-                f"状态 {current.value} 无定义的后继状态"
-            )
+            raise InvalidStateTransitionError(f"状态 {current.value} 无定义的后继状态")
         return STATE_TRANSITIONS[current]
 
-    async def _agent_cycle(
-        self, task_id: str, state: TaskState, context: dict[str, Any]
-    ) -> str:
+    async def _agent_cycle(self, task_id: str, state: TaskState, context: dict[str, Any]) -> str:
         """单个 Agent 循环：思考（LLM）→ 行动 → 观察。
 
         MVP 阶段每个状态都调一次 LLM，返回内容作为观察结果。

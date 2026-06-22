@@ -8,15 +8,16 @@
 - 异常 → FAILED
 - resume 从检查点恢复
 """
+
 from __future__ import annotations
 
 import pytest
 
 from orbit.api.schemas.task import TaskState
 from orbit.scheduler.orchestrator import (
+    STATE_TRANSITIONS,
     InvalidStateTransitionError,
     Scheduler,
-    STATE_TRANSITIONS,
 )
 
 
@@ -130,9 +131,7 @@ async def test_resume_from_checkpoint():
         async def load(self, task_id):
             from orbit.checkpoint.manager import CheckpointData
 
-            return CheckpointData(
-                task_id=task_id, state=self.state, context=self.context
-            )
+            return CheckpointData(task_id=task_id, state=self.state, context=self.context)
 
     ckpt = FakeCheckpoint("DONE", {"prd": "x", "artifacts": {}})
     sched = Scheduler(checkpoint_manager=ckpt)
@@ -152,9 +151,7 @@ async def test_resume_mid_state_continues():
         async def load(self, task_id):
             from orbit.checkpoint.manager import CheckpointData
 
-            return CheckpointData(
-                task_id=task_id, state=self.state, context=self.context
-            )
+            return CheckpointData(task_id=task_id, state=self.state, context=self.context)
 
         async def save(self, task_id, data):
             pass

@@ -107,6 +107,7 @@ class L6ContractValidator:
             return None
         try:
             import json
+
             import yaml
 
             content = self._spec_path.read_text(encoding="utf-8")

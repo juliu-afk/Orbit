@@ -7,6 +7,14 @@ L5 Z3 形式化 → L6 合约验证 → L7 沙箱执行 → L8 配置漂移
 深度验证(L5-L8)。
 """
 
+from orbit.hallucination.l1_graph import L1GraphValidator
+from orbit.hallucination.l2_dynamic import L2DynamicTracer
+from orbit.hallucination.l3_entropy import L3EntropyMonitor
+from orbit.hallucination.l4_type import L4TypeValidator
+from orbit.hallucination.l5_z3 import L5Z3Validator
+from orbit.hallucination.l6_contract import L6ContractValidator
+from orbit.hallucination.l7_runtime import L7RuntimeValidator
+from orbit.hallucination.l8_config import L8ConfigValidator
 from orbit.hallucination.schemas import (
     DynamicCallError,
     GraphReferenceError,
@@ -24,14 +32,6 @@ from orbit.hallucination.schemas import (
     TypeCheckError,
     ValidationResult,
 )
-from orbit.hallucination.l1_graph import L1GraphValidator
-from orbit.hallucination.l2_dynamic import L2DynamicTracer
-from orbit.hallucination.l3_entropy import L3EntropyMonitor
-from orbit.hallucination.l4_type import L4TypeValidator
-from orbit.hallucination.l5_z3 import L5Z3Validator
-from orbit.hallucination.l6_contract import L6ContractValidator
-from orbit.hallucination.l7_runtime import L7RuntimeValidator
-from orbit.hallucination.l8_config import L8ConfigValidator
 
 __all__ = [
     "L1GraphValidator",

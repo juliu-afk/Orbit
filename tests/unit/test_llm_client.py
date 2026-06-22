@@ -166,3 +166,37 @@ async def test_usage_stats_empty(client):
     stats = client.get_usage_stats("nonexistent")
     assert stats.total_tokens == 0
     assert stats.cost_usd == 0.0
+
+@pytest.mark.asyncio
+async def test_circuit_opens_by_error_rate():
+    """P2-3 修复验证：错误率超阈值触发熔断（非仅靠连续失败）。"""
+    cb = CircuitBreaker(
+        failure_threshold=100,  # 调高，让连续失败不触发
+        error_rate_threshold=0.5,
+        error_rate_min_calls=4,
+        cooldown=1,
+    )
+    key = "test/err-rate"
+    for ok in [False, True, False, True, False, False]:
+        if ok:
+            await cb.record_success(key)
+        else:
+            await cb.record_failure(key)
+    state = await cb.get_state(key)
+    assert state.opened_at is not None
+
+
+@pytest.mark.asyncio
+async def test_error_rate_below_min_calls_no_trip():
+    """样本不足时不触发错误率熔断。"""
+    cb = CircuitBreaker(
+        failure_threshold=100,
+        error_rate_threshold=0.1,
+        error_rate_min_calls=10,
+        cooldown=1,
+    )
+    key = "test/few"
+    for _ in range(3):
+        await cb.record_failure(key)
+    state = await cb.get_state(key)
+    assert state.opened_at is None

@@ -153,7 +153,7 @@ class CheckpointManager:
     async def _save_to_pg(
         self, task_id: str, data: CheckpointData, serialized: bytes
     ) -> None:
-        """写 PG，带版本号乐观锁（WHERE checkpoints.version <= EXCLUDED.version）。
+        """写 PG，带版本号乐观锁（WHERE checkpoints.version < EXCLUDED.version）。
 
         fire-and-forget 调用，异常仅记 Critical 日志（不影响主流程）。
         """
@@ -167,7 +167,7 @@ class CheckpointManager:
             context = EXCLUDED.context,
             updated_at = EXCLUDED.updated_at,
             version = checkpoints.version + 1
-        WHERE checkpoints.version <= EXCLUDED.version
+        WHERE checkpoints.version < EXCLUDED.version
         """
         try:
             await self.pg.execute(

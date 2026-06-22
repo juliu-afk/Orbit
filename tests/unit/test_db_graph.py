@@ -85,9 +85,12 @@ async def test_get_foreign_keys(db_engine):
 
 @pytest.mark.asyncio
 async def test_column_exists(db_engine):
-    """字段存在查询（表级别验证）。"""
+    """P2-1: 字段存在查询 column_exists。"""
     await db_engine.build_index()
-    assert await db_engine.table_exists("users") is True
+    # users 表有 id/name 列
+    assert await db_engine.column_exists("users", "id") is True
+    assert await db_engine.column_exists("users", "name") is True
+    assert await db_engine.column_exists("users", "nonexistent") is False
 
 
 @pytest.mark.asyncio

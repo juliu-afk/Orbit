@@ -34,17 +34,29 @@ class GraphEngineBase:
             return await session.get(model, node_id)
 
     async def delete_nodes_by_file(self, model: type, file_path: str) -> int:
-        """删除某文件的所有节点（增量更新前清理旧数据）。"""
-        # 各引擎的 model 都有 file_path 字段
+        """删除某文件的所有节点（增量更新前清理旧数据）。
+
+        PR#5 P1-1：必须同时清理关联的 Edge，否则残留边指向已删节点，
+        导致 get_callers/get_callees 返回错误结果。
+        """
+        from sqlalchemy import delete as sa_delete
+
         async with self.session_factory() as session:
-            result = await session.execute(select(model).where(model.file_path == file_path))
+            result = await session.execute(
+                select(model).where(model.file_path == file_path)
+            )
             nodes = result.scalars().all()
-            count = len(nodes)
+            node_ids = [n.id for n in nodes]
+            if node_ids:
+                await session.execute(
+                    sa_delete(Edge).where(
+                        Edge.source_id.in_(node_ids) | Edge.target_id.in_(node_ids)
+                    )
+                )
             for node in nodes:
                 await session.delete(node)
             await session.commit()
-            return count
-
+            return len(nodes)
     async def find_node_by_name(
         self, model: type, name: str, namespace: str | None = None
     ) -> Any | None:

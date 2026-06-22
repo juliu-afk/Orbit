@@ -146,7 +146,13 @@ class CodeGraphEngine(GraphEngineBase):
         )
 
     def _get_namespace(self, node: ast.AST, tree: ast.Module) -> str:
-        """推断符号的命名空间（模块级或类内）。简化：模块级返回 __main__。"""
+        """推断符号的命名空间（模块级或类内）。
+
+        TODO PR#5 P2-2：当前简化为模块级，类内方法无法区分。
+        Step 5.x Agent 角色细化时需实现真正嵌套命名空间推断
+        （遍历父节点找 ClassDef，拼 Calculator.compute 形式）。
+        当前 find_node_by_name 的 namespace 过滤未启用，影响有限。
+        """
         return "__main__"
 
     def _get_args(self, node: ast.FunctionDef) -> list[str]:

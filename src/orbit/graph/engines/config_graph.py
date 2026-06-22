@@ -26,8 +26,6 @@ logger = structlog.get_logger()
 
 # 支持的配置文件扩展名
 SUPPORTED_EXTENSIONS = {".env", ".yml", ".yaml", ".json", ".ini", ".conf"}
-# 基线表（内存版，后续可换持久化）
-_config_baselines: dict[str, dict] = {}
 
 
 class ConfigGraphError(Exception):
@@ -59,6 +57,8 @@ class ConfigGraphEngine(GraphEngineBase):
         self.base_dir = Path(base_dir)
         self.env = env
         self.backup_dir = Path(backup_dir) if backup_dir else self.base_dir / ".backups"
+        # PR#5 P2-3：基线存实例属性，避免全局 dict 多实例污染
+        self._baselines: dict[str, dict] = {}
 
     def _is_config_file(self, path: Path) -> bool:
         """判断是否为支持的配置文件。
@@ -116,7 +116,7 @@ class ConfigGraphEngine(GraphEngineBase):
         WHY 每次扫描清空基线：避免多个实例/测试间基线残留导致漂移误报。
         基线只在本次扫描周期内有效，下次扫描重建。
         """
-        _config_baselines.clear()
+        self._baselines.clear()
         if not self.base_dir.exists():
             logger.warning("config_dir_not_found", dir=str(self.base_dir))
             return 0
@@ -150,8 +150,8 @@ class ConfigGraphEngine(GraphEngineBase):
         )
         # 建立黄金基线（首次扫描时记录）
         key = str(path)
-        if key not in _config_baselines:
-            _config_baselines[key] = {
+        if key not in self._baselines:
+            self._baselines[key] = {
                 "hash": file_hash,
                 "content": content,
                 "file_path": str(path),
@@ -160,7 +160,7 @@ class ConfigGraphEngine(GraphEngineBase):
     async def detect_drift(self) -> list[dict]:
         """SC1: 检测配置漂移。返回漂移文件列表。"""
         drifts = []
-        for file_path_str, baseline in _config_baselines.items():
+        for file_path_str, baseline in self._baselines.items():
             path = Path(file_path_str)
             if not path.exists():
                 drifts.append({"file": file_path_str, "expected": baseline["hash"], "actual": None})
@@ -187,7 +187,7 @@ class ConfigGraphEngine(GraphEngineBase):
         if self.env == "prod":
             raise ConfigGraphError("生产环境禁止自动修复，仅告警")
         path = Path(file_path)
-        baseline = _config_baselines.get(str(path))
+        baseline = self._baselines.get(str(path))
         if baseline is None:
             logger.warning("no_baseline_for_fix", file=file_path)
             return False
@@ -205,7 +205,7 @@ class ConfigGraphEngine(GraphEngineBase):
         """更新黄金基线（人工触发，PRD Q2）。"""
         path = Path(file_path)
         content = path.read_text(encoding="utf-8")
-        _config_baselines[str(path)] = {
+        self._baselines[str(path)] = {
             "hash": self.compute_hash(path),
             "content": content,
             "file_path": str(path),

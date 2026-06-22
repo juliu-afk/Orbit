@@ -1,0 +1,54 @@
+# 基础设施容器（Step 0.2 ADR）
+# PostgreSQL：审计存储（task_audit_trail、成本记录）
+# Redis：审计缓存（热点数据、熔断器状态）
+# LiteLLM：LLM 统一网关（DeepSeek/Qwen/Ollama）
+services:
+  postgres:
+    image: postgres:15
+    container_name: orbit-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orbit
+    ports:
+      - "5432:5432"
+    volumes:
+      - orbit-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d orbit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.2
+    container_name: orbit-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - orbit-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-v1.40.0-stable
+    container_name: orbit-litellm
+    restart: unless-stopped
+    environment:
+      LITELLM_MASTER_KEY: sk-123456
+    ports:
+      - "4000:4000"
+    # WHY 仅 MVP：用内存存储，生产阶段再配 PostgreSQL 持久化（Step 0.2 待定决议）
+    command: ["--num_workers", "4", "--port", "4000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  orbit-pg-data:
+  orbit-redis-data:

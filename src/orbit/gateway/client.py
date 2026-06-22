@@ -111,7 +111,7 @@ class LLMClient:
         """
         # 延迟导入 litellm，避免未装包时 import 失败影响测试
         try:
-            import litellm  # type: ignore
+            import litellm  # noqa: F401
         except ImportError as e:
             raise RuntimeError(
                 "litellm 未安装。生产环境需 poetry install，测试请 mock _do_completion"

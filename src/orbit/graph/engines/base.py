@@ -20,7 +20,7 @@ class GraphEngineBase:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self.session_factory = session_factory
 
-    async def upsert_node(self, model: type, node_id: str, **fields: Any) -> Any:
+    async def upsert_node(self, model: type, node_id: str, **fields: Any) -> Any:  # type: ignore[func-returns-value]
         """插入或更新节点（按 id upsert）。"""
         async with self.session_factory() as session:
             existing = await session.get(model, node_id)
@@ -42,7 +42,7 @@ class GraphEngineBase:
         from sqlalchemy import delete as sa_delete
 
         async with self.session_factory() as session:
-            result = await session.execute(select(model).where(model.file_path == file_path))
+            result: Any = await session.execute(select(model).where(model.file_path == file_path))  # type: ignore[attr-defined]
             nodes = result.scalars().all()
             node_ids = [n.id for n in nodes]
             if node_ids:
@@ -61,9 +61,9 @@ class GraphEngineBase:
     ) -> Any | None:
         """按名称（+ 可选命名空间）查找节点。"""
         async with self.session_factory() as session:
-            stmt = select(model).where(model.name == name)
+            stmt: Any = select(model).where(model.name == name)  # type: ignore[attr-defined]
             if namespace is not None:
-                stmt = stmt.where(model.meta["namespace"].as_string() == namespace)
+                stmt = stmt.where(model.meta["namespace"].as_string() == namespace)  # type: ignore[attr-defined]
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
 
@@ -103,4 +103,4 @@ class GraphEngineBase:
 
             result = await session.execute(sa_delete(model))
             await session.commit()
-            return result.rowcount or 0
+            return result.rowcount or 0  # type: ignore[attr-defined]

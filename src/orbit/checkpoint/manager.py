@@ -144,7 +144,7 @@ class CheckpointManager:
         if self.redis is None:
             return self._memory_store.get(key)
         try:
-            return await self.redis.get(key)
+            return await self.redis.get(key)  # type: ignore[no-any-return]
         except Exception as e:
             logger.warning("redis_load_failed", key=key, error=str(e))
             return self._memory_store.get(key)

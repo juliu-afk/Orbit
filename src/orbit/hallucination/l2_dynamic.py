@@ -126,7 +126,7 @@ class L2DynamicTracer:
         for line in stdout.splitlines():
             if line.startswith(_RESULT_MARKER):
                 try:
-                    return json.loads(line[len(_RESULT_MARKER):])
+                    return json.loads(line[len(_RESULT_MARKER) :])
                 except json.JSONDecodeError:
                     logger.warning("l2_trace_result_parse_failed")
                     return []

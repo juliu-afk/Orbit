@@ -42,6 +42,7 @@ async def test_l1_all_symbols_exist(validator, mock_engine):
 @pytest.mark.asyncio
 async def test_l1_missing_symbol(validator, mock_engine):
     """AC1: 引用不存在的符号 → passed=False + GraphReferenceError 信息。"""
+
     # foo 存在，bar 不存在
     async def fake_exists(name):
         return name != "bar"

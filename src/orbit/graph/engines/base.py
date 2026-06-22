@@ -42,9 +42,7 @@ class GraphEngineBase:
         from sqlalchemy import delete as sa_delete
 
         async with self.session_factory() as session:
-            result = await session.execute(
-                select(model).where(model.file_path == file_path)
-            )
+            result = await session.execute(select(model).where(model.file_path == file_path))
             nodes = result.scalars().all()
             node_ids = [n.id for n in nodes]
             if node_ids:
@@ -57,6 +55,7 @@ class GraphEngineBase:
                 await session.delete(node)
             await session.commit()
             return len(nodes)
+
     async def find_node_by_name(
         self, model: type, name: str, namespace: str | None = None
     ) -> Any | None:

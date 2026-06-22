@@ -31,9 +31,7 @@ def tracer(mock_sandbox):
 @pytest.mark.asyncio
 async def test_l2_traces_function_calls(tracer, mock_sandbox):
     """正向：沙箱执行追踪包装代码，返回 traced_calls。"""
-    mock_sandbox.run.return_value = (
-        "some user output\n__L2_TRACE_RESULT__[\"add\", \"compute\"]\n"
-    )
+    mock_sandbox.run.return_value = 'some user output\n__L2_TRACE_RESULT__["add", "compute"]\n'
     code = "def add(a, b): return a + b\nresult = add(1, 2)"
     result = await tracer.validate(code)
     assert result.passed is True

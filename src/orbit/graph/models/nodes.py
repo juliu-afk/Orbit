@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import JSON, DateTime, Float, Index, Integer, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -35,7 +36,7 @@ class BaseNode:
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     # meta 存非结构化扩展属性（如函数签名、表注释），JSON 灵活无需改表
-    meta: Mapped[dict] = mapped_column(JSON, default=dict)
+    meta: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
 
 

@@ -21,13 +21,13 @@ jobs:
           python-version: "3.12"
 
       - name: Install Poetry
-        run: pipx install poetry==1.8.5
+        run: pip install poetry==1.8.5
 
       - name: Configure Poetry
         run: poetry config virtualenvs.create false
 
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction
 
       - name: Run mutmut on core modules
         # WHY 只测核心模块：调度器/熔断器/检查点是业务关键路径，测试必须有效

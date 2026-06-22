@@ -53,13 +53,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install Poetry
-        run: pipx install poetry==1.8.5
+        run: pip install poetry==1.8.5
 
       - name: Configure Poetry
         run: poetry config virtualenvs.create false
 
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction
 
       - name: Run integration tests
         # 集成测试标记 integration，单元测试不依赖外部服务

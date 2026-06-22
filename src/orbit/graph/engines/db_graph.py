@@ -35,7 +35,7 @@ class DbGraphEngine(GraphEngineBase):
 
     def __init__(
         self,
-        session_factory: async_sessionmaker,
+        session_factory: async_sessionmaker[AsyncSession],
         db_engine: AsyncEngine,
         schema: str | None = None,
     ):
@@ -54,7 +54,7 @@ class DbGraphEngine(GraphEngineBase):
         logger.info("db_graph_indexed", tables=len(table_names), schema=self.schema)
         return len(table_names)
 
-    async def _index_table(self, conn, table_name: str) -> None:
+    async def _index_table(self, conn: Any, table_name: str) -> None:
         """索引单张表的字段和外键。"""
         columns = await conn.run_sync(
             lambda sync_conn: inspect(sync_conn).get_columns(table_name, schema=self.schema)
@@ -104,7 +104,7 @@ class DbGraphEngine(GraphEngineBase):
         for fk in fks:
             await self._record_foreign_key(table_name, fk)
 
-    async def _record_foreign_key(self, table: str, fk: dict) -> None:
+    async def _record_foreign_key(self, table: str, fk: dict[str, Any]) -> None:
         """记录外键关系为边。"""
         # fk 格式：{constrained_columns: [...], referred_table: ..., referred_columns: [...]}
         constrained = fk.get("constrained_columns", [])
@@ -145,7 +145,7 @@ class DbGraphEngine(GraphEngineBase):
             result = await session.execute(stmt)
             return result.scalar_one_or_none() is not None
 
-    async def get_foreign_keys(self, table_name: str) -> list[dict]:
+    async def get_foreign_keys(self, table_name: str) -> list[dict[str, Any]]:
         """SC2: 获取表的外键关系。
 
         返回 [{column, ref_table, ref_column}, ...]
@@ -153,7 +153,7 @@ class DbGraphEngine(GraphEngineBase):
         node = await self.find_node_by_name(DbNode, table_name)
         if node is None:
             return []
-        return node.meta.get("foreign_keys", [])
+        return node.meta.get("foreign_keys", [])  # type: ignore[no-any-return]
 
     async def get_tables(self) -> list[str]:
         """获取所有表名。"""

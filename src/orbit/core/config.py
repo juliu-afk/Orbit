@@ -57,5 +57,17 @@ class Settings:
     # 沙箱
     SANDBOX_TIMEOUT_SECONDS: int = _get_int("SANDBOX_TIMEOUT_SECONDS", 30)
 
+    # ---- Step 4.1 防幻觉层 L1-L4 ----
+    # WHY 按层独立开关：Dev 仅启用 L1/L4，Test 全量 L1-L4，Prod 仅 L1/L4
+    ENABLE_L1: bool = _get_bool("ENABLE_L1", True)
+    ENABLE_L2: bool = _get_bool("ENABLE_L2", False)  # 默认关闭（性能开销 ~200ms）
+    ENABLE_L3: bool = _get_bool("ENABLE_L3", True)
+    ENABLE_L4: bool = _get_bool("ENABLE_L4", True)
+
+    # L3 熵阈值（PRD Q1 决议：DeepSeek 0.75，Qwen 0.70）
+    # 模型级配置——不同模型 token 分布差异大，统一阈值误报率高
+    ENTROPY_THRESHOLD_DEEPSEEK: float = float(_get("ENTROPY_THRESHOLD_DEEPSEEK", "0.75"))
+    ENTROPY_THRESHOLD_QWEN: float = float(_get("ENTROPY_THRESHOLD_QWEN", "0.70"))
+
 
 settings = Settings()

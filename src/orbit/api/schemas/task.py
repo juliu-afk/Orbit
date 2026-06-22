@@ -39,7 +39,7 @@ class TaskCreateRequest(BaseModel):
     - callback_url：可选 webhook，任务完成时回调（V1 仅定义字段，不实现推送）
     """
 
-    prd: constr(min_length=10, max_length=5000) = Field(..., description="产品需求文档")
+    prd: constr(min_length=10, max_length=5000) = Field(..., description="产品需求文档")  # type: ignore[valid-type]
     language: Literal["python", "javascript", "java", "go"] = Field(
         "python", description="目标语言"
     )

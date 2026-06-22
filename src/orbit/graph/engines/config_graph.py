@@ -48,7 +48,7 @@ class ConfigGraphEngine(GraphEngineBase):
 
     def __init__(
         self,
-        session_factory: async_sessionmaker,
+        session_factory: async_sessionmaker[AsyncSession],
         base_dir: str,
         env: str = "dev",
         backup_dir: str | None = None,
@@ -58,7 +58,7 @@ class ConfigGraphEngine(GraphEngineBase):
         self.env = env
         self.backup_dir = Path(backup_dir) if backup_dir else self.base_dir / ".backups"
         # PR#5 P2-3：基线存实例属性，避免全局 dict 多实例污染
-        self._baselines: dict[str, dict] = {}
+        self._baselines: dict[str, dict[str, Any]] = {}
 
     def _is_config_file(self, path: Path) -> bool:
         """判断是否为支持的配置文件。
@@ -157,7 +157,7 @@ class ConfigGraphEngine(GraphEngineBase):
                 "file_path": str(path),
             }
 
-    async def detect_drift(self) -> list[dict]:
+    async def detect_drift(self) -> list[dict[str, Any]]:
         """SC1: 检测配置漂移。返回漂移文件列表。"""
         drifts = []
         for file_path_str, baseline in self._baselines.items():

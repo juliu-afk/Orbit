@@ -61,7 +61,7 @@ class DbNode(Base, BaseNode):
 
     __tablename__ = "db_nodes"
 
-    # schema 是 Python 关键字，字段名仍用 schema 但属性名避开冲突无需——SQLAlchemy 允许
+    # 数据库列名保留为 schema（SQLAlchemy 允许列名为 schema，与 Python 关键字无关）
     schema_name: Mapped[str | None] = mapped_column("schema", String(128))
     db_type: Mapped[str | None] = mapped_column(String(50))  # table / view / column
 

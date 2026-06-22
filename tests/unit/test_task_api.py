@@ -79,13 +79,31 @@ async def test_get_task_not_found(client):
 
 @pytest.mark.asyncio
 async def test_cancel_task(client):
-    """创建后可取消，状态查询正常。"""
+    """创建后可取消，状态变更为 CANCELLED。"""
     create = await client.post(
         "/api/v1/tasks", json={"prd": "write a sum function"}
     )
     task_id = create.json()["task_id"]
     cancel = await client.post(f"/api/v1/tasks/{task_id}/cancel")
     assert cancel.status_code == 200
+    # P2-4: 断言状态已改为 CANCELLED
+    assert cancel.json()["state"] == "CANCELLED"
+    # 再次查询确认状态持久
+    query = await client.get(f"/api/v1/tasks/{task_id}")
+    assert query.json()["state"] == "CANCELLED"
+
+
+@pytest.mark.asyncio
+async def test_cancel_already_cancelled(client):
+    """重复取消已取消任务返回 409。"""
+    create = await client.post(
+        "/api/v1/tasks", json={"prd": "write a sum function"}
+    )
+    task_id = create.json()["task_id"]
+    await client.post(f"/api/v1/tasks/{task_id}/cancel")
+    second = await client.post(f"/api/v1/tasks/{task_id}/cancel")
+    assert second.status_code == 409
+    assert second.json()["detail"]["error_code"] == "INVALID_STATE"
 
 
 @pytest.mark.asyncio
@@ -107,3 +125,48 @@ async def test_openapi_schema(client):
     assert "/api/v1/tasks/{task_id}" in paths
     assert "/api/v1/tasks/{task_id}/cancel" in paths
     assert "/health" in paths
+
+@pytest.mark.asyncio
+async def test_prd_boundary_min_length(client):
+    """prd 恰好 10 字符（最小边界）应通过。"""
+    resp = await client.post("/api/v1/tasks", json={"prd": "1234567890"})
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_prd_boundary_too_short(client):
+    """prd 9 字符（边界-1）应返回 422。"""
+    resp = await client.post("/api/v1/tasks", json={"prd": "123456789"})
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_prd_exceeds_max_length(client):
+    """prd 5001 字符（边界+1）应返回 422。"""
+    resp = await client.post("/api/v1/tasks", json={"prd": "x" * 5001})
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_prd_max_boundary(client):
+    """prd 恰好 5000 字符（最大边界）应通过。"""
+    resp = await client.post("/api/v1/tasks", json={"prd": "x" * 5000})
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_language_allows_javascript(client):
+    """language=javascript 应通过。"""
+    resp = await client.post(
+        "/api/v1/tasks", json={"prd": "write a sum function", "language": "javascript"}
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_health_version_not_hardcoded(client):
+    """P2-3: 健康检查返回版本号非空字符串。"""
+    resp = await client.get("/health")
+    version = resp.json()["version"]
+    assert isinstance(version, str)
+    assert len(version) > 0

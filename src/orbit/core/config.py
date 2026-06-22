@@ -2,7 +2,8 @@
 
 WHY 用 python-dotenv 而非 pydantic-settings：开发计划 3.4.1 明确指定
 配置管理组件为 python-dotenv，保持技术栈与设计文档一致。
-启动时校验必填项，缺关键字段直接报错，避免运行时才暴露配置问题。
+所有字段带默认值（占位符），生产部署时由环境变量注入真实值。
+MVP 阶段不强制校验：真实 key 校验留待 Step 2.1（LiteLLM 网关）接入时实现。
 """
 import os
 from dataclasses import dataclass

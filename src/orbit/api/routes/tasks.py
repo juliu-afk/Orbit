@@ -5,6 +5,9 @@ MVP 阶段：仅定义路由 + 请求/响应校验，返回 mock 响应。
 """
 from __future__ import annotations
 
+import uuid
+from datetime import datetime, timezone
+
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
@@ -32,8 +35,6 @@ _mock_store: dict[str, TaskStatusResponse] = {}
     description="提交 PRD 创建任务，返回初始 IDLE 状态。prd 长度 10-5000。",
 )
 async def create_task(req: TaskCreateRequest) -> TaskStatusResponse:
-    import uuid
-
     now = datetime.now(timezone.utc)
     resp = TaskStatusResponse(
         task_id=uuid.uuid4().hex,
@@ -93,7 +94,8 @@ async def cancel_task(task_id: str) -> TaskStatusResponse:
         )
     # WHY 终态不可取消：DONE/FAILED 是不可逆状态，取消已完成的任务语义错误。
     # 调度器（Step 5.x）也必须遵守此契约。
-    if task.state in (TaskState.DONE, TaskState.FAILED):
+    if task.state in (TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED):
+
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
@@ -102,6 +104,7 @@ async def cancel_task(task_id: str) -> TaskStatusResponse:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
+    task.state = TaskState.CANCELLED
     task.updated_at = datetime.now(timezone.utc)
     _mock_store[task_id] = task
     return task

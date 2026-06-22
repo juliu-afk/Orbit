@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, HttpUrl, conint, constr
 
@@ -27,6 +27,7 @@ class TaskState(str, Enum):
     VERIFYING = "VERIFYING"
     DONE = "DONE"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 class TaskCreateRequest(BaseModel):
@@ -40,9 +41,7 @@ class TaskCreateRequest(BaseModel):
     prd: constr(min_length=10, max_length=5000) = Field(
         ..., description="产品需求文档"
     )
-    language: constr(pattern=r"^(python|javascript|java|go)$") = Field(
-        "python", description="目标语言"
-    )
+    language: Literal["python", "javascript", "java", "go"] = Field("python", description="目标语言")
     callback_url: Optional[HttpUrl] = Field(
         None, description="可选回调 URL，任务完成时推送结果"
     )

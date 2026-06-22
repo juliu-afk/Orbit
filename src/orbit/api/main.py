@@ -26,6 +26,8 @@ def create_app() -> FastAPI:
     )
     # 路由统一挂 API 前缀（Step 1.1 ADR：API_V1_STR=/api/v1）
     app.include_router(tasks.router, prefix=settings.API_V1_STR)
+    # WHY /health 不加 API_V1_STR 前缀：符合 K8s liveness/readiness 探针惯例，
+    # 探针不带版本号，避免升级时探针配置频繁改动。
     app.include_router(health.router)
     return app
 

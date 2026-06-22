@@ -45,9 +45,13 @@ tox = ">=4.11.0"
 # E2E（Step 6.2）
 playwright = ">=1.40.0"
 # 代码风格（Step 0.2 Makefile lint）
+ruff = ">=0.6.0"
 black = ">=24.1.0"
 isort = ">=5.13.0"
 mypy = ">=1.8.0"
+# 安全扫描（security.yml）
+bandit = [{version = ">=1.7.10", extras = ["toml"]}]
+pip-audit = ">=2.7.0"
 # CI 工具
 pre-commit = ">=3.6.0"
 
@@ -67,6 +71,20 @@ branch = true
 [tool.coverage.report]
 fail_under = 80
 show_missing = true
+
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# WHY 默认规则集：E/F（pyflakes）+ I（isort）+ UP（pyupgrade）
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]  # 行长由 ruff-format 处理
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.black]
 line-length = 100

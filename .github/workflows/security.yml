@@ -1,0 +1,58 @@
+# 安全扫描：依赖漏洞 + 代码安全
+name: Security
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+  schedule:
+    # 每周日凌晨 4 点定期扫描（捕获新发现的漏洞）
+    - cron: "0 4 * * 0"
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.5
+
+      - name: Configure Poetry
+        run: poetry config virtualenvs.create false
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Audit dependencies (pip-audit)
+        # WHY pip-audit：查 PyPI 已知漏洞，对比 Safety 更新快且免费
+        run: poetry run pip-audit --strict
+
+  bandit:
+    name: Code security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install bandit
+        run: pip install bandit[toml]
+
+      - name: Run bandit
+        # WHY bandit：静态扫描代码安全问题（eval/assert/hardcoded secrets）
+        # -lll 只报 HIGH，-iiii 忽略 experimental
+        run: bandit -r src/ -ll -ii

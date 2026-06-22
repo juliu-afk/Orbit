@@ -6,6 +6,7 @@ WHY 统一网关：调度器只认 LLMClient.generate()，不直接接触 litell
 主备降级（PRD SC5）：主力连续失败 2 次 → 自动切备选模型。
 熔断（PRD SC2/SC3）：单模型连续 5 次失败 → 熔断 60s → 半开探测。
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -63,17 +64,11 @@ class LLMClient:
         """
         # 主力模型尝试
         try:
-            return await self._call_with_circuit(
-                self.default_model, req, task_id
-            )
+            return await self._call_with_circuit(self.default_model, req, task_id)
         except CircuitOpenError:
             # 主力熔断 → 尝试备选
-            logger.warning(
-                "primary_circuit_open_fallback", model=self.default_model
-            )
-            return await self._call_with_circuit(
-                self.fallback_model, req, task_id
-            )
+            logger.warning("primary_circuit_open_fallback", model=self.default_model)
+            return await self._call_with_circuit(self.fallback_model, req, task_id)
         except Exception as e:
             # 主力失败但未熔断 → 记录后试备选
             logger.warning(
@@ -81,13 +76,9 @@ class LLMClient:
                 model=self.default_model,
                 error=str(e),
             )
-            return await self._call_with_circuit(
-                self.fallback_model, req, task_id
-            )
+            return await self._call_with_circuit(self.fallback_model, req, task_id)
 
-    async def _call_with_circuit(
-        self, model: str, req: LLMRequest, task_id: str
-    ) -> LLMResponse:
+    async def _call_with_circuit(self, model: str, req: LLMRequest, task_id: str) -> LLMResponse:
         """单模型调用 + 熔断器保护。"""
         await self.cb.before_call(model)
         try:
@@ -148,9 +139,7 @@ class LLMClient:
             prompt_t + completion_t
         )
         price = PRICES.get(model, {"prompt": 0.0, "completion": 0.0})
-        cost = (prompt_t / 1000.0 * price["prompt"]) + (
-            completion_t / 1000.0 * price["completion"]
-        )
+        cost = (prompt_t / 1000.0 * price["prompt"]) + (completion_t / 1000.0 * price["completion"])
         return LLMUsage(
             prompt_tokens=prompt_t,
             completion_tokens=completion_t,

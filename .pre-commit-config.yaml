@@ -1,0 +1,49 @@
+# 本地 commit 前自动检查（pre-commit）
+# 安装：pip install pre-commit && pre-commit install
+# 手动跑：pre-commit run --all-files
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        # 删除行尾空格
+      - id: end-of-file-fixer
+        # 确保文件末尾换行
+      - id: check-yaml
+        # YAML 语法校验（含 GitHub Actions workflow）
+      - id: check-toml
+        # TOML 语法校验（pyproject.toml）
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+        # 阻止大文件提交（>500KB，如二进制/数据集）
+      - id: check-merge-conflict
+        # 阻止有冲突标记的文件提交
+      - id: detect-private-key
+        # 检测私钥文件（.pem/.key）防止误提交
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        # WHY --exit-non-zero-on-fix：自动修复后要求重新 add，防止静默改代码
+      - id: ruff-format
+        # 替代 black 的格式化（ruff 内置，更快）
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.10
+    hooks:
+      - id: bandit
+        args: [-r, "src/", -ll, -ii]
+        # WHY -ll：只报 MEDIUM/HIGH，避免 LOW 噪音；-ii 忽略 experimental
+
+  - repo: local
+    hooks:
+      - id: pytest-quick
+        name: pytest (unit tests only)
+        entry: poetry run pytest tests/unit/ -q
+        language: system
+        types: [python]
+        pass_filenames: false
+        # WHY 本地 commit 跑单元测试：快速反馈，不跑集成/E2E（太慢）
+        # CI 会跑完整测试套件

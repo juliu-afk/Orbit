@@ -1,0 +1,44 @@
+# 代码质量门禁：lint + 类型检查
+# 每个 PR 和 push master 都跑
+name: CI Quality
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  lint-typecheck:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.5
+
+      - name: Configure Poetry
+        run: poetry config virtualenvs.create false
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Check formatting (black)
+        run: poetry run black --check src/ tests/
+
+      - name: Check imports (isort)
+        run: poetry run isort --check-only src/ tests/
+
+      - name: Lint (ruff)
+        run: poetry run ruff check src/ tests/
+
+      - name: Type check (mypy)
+        run: poetry run mypy src/

@@ -7,6 +7,7 @@
 - SC4: 成本追踪
 - SC5: 主备降级
 """
+
 from __future__ import annotations
 
 import pytest
@@ -166,6 +167,7 @@ async def test_usage_stats_empty(client):
     stats = client.get_usage_stats("nonexistent")
     assert stats.total_tokens == 0
     assert stats.cost_usd == 0.0
+
 
 @pytest.mark.asyncio
 async def test_circuit_opens_by_error_rate():

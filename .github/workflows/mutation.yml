@@ -1,0 +1,45 @@
+# 变异测试（mutmut）：验证测试能否抓到代码改动
+# WHY 变异测试：覆盖率只测"代码跑过"，变异测试测"测试是否真的有效"（故意改代码看测试是否失败）
+# 只在 push master 跑（耗时长，不阻断 PR）
+name: Mutation Tests
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  mutmut:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry==1.8.5
+
+      - name: Configure Poetry
+        run: poetry config virtualenvs.create false
+
+      - name: Install dependencies
+        run: poetry install --no-interaction --no-root
+
+      - name: Run mutmut on core modules
+        # WHY 只测核心模块：调度器/熔断器/检查点是业务关键路径，测试必须有效
+        # 防幻觉/沙箱后续模块成熟后加入
+        env:
+          PYTHONPATH: src
+        run: |
+          poetry run mutmut run \
+            --paths-to-mutate src/orbit/scheduler,src/orbit/gateway/circuit_breaker.py,src/orbit/checkpoint \
+            --tests-dir tests/unit \
+            || true  # WHY || true：变异测试有 survived 不算失败，结果供人工审查
+
+      - name: Show mutation summary
+        if: always()
+        run: poetry run mutmut results || true

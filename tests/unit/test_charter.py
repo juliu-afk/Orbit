@@ -2,6 +2,7 @@
 
 验证 docs/charter.md 的 frontmatter 可被解析，度量指标存在。
 """
+
 from __future__ import annotations
 
 import pathlib

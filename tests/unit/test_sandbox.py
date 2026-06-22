@@ -3,6 +3,7 @@
 Docker 不可用时（CI/无 Docker 环境）测试 is_available 返回 False，
 不依赖真实 Docker。真实执行需集成测试环境。
 """
+
 from __future__ import annotations
 
 import pytest
@@ -33,6 +34,7 @@ async def test_unsupported_language_raises(sandbox):
     with pytest.raises(SandboxError, match="不支持"):
         await sandbox.run("console.log('x')", language="javascript")
 
+
 @pytest.mark.asyncio
 async def test_unsupported_language_java_raises(sandbox):
     """P2-4: java 语言 MVP 不支持，抛 SandboxError。"""
@@ -44,8 +46,7 @@ async def test_unsupported_language_java_raises(sandbox):
 async def test_unsupported_language_go_raises(sandbox):
     """P2-4: go 语言 MVP 不支持，抛 SandboxError。"""
     with pytest.raises(SandboxError, match="不支持"):
-        await sandbox.run('package main', language="go")
-
+        await sandbox.run("package main", language="go")
 
 
 @pytest.mark.asyncio

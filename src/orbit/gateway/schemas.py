@@ -2,6 +2,7 @@
 
 请求/响应/统计的结构化定义，供 LLMClient 和调度器使用。
 """
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field

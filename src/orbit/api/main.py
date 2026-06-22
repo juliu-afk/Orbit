@@ -3,6 +3,7 @@
 WHY 分层：main 只负责组装 app（路由注册、中间件、异常处理），
 不写业务逻辑。路由在 routes/，模型在 schemas/，配置在 core/。
 """
+
 from __future__ import annotations
 
 from fastapi import FastAPI

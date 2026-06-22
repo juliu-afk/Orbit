@@ -69,5 +69,15 @@ class Settings:
     ENTROPY_THRESHOLD_DEEPSEEK: float = float(_get("ENTROPY_THRESHOLD_DEEPSEEK", "0.75"))
     ENTROPY_THRESHOLD_QWEN: float = float(_get("ENTROPY_THRESHOLD_QWEN", "0.70"))
 
+    # ---- Step 4.2 防幻觉层 L5-L8 ----
+    ENABLE_L5: bool = _get_bool("ENABLE_L5", True)
+    Z3_TIMEOUT_MS: int = _get_int("Z3_TIMEOUT_MS", 30000)  # 30s
+    ENABLE_L6: bool = _get_bool("ENABLE_L6", True)
+    OPENAPI_SPEC_PATH: str = _get("OPENAPI_SPEC_PATH", "/app/openapi.yaml")
+    ENABLE_L7: bool = _get_bool("ENABLE_L7", True)
+    ENABLE_L8: bool = _get_bool("ENABLE_L8", True)
+    CONFIG_BASELINE_DIR: str = _get("CONFIG_BASELINE_DIR", "/app/config_baselines")
+    L8_AUTO_FIX_ENABLED: bool = _get_bool("L8_AUTO_FIX_ENABLED", False)  # prod 默认 false
+
 
 settings = Settings()

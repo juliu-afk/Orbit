@@ -71,7 +71,7 @@ class L5Z3Validator:
                 warnings=[f"Z3 solver error: {e}"],
             )
 
-    def _parse_contract(self, func_code: str) -> dict | None:
+    def _parse_contract(self, func_code: str) -> dict[str, Any] | None:
         """从 @formal 装饰器提取 pre/post conditions。
 
         识别格式：

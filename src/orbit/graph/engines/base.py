@@ -20,7 +20,7 @@ class GraphEngineBase:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self.session_factory = session_factory
 
-    async def upsert_node(self, model: type, node_id: str, **fields: Any) -> Any:  # type: ignore[func-returns-value]
+    async def upsert_node(self, model: type, node_id: str, **fields: Any) -> Any:  # type: ignore[func-returns-value]  # noqa: RUF100
         """插入或更新节点（按 id upsert）。"""
         async with self.session_factory() as session:
             existing = await session.get(model, node_id)

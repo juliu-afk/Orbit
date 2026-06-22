@@ -154,7 +154,7 @@ class LLMClient:
         """查询任务累计 Token 消耗与成本（PRD 需求⑥）。"""
         records = self._usage_log.get(task_id, [])
         if not records:
-            return LLMUsage()
+            return LLMUsage()  # type: ignore[call-arg]
         return LLMUsage(
             prompt_tokens=sum(r.prompt_tokens for r in records),
             completion_tokens=sum(r.completion_tokens for r in records),

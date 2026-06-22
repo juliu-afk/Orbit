@@ -39,7 +39,7 @@ class L6ContractValidator:
 
     def __init__(self, openapi_path: str):
         self._spec_path = Path(openapi_path)
-        self._spec: dict | None = None  # 缓存解析结果
+        self._spec: dict[str, Any] | None = None  # 缓存解析结果
 
     async def validate(self, code: str) -> ValidationResult:
         """比对代码实现与 OpenAPI 规格。
@@ -99,7 +99,7 @@ class L6ContractValidator:
             metadata={"checked_endpoints": len(spec_endpoints)},
         )
 
-    async def _load_spec(self) -> dict | None:
+    async def _load_spec(self) -> dict[str, Any] | None:
         """加载 OpenAPI spec（缓存结果）。"""
         if self._spec is not None:
             return self._spec
@@ -120,12 +120,12 @@ class L6ContractValidator:
             logger.warning("l6_spec_load_failed", path=str(self._spec_path), error=str(e))
             return None
 
-    def _extract_spec_endpoints(self, spec: dict) -> list[dict]:
+    def _extract_spec_endpoints(self, spec: dict) -> list[dict[str, Any]]:
         """从 OpenAPI 3.0 spec 提取端点列表。
 
         返回 [{"path": "/users/{id}", "method": "get", "response_model": "User"}, ...]
         """
-        endpoints: list[dict] = []
+        endpoints: list[dict[str, Any]] = []
         paths = spec.get("paths", {})
         for path_url, methods in paths.items():
             if not isinstance(methods, dict):
@@ -149,7 +149,7 @@ class L6ContractValidator:
                 )
         return endpoints
 
-    def _extract_code_routes(self, code: str) -> dict:
+    def _extract_code_routes(self, code: str) -> dict[str, Any]:
         """从代码中 AST 提取 FastAPI 路由定义。
 
         返回 {(path, method): {"response_model": str, ...}}
@@ -171,7 +171,7 @@ class L6ContractValidator:
                         routes[(info["path"], info["method"])] = info
         return routes
 
-    def _parse_route_decorator(self, decorator: ast.AST) -> dict | None:
+    def _parse_route_decorator(self, decorator: ast.AST) -> dict[str, Any] | None:
         """解析 FastAPI 路由装饰器。
 
         @app.get("/users/{id}") → {"path": "/users/{id}", "method": "GET"}

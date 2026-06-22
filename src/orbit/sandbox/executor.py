@@ -11,7 +11,6 @@ from __future__ import annotations
 import asyncio
 import shutil
 import tempfile
-import uuid
 from pathlib import Path
 
 import structlog

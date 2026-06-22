@@ -33,6 +33,20 @@ async def test_unsupported_language_raises(sandbox):
     with pytest.raises(SandboxError, match="不支持"):
         await sandbox.run("console.log('x')", language="javascript")
 
+@pytest.mark.asyncio
+async def test_unsupported_language_java_raises(sandbox):
+    """P2-4: java 语言 MVP 不支持，抛 SandboxError。"""
+    with pytest.raises(SandboxError, match="不支持"):
+        await sandbox.run("class A {}", language="java")
+
+
+@pytest.mark.asyncio
+async def test_unsupported_language_go_raises(sandbox):
+    """P2-4: go 语言 MVP 不支持，抛 SandboxError。"""
+    with pytest.raises(SandboxError, match="不支持"):
+        await sandbox.run('package main', language="go")
+
+
 
 @pytest.mark.asyncio
 async def test_docker_unavailable_raises(sandbox, monkeypatch):

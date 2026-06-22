@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orbit.hallucination.l7_runtime import L7RuntimeValidator
-from orbit.hallucination.schemas import HallucinationLevel
 from orbit.sandbox.executor import SandboxExecutionError
 
 

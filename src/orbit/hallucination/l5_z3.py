@@ -109,7 +109,7 @@ class L5Z3Validator:
         赋值（反例）。若 unsat（不存在反例）→ 函数正确。
         """
         try:
-            from z3 import Bool, Int, Real, Solver, sat, unknown
+            from z3 import Int, Solver, sat, unknown  # noqa: F401
         except ImportError:
             return L5ValidationResult(
                 passed=True,
@@ -161,7 +161,7 @@ class L5Z3Validator:
         if result == sat:
             z3_model = solver.model()
             # 提取反例（只取参数值）
-            ce: dict[str, Any] = {}
+            ce: dict[str, object] = {}
             for name, var in z3_vars.items():
                 try:
                     val = z3_model.evaluate(var)
@@ -195,7 +195,7 @@ class L5Z3Validator:
         WHY 不用 Python eval：仅支持有限操作符白名单（+ - * / > < == != and or not）。
         表达式先被转为 Z3 操作，避免任意代码执行。
         """
-        from z3 import And, Not, Or
+        from z3 import And, Int, Not, Or
 
         expr = expr.strip()
         # 替换 Python 操作符为 Z3 操作符（处理优先级）

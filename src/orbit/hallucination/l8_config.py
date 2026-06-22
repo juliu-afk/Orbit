@@ -12,8 +12,7 @@ PRD 决议：Test 环境自动修复，Prod 仅告警（需人工确认）。
 from __future__ import annotations
 
 import hashlib
-import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
@@ -119,7 +118,7 @@ class L8ConfigValidator:
             current_hash=current_hash,
             diff=diff,
             auto_fixed=auto_fixed,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
     def _hash_file(self, file_path: Path) -> str:

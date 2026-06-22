@@ -13,6 +13,10 @@ import json
 import re
 import shutil
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 import structlog
 import yaml

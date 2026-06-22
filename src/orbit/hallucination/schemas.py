@@ -5,7 +5,7 @@ PRD 数据契约来源：docs/PRD+ADR_4阶段.md 代码块-1/2/5/6。
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
@@ -72,7 +72,7 @@ class L8DriftReport(BaseModel):
     current_hash: str
     diff: str
     auto_fixed: bool
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ---- 异常定义 ----

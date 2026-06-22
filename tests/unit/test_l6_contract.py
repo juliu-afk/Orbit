@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
-
 import pytest
 
 from orbit.hallucination.l6_contract import L6ContractValidator
-from orbit.hallucination.schemas import HallucinationLevel
 
 
 @pytest.fixture

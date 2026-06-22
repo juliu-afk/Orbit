@@ -32,7 +32,9 @@ class L3EntropyMonitor:
     """
 
     def __init__(self, config: L3EntropyConfig | None = None):
-        self.config = config or L3EntropyConfig()
+        self.config = config or L3EntropyConfig(
+            window_size=10, threshold=0.75, fallback_enabled=True
+        )
         # 滑动窗口：存最近 window_size 个采样点的熵值
         self._buffer: deque[float] = deque(maxlen=self.config.window_size)
         # 降级模式：无 logprobs 时记录最近 token 用于重复度检测

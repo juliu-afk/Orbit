@@ -86,7 +86,6 @@ _BUILTINS = frozenset(
         "format",
         "pow",
         "divmod",
-        "isinstance",
     }
 )
 

@@ -77,3 +77,11 @@ class TypeCheckError(HallucinationError):
     def __init__(self, errors: list[str]):
         self.errors = errors
         super().__init__(f"Type check failed: {'; '.join(errors[:3])}")
+
+
+class DynamicCallError(HallucinationError):
+    """L2: 沙箱运行时追踪到未注册在图谱中的动态调用。"""
+
+    def __init__(self, calls: list[str]):
+        self.calls = calls
+        super().__init__(f"Dynamic calls not found in code graph: {', '.join(calls)}")

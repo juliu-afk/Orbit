@@ -38,9 +38,8 @@ class L3EntropyMonitor:
         # 降级模式：无 logprobs 时记录最近 token 用于重复度检测
         self._last_token: str | None = None
         self._repeat_count: int = 0
-        # 采样计数器（每 N 个 token 采样一次，减少计算开销）
+        # 采样计数器（生产可按间隔采样减少计算开销，MVP 每 token 采样）
         self._token_count: int = 0
-        self._sampling_interval: int = 1  # MVP 每 token 采样，生产可调
 
     def on_token(self, token: str, logprobs: list[float] | None) -> float | None:
         """处理一个 token，返回当前滑动窗口平均熵（超阈值时）或 None（正常）。

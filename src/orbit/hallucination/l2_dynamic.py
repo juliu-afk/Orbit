@@ -2,19 +2,20 @@
 
 WHY L2：LLM 生成代码可能使用 getattr()、动态字符串拼接等技巧调用函数，
 这些无法被 L1 静态分析捕获。L2 在沙箱执行时注入 sys.settrace 追踪所有
-函数调用，验证被调用的函数是否在代码图谱中存在。
+函数调用，然后对照代码图谱验证被调用函数是否存在。
 
-实现：将用户的代码包装在 sys.settrace 追踪逻辑中，在 Sandbox 内执行。
-追踪器收集所有 function call 事件的目标函数名，然后对照图谱验证。
+实现：将用户代码包装在 sys.settrace 追踪逻辑中，在 Sandbox 内执行。
+追踪器收集所有 function call 事件的目标函数名，再通过 CodeGraphEngine
+逐个验证是否在代码图谱中存在。不在图谱中的调用 → passed=False。
 
-限制（PRD）：仅在 Test/Prod 启用（性能开销 ~200ms）；当前传递
-enable_l2 标志让 Sandbox 决定是否注入追踪。
+限制（PRD）：仅在 Test/Prod 启用（性能开销 ~200ms）。
 """
 
 from __future__ import annotations
 
 import structlog
 
+from orbit.graph.engines.code_graph import CodeGraphEngine
 from orbit.hallucination.schemas import HallucinationLevel, ValidationResult
 from orbit.sandbox.executor import Sandbox
 
@@ -50,6 +51,9 @@ print("__L2_TRACE_RESULT__" + json.dumps(_traced_calls))
 # 追踪结果标记（用于从 stdout 中提取）
 _RESULT_MARKER = "__L2_TRACE_RESULT__"
 
+# 沙箱内部函数（L2 自身注入的追踪器函数，不验证）
+_TRACE_INTERNAL = frozenset({"_l2_trace"})
+
 
 class L2DynamicTracer:
     """L2 动态调用追踪器。
@@ -59,14 +63,15 @@ class L2DynamicTracer:
         result = await tracer.validate(code)
         if not result.passed:
             # result.metadata["untracked_calls"] 含未在图谱中找到的调用
-            ...
+            raise DynamicCallError(result.metadata["untracked_calls"])
     """
 
-    def __init__(self, sandbox: Sandbox):
+    def __init__(self, sandbox: Sandbox, code_engine: CodeGraphEngine):
         self._sandbox = sandbox
+        self._engine = code_engine
 
     async def validate(self, code: str) -> ValidationResult:
-        """在沙箱中执行带追踪包装的代码，收集函数调用。
+        """在沙箱中执行带追踪包装的代码，验证所有函数调用是否在代码图谱中。
 
         Args:
             code: LLM 生成的 Python 代码
@@ -108,11 +113,41 @@ class L2DynamicTracer:
 
         # 提取追踪结果
         traced = self._parse_trace_result(stdout)
-        logger.info("l2_trace_complete", call_count=len(traced))
+        # 过滤 L2 自身注入的函数
+        user_calls = [c for c in traced if c not in _TRACE_INTERNAL]
+
+        # WHY 对照图谱验证：收集到的函数调用必须全部在代码图谱中存在，
+        # 否则说明 LLM 生成了不存在的动态调用（L2 的核心职责）
+        untracked: list[str] = []
+        for call in user_calls:
+            try:
+                if not await self._engine.exists(call):
+                    untracked.append(call)
+            except Exception as e:
+                logger.warning("l2_graph_query_failed", call=call, error=str(e))
+                # 查询失败不阻断，记录 warning
+                pass
+
+        if untracked:
+            logger.info("l2_untracked_calls", calls=untracked)
+            return ValidationResult(
+                passed=False,
+                level=HallucinationLevel.L2_DYNAMIC,
+                errors=[
+                    f"Dynamic calls not found in code graph: {', '.join(untracked)}"
+                ],
+                metadata={
+                    "untracked_calls": untracked,
+                    "traced_calls": user_calls,
+                    "call_count": len(user_calls),
+                },
+            )
+
+        logger.info("l2_trace_complete", call_count=len(user_calls))
         return ValidationResult(
             passed=True,
             level=HallucinationLevel.L2_DYNAMIC,
-            metadata={"traced_calls": traced, "call_count": len(traced)},
+            metadata={"traced_calls": user_calls, "call_count": len(user_calls)},
         )
 
     def _parse_trace_result(self, stdout: str) -> list[str]:
@@ -126,7 +161,7 @@ class L2DynamicTracer:
         for line in stdout.splitlines():
             if line.startswith(_RESULT_MARKER):
                 try:
-                    return json.loads(line[len(_RESULT_MARKER) :])
+                    return json.loads(line[len(_RESULT_MARKER):])
                 except json.JSONDecodeError:
                     logger.warning("l2_trace_result_parse_failed")
                     return []

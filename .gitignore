@@ -1,0 +1,37 @@
+﻿# 环境
+.env
+*.key
+*.pem
+credentials*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# 数据
+data/
+*.db
+*.sqlite*
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+.mutmut-cache/
+
+# 前端
+node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+erl_crash.dump

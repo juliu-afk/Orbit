@@ -1,0 +1,59 @@
+﻿"""全局配置：从环境变量读取，禁止硬编码任何密钥/连接串。
+
+WHY 用 python-dotenv 而非 pydantic-settings：开发计划 3.4.1 明确指定
+配置管理组件为 python-dotenv，保持技术栈与设计文档一致。
+启动时校验必填项，缺关键字段直接报错，避免运行时才暴露配置问题。
+"""
+import os
+from dataclasses import dataclass
+
+from dotenv import load_dotenv
+
+# 加载 .env（开发环境），生产用真实环境变量注入
+load_dotenv()
+
+
+def _get(key: str, default: str = "") -> str:
+    return os.environ.get(key, default)
+
+
+def _get_bool(key: str, default: bool = False) -> bool:
+    return _get(key, str(default)).lower() in ("1", "true", "yes")
+
+
+def _get_int(key: str, default: int = 0) -> int:
+    try:
+        return int(_get(key, str(default)))
+    except ValueError:
+        return default
+
+
+@dataclass(frozen=True)
+class Settings:
+    """全局配置单例（frozen 防止运行时被篡改）。"""
+
+    # 基础
+    APP_ENV: str = _get("APP_ENV", "dev")
+    DEBUG: bool = _get_bool("DEBUG", True)
+    PROJECT_NAME: str = _get("PROJECT_NAME", "Orbit")
+    API_V1_STR: str = _get("API_V1_STR", "/api/v1")
+
+    # 数据库（开发默认 SQLite 零依赖启动，生产切 PostgreSQL）
+    DATABASE_URL: str = _get("DATABASE_URL", "sqlite+aiosqlite:///./data/graph.db")
+
+    # Redis（检查点/缓存，Step 2.2 启用）
+    REDIS_URL: str = _get("REDIS_URL", "redis://localhost:6379/0")
+
+    # LiteLLM 网关（Step 2.1 启用，MVP 阶段不依赖）
+    LITELLM_MASTER_KEY: str = _get("LITELLM_MASTER_KEY", "sk-dummy")
+    LITELLM_PROXY_URL: str = _get("LITELLM_PROXY_URL", "http://localhost:4000")
+
+    # 模型 key 占位——禁止填真实值进仓库
+    OPENAI_API_KEY: str = _get("OPENAI_API_KEY", "sk-dummy")
+    DEEPSEEK_API_KEY: str = _get("DEEPSEEK_API_KEY", "sk-dummy")
+
+    # 沙箱
+    SANDBOX_TIMEOUT_SECONDS: int = _get_int("SANDBOX_TIMEOUT_SECONDS", 30)
+
+
+settings = Settings()

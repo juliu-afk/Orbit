@@ -3,11 +3,19 @@
 ## 2026-06-23
 
 ### 完成项
-- PR #6 Step 4.1：8 层防幻觉体系前半（L1-L4）
-  - L1 图谱引用验证（AST → CodeGraphEngine.exists）
-  - L2 动态调用追踪（sys.settrace → Sandbox + 图谱验证）
-  - L3 概率熵监控（滑动窗口归一化熵 + 重复度降级）
-  - L4 静态类型检查（mypy --strict subprocess）
+- PR #6 Step 4.1：防幻觉 L1-L4（v0.6.0）
+- PR #7 Step 4.2：防幻觉 L5-L8 + CI 全修复（v0.7.0）
+  - L5 Z3 形式化验证（@formal pre/post SMT 求解）
+  - L6 OpenAPI 合约双向验证（spec vs 路由）
+  - L7 沙箱运行时验证（pytest assert 执行）
+  - L8 配置漂移检测（SHA256 基线 + 自动修复）
+  - CI: mypy 0 + ruff 0 + bandit pass + integration tests
+  - 8 层防幻觉体系全部交付（L1-L8）
+
+### PR / Commit
+- PR #6 → v0.6.0（Step 4.1）
+- PR #7 → v0.7.0（Step 4.2 + CI fix）
+- 全量 150/150 通过
 - CI 修复：pipx→pip、--no-root、black/isort/ruff/mypy 全量修复
 - 审查修复 P1+P2 全修
 

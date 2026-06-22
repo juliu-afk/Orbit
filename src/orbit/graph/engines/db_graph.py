@@ -9,10 +9,14 @@ WHY 反射而非解析 DDL：反射走 information_schema，准确性最高（PR
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 from orbit.graph.engines.base import GraphEngineBase
 from orbit.graph.models.nodes import DbNode

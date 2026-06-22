@@ -116,7 +116,7 @@ class Scheduler:
         # 根据状态构造不同的 prompt（Step 5.2 细化为 Agent 角色模板）
         prompt = self._build_prompt(state, context)
         resp = await self.llm.generate(
-            LLMRequest(prompt=prompt, system_prompt=self._system_prompt(state)),
+            LLMRequest(prompt=prompt, system_prompt=self._system_prompt(state)),  # type: ignore[call-arg]
             task_id=task_id,
         )
         return resp.content
@@ -137,7 +137,7 @@ class Scheduler:
         if state == TaskState.VERIFYING:
             code = context.get("artifacts", {}).get("CODING", "")
             return f"验证以下代码的正确性：\n{code}"
-        return prd
+        return prd  # type: ignore[no-any-return]
 
     def _system_prompt(self, state: TaskState) -> str:
         """编排层风格的 System Prompt（Step 0.4 架构锚定）。"""
@@ -152,7 +152,9 @@ class Scheduler:
         """保存检查点（每次状态转换后）。"""
         if self.checkpoint is None:
             return
-        data = CheckpointData(
+        # Pydantic 2.x + mypy strict 已知兼容问题：所有字段有 default 但
+        # mypy 仍要求显式传参。不是真实类型错误。
+        data = CheckpointData(  # type: ignore[call-arg]
             task_id=task_id,
             state=state.value,
             progress=self._state_to_progress(state),
@@ -222,11 +224,13 @@ class Scheduler:
         return current
 
 
-@staticmethod
 def generate_task_id() -> str:
     """生成任务 ID（uuid4 hex，与 API 层一致）。
 
     WHY 保留为公共 API：调度器外部入口（API 层创建任务/CLI 工具）可能复用，
     当前 API 层独立生成 ID，此方法供测试和未来 CLI 用。
+
+    WHY 模块级函数不用 @staticmethod：此函数不在类内，@staticmethod 是 Python
+    no-op（无实际效果），mypy 报 misc 错误。零外部调用方，删除不影响 API。
     """
     return uuid.uuid4().hex

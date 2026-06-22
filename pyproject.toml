@@ -8,14 +8,14 @@ readme = "README.md"
 packages = [{include = "orbit", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.14"
 # API 层（Step 1.1）
 fastapi = ">=0.110.0"
 uvicorn = {extras = ["standard"], version = ">=0.27.1"}
 pydantic = ">=2.6.1"
 python-multipart = ">=0.0.9"
 # 配置管理（开发计划 3.4.1 指定）
-python-dotenv = ">=1.0.0"
+python-dotenv = ">=1.2.2"
 # ORM（Step 1.2）
 sqlalchemy = ">=2.0.25"
 alembic = ">=1.13.0"
@@ -25,7 +25,7 @@ asyncpg = ">=0.29.0"
 # Redis（Step 2.2 检查点/缓存）
 redis = ">=5.0.1"
 # LLM 网关（Step 2.1）
-litellm = ">=1.40.0"
+litellm = ">=1.84.0"
 # 序列化（Step 2.2 检查点，PRD 指定 orjson 比 pickle 快且安全）
 orjson = ">=3.9.0"
 # HTTP 客户端（开发计划 3.4.1）

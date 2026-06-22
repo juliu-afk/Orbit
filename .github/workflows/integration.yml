@@ -53,7 +53,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install Poetry
-        run: pip install poetry==1.8.5
+        run: pip install "poetry>=2.0"
 
       - name: Configure Poetry
         run: poetry config virtualenvs.create false
@@ -68,7 +68,7 @@ jobs:
       - name: Run smoke tests (if exist)
         # E2E 冒烟测试（Playwright 阶段后启用）
         run: |
-          if poetry run pytest tests/e2e/ -k "smoke" --collect-only 2>/dev/null | grep -q "test"; then
+          if [ -d tests/e2e ] && poetry run pytest tests/e2e/ -k "smoke" --collect-only 2>/dev/null | grep -q "test"; then
             poetry run pytest tests/e2e/ -k "smoke" -v
           else
             echo "No smoke tests found, skipping"

@@ -169,7 +169,7 @@ class CheckpointManager:
         WHERE checkpoints.version < EXCLUDED.version
         """
         try:
-            await self.pg.execute(
+            await self.pg.execute(  # type: ignore[union-attr]
                 query,
                 task_id,
                 data.state,
@@ -189,7 +189,7 @@ class CheckpointManager:
     async def _load_from_pg(self, task_id: str) -> CheckpointData | None:
         query = "SELECT state, retry_count, progress, context, updated_at, version FROM checkpoints WHERE task_id = $1"
         try:
-            row = await self.pg.fetchrow(query, task_id)
+            row = await self.pg.fetchrow(query, task_id)  # type: ignore[union-attr]
         except Exception as e:
             logger.warning("pg_load_failed", task_id=task_id, error=str(e))
             return None

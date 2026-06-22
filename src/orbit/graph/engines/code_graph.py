@@ -155,7 +155,7 @@ class CodeGraphEngine(GraphEngineBase):
         """
         return "__main__"
 
-    def _get_args(self, node: ast.FunctionDef) -> list[str]:
+    def _get_args(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
         """提取函数参数名。"""
         args = [a.arg for a in node.args.args]
         return args

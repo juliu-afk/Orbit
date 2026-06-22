@@ -116,7 +116,7 @@ class Scheduler:
         # 根据状态构造不同的 prompt（Step 5.2 细化为 Agent 角色模板）
         prompt = self._build_prompt(state, context)
         resp = await self.llm.generate(
-            LLMRequest(prompt=prompt, system_prompt=self._system_prompt(state)),
+            LLMRequest(prompt=prompt, system_prompt=self._system_prompt(state)),  # type: ignore[call-arg]
             task_id=task_id,
         )
         return resp.content
@@ -137,7 +137,7 @@ class Scheduler:
         if state == TaskState.VERIFYING:
             code = context.get("artifacts", {}).get("CODING", "")
             return f"验证以下代码的正确性：\n{code}"
-        return prd
+        return prd  # type: ignore[no-any-return]
 
     def _system_prompt(self, state: TaskState) -> str:
         """编排层风格的 System Prompt（Step 0.4 架构锚定）。"""
@@ -152,7 +152,7 @@ class Scheduler:
         """保存检查点（每次状态转换后）。"""
         if self.checkpoint is None:
             return
-        data = CheckpointData(
+        data = CheckpointData(  # type: ignore[call-arg]
             task_id=task_id,
             state=state.value,
             progress=self._state_to_progress(state),
@@ -222,7 +222,6 @@ class Scheduler:
         return current
 
 
-@staticmethod
 def generate_task_id() -> str:
     """生成任务 ID（uuid4 hex，与 API 层一致）。
 

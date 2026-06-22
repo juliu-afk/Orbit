@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [{include = "orbit", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.14"
 # API 层（Step 1.1）
 fastapi = ">=0.110.0"
 uvicorn = {extras = ["standard"], version = ">=0.27.1"}

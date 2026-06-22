@@ -18,7 +18,6 @@ import structlog
 
 from orbit.graph.engines.code_graph import CodeGraphEngine
 from orbit.hallucination.schemas import (
-    GraphReferenceError,
     HallucinationLevel,
     ValidationResult,
 )

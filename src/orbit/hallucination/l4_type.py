@@ -20,7 +20,6 @@ import structlog
 
 from orbit.hallucination.schemas import (
     HallucinationLevel,
-    TypeCheckError,
     ValidationResult,
 )
 

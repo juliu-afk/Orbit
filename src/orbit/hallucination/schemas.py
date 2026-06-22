@@ -5,13 +5,13 @@ PRD 数据契约来源：docs/PRD+ADR_4阶段.md 代码块-1、代码块-2。
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class HallucinationLevel(str, Enum):
+class HallucinationLevel(StrEnum):
     """防幻觉层级枚举。L1-L4 属于 Step 4.1，L5-L8 属于 Step 4.2。"""
 
     L1_GRAPH = "l1_graph"

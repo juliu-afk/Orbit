@@ -23,14 +23,14 @@ async def test_l5_no_formal_decorator(validator):
 @pytest.mark.asyncio
 async def test_l5_parse_pre_post(validator):
     """解析 @requires/@ensures 装饰器。"""
-    code = '''
+    code = """
 @formal
 @requires("x > 0")
 @requires("y > 0")
 @ensures("result == x + y")
 def add(x, y):
     return x + y
-'''
+"""
     contract = validator._parse_contract(code)
     assert contract is not None
     assert contract["pre"] == ["x > 0", "y > 0"]
@@ -41,11 +41,11 @@ def add(x, y):
 @pytest.mark.asyncio
 async def test_l5_z3_not_installed_skipped(validator):
     """Z3 未安装 → skipped + warning（AC1/AC2 在真实 Z3 环境测试）。"""
-    code = '''
+    code = """
 @formal
 @ensures("result == x + y")
 def add(x, y): return x + y
-'''
+"""
     result = await validator.validate(code)
     # Z3 未安装 → skipped
     assert result.passed is True
@@ -55,12 +55,12 @@ def add(x, y): return x + y
 @pytest.mark.asyncio
 async def test_l5_parse_error_unsafe_expr(validator):
     """不安全的表达式 → _parse_contract 安全拒绝。"""
-    code = '''
+    code = """
 @formal
 @requires("x > 0")
 @ensures("result == x + y")
 def f(x, y): return x + y
-'''
+"""
     contract = validator._parse_contract(code)
     assert contract is not None
     # 安全表达式通过 parse（具体验证在 _solve 中）

@@ -33,6 +33,7 @@ def openapi_spec(tmp_path):
         },
     }
     import json
+
     spec_file = tmp_path / "openapi.json"
     spec_file.write_text(json.dumps(spec))
     return str(spec_file)
@@ -42,11 +43,11 @@ def openapi_spec(tmp_path):
 async def test_l6_contract_match(openapi_spec):
     """AC3: 合约匹配 → passed=True。"""
     validator = L6ContractValidator(openapi_spec)
-    code = '''
+    code = """
 @app.get("/users/{id}")
 def get_user(id: int) -> User:
     return User(id=id, name="test")
-'''
+"""
     result = await validator.validate(code)
     assert result.passed is True
 
@@ -55,11 +56,11 @@ def get_user(id: int) -> User:
 async def test_l6_response_model_mismatch(openapi_spec):
     """AC3: 返回类型不匹配 → passed=False。"""
     validator = L6ContractValidator(openapi_spec)
-    code = '''
+    code = """
 @app.get("/users/{id}")
 def get_user(id: int) -> dict:
     return {"id": id}
-'''
+"""
     result = await validator.validate(code)
     assert result.passed is False
     assert any("User" in e or "response_model" in e for e in result.errors)

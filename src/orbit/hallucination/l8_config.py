@@ -84,7 +84,9 @@ class L8ConfigValidator:
             return ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L8_CONFIG,
-                errors=[f"Config drift detected in {len(reports)} file(s): {', '.join(r.file_path for r in reports)}"],
+                errors=[
+                    f"Config drift detected in {len(reports)} file(s): {', '.join(r.file_path for r in reports)}"
+                ],
                 metadata={"reports": [r.model_dump() for r in reports]},
             )
         return ValidationResult(passed=True, level=HallucinationLevel.L8_CONFIG)
@@ -139,7 +141,7 @@ class L8ConfigValidator:
 
     def _restore_baseline(self, config_path: Path, baseline_file: Path) -> None:
         """从备份恢复基线版本（当前由外部备份系统管理，此处仅记录）。
-        
+
         WHY 不自动恢复：自动恢复需存储完整文件备份而非仅 hash。
         MVP 阶段标记 auto_fixed 供上层处理，Phase 2 实现完整备份/恢复。
         """

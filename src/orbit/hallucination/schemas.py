@@ -45,6 +45,7 @@ class L3EntropyConfig(BaseModel):
 
 # ---- Step 4.2 数据模型 ----
 
+
 class L5ValidationResult(ValidationResult):
     """L5 Z3 验证结果。"""
 
@@ -75,6 +76,7 @@ class L8DriftReport(BaseModel):
 
 
 # ---- 异常定义 ----
+
 
 class HallucinationError(Exception):
     """防幻觉异常基类。"""

@@ -86,7 +86,10 @@ class L6ContractValidator:
             return ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L6_CONTRACT,
-                errors=[f"Contract violation: {v.endpoint} {v.method} - {'; '.join(v.differences)}" for v in violations],
+                errors=[
+                    f"Contract violation: {v.endpoint} {v.method} - {'; '.join(v.differences)}"
+                    for v in violations
+                ],
                 metadata={"violations": [v.model_dump() for v in violations]},
             )
 
@@ -136,11 +139,13 @@ class L6ContractValidator:
                     json_schema = content.get("application/json", {})
                     ref = json_schema.get("schema", {}).get("$ref", "")
                     resp_model = ref.split("/")[-1] if ref else ""
-                endpoints.append({
-                    "path": path_url,
-                    "method": method.upper(),
-                    "response_model": resp_model,
-                })
+                endpoints.append(
+                    {
+                        "path": path_url,
+                        "method": method.upper(),
+                        "response_model": resp_model,
+                    }
+                )
         return endpoints
 
     def _extract_code_routes(self, code: str) -> dict:
@@ -174,7 +179,13 @@ class L6ContractValidator:
             return None
         if not isinstance(decorator.func, ast.Attribute):
             return None
-        method_map = {"get": "GET", "post": "POST", "put": "PUT", "delete": "DELETE", "patch": "PATCH"}
+        method_map = {
+            "get": "GET",
+            "post": "POST",
+            "put": "PUT",
+            "delete": "DELETE",
+            "patch": "PATCH",
+        }
         method = method_map.get(decorator.func.attr, "")
         if not method:
             return None
@@ -199,12 +210,14 @@ class L6ContractValidator:
         elif spec_resp and not code_resp:
             differences.append("code missing response_model type annotation")
 
-        matches.append(L6ContractMatch(
-            endpoint=spec_ep["path"],
-            method=spec_ep["method"],
-            request_model="",
-            response_model=spec_resp,
-            matched=matched,
-            differences=differences,
-        ))
+        matches.append(
+            L6ContractMatch(
+                endpoint=spec_ep["path"],
+                method=spec_ep["method"],
+                request_model="",
+                response_model=spec_resp,
+                matched=matched,
+                differences=differences,
+            )
+        )
         return matches

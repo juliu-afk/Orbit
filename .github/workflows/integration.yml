@@ -68,7 +68,7 @@ jobs:
       - name: Run smoke tests (if exist)
         # E2E 冒烟测试（Playwright 阶段后启用）
         run: |
-          if poetry run pytest tests/e2e/ -k "smoke" --collect-only 2>/dev/null | grep -q "test"; then
+          if [ -d tests/e2e ] && poetry run pytest tests/e2e/ -k "smoke" --collect-only 2>/dev/null | grep -q "test"; then
             poetry run pytest tests/e2e/ -k "smoke" -v
           else
             echo "No smoke tests found, skipping"

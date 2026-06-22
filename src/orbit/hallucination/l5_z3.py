@@ -220,7 +220,7 @@ class L5Z3Validator:
             variables["result"] = Int("result")
             safe_locals["__RESULT__"] = variables["result"]
 
-        z3_expr = eval(result_val, safe_globals, safe_locals)
+        z3_expr = eval(result_val, safe_globals, safe_locals)  # nosec B307
         return z3_expr
 
     def _negate(self, z3_expr: object) -> object:

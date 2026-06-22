@@ -103,7 +103,7 @@ class L5Z3Validator:
             return None
         return None
 
-    async def _solve(self, contract: dict) -> L5ValidationResult:
+    async def _solve(self, contract: dict[str, Any]) -> L5ValidationResult:
         """构造 Z3 公式并求解。
 
         WHY 否定后置条件：Z3 寻找使 precondition 成立但 postcondition 不成立的
@@ -190,7 +190,7 @@ class L5Z3Validator:
                 z3_status="unsat",
             )
 
-    def _safe_eval(self, expr: str, variables: dict) -> object:
+    def _safe_eval(self, expr: str, variables: dict[str, Any]) -> object:
         """安全求值数学表达式为 Z3 约束。
 
         WHY 不用 Python eval：仅支持有限操作符白名单（+ - * / > < == != and or not）。

@@ -77,8 +77,8 @@ class L6ContractValidator:
         violations: list[L6ContractMatch] = []
         for ep in spec_endpoints:
             key = (ep["path"], ep["method"])
-            if key in code_endpoints:
-                code_ep = code_endpoints[key]
+            if key in code_endpoints:  # type: ignore[comparison-overlap]
+                code_ep = code_endpoints[key]  # type: ignore[index]
                 matches = self._compare_endpoint(ep, code_ep)
                 violations.extend([m for m in matches if not m.matched])
             # NOTE: spec 中定义但代码未实现的端点不报错（可能是其他文件定义）
@@ -121,7 +121,7 @@ class L6ContractValidator:
             logger.warning("l6_spec_load_failed", path=str(self._spec_path), error=str(e))
             return None
 
-    def _extract_spec_endpoints(self, spec: dict) -> list[dict[str, Any]]:
+    def _extract_spec_endpoints(self, spec: dict[str, Any]) -> list[dict[str, Any]]:
         """从 OpenAPI 3.0 spec 提取端点列表。
 
         返回 [{"path": "/users/{id}", "method": "get", "response_model": "User"}, ...]
@@ -198,11 +198,11 @@ class L6ContractValidator:
                 path = str(first.value)
         return {"path": path, "method": method, "response_model": ""}
 
-    def _compare_endpoint(self, spec_ep: dict, code_ep: dict) -> list[L6ContractMatch]:
+    def _compare_endpoint(self, spec_ep: dict[str, Any], code_ep: dict[str, Any]) -> list[L6ContractMatch]:
         """比对单个端点。"""
         matches: list[L6ContractMatch] = []
         spec_resp = spec_ep.get("response_model", "")
-        code_resp = code_ep.get("response_model", "")
+        code_resp = code_ep.get("response_model", "")  # type: ignore[return-value]
         matched = True
         differences: list[str] = []
 

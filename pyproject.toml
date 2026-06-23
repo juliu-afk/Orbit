@@ -55,6 +55,7 @@ pip-audit = ">=2.7.0"
 # CI 工具
 pre-commit = ">=3.6.0"
 websockets = "^16.0"
+pytest-timeout = "^2.4.0"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]

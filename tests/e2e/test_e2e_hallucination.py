@@ -1,12 +1,13 @@
-"""S5: 防幻觉告警——高熵 LLM 输出触发 L3 告警。"""
+"""S5: 防幻觉告警 + 并发 + 健康检查。"""
 
+from typing import Any
 
 import pytest
 
 
 @pytest.mark.e2e
 @pytest.mark.asyncio(loop_scope="function")
-async def test_e2e_health_endpoint(e2e_app):
+async def test_e2e_health_endpoint(e2e_app: Any) -> None:
     """健康检查端点正常。"""
     resp = await e2e_app.get("/health")
     assert resp.status_code == 200
@@ -16,7 +17,7 @@ async def test_e2e_health_endpoint(e2e_app):
 
 @pytest.mark.e2e
 @pytest.mark.asyncio(loop_scope="function")
-async def test_e2e_task_creation_idempotency(e2e_app):
+async def test_e2e_task_creation_idempotency(e2e_app: Any) -> None:
     """并发创建 3 个任务——task_id 互不相同。"""
     tasks = []
     for i in range(3):
@@ -27,5 +28,4 @@ async def test_e2e_task_creation_idempotency(e2e_app):
         assert resp.status_code == 200, f"任务 {i} 创建失败"
         tasks.append(resp.json()["task_id"])
 
-    # task_id 互不相同
     assert len(set(tasks)) == 3

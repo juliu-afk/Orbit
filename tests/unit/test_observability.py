@@ -17,19 +17,24 @@ class TestHealthCollector:
 
     def test_register(self, collector: HealthCollector) -> None:
         collector.register("scheduler")
-        assert collector.get("scheduler") is not None
-        assert collector.get("scheduler").status == ComponentStatus.UNKNOWN
+        h = collector.get("scheduler")
+        assert h is not None
+        assert h.status == ComponentStatus.UNKNOWN
 
     def test_update_status(self, collector: HealthCollector) -> None:
         collector.register("test")
         collector.update("test", ComponentStatus.HEALTHY, "OK")
-        assert collector.get("test").status == ComponentStatus.HEALTHY
-        assert collector.get("test").message == "OK"
+        h = collector.get("test")
+        assert h is not None
+        assert h.status == ComponentStatus.HEALTHY
+        assert h.message == "OK"
 
     def test_update_metrics(self, collector: HealthCollector) -> None:
         collector.register("test")
         collector.update("test", ComponentStatus.HEALTHY, metrics={"latency_ms": 5})
-        assert collector.get("test").metrics["latency_ms"] == 5
+        h = collector.get("test")
+        assert h is not None
+        assert h.metrics["latency_ms"] == 5
 
     def test_overall_all_healthy(self, collector: HealthCollector) -> None:
         for name in ["a", "b"]:

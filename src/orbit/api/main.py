@@ -14,7 +14,8 @@ from fastapi import FastAPI
 from orbit.api.routes import health, tasks
 from orbit.core.config import settings
 from orbit.events.bus import EventBus
-from orbit.ws.router import router as ws_router, start_broadcaster
+from orbit.ws.router import router as ws_router
+from orbit.ws.router import start_broadcaster
 
 logger = structlog.get_logger()
 

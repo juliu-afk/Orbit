@@ -7,7 +7,7 @@ WHY 独立于 API schemas：
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -23,7 +23,7 @@ class DashboardEvent(BaseModel):
     type: str
     task_id: str
     payload: dict[str, Any]
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class TaskUpdatePayload(BaseModel):

@@ -5,8 +5,6 @@
 
 import asyncio
 
-import pytest
-
 from orbit.events.bus import EventBus
 from orbit.events.schemas import AlertPayload, DashboardEvent, TaskUpdatePayload
 

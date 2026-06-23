@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -92,7 +92,7 @@ class Scheduler:
                 state=state,
                 progress=progress,
                 dag=dag or [],
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             ).model_dump(),
         ))
 
@@ -111,7 +111,7 @@ class Scheduler:
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             ).model_dump(),
         ))
 
@@ -316,7 +316,7 @@ class Scheduler:
                 state="DAG_RUNNING",
                 progress=0.0,  # DAG 进度由已完成节点占比计算
                 dag=dag_nodes,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             ).model_dump(),
         ))
 

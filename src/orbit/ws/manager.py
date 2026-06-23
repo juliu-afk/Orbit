@@ -6,9 +6,8 @@ WHY 手写而非 Socket.IO：原生 WebSocket 足够简单——
 
 from __future__ import annotations
 
-from fastapi import WebSocket
-
 import structlog
+from fastapi import WebSocket
 
 logger = structlog.get_logger()
 

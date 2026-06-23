@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import asyncio
 
+import os
+
 import structlog
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.api.routes import chat, compliance, health, knowledge, observability, tasks
@@ -54,6 +57,16 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
 
     # Prometheus 指标（Step 7.1 生产部署）
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+    # 前端静态文件 (PyInstaller 打包时 static/ 在 sys._MEIPASS 下)
+    import sys
+
+    static_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "static")
+    if getattr(sys, "frozen", False):
+        static_dir = os.path.join(sys._MEIPASS, "static")  # type: ignore[attr-defined]
+    if os.path.isdir(static_dir):
+        app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
+        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
     # 启动 EventBus→WS 广播协程
     if event_bus is not None:

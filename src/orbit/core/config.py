@@ -77,6 +77,11 @@ class Settings:
     ENABLE_L7: bool = _get_bool("ENABLE_L7", True)
     ENABLE_L8: bool = _get_bool("ENABLE_L8", True)
     CONFIG_BASELINE_DIR: str = _get("CONFIG_BASELINE_DIR", "/app/config_baselines")
+
+    # ---- Step 5.1 调度器 DAG ----
+    MAX_CONCURRENT_NODES: int = _get_int("MAX_CONCURRENT_NODES", 3)
+    NODE_TIMEOUT_SECONDS: int = _get_int("NODE_TIMEOUT_SECONDS", 30)
+    MAX_RETRIES_PER_NODE: int = _get_int("MAX_RETRIES_PER_NODE", 2)
     L8_AUTO_FIX_ENABLED: bool = _get_bool("L8_AUTO_FIX_ENABLED", False)  # prod 默认 false
 
 

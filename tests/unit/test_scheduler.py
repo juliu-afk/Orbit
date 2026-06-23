@@ -11,9 +11,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
 from orbit.api.schemas.task import TaskState
+from orbit.scheduler.graph import GraphNode, NodeStatus, TaskGraph
 from orbit.scheduler.orchestrator import (
     STATE_TRANSITIONS,
     InvalidStateTransitionError,
@@ -180,3 +185,171 @@ def test_state_to_progress_mapping():
     assert Scheduler._state_to_progress(TaskState.IDLE) == 0.0
     assert Scheduler._state_to_progress(TaskState.DONE) == 1.0
     assert 0 < Scheduler._state_to_progress(TaskState.CODING) < 1.0
+
+
+# ---- Step 5.1 DAG 执行测试 ----
+
+
+@pytest.fixture
+def dag_scheduler():
+    """轻量调度器：mock LLM + mock checkpoint。"""
+    mock_checkpoint = MagicMock()
+    mock_checkpoint.save = AsyncMock()
+    return Scheduler(
+        llm_client=MagicMock(),
+        checkpoint_manager=mock_checkpoint,
+        max_concurrent=3,
+        node_timeout=30,
+        max_retries=2,
+    )
+
+
+@pytest.fixture
+def diamond_graph():
+    """AC1 钻石 DAG: A→B, A→C, B→D, C→D。"""
+    return TaskGraph(
+        task_id="dag-test",
+        nodes=[
+            GraphNode(id="A", agent_role="developer"),
+            GraphNode(id="B", agent_role="reviewer"),
+            GraphNode(id="C", agent_role="developer"),
+            GraphNode(id="D", agent_role="qa"),
+        ],
+        edges=[("A", "B"), ("A", "C"), ("B", "D"), ("C", "D")],
+    )
+
+
+@pytest.mark.asyncio
+async def test_dag_topological_order(dag_scheduler, diamond_graph):
+    """AC1: 拓扑排序满足依赖约束。"""
+    layers = diamond_graph.topological_sort()
+    assert layers[0] == ["A"]
+    assert set(layers[1]) == {"B", "C"}
+    assert layers[2] == ["D"]
+
+
+@pytest.mark.asyncio
+async def test_dag_execution_all_success(dag_scheduler, diamond_graph):
+    """DAG 正常执行：全部节点成功。"""
+    results = await dag_scheduler.run_dag(diamond_graph)
+    assert all(s == NodeStatus.SUCCESS for s in results.values())
+    for node in diamond_graph.nodes:
+        assert node.status == NodeStatus.SUCCESS
+
+
+@pytest.mark.asyncio
+async def test_dag_concurrent_execution(dag_scheduler):
+    """AC2: 无依赖节点并发执行。"""
+    graph = TaskGraph(
+        task_id="concurrent",
+        nodes=[GraphNode(id="A"), GraphNode(id="B"), GraphNode(id="C")],
+        edges=[],
+    )
+    start = time.monotonic()
+    await dag_scheduler.run_dag(graph)
+    elapsed = time.monotonic() - start
+    # MVP 占位 _execute_node 约 10ms sleep，三个串行 ≈30ms，并行 <25ms
+    assert elapsed < 0.15
+
+
+@pytest.mark.asyncio
+async def test_dag_resume_skips_completed(dag_scheduler, diamond_graph):
+    """AC3: 恢复时已完成节点不重复执行。"""
+    # 标记 A/B 为已完成（模拟崩溃恢复）
+    diamond_graph.get_node("A").status = NodeStatus.SUCCESS
+    diamond_graph.get_node("B").status = NodeStatus.SUCCESS
+    diamond_graph.get_node("C").status = NodeStatus.SUCCESS
+
+    results = await dag_scheduler.resume_dag(diamond_graph)
+    # A/B/C 已完成 → 仅 D 执行
+    assert results["A"] == NodeStatus.SUCCESS
+    assert results["B"] == NodeStatus.SUCCESS
+    assert results["C"] == NodeStatus.SUCCESS
+    assert results["D"] == NodeStatus.SUCCESS
+
+
+@pytest.mark.asyncio
+async def test_dag_node_timeout(dag_scheduler):
+    """AC4: 节点超时 → 重试 → 失败。"""
+    sched = Scheduler(
+        llm_client=MagicMock(),
+        checkpoint_manager=MagicMock(),
+        max_concurrent=1,
+        node_timeout=0.01,  # 10ms 超时
+        max_retries=0,  # 不重试
+    )
+    # 让 _execute_node 延时远超超时
+    async def slow_execute(node):
+        await asyncio.sleep(0.1)
+        return {}
+
+    sched._execute_node = slow_execute
+    graph = TaskGraph(
+        task_id="timeout",
+        nodes=[GraphNode(id="A")],
+        edges=[],
+    )
+    results = await sched.run_dag(graph)
+    assert results["A"] == NodeStatus.FAILED
+
+
+@pytest.mark.asyncio
+async def test_dag_max_retries_exceeded(dag_scheduler):
+    """AC4: 2 次重试全失败 → FAILED。"""
+    sched = Scheduler(
+        llm_client=MagicMock(),
+        checkpoint_manager=MagicMock(),
+        max_concurrent=1,
+        node_timeout=30,
+        max_retries=2,
+    )
+    # Mock _execute_node 总是抛异常
+    sched._execute_node = AsyncMock(side_effect=RuntimeError("boom"))
+
+    graph = TaskGraph(
+        task_id="retry",
+        nodes=[GraphNode(id="A")],
+        edges=[],
+    )
+    results = await sched.run_dag(graph)
+    assert results["A"] == NodeStatus.FAILED
+    assert graph.get_node("A").retry_count == 3  # 初始 + 2 重试
+
+
+@pytest.mark.asyncio
+async def test_dag_empty_graph(dag_scheduler):
+    """空 DAG → 正常返回。"""
+    graph = TaskGraph(task_id="empty", nodes=[], edges=[])
+    results = await dag_scheduler.run_dag(graph)
+    assert results == {}
+
+
+@pytest.mark.asyncio
+async def test_dag_fail_fast_abort(dag_scheduler):
+    """快速失败：A 失败则 B/C 不执行。"""
+    sched = Scheduler(
+        llm_client=MagicMock(),
+        checkpoint_manager=MagicMock(),
+        max_concurrent=1,
+        node_timeout=30,
+        max_retries=0,
+        fail_fast=True,
+    )
+    # 让第一层的 A 失败
+    async def fail_a(node):
+        if node.id == "A":
+            raise RuntimeError("A failed")
+        return {}
+
+    sched._execute_node = fail_a
+
+    graph = TaskGraph(
+        task_id="failfast",
+        nodes=[GraphNode(id="A"), GraphNode(id="B"), GraphNode(id="C")],
+        edges=[("A", "B"), ("A", "C")],
+    )
+    results = await sched.run_dag(graph)
+    assert results["A"] == NodeStatus.FAILED
+    # B/C 在 fail_fast 下不会执行（仍是 PENDING）
+    assert results["B"] == NodeStatus.PENDING
+    assert results["C"] == NodeStatus.PENDING

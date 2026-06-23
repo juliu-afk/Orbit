@@ -90,5 +90,13 @@ class Settings:
     # 此处只放影响启动行为的开关，阈值细节在 observability/config.py。
     AGENTOPS_ENABLED: bool = _get_bool("AGENTOPS_ENABLED", True)
 
+    # ---- Step 7.3 ResourceGuard 资源熔断 ----
+    RESOURCE_GUARD_ENABLED: bool = _get_bool("RESOURCE_GUARD_ENABLED", True)
+    RESOURCE_GUARD_TOKEN_CAPACITY: int = _get_int("RESOURCE_GUARD_TOKEN_CAPACITY", 100000)
+    RESOURCE_GUARD_TOKEN_RATE: int = _get_int("RESOURCE_GUARD_TOKEN_RATE", 5000)
+    RESOURCE_GUARD_BUDGET_MULTIPLIER: float = float(
+        _get("RESOURCE_GUARD_BUDGET_MULTIPLIER", "1.5")
+    )
+
 
 settings = Settings()

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -112,11 +113,13 @@ class TaskShardingEngine:
         for para in paragraphs:
             if current_len + len(para) > MAX_CHARS_PER_TASK and current:
                 # 当前累积块已满，保存并开始新块
-                shards.append(ShardResult(
-                    shard_id=f"{parent_task_id}-s{index}",
-                    shard_index=index,
-                    content=current.strip(),
-                ))
+                shards.append(
+                    ShardResult(
+                        shard_id=f"{parent_task_id}-s{index}",
+                        shard_index=index,
+                        content=current.strip(),
+                    )
+                )
                 index += 1
                 current = para
                 current_len = len(para)
@@ -134,11 +137,13 @@ class TaskShardingEngine:
 
         # 最后一块
         if current.strip():
-            shards.append(ShardResult(
-                shard_id=f"{parent_task_id}-s{index}",
-                shard_index=index,
-                content=current.strip(),
-            ))
+            shards.append(
+                ShardResult(
+                    shard_id=f"{parent_task_id}-s{index}",
+                    shard_index=index,
+                    content=current.strip(),
+                )
+            )
 
         return ShardPlan(parent_task_id=parent_task_id, shards=shards)
 
@@ -159,12 +164,9 @@ class TaskShardingEngine:
             # 单任务——直接执行
             shard = plan.shards[0]
             shard.status = ShardStatus.RUNNING
-            import time
             t0 = time.perf_counter()
             try:
-                state = await self._scheduler.run_task(
-                    shard.shard_id, shard.content
-                )
+                state = await self._scheduler.run_task(shard.shard_id, shard.content)
                 shard.status = ShardStatus.COMPLETED
                 shard.output = state.value
             except Exception as e:
@@ -179,12 +181,9 @@ class TaskShardingEngine:
         async def run_shard(shard: ShardResult) -> None:
             async with sem:
                 shard.status = ShardStatus.RUNNING
-                import time
                 t0 = time.perf_counter()
                 try:
-                    state = await self._scheduler.run_task(
-                        shard.shard_id, shard.content
-                    )
+                    state = await self._scheduler.run_task(shard.shard_id, shard.content)
                     shard.status = ShardStatus.COMPLETED
                     shard.output = state.value
                 except Exception as e:

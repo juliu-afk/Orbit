@@ -1,7 +1,5 @@
 """Step 5.3 TaskShardingEngine 单元测试。"""
 
-import asyncio
-
 import pytest
 
 from orbit.sharding.engine import (

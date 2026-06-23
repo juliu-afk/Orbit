@@ -376,7 +376,7 @@ class Scheduler:
                 context=snapshot,
                 version=1,
             )
-            await self.checkpoint.save(data)
+            await self.checkpoint.save(graph.task_id, data)
         except Exception as e:
             logger.warning("dag_checkpoint_save_failed", error=str(e))
 

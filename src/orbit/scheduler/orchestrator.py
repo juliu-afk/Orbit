@@ -75,7 +75,9 @@ class Scheduler:
         self._max_retries = max_retries
         self._fail_fast = fail_fast
 
-    def _publish_task_update(self, task_id: str, state: str, progress: float, dag: list[dict[str, Any]] | None = None) -> None:
+    def _publish_task_update(
+        self, task_id: str, state: str, progress: float, dag: list[dict[str, Any]] | None = None
+    ) -> None:
         """发布 task:update 事件到 EventBus（非阻塞）。
 
         WHY 抽方法而非内联：多个代码路径（run_task/run_dag/resume）
@@ -84,36 +86,42 @@ class Scheduler:
         """
         if self._event_bus is None:
             return
-        self._event_bus.publish(DashboardEvent(
-            type="task:update",
-            task_id=task_id,
-            payload=TaskUpdatePayload(
+        self._event_bus.publish(
+            DashboardEvent(
+                type="task:update",
                 task_id=task_id,
-                state=state,
-                progress=progress,
-                dag=dag or [],
-                timestamp=datetime.now(UTC).isoformat(),
-            ).model_dump(),
-        ))
+                payload=TaskUpdatePayload(
+                    task_id=task_id,
+                    state=state,
+                    progress=progress,
+                    dag=dag or [],
+                    timestamp=datetime.now(UTC).isoformat(),
+                ).model_dump(),
+            )
+        )
 
-    def _publish_token_update(self, task_id: str, prompt_tokens: int, completion_tokens: int, total_tokens: int) -> None:
+    def _publish_token_update(
+        self, task_id: str, prompt_tokens: int, completion_tokens: int, total_tokens: int
+    ) -> None:
         """发布 token:update 事件（非阻塞）。
 
         每次 LLM 调用完成后推送，供 Dashboard Token 折线图消费。
         """
         if self._event_bus is None:
             return
-        self._event_bus.publish(DashboardEvent(
-            type="token:update",
-            task_id=task_id,
-            payload=TokenUpdatePayload(
+        self._event_bus.publish(
+            DashboardEvent(
+                type="token:update",
                 task_id=task_id,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-                timestamp=datetime.now(UTC).isoformat(),
-            ).model_dump(),
-        ))
+                payload=TokenUpdatePayload(
+                    task_id=task_id,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    timestamp=datetime.now(UTC).isoformat(),
+                ).model_dump(),
+            )
+        )
 
     async def run_task(self, task_id: str, prd: str) -> TaskState:
         """运行单个任务：IDLE → ... → DONE/FAILED。
@@ -308,17 +316,19 @@ class Scheduler:
             }
             for n in graph.nodes
         ]
-        self._event_bus.publish(DashboardEvent(
-            type="task:update",
-            task_id=graph.task_id,
-            payload=TaskUpdatePayload(
+        self._event_bus.publish(
+            DashboardEvent(
+                type="task:update",
                 task_id=graph.task_id,
-                state="DAG_RUNNING",
-                progress=0.0,  # DAG 进度由已完成节点占比计算
-                dag=dag_nodes,
-                timestamp=datetime.now(UTC).isoformat(),
-            ).model_dump(),
-        ))
+                payload=TaskUpdatePayload(
+                    task_id=graph.task_id,
+                    state="DAG_RUNNING",
+                    progress=0.0,  # DAG 进度由已完成节点占比计算
+                    dag=dag_nodes,
+                    timestamp=datetime.now(UTC).isoformat(),
+                ).model_dump(),
+            )
+        )
 
     # ---- Step 5.1 DAG 执行方法 ----
 

@@ -36,10 +36,13 @@ async def test_e2e_normal_flow(e2e_app: Any) -> None:
 @pytest.mark.asyncio(loop_scope="function")
 async def test_e2e_api_task_create_and_query(e2e_app: Any) -> None:
     """API 层：创建任务 → 查询状态。"""
-    resp = await e2e_app.post("/api/v1/tasks", json={
-        "prd": "API 契约测试——验证请求响应格式",
-        "language": "python",
-    })
+    resp = await e2e_app.post(
+        "/api/v1/tasks",
+        json={
+            "prd": "API 契约测试——验证请求响应格式",
+            "language": "python",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["task_id"]) == 32

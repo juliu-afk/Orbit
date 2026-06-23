@@ -21,10 +21,13 @@ async def test_e2e_task_creation_idempotency(e2e_app: Any) -> None:
     """并发创建 3 个任务——task_id 互不相同。"""
     tasks = []
     for i in range(3):
-        resp = await e2e_app.post("/api/v1/tasks", json={
-            "prd": f"并发测试 #{i}——验证多任务同时创建不冲突",
-            "language": "python",
-        })
+        resp = await e2e_app.post(
+            "/api/v1/tasks",
+            json={
+                "prd": f"并发测试 #{i}——验证多任务同时创建不冲突",
+                "language": "python",
+            },
+        )
         assert resp.status_code == 200, f"任务 {i} 创建失败"
         tasks.append(resp.json()["task_id"])
 

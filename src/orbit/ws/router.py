@@ -25,12 +25,15 @@ async def start_broadcaster(bus: EventBus) -> None:
     """
     while True:
         event = await bus.subscribe()
-        await manager.broadcast(event.task_id, {
-            "type": event.type,
-            "task_id": event.task_id,
-            "payload": event.payload,
-            "timestamp": event.timestamp.isoformat(),
-        })
+        await manager.broadcast(
+            event.task_id,
+            {
+                "type": event.type,
+                "task_id": event.task_id,
+                "payload": event.payload,
+                "timestamp": event.timestamp.isoformat(),
+            },
+        )
 
 
 @router.websocket("/ws/dashboard")
@@ -51,10 +54,12 @@ async def dashboard_ws(websocket: WebSocket) -> None:
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                await websocket.send_json({
-                    "type": "error",
-                    "payload": {"message": "invalid JSON"},
-                })
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "payload": {"message": "invalid JSON"},
+                    }
+                )
                 continue
 
             msg_type = msg.get("type")

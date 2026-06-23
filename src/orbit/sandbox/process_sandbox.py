@@ -102,9 +102,7 @@ class ProcessSandbox:
         stderr = stderr_b.decode("utf-8", errors="replace")
 
         if proc.returncode != 0:
-            raise SandboxExecutionError(
-                f"代码执行失败（exit={proc.returncode}）: {stderr[:200]}"
-            )
+            raise SandboxExecutionError(f"代码执行失败（exit={proc.returncode}）: {stderr[:200]}")
         logger.info("process_sandbox_ok", exit_code=proc.returncode)
         return stdout
 
@@ -141,9 +139,7 @@ class ProcessSandbox:
         stderr = stderr_b.decode("utf-8", errors="replace")
 
         if proc.returncode != 0:
-            raise SandboxExecutionError(
-                f"代码执行失败（exit={proc.returncode}）: {stderr[:200]}"
-            )
+            raise SandboxExecutionError(f"代码执行失败（exit={proc.returncode}）: {stderr[:200]}")
         logger.info("process_sandbox_ok", exit_code=proc.returncode)
         return stdout
 
@@ -171,6 +167,7 @@ def _drop_privileges() -> None:
     # 网络隔离（Linux unshare，macOS 不支持则静默跳过）
     try:
         import ctypes
+
         CLONE_NEWNET = 0x40000000  # Linux 专有
         libc = ctypes.CDLL("libc.so.6", use_errno=True)
         if libc.unshare(CLONE_NEWNET) != 0:

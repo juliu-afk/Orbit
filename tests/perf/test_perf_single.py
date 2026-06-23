@@ -43,10 +43,13 @@ async def test_perf_single_task_roundtrip(e2e_app: Any) -> None:
     times = []
     for _ in range(3):
         t0 = time.perf_counter()
-        resp = await e2e_app.post("/api/v1/tasks", json={
-            "prd": "性能测试——API 往返延迟测试验证",
-            "language": "python",
-        })
+        resp = await e2e_app.post(
+            "/api/v1/tasks",
+            json={
+                "prd": "性能测试——API 往返延迟测试验证",
+                "language": "python",
+            },
+        )
         assert resp.status_code == 200
         task_id = resp.json()["task_id"]
         await e2e_app.get(f"/api/v1/tasks/{task_id}")

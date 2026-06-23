@@ -49,6 +49,7 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
 
     # 启动 EventBus→WS 广播协程
     if event_bus is not None:
+
         @app.on_event("startup")
         async def _start_broadcaster() -> None:
             asyncio.create_task(start_broadcaster(event_bus))

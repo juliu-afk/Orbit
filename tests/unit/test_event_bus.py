@@ -80,6 +80,7 @@ class TestEventBus:
         assert data["payload"]["level"] == "l3_entropy"
         # 确保 timestamp 可 JSON 序列化
         import json
+
         json.dumps(data, default=str)  # 不应抛异常
 
     def test_subscriber_blocks_on_empty(self):
@@ -90,11 +91,13 @@ class TestEventBus:
 
         async def delayed_publish():
             await asyncio.sleep(0.01)
-            bus.publish(DashboardEvent(
-                type="task:update",
-                task_id="delayed",
-                payload={},
-            ))
+            bus.publish(
+                DashboardEvent(
+                    type="task:update",
+                    task_id="delayed",
+                    payload={},
+                )
+            )
 
         async def consume():
             event = await bus.subscribe()

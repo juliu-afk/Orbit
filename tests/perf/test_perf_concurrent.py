@@ -19,8 +19,7 @@ async def test_perf_concurrent_3_tasks(e2e_app: Any) -> None:
 
     async def run_concurrent() -> Any:
         tasks = [
-            scheduler.run_task(f"perf-concurrent-{i:032d}", f"并发任务 #{i}")
-            for i in range(3)
+            scheduler.run_task(f"perf-concurrent-{i:032d}", f"并发任务 #{i}") for i in range(3)
         ]
         return await asyncio.gather(*tasks)
 

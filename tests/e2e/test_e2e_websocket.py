@@ -19,10 +19,13 @@ async def test_e2e_websocket_connect(e2e_app: Any) -> None:
     app = getattr(e2e_app, "_app", None)
     assert app is not None, "app 未注入到 e2e_app"
 
-    resp = await e2e_app.post("/api/v1/tasks", json={
-        "prd": "WS 测试——验证端点连通性测试",
-        "language": "python",
-    })
+    resp = await e2e_app.post(
+        "/api/v1/tasks",
+        json={
+            "prd": "WS 测试——验证端点连通性测试",
+            "language": "python",
+        },
+    )
     assert resp.status_code == 200
     task_id = resp.json()["task_id"]
 

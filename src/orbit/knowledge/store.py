@@ -67,7 +67,7 @@ class KnowledgeStore:
                 INSERT OR IGNORE INTO knowledge_concepts
                     (domain, concept, name_zh, definition, formula, source_uri, source_level)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
+            """,
                 (
                     c["domain"],
                     c["concept"],

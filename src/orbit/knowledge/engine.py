@@ -1,9 +1,9 @@
-"""Step 3.4b 知识查询引擎——统一查询接口。
+"""Step 3.4b/c 知识查询引擎——统一查询接口。
 
-支持三种模式：
-- exact: Neo4j/SQLite 精确查询（当前 SQLite，零 Token，<50ms）
-- semantic: 向量语义检索（3.4c 实现，当前 stub）
-- hybrid: 图谱锚定 + 向量扩展（3.4c 实现，当前降级为 exact）
+三种模式：
+- exact: SQLite 精确查询（零 Token，<50ms）
+- semantic: TF-IDF 向量语义检索（3.4c）
+- hybrid: 图谱锚定 + 向量扩展（3.4c）
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from typing import Any, Literal
 import structlog
 
 from orbit.knowledge.store import KnowledgeStore
+from orbit.knowledge.vector import VectorStore
 
 logger = structlog.get_logger()
 
@@ -46,13 +47,24 @@ class QueryResult:
 class KnowledgeEngine:
     """知识查询引擎。
 
-    包装 KnowledgeStore，提供 exact/semantic/hybrid 统一接口。
+    包装 KnowledgeStore + VectorStore，提供 exact/semantic/hybrid 统一接口。
     """
 
-    def __init__(self, store: KnowledgeStore | None = None) -> None:
+    def __init__(
+        self,
+        store: KnowledgeStore | None = None,
+        vector_store: VectorStore | None = None,
+    ) -> None:
         self._store = store or KnowledgeStore()
         if self._store.count() == 0:
             self._store.initialize()
+        # 惰性初始化 VectorStore（只在 semantic/hybrid 模式需要）
+        self._vector: VectorStore | None = vector_store
+
+    def _get_vector(self) -> VectorStore:
+        if self._vector is None:
+            self._vector = VectorStore(store=self._store)
+        return self._vector
 
     def query(
         self,
@@ -62,23 +74,25 @@ class KnowledgeEngine:
     ) -> QueryResult | None:
         """按领域+概念查询。
 
-        exact 模式：直接 SQLite 查，零 LLM Token。
-        semantic/hybrid：3.4c 实现。
+        exact: 直接 SQLite，confidence=1.0。
+        semantic: TF-IDF 向量检索，confidence=score。
+        hybrid: exact 锚定 + semantic 扩展。
         """
-        if mode in ("semantic", "hybrid"):
-            # 3.4c 实现前降级为 exact
-            logger.info(
-                "query_mode_degraded",
-                mode=mode,
-                fallback="exact",
-                reason="3.4c not yet implemented",
-            )
+        if mode == "exact":
+            return self._query_exact(domain, concept)
+        if mode == "semantic":
+            return self._query_semantic(concept)
+        # hybrid: exact first, fallback to semantic
+        result = self._query_exact(domain, concept)
+        if result is not None:
+            return result
+        return self._query_semantic(concept)
 
+    def _query_exact(self, domain: str, concept: str) -> QueryResult | None:
         row = self._store.query_exact(domain, concept)
         if row is None:
             return None
 
-        # 构建 content：定义 + 公式（如有）
         parts = [f"## {row['name_zh']} ({row['concept']})", row["definition"]]
         if row.get("formula"):
             parts.append(f"公式：{row['formula']}")
@@ -86,14 +100,39 @@ class KnowledgeEngine:
         return QueryResult(
             content="\n\n".join(parts),
             source_uri=row["source_uri"],
-            confidence=1.0,  # exact 模式 100% 置信
-            mode_used=mode,
+            confidence=1.0,
+            mode_used="exact",
         )
 
+    def _query_semantic(self, concept: str) -> QueryResult | None:
+        """语义检索——用概念名作为查询词搜索 TF-IDF 索引。"""
+        vector = self._get_vector()
+        results = vector.search(concept, top_k=1)
+        if not results:
+            return None
+
+        top = results[0]
+        # score 低于 0.1 视为不相关
+        if top["score"] < 0.1:
+            return None
+
+        parts = [f"## {top['name_zh']} ({top['concept']})", top["definition"]]
+        if top.get("formula"):
+            parts.append(f"公式：{top['formula']}")
+
+        return QueryResult(
+            content="\n\n".join(parts),
+            source_uri=top["source_uri"],
+            confidence=top["score"],
+            mode_used="semantic",
+        )
+
+    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
+        """开放语义搜索——直接暴露 VectorStore.search。"""
+        return self._get_vector().search(query, top_k=top_k)
+
     def list_concepts(self, domain: str) -> list[dict[str, Any]]:
-        """列出某领域所有概念（简要）。"""
         return self._store.list_by_domain(domain)
 
     def count(self) -> int:
-        """概念总数。"""
         return self._store.count()

@@ -110,8 +110,7 @@ class LessonStore:
         return self._conn
 
     def _ensure_table(self) -> None:
-        self._get_conn().execute(
-            """
+        self._get_conn().execute("""
             CREATE TABLE IF NOT EXISTS agentops_lessons (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 task_id TEXT NOT NULL,
@@ -121,8 +120,7 @@ class LessonStore:
                 tags TEXT DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             )
-            """
-        )
+            """)
         self._get_conn().execute(
             "CREATE INDEX IF NOT EXISTS idx_lessons_domain ON agentops_lessons(domain)"
         )
@@ -153,24 +151,34 @@ class LessonStore:
         row = conn.execute(
             "SELECT * FROM agentops_lessons WHERE id = ?", (cursor.lastrowid,)
         ).fetchone()
-        return self._row_to_lesson(row) if row else Lesson(
-            task_id=task_id, domain=domain, outcome=outcome, lesson=lesson
+        return (
+            self._row_to_lesson(row)
+            if row
+            else Lesson(task_id=task_id, domain=domain, outcome=outcome, lesson=lesson)
         )
 
     def list_by_domain(self, domain: str, limit: int = 50) -> list[Lesson]:
         """按领域查询教训。"""
-        rows = self._get_conn().execute(
-            "SELECT * FROM agentops_lessons WHERE domain = ? ORDER BY created_at DESC LIMIT ?",
-            (domain, limit),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM agentops_lessons WHERE domain = ? ORDER BY created_at DESC LIMIT ?",
+                (domain, limit),
+            )
+            .fetchall()
+        )
         return [self._row_to_lesson(r) for r in rows]
 
     def list_by_task(self, task_id: str) -> list[Lesson]:
         """按任务查询教训。"""
-        rows = self._get_conn().execute(
-            "SELECT * FROM agentops_lessons WHERE task_id = ? ORDER BY created_at DESC",
-            (task_id,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM agentops_lessons WHERE task_id = ? ORDER BY created_at DESC",
+                (task_id,),
+            )
+            .fetchall()
+        )
         return [self._row_to_lesson(r) for r in rows]
 
     def count(self) -> int:

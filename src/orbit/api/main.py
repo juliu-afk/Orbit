@@ -12,7 +12,7 @@ import structlog
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from orbit.api.routes import health, tasks
+from orbit.api.routes import health, knowledge, tasks
 from orbit.core.config import settings
 from orbit.events.bus import EventBus
 from orbit.ws.router import router as ws_router
@@ -39,6 +39,8 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     )
     # REST 路由（Step 1.1）
     app.include_router(tasks.router, prefix=settings.API_V1_STR)
+    # 知识图谱 API（Step 3.4b）
+    app.include_router(knowledge.router, prefix=settings.API_V1_STR)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
     # WebSocket 路由（Step 6.1 驾驶舱）

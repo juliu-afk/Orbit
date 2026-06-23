@@ -95,8 +95,9 @@ async def e2e_app(use_docker: bool):
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        # 注入 scheduler 引用供 E2E 测试使用
+        # 注入 scheduler + app 引用供 E2E 测试使用
         client._scheduler = scheduler
+        client._app = app
         yield client
 
     # teardown

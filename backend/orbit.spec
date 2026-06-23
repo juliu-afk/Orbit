@@ -12,13 +12,16 @@ from pathlib import Path
 ROOT = Path(SPECPATH).resolve().parent
 
 a = Analysis(
-    [str(ROOT / "src" / "orbit" / "api" / "main.py")],
-    pathex=[],
+    [str(ROOT / "src" / "orbit" / "launcher.py")],
+    pathex=[str(ROOT / "src")],
     binaries=[],
     datas=[
         (str(ROOT / "backend" / "static"), "static"),
     ],
     hiddenimports=[
+        "uvicorn",
+        "uvicorn.loops",
+        "uvicorn.protocols",
         "orbit.agents",
         "orbit.agents.base",
         "orbit.agents.factory",

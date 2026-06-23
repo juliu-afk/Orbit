@@ -38,7 +38,7 @@ export interface TokenPoint {
 
 /** WebSocket 推送消息基类 */
 export interface WsMessage {
-  type: 'task:update' | 'token:update' | 'alert:new' | 'error'
+  type: 'task:update' | 'token:update' | 'alert:new' | 'metrics:snapshot' | 'agentops:alert' | 'error'
   task_id: string
   payload: Record<string, unknown>
   timestamp: string
@@ -48,4 +48,36 @@ export interface WsMessage {
 export interface ClientMessage {
   type: 'subscribe' | 'unsubscribe'
   task_id: string
+}
+
+// ── F1 AgentOps 类型 ──────────────────────────────
+
+export interface MetricsSnapshot {
+  tasks_total: Record<string, number>
+  active_tasks: number
+  llm_tokens_total: Record<string, number>
+  hallucination_intercepted_total: Record<string, number>
+  circuit_breaker_state: Record<string, number>
+  sandbox_pool_available: number
+  sandbox_executions_total: Record<string, number>
+  compliance_checks_total: Record<string, number>
+}
+
+export interface ComponentHealth {
+  name: string
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown'
+  message: string
+  metrics: Record<string, unknown>
+}
+
+export interface HealthSummary {
+  overall: string
+  components: ComponentHealth[]
+}
+
+export interface AgentOpsAlert {
+  name: string
+  severity: 'warning' | 'critical'
+  message: string
+  since: number
 }

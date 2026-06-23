@@ -11,8 +11,12 @@ class TestProjectRegistry:
     def test_register_and_get(self) -> None:
         reg = ProjectRegistry()
         try:
-            reg.register("Orbit", repo_url="https://github.com/juliu-afk/Orbit",
-                         description="多Agent开发系统", tags=["agent", "python"])
+            reg.register(
+                "Orbit",
+                repo_url="https://github.com/juliu-afk/Orbit",
+                description="多Agent开发系统",
+                tags=["agent", "python"],
+            )
             p = reg.get("Orbit")
             assert p is not None
             assert p.name == "Orbit"
@@ -113,8 +117,11 @@ class TestProjectRegistry:
     def test_issue_tracker_config(self) -> None:
         reg = ProjectRegistry()
         try:
-            reg.register("Orbit", issue_tracker="github",
-                         issue_tracker_config={"owner": "juliu-afk", "repo": "Orbit"})
+            reg.register(
+                "Orbit",
+                issue_tracker="github",
+                issue_tracker_config={"owner": "juliu-afk", "repo": "Orbit"},
+            )
             p = reg.get("Orbit")
             assert p is not None
             assert p.issue_tracker == "github"

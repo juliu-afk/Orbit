@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import structlog
 
@@ -22,20 +23,26 @@ logger = structlog.get_logger()
 
 def _make_response(id_val: int | str | None, result: Any) -> str:
     """构造 JSON-RPC 2.0 响应。"""
-    return json.dumps({
-        "jsonrpc": "2.0",
-        "id": id_val,
-        "result": result,
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": id_val,
+            "result": result,
+        },
+        ensure_ascii=False,
+    )
 
 
 def _make_error(id_val: int | str | None, code: int, message: str) -> str:
     """构造 JSON-RPC 2.0 错误响应。"""
-    return json.dumps({
-        "jsonrpc": "2.0",
-        "id": id_val,
-        "error": {"code": code, "message": message},
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": id_val,
+            "error": {"code": code, "message": message},
+        },
+        ensure_ascii=False,
+    )
 
 
 class McpServer:
@@ -121,17 +128,23 @@ class McpServer:
                 return _make_error(req_id, -32601, f"工具 {tool_name} 未找到")
             try:
                 result = self._handlers[tool_name](**params.get("arguments", {}))
-                return _make_response(req_id, {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]})
+                return _make_response(
+                    req_id,
+                    {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]},
+                )
             except Exception as e:
                 logger.error("mcp_tool_error", tool=tool_name, error=str(e))
                 return _make_error(req_id, -32000, str(e))
 
         if method == "initialize":
-            return _make_response(req_id, {
-                "protocolVersion": "0.1.0",
-                "serverInfo": {"name": "orbit-knowledge", "version": "0.11.0"},
-                "capabilities": {"tools": {}},
-            })
+            return _make_response(
+                req_id,
+                {
+                    "protocolVersion": "0.1.0",
+                    "serverInfo": {"name": "orbit-knowledge", "version": "0.11.0"},
+                    "capabilities": {"tools": {}},
+                },
+            )
 
         # notifications（无 id）不响应
         if req_id is None:

@@ -2,7 +2,9 @@
 
 import json
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -15,7 +17,7 @@ class TestMcpServer:
     """MCP JSON-RPC 协议——工具列表/调用/错误处理。"""
 
     @pytest.fixture
-    def server(self) -> McpServer:
+    def server(self) -> Generator[McpServer, None, None]:
         path = Path(tempfile.mktemp(suffix=".db"))
         store = KnowledgeStore(db_path=path)
         store.initialize()
@@ -24,13 +26,21 @@ class TestMcpServer:
         yield s
         store.close(cleanup=True)
 
-    def _request(self, server: McpServer, method: str, params: dict | None = None, req_id: int = 1) -> dict:
-        raw = server._handle_request({
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "method": method,
-            "params": params or {},
-        })
+    def _request(
+        self,
+        server: McpServer,
+        method: str,
+        params: dict[str, Any] | None = None,
+        req_id: int = 1,
+    ) -> Any:
+        raw = server._handle_request(
+            {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "method": method,
+                "params": params or {},
+            }
+        )
         assert raw is not None
         return json.loads(raw)
 
@@ -44,10 +54,14 @@ class TestMcpServer:
 
     def test_tools_call_exact(self, server: McpServer) -> None:
         """tools/call query_knowledge exact 模式。"""
-        resp = self._request(server, "tools/call", {
-            "name": "query_knowledge",
-            "arguments": {"domain": "accounting", "concept": "ROE", "mode": "exact"},
-        })
+        resp = self._request(
+            server,
+            "tools/call",
+            {
+                "name": "query_knowledge",
+                "arguments": {"domain": "accounting", "concept": "ROE", "mode": "exact"},
+            },
+        )
         content = resp["result"]["content"][0]["text"]
         data = json.loads(content)
         assert data["found"] is True
@@ -55,20 +69,29 @@ class TestMcpServer:
 
     def test_tools_call_not_found(self, server: McpServer) -> None:
         """不存在的概念返回 found=False。"""
-        resp = self._request(server, "tools/call", {
-            "name": "query_knowledge",
-            "arguments": {"concept": "NonExistent"},
-        })
+        resp = self._request(
+            server,
+            "tools/call",
+            {
+                "name": "query_knowledge",
+                "arguments": {"concept": "NonExistent"},
+            },
+        )
         content = resp["result"]["content"][0]["text"]
         data = json.loads(content)
         assert data["found"] is False
 
     def test_tools_call_unknown_tool(self, server: McpServer) -> None:
         """调用未注册工具返回错误。"""
-        resp = self._request(server, "tools/call", {
-            "name": "unknown_tool",
-            "arguments": {},
-        }, req_id=2)
+        resp = self._request(
+            server,
+            "tools/call",
+            {
+                "name": "unknown_tool",
+                "arguments": {},
+            },
+            req_id=2,
+        )
         assert "error" in resp
         assert resp["error"]["code"] == -32601
 
@@ -81,10 +104,12 @@ class TestMcpServer:
 
     def test_notification_no_response(self, server: McpServer) -> None:
         """通知（无 id）不返回响应。"""
-        raw = server._handle_request({
-            "jsonrpc": "2.0",
-            "method": "notifications/initialized",
-        })
+        raw = server._handle_request(
+            {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+            }
+        )
         assert raw is None
 
     def test_unknown_method_error(self, server: McpServer) -> None:

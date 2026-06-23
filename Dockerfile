@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir "poetry>=2.0"
 # 先复制依赖文件（利用 Docker 层缓存——改代码不改依赖时跳过重装）
 COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction \
+    && poetry install --only main --no-interaction \
     && pip uninstall poetry -y  # 生产镜像不需要 poetry
 
 # 复制源代码

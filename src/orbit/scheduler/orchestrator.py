@@ -226,8 +226,13 @@ class Scheduler:
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
             if self._audit_logger:
-                self._audit_logger.log("orchestrator", "agent_build_failed",
-                                       task_id=task_id, status="error", error=str(e))
+                self._audit_logger.log(
+                    "orchestrator",
+                    "agent_build_failed",
+                    task_id=task_id,
+                    status="error",
+                    error=str(e),
+                )
             return f"[error] Agent {role} 创建失败: {e}"
 
         # 注入依赖
@@ -243,26 +248,25 @@ class Scheduler:
 
         # 记录审计
         if self._audit_logger:
-            self._audit_logger.log("orchestrator", "agent_start",
-                                   task_id=task_id, component=role)
+            self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, component=role)
 
         try:
-            result = await asyncio.wait_for(
-                agent.run(agent_context), timeout=timeout
-            )
+            result = await asyncio.wait_for(agent.run(agent_context), timeout=timeout)
             output = result.output if result.success else f"[error] {result.error}"
         except TimeoutError:
             logger.warning("agent_timeout", role=role, task_id=task_id)
             output = f"[timeout] {role} 超时 (300s)"
             if self._audit_logger:
-                self._audit_logger.log("orchestrator", "agent_timeout",
-                                       task_id=task_id, component=role)
+                self._audit_logger.log(
+                    "orchestrator", "agent_timeout", task_id=task_id, component=role
+                )
         except Exception as e:
             logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
             output = f"[error] {role}: {e}"
             if self._audit_logger:
-                self._audit_logger.log("orchestrator", "agent_run_error",
-                                       task_id=task_id, component=role, error=str(e))
+                self._audit_logger.log(
+                    "orchestrator", "agent_run_error", task_id=task_id, component=role, error=str(e)
+                )
 
         return str(output)
 
@@ -281,8 +285,11 @@ class Scheduler:
             task_id=task_id,
             l1="遵循小企业会计准则; 禁止直接操作总账; 金额使用 Decimal",
             l2=context.get("l2", {}),  # 图谱查询结果由调用方注入
-            l3={"state": context.get("state", "UNKNOWN"), "prd": context.get("prd", ""),
-                "artifacts": context.get("artifacts", {})},
+            l3={
+                "state": context.get("state", "UNKNOWN"),
+                "prd": context.get("prd", ""),
+                "artifacts": context.get("artifacts", {}),
+            },
             l4={},  # 私有记忆——Agent 间通过 MessageBus 传递
             l5=context.get("l5", []),  # 教训库检索结果
         )

@@ -49,27 +49,49 @@ class ComplexityScorer:
 
     # 简单任务关键词 → 拉低分数
     SIMPLE_KEYWORDS: list[tuple[str, int]] = [
-        (r"(修改|改成|改.*日志|日志.*改)", -20), (r"改一行", -25),
-        (r"加个.*日志", -20), (r"调整.*配置", -15),
-        (r"换个.*名字", -20), (r"注释", -15),
-        (r"改个.*文案", -20), (r"格式化", -20), (r"修.*拼写", -25),
-        (r"bump.*version", -20), (r"update.*README", -20),
+        (r"(修改|改成|改.*日志|日志.*改)", -20),
+        (r"改一行", -25),
+        (r"加个.*日志", -20),
+        (r"调整.*配置", -15),
+        (r"换个.*名字", -20),
+        (r"注释", -15),
+        (r"改个.*文案", -20),
+        (r"格式化", -20),
+        (r"修.*拼写", -25),
+        (r"bump.*version", -20),
+        (r"update.*README", -20),
     ]
 
     # 复杂任务关键词 → 推高分数
     COMPLEX_KEYWORDS: list[tuple[str, int]] = [
-        (r"实现", 25), (r"重构", 30), (r"架构", 30),
-        (r"新增.*功能", 20), (r"设计", 25), (r"支付", 20),
-        (r"数据库.*迁移", 30), (r"API.*breaking", 35),
-        (r"实时", 15), (r"并发", 20), (r"分布式", 25),
-        (r"安全", 15), (r"加密", 15), (r"认证", 20),
+        (r"实现", 25),
+        (r"重构", 30),
+        (r"架构", 30),
+        (r"新增.*功能", 20),
+        (r"设计", 25),
+        (r"支付", 20),
+        (r"数据库.*迁移", 30),
+        (r"API.*breaking", 35),
+        (r"实时", 15),
+        (r"并发", 20),
+        (r"分布式", 25),
+        (r"安全", 15),
+        (r"加密", 15),
+        (r"认证", 20),
     ]
 
     # 核心模块关键词
     CORE_MODULES: list[str] = [
-        "double_entry", "voucher", "posting", "ledger",
-        "trial_balance", "statement", "closing",
-        "scheduler", "orchestrator", "checkpoint",
+        "double_entry",
+        "voucher",
+        "posting",
+        "ledger",
+        "trial_balance",
+        "statement",
+        "closing",
+        "scheduler",
+        "orchestrator",
+        "checkpoint",
     ]
 
     def evaluate(self, prd_text: str) -> ComplexityResult:
@@ -167,7 +189,7 @@ def find_similar_task(prd_text: str, history: list[str], threshold: float = 0.7)
     def _bigrams(text: str) -> set[str]:
         """2-gram 集合——简单有效的中英混合相似度。"""
         chars = text.lower().replace(" ", "")
-        return {chars[i:i + 2] for i in range(len(chars) - 1)}
+        return {chars[i : i + 2] for i in range(len(chars) - 1)}
 
     prd_grams = _bigrams(prd_text)
     if not prd_grams:

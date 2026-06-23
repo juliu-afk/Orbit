@@ -66,29 +66,46 @@ class ProjectRegistry:
     # ── CRUD ─────────────────────────────────────────────
 
     def register(
-        self, name: str, repo_url: str = "", description: str = "",
-        issue_tracker: str = "", issue_tracker_config: dict[str, str] | None = None,
-        doc_sources: list[str] | None = None, tags: list[str] | None = None,
+        self,
+        name: str,
+        repo_url: str = "",
+        description: str = "",
+        issue_tracker: str = "",
+        issue_tracker_config: dict[str, str] | None = None,
+        doc_sources: list[str] | None = None,
+        tags: list[str] | None = None,
     ) -> ProjectRecord:
         """注册新项目或更新已有项目。"""
         conn = self._get_conn()
         now = time.time()
         record = ProjectRecord(
-            name=name, repo_url=repo_url, description=description,
+            name=name,
+            repo_url=repo_url,
+            description=description,
             issue_tracker=issue_tracker,
             issue_tracker_config=issue_tracker_config or {},
-            doc_sources=doc_sources or [], tags=tags or [],
-            is_active=True, created_at=now, updated_at=now,
+            doc_sources=doc_sources or [],
+            tags=tags or [],
+            is_active=True,
+            created_at=now,
+            updated_at=now,
         )
         conn.execute(
             "INSERT OR REPLACE INTO projects "
             "(name, repo_url, description, issue_tracker, issue_tracker_config, "
             " doc_sources, tags, is_active, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
-            (name, repo_url, description, issue_tracker,
-             json.dumps(record.issue_tracker_config),
-             json.dumps(record.doc_sources), json.dumps(record.tags),
-             now, now),
+            (
+                name,
+                repo_url,
+                description,
+                issue_tracker,
+                json.dumps(record.issue_tracker_config),
+                json.dumps(record.doc_sources),
+                json.dumps(record.tags),
+                now,
+                now,
+            ),
         )
         conn.commit()
         logger.info("project_registered", name=name)
@@ -96,16 +113,16 @@ class ProjectRegistry:
 
     def get(self, name: str) -> ProjectRecord | None:
         """按名称查询项目。"""
-        row = self._get_conn().execute(
-            "SELECT * FROM projects WHERE name=?", (name,)
-        ).fetchone()
+        row = self._get_conn().execute("SELECT * FROM projects WHERE name=?", (name,)).fetchone()
         return self._row_to_record(row) if row else None
 
     def list_all(self) -> list[ProjectRecord]:
         """列出所有活跃项目。"""
-        rows = self._get_conn().execute(
-            "SELECT * FROM projects WHERE is_active=1 ORDER BY updated_at DESC"
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute("SELECT * FROM projects WHERE is_active=1 ORDER BY updated_at DESC")
+            .fetchall()
+        )
         return [self._row_to_record(r) for r in rows]
 
     def deactivate(self, name: str) -> bool:
@@ -136,10 +153,12 @@ class ProjectRegistry:
         ).fetchall()
         results = [self._row_to_record(r) for r in rows]
         # 排序: 名称精确匹配优先
-        results.sort(key=lambda r: (
-            0 if query.lower() in r.name.lower() else 1,
-            0 if any(query.lower() in t.lower() for t in r.tags) else 1,
-        ))
+        results.sort(
+            key=lambda r: (
+                0 if query.lower() in r.name.lower() else 1,
+                0 if any(query.lower() in t.lower() for t in r.tags) else 1,
+            )
+        )
         return results
 
     def search_by_tags(self, tags: list[str]) -> list[ProjectRecord]:
@@ -160,9 +179,11 @@ class ProjectRegistry:
         return results
 
     def count(self) -> int:
-        row = self._get_conn().execute(
-            "SELECT COUNT(*) as cnt FROM projects WHERE is_active=1"
-        ).fetchone()
+        row = (
+            self._get_conn()
+            .execute("SELECT COUNT(*) as cnt FROM projects WHERE is_active=1")
+            .fetchone()
+        )
         return row["cnt"] if row else 0
 
     def close(self) -> None:

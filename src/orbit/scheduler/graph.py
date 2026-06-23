@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import deque
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -37,8 +38,8 @@ class GraphNode(BaseModel):
 
     id: str
     agent_role: str = "developer"
-    input: dict = Field(default_factory=dict)
-    output: dict | None = None
+    input: dict[str, Any] = Field(default_factory=dict)
+    output: dict[str, Any] | None = None
     status: NodeStatus = NodeStatus.PENDING
     retry_count: int = 0
     error: str | None = None
@@ -55,8 +56,12 @@ class TaskGraph(BaseModel):
     nodes: list[GraphNode]
     edges: list[tuple[str, str]] = Field(default_factory=list)
 
-    def validate(self) -> None:
+    def validate_dag(self) -> None:
         """验证 DAG 合法性：无循环、边引用的节点存在。
+
+        WHY 命名 validate_dag 而非 validate：
+        BaseModel.validate 是 Pydantic 类方法（签名 def validate(cls, value: Any) -> TaskGraph），
+        重名但签名不同导致 mypy override 错误。validate_dag 语义更精确。
 
         Raises:
             ValueError: 循环依赖或引用不存在的节点

@@ -242,7 +242,7 @@ class Scheduler:
             {node_id: NodeStatus} 各节点最终状态
         """
         # 验证 DAG 合法性
-        graph.validate()
+        graph.validate_dag()
         layers = graph.topological_sort()
         logger.info(
             "dag_execution_start",
@@ -337,7 +337,7 @@ class Scheduler:
         await self._save_dag_checkpoint(graph)
         logger.error("dag_node_all_retries_exhausted", node=node.id)
 
-    async def _execute_node(self, node: GraphNode) -> dict:
+    async def _execute_node(self, node: GraphNode) -> dict[str, Any]:
         """执行单个节点的 Agent 逻辑。
 
         WHY 可扩展：当前为占位实现（模拟 Agent 执行），
@@ -368,7 +368,7 @@ class Scheduler:
                     for n in graph.nodes
                 ],
             }
-            data = CheckpointData(  # type: ignore[call-arg]
+            data = CheckpointData(
                 task_id=graph.task_id,
                 state="DAG_RUNNING",
                 retry_count=0,

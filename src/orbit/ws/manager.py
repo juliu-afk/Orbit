@@ -6,6 +6,8 @@ WHY 手写而非 Socket.IO：原生 WebSocket 足够简单——
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 from fastapi import WebSocket
 
@@ -53,7 +55,7 @@ class ConnectionManager:
             if not self._rooms[task_id]:
                 del self._rooms[task_id]
 
-    async def broadcast(self, task_id: str, data: dict) -> None:
+    async def broadcast(self, task_id: str, data: dict[str, Any]) -> None:
         """向订阅某 task 的所有客户端推送。
 
         WHY 清理死连接：WebSocket 可能因网络中断未触发 disconnect，

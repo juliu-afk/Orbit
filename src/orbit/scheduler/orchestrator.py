@@ -427,7 +427,7 @@ class Scheduler:
         self._publish_dag_update(graph)
         logger.error("dag_node_all_retries_exhausted", node=node.id)
 
-    async def _execute_node(self, node: GraphNode) -> dict:
+    async def _execute_node(self, node: GraphNode) -> dict[str, Any]:
         """执行单个节点的 Agent 逻辑。
 
         WHY 可扩展：当前为占位实现（模拟 Agent 执行），
@@ -458,7 +458,7 @@ class Scheduler:
                     for n in graph.nodes
                 ],
             }
-            data = CheckpointData(  # type: ignore[call-arg]
+            data = CheckpointData(
                 task_id=graph.task_id,
                 state="DAG_RUNNING",
                 retry_count=0,

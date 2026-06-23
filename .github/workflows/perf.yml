@@ -1,0 +1,48 @@
+# 性能基准——PR 非阻塞门禁
+name: Performance
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pip install "poetry>=2.0"
+
+      - name: Configure Poetry
+        run: poetry config virtualenvs.create false
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run performance benchmarks
+        run: >
+          poetry run pytest tests/perf/ -v -m perf
+          --benchmark-only
+          --benchmark-json=perf.json
+          --benchmark-min-rounds=3
+          --benchmark-max-time=1.0
+
+      - name: Check thresholds
+        run: python scripts/check_perf_thresholds.py perf.json
+
+      - name: Upload benchmark data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-benchmark
+          path: perf.json

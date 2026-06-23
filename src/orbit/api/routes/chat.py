@@ -26,8 +26,9 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 _registry = ProjectRegistry()
 # WHY 预注册: 确保测试/生产的 ProjectRegistry 至少有一个项目可匹配
 if _registry.count() == 0:
-    _registry.register("Orbit", description="多Agent开发自循环系统",
-                       tags=["agent", "python", "llm"])
+    _registry.register(
+        "Orbit", description="多Agent开发自循环系统", tags=["agent", "python", "llm"]
+    )
 _matcher = ContextMatcher(_registry)
 
 
@@ -55,9 +56,7 @@ async def chat_endpoint(ws: WebSocket) -> None:
             session_projects = payload.get("session_projects")
 
             if not text.strip():
-                await ws.send_json(
-                    {"error": "输入为空", "code": 1, "data": None}
-                )
+                await ws.send_json({"error": "输入为空", "code": 1, "data": None})
                 continue
 
             # 上下文匹配

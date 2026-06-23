@@ -45,8 +45,9 @@ class TestContextMatcher:
         """中文输入"支付超时了修一下"→匹配到含"支付"描述的项目。"""
         reg = _seeded_registry()
         # 注册一个支付相关项目
-        reg.register("PaymentService", description="支付网关服务, 处理超时重试",
-                     tags=["支付", "gateway"])
+        reg.register(
+            "PaymentService", description="支付网关服务, 处理超时重试", tags=["支付", "gateway"]
+        )
         matcher = ContextMatcher(reg)
         try:
             result = matcher.match("支付超时了修一下")
@@ -139,13 +140,16 @@ class TestContextMatcher:
 def _seeded_registry() -> ProjectRegistry:
     """预填测试数据的注册表。"""
     reg = ProjectRegistry()
-    reg.register("Orbit", repo_url="https://github.com/juliu-afk/Orbit",
-                 description="多Agent开发自循环系统",
-                 tags=["agent", "python", "llm", "调度"])
-    reg.register("Finite", description="财务数据分析平台",
-                 tags=["财务", "python", "数据分析"])
-    reg.register("Keshen", description="财务软件——凭证录入/报表",
-                 tags=["财务", "会计", "react", "python"])
+    reg.register(
+        "Orbit",
+        repo_url="https://github.com/juliu-afk/Orbit",
+        description="多Agent开发自循环系统",
+        tags=["agent", "python", "llm", "调度"],
+    )
+    reg.register("Finite", description="财务数据分析平台", tags=["财务", "python", "数据分析"])
+    reg.register(
+        "Keshen", description="财务软件——凭证录入/报表", tags=["财务", "会计", "react", "python"]
+    )
     return reg
 
 

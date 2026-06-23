@@ -27,10 +27,14 @@ class TestChatWebSocket:
     def test_session_history_priority(self) -> None:
         """会话历史优先——指定 session_projects 直接命中。"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
-            ws.send_text(json.dumps({
-                "text": "anything",
-                "session_projects": ["Orbit"],
-            }))
+            ws.send_text(
+                json.dumps(
+                    {
+                        "text": "anything",
+                        "session_projects": ["Orbit"],
+                    }
+                )
+            )
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["data"]["source"] == "session"

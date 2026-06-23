@@ -30,20 +30,91 @@ logger = structlog.get_logger("orbit.context")
 
 # 常见中文停用词 + 通用词 (不参与匹配)
 STOP_WORDS: set[str] = {
-    "的", "了", "是", "在", "我", "有", "和", "就", "不", "人", "都", "一",
-    "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着",
-    "没有", "看", "好", "自己", "这", "他", "她", "它", "们", "那", "些",
-    "个", "下", "修", "一下", "搞", "弄", "做", "帮", "请", "让", "把",
-    "被", "给", "从", "对", "向", "跟", "与", "或", "且", "但", "而",
-    "吗", "呢", "吧", "啊", "哦", "嗯", "哈", "呀",
+    "的",
+    "了",
+    "是",
+    "在",
+    "我",
+    "有",
+    "和",
+    "就",
+    "不",
+    "人",
+    "都",
+    "一",
+    "一个",
+    "上",
+    "也",
+    "很",
+    "到",
+    "说",
+    "要",
+    "去",
+    "你",
+    "会",
+    "着",
+    "没有",
+    "看",
+    "好",
+    "自己",
+    "这",
+    "他",
+    "她",
+    "它",
+    "们",
+    "那",
+    "些",
+    "个",
+    "下",
+    "修",
+    "一下",
+    "搞",
+    "弄",
+    "做",
+    "帮",
+    "请",
+    "让",
+    "把",
+    "被",
+    "给",
+    "从",
+    "对",
+    "向",
+    "跟",
+    "与",
+    "或",
+    "且",
+    "但",
+    "而",
+    "吗",
+    "呢",
+    "吧",
+    "啊",
+    "哦",
+    "嗯",
+    "哈",
+    "呀",
 }
 
 # 技术关键词强化权重 (匹配到这些词时加分)
 TECH_KEYWORDS: dict[str, float] = {
-    "支付": 1.5, "超时": 1.2, "财务": 1.5, "凭证": 1.5, "报表": 1.3,
-    "agent": 1.3, "调度": 1.2, "熔断": 1.2, "图谱": 1.2,
-    "api": 1.1, "数据库": 1.2, "前端": 1.1, "后端": 1.1,
-    "python": 1.0, "react": 1.0, "vue": 1.0, "sql": 1.0,
+    "支付": 1.5,
+    "超时": 1.2,
+    "财务": 1.5,
+    "凭证": 1.5,
+    "报表": 1.3,
+    "agent": 1.3,
+    "调度": 1.2,
+    "熔断": 1.2,
+    "图谱": 1.2,
+    "api": 1.1,
+    "数据库": 1.2,
+    "前端": 1.1,
+    "后端": 1.1,
+    "python": 1.0,
+    "react": 1.0,
+    "vue": 1.0,
+    "sql": 1.0,
 }
 
 
@@ -113,23 +184,36 @@ class ContextMatcher:
                 p = self._registry.get(name)
                 if p and p.is_active:
                     return MatchResult(
-                        query=query, keywords=keywords,
-                        candidates=[MatchCandidate(
-                            project_name=name, score=1.0,
-                            match_reason="session_history", matched_keywords=keywords,
-                        )],
-                        source="session", requires_confirmation=False,
+                        query=query,
+                        keywords=keywords,
+                        candidates=[
+                            MatchCandidate(
+                                project_name=name,
+                                score=1.0,
+                                match_reason="session_history",
+                                matched_keywords=keywords,
+                            )
+                        ],
+                        source="session",
+                        requires_confirmation=False,
                     )
 
         # 3. 无关键词 → 回退列表
         if not keywords:
             recent = self._registry.list_all()[:5]
             return MatchResult(
-                query=query, keywords=[],
-                candidates=[MatchCandidate(
-                    project_name=p.name, score=0.1, match_reason="fallback",
-                ) for p in recent],
-                source="fallback", requires_confirmation=True,
+                query=query,
+                keywords=[],
+                candidates=[
+                    MatchCandidate(
+                        project_name=p.name,
+                        score=0.1,
+                        match_reason="fallback",
+                    )
+                    for p in recent
+                ],
+                source="fallback",
+                requires_confirmation=True,
             )
 
         # 4. 关键词匹配
@@ -139,12 +223,12 @@ class ContextMatcher:
             top = candidates[0]
             needs_confirm = True
             if (len(candidates) == 1 and top.score > 0.8) or (
-                len(candidates) >= 2 and top.score > 0.8
-                and top.score > candidates[1].score * 2
+                len(candidates) >= 2 and top.score > 0.8 and top.score > candidates[1].score * 2
             ):
                 needs_confirm = False
             return MatchResult(
-                query=query, keywords=keywords,
+                query=query,
+                keywords=keywords,
                 candidates=candidates,
                 source="keyword_match",
                 requires_confirmation=needs_confirm,
@@ -153,11 +237,18 @@ class ContextMatcher:
         # 5. 无匹配 → 回退
         recent = self._registry.list_all()[:5]
         return MatchResult(
-            query=query, keywords=keywords,
-            candidates=[MatchCandidate(
-                project_name=p.name, score=0.0, match_reason="fallback",
-            ) for p in recent],
-            source="fallback", requires_confirmation=True,
+            query=query,
+            keywords=keywords,
+            candidates=[
+                MatchCandidate(
+                    project_name=p.name,
+                    score=0.0,
+                    match_reason="fallback",
+                )
+                for p in recent
+            ],
+            source="fallback",
+            requires_confirmation=True,
         )
 
     # ── 内部 ─────────────────────────────────────────────
@@ -191,7 +282,7 @@ class ContextMatcher:
                     # 长中文: bigram 滑动窗口 (2字词组), 同时保留完整段落后备
                     keywords.append(seg)  # 完整段落
                     for i in range(len(seg) - 1):
-                        bigram = seg[i:i + 2]
+                        bigram = seg[i : i + 2]
                         if bigram not in STOP_WORDS and len(bigram) >= 2:
                             keywords.append(bigram)
         # 去重, 保持顺序
@@ -247,10 +338,14 @@ class ContextMatcher:
             if score > 0:
                 # 归一化: score / (关键词数 * 0.8), cap at 1.0
                 normalized = min(score / (len(keywords) * 0.8), 1.0)
-                candidates.append(MatchCandidate(
-                    project_name=p.name, score=normalized,
-                    match_reason="|".join(reasons), matched_keywords=matched,
-                ))
+                candidates.append(
+                    MatchCandidate(
+                        project_name=p.name,
+                        score=normalized,
+                        match_reason="|".join(reasons),
+                        matched_keywords=matched,
+                    )
+                )
 
         candidates.sort(key=lambda c: c.score, reverse=True)
         return candidates

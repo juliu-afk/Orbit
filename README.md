@@ -45,19 +45,32 @@ Orbit 是**多智能体软件开发自循环系统**，锚定在**编排层**—
 
 ## 快速开始
 
+### 方式 1：双击 exe（推荐）
+
+下载 `Orbit.exe` (20MB) → 双击 → 浏览器自动打开 `http://127.0.0.1:18888`。
+
+### 方式 2：源码启动
+
 ```bash
-# 1. 克隆
-git clone https://github.com/<owner>/Orbit.git
+git clone https://github.com/juliu-afk/Orbit.git
 cd Orbit
 
-# 2. 复制环境变量模板
+# 后端（零依赖启动——SQLite 无需 Docker/Redis）
+poetry install
+poetry run python src/orbit/launcher.py
+# → http://127.0.0.1:18888
+
+# 前端开发（可选——exe/后端已内置前端）
+cd frontend && pnpm install && pnpm dev
+# → http://localhost:5173
+```
+
+### 方式 3：Docker 全栈
+
+```bash
 cp .env.example .env
-
-# 3. 一键拉起（PostgreSQL / Redis / LiteLLM + 安装依赖）
-make init
-
-# 4. 运行测试
-make test
+make init   # docker compose up + poetry install
+make test   # 453 测试
 ```
 
 ## 项目结构

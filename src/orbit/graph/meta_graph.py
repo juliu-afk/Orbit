@@ -95,9 +95,11 @@ class MetaGraph:
 
     def add_relation(
         self,
-        source_type: str, source_id: str,
+        source_type: str,
+        source_id: str,
         relation: RelationType,
-        target_type: str, target_id: str,
+        target_type: str,
+        target_id: str,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         """添加跨图谱关系。"""
@@ -108,8 +110,15 @@ class MetaGraph:
             "INSERT INTO cross_graph_relations "
             "(source_type, source_id, relation, target_type, target_id, metadata, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (source_type, source_id, relation.value, target_type, target_id,
-             json.dumps(metadata or {}), time.time()),
+            (
+                source_type,
+                source_id,
+                relation.value,
+                target_type,
+                target_id,
+                json.dumps(metadata or {}),
+                time.time(),
+            ),
         )
         conn.commit()
 
@@ -118,16 +127,27 @@ class MetaGraph:
 
         返回: { "databases": [...], "configs": [...], "knowledge": [...], "reasoning": [...] }
         """
-        rows = self._get_conn().execute(
-            "SELECT * FROM cross_graph_relations WHERE source_type=? AND source_id=?",
-            (node_type, node_id),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM cross_graph_relations WHERE source_type=? AND source_id=?",
+                (node_type, node_id),
+            )
+            .fetchall()
+        )
 
         result: dict[str, list[str]] = {
-            "databases": [], "configs": [], "knowledge": [], "reasoning": [],
+            "databases": [],
+            "configs": [],
+            "knowledge": [],
+            "reasoning": [],
         }
-        type_map = {"db": "databases", "config": "configs",
-                     "knowledge": "knowledge", "reasoning": "reasoning"}
+        type_map = {
+            "db": "databases",
+            "config": "configs",
+            "knowledge": "knowledge",
+            "reasoning": "reasoning",
+        }
 
         for r in rows:
             key = type_map.get(r["target_type"])
@@ -138,10 +158,14 @@ class MetaGraph:
 
     def config_impact_trace(self, config_key: str) -> dict[str, Any]:
         """配置变更追溯——哪些代码/任务受此配置影响。"""
-        rows = self._get_conn().execute(
-            "SELECT * FROM cross_graph_relations WHERE source_type='config' AND source_id LIKE ?",
-            (f"%{config_key}%",),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM cross_graph_relations WHERE source_type='config' AND source_id LIKE ?",
+                (f"%{config_key}%",),
+            )
+            .fetchall()
+        )
 
         affected_code: list[str] = []
         affected_tasks: list[str] = []
@@ -177,26 +201,32 @@ class MetaGraph:
                 (r["source_id"],),
             ).fetchone()
             if not has_compliance:
-                violations.append({
-                    "type": "db_write_without_compliance",
-                    "source": r["source_id"],
-                    "target": r["target_id"],
-                    "message": f"代码 {r['source_id']} 写入 {r['target_id']} 无合规关联",
-                })
+                violations.append(
+                    {
+                        "type": "db_write_without_compliance",
+                        "source": r["source_id"],
+                        "target": r["target_id"],
+                        "message": f"代码 {r['source_id']} 写入 {r['target_id']} 无合规关联",
+                    }
+                )
 
         return violations
 
     def list_relations(self, limit: int = 50) -> list[dict[str, Any]]:
-        rows = self._get_conn().execute(
-            "SELECT * FROM cross_graph_relations ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM cross_graph_relations ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            )
+            .fetchall()
+        )
         return [dict(r) for r in rows]
 
     def count(self) -> int:
-        row = self._get_conn().execute(
-            "SELECT COUNT(*) as cnt FROM cross_graph_relations"
-        ).fetchone()
+        row = (
+            self._get_conn().execute("SELECT COUNT(*) as cnt FROM cross_graph_relations").fetchone()
+        )
         return row["cnt"] if row else 0
 
     def close(self) -> None:

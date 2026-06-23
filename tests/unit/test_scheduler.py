@@ -278,7 +278,6 @@ async def test_dag_node_timeout(dag_scheduler):
         node_timeout=0.01,  # 10ms 超时
         max_retries=0,  # 不重试
     )
-
     # 让 _execute_node 延时远超超时
     async def slow_execute(node):
         await asyncio.sleep(0.1)
@@ -336,7 +335,6 @@ async def test_dag_fail_fast_abort(dag_scheduler):
         max_retries=0,
         fail_fast=True,
     )
-
     # 让第一层的 A 失败
     async def fail_a(node):
         if node.id == "A":

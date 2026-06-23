@@ -1,0 +1,32 @@
+{
+  "name": "orbit-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "echarts": "^5.5.0",
+    "element-plus": "^2.7.0",
+    "pinia": "^2.1.7",
+    "vis-data": "^7.1.9",
+    "vis-network": "^9.1.9",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "@vue/test-utils": "^2.4.4",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.4.2",
+    "vite": "^5.0.12",
+    "vitest": "^1.4.0",
+    "vue-tsc": "^2.0.6"
+  }
+}

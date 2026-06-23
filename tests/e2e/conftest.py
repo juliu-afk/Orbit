@@ -78,7 +78,7 @@ async def e2e_app(use_docker: bool) -> Any:
     llm = MockLLMClient(fail_count=0, fixed_response="[mock] E2E OK")
     _ = await create_sandbox()  # 验证沙箱可用
     cp = CheckpointManager()
-    scheduler = Scheduler(llm_client=llm, checkpoint_manager=cp, event_bus=bus)  # type: ignore[arg-type]
+    scheduler = Scheduler(llm_client=llm, checkpoint_manager=cp, event_bus=bus)
     app = create_app(event_bus=bus)
     app.state.scheduler = scheduler
 

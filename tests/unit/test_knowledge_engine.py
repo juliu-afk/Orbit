@@ -67,3 +67,24 @@ class TestKnowledgeEngine:
         assert d["confidence"] == 1.0
         assert "复式记账" in d["content"]
         assert d["source_uri"].startswith("standard://")
+
+    def test_semantic_mode_uses_vector_search(self, engine: KnowledgeEngine) -> None:
+        """semantic 模式用 TF-IDF 检索（非 exact 降级）。"""
+        result = engine.query("accounting", "流动比率", mode="semantic")
+        assert result is not None
+        assert result.mode_used == "semantic"
+        assert 0 < result.confidence <= 1.0  # TF-IDF score
+
+    def test_hybrid_exact_first(self, engine: KnowledgeEngine) -> None:
+        """hybrid 模式——exact 命中时直接返回。"""
+        result = engine.query("accounting", "EBITDA", mode="hybrid")
+        assert result is not None
+        assert result.confidence == 1.0  # exact hit
+        assert "息税折旧摊销前利润" in result.content
+
+    def test_search_returns_ranked_results(self, engine: KnowledgeEngine) -> None:
+        """开放语义搜索返回排序结果。"""
+        results = engine.search("盈利能力指标")
+        assert len(results) > 0
+        # 第一个结果分数最高
+        assert results[0]["score"] >= results[-1]["score"]

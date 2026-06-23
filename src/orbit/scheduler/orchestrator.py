@@ -5,18 +5,23 @@ Step 5.1 扩展为 DAG 并发执行 + 拓扑排序。
 
 Agent 循环：思考（LLM 生成计划/代码）→ 行动（执行）→ 观察（收集结果）→ 状态转换。
 每次状态转换后保存检查点（崩溃可恢复）。
+
+Step 6.1：注入 EventBus，状态/Token/告警变更时发布事件供 Dashboard 消费。
 """
 
 from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
 
 from orbit.api.schemas.task import TaskState
 from orbit.checkpoint.manager import CheckpointData, CheckpointManager
+from orbit.events.bus import EventBus
+from orbit.events.schemas import DashboardEvent, TaskUpdatePayload, TokenUpdatePayload
 from orbit.gateway.client import LLMClient
 from orbit.gateway.schemas import LLMRequest
 from orbit.scheduler.graph import GraphNode, NodeStatus, TaskGraph
@@ -55,6 +60,7 @@ class Scheduler:
         self,
         llm_client: LLMClient | None = None,
         checkpoint_manager: CheckpointManager | None = None,
+        event_bus: EventBus | None = None,
         max_concurrent: int = 3,
         node_timeout: int = 30,
         max_retries: int = 2,
@@ -62,11 +68,52 @@ class Scheduler:
     ):
         self.llm = llm_client
         self.checkpoint = checkpoint_manager
+        self._event_bus = event_bus
         # Step 5.1 DAG 配置
         self._max_concurrent = max_concurrent
         self._node_timeout = node_timeout
         self._max_retries = max_retries
         self._fail_fast = fail_fast
+
+    def _publish_task_update(self, task_id: str, state: str, progress: float, dag: list[dict[str, Any]] | None = None) -> None:
+        """发布 task:update 事件到 EventBus（非阻塞）。
+
+        WHY 抽方法而非内联：多个代码路径（run_task/run_dag/resume）
+        都需推送状态更新，统一入口避免遗漏。
+        event_bus 为 None 时静默跳过——不影响无 Dashboard 场景。
+        """
+        if self._event_bus is None:
+            return
+        self._event_bus.publish(DashboardEvent(
+            type="task:update",
+            task_id=task_id,
+            payload=TaskUpdatePayload(
+                task_id=task_id,
+                state=state,
+                progress=progress,
+                dag=dag or [],
+                timestamp=datetime.now(UTC).isoformat(),
+            ).model_dump(),
+        ))
+
+    def _publish_token_update(self, task_id: str, prompt_tokens: int, completion_tokens: int, total_tokens: int) -> None:
+        """发布 token:update 事件（非阻塞）。
+
+        每次 LLM 调用完成后推送，供 Dashboard Token 折线图消费。
+        """
+        if self._event_bus is None:
+            return
+        self._event_bus.publish(DashboardEvent(
+            type="token:update",
+            task_id=task_id,
+            payload=TokenUpdatePayload(
+                task_id=task_id,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                timestamp=datetime.now(UTC).isoformat(),
+            ).model_dump(),
+        ))
 
     async def run_task(self, task_id: str, prd: str) -> TaskState:
         """运行单个任务：IDLE → ... → DONE/FAILED。
@@ -87,6 +134,8 @@ class Scheduler:
                 next_state = self._transition(state)
                 state = next_state
                 await self._save_checkpoint(task_id, state, context)
+                # Step 6.1：推送状态变更到 Dashboard
+                self._publish_task_update(task_id, state.value, self._state_to_progress(state))
                 logger.info(
                     "state_transition",
                     task_id=task_id,
@@ -129,6 +178,14 @@ class Scheduler:
             LLMRequest(prompt=prompt, system_prompt=self._system_prompt(state)),  # type: ignore[call-arg]
             task_id=task_id,
         )
+        # Step 6.1：推送 Token 消耗到 Dashboard
+        if resp.usage:
+            self._publish_token_update(
+                task_id,
+                resp.usage.prompt_tokens,
+                resp.usage.completion_tokens,
+                resp.usage.total_tokens,
+            )
         return resp.content
 
     def _build_prompt(self, state: TaskState, context: dict[str, Any]) -> str:
@@ -233,6 +290,36 @@ class Scheduler:
                 return current
         return current
 
+    def _publish_dag_update(self, graph: TaskGraph) -> None:
+        """发布 DAG 状态快照到 Dashboard（非阻塞）。
+
+        WHY 独立于 _publish_task_update：DAG 节点级更新频率高
+        （每节点状态变更一次），字段不同，单独处理。
+        """
+        if self._event_bus is None:
+            return
+        dag_nodes = [
+            {
+                "id": n.id,
+                "agent_role": n.agent_role,
+                "status": n.status.value,
+                "duration_ms": None,  # Step 6.2 加入耗时
+                "error": n.error,
+            }
+            for n in graph.nodes
+        ]
+        self._event_bus.publish(DashboardEvent(
+            type="task:update",
+            task_id=graph.task_id,
+            payload=TaskUpdatePayload(
+                task_id=graph.task_id,
+                state="DAG_RUNNING",
+                progress=0.0,  # DAG 进度由已完成节点占比计算
+                dag=dag_nodes,
+                timestamp=datetime.now(UTC).isoformat(),
+            ).model_dump(),
+        ))
+
     # ---- Step 5.1 DAG 执行方法 ----
 
     async def run_dag(self, graph: TaskGraph) -> dict[str, NodeStatus]:
@@ -312,6 +399,7 @@ class Scheduler:
         """
         node.status = NodeStatus.RUNNING
         await self._save_dag_checkpoint(graph)
+        self._publish_dag_update(graph)
 
         for attempt in range(self._max_retries + 1):
             try:
@@ -322,6 +410,7 @@ class Scheduler:
                 node.status = NodeStatus.SUCCESS
                 node.error = None
                 await self._save_dag_checkpoint(graph)
+                self._publish_dag_update(graph)
                 return
             except TimeoutError:
                 node.error = f"Timeout after {self._node_timeout}s (attempt {attempt+1})"
@@ -335,9 +424,10 @@ class Scheduler:
         # 所有重试耗尽
         node.status = NodeStatus.FAILED
         await self._save_dag_checkpoint(graph)
+        self._publish_dag_update(graph)
         logger.error("dag_node_all_retries_exhausted", node=node.id)
 
-    async def _execute_node(self, node: GraphNode) -> dict:
+    async def _execute_node(self, node: GraphNode) -> dict[str, Any]:
         """执行单个节点的 Agent 逻辑。
 
         WHY 可扩展：当前为占位实现（模拟 Agent 执行），
@@ -368,7 +458,7 @@ class Scheduler:
                     for n in graph.nodes
                 ],
             }
-            data = CheckpointData(  # type: ignore[call-arg]
+            data = CheckpointData(
                 task_id=graph.task_id,
                 state="DAG_RUNNING",
                 retry_count=0,

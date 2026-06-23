@@ -20,8 +20,33 @@
 - v0.9.0：5 Agent 角色定义（PR #12，tag 待 push）
 
 ### 待处理
-- Step 6.1 前端驾驶舱
 - Step 7.1 灰度发布
+- Step 6.2 E2E 集成测试
+
+## 2026-06-23（下午）
+
+### 完成项
+- **Step 6.1 驾驶舱**（PR #13）
+  - 后端：EventBus (asyncio.Queue) + ConnectionManager + WebSocket 端点
+  - 前端：Vue3+Vite+Pinia + vis-network DAG + ECharts Token + 告警列表
+  - 实时通信：原生 WebSocket（零依赖，评估后放弃 Socket.IO）
+  - 测试：后端 192 (+10) + 前端 13 = 205 全通过
+  - 文档：PRD + 技术方案 + 审查 + 实现记录 4 份
+- 文档同步：功能清单 + 路线图（Step 5.1/5.2 补录，测试数 150→174）
+
+### 版本
+- v0.10.0：Step 6.1 驾驶舱（PR #13，待合并）
+
+### 关键决策
+- 原生 WebSocket > Socket.IO（零依赖，完全可控）
+- EventBus put_nowait（非阻塞，不卡调度器状态机）
+- 前端 vis-network/ECharts 独立 chunk（首屏加载优化）
+- P1 功能延后（DagNodeModal/任务列表）
+
+### 踩坑记录
+- vis-network 9.x 类型定义不完整 → as any 绕过（运行时正确）
+- disconnect 日志在清空后计数 → 移到清空前
+- git stash/pop 切换分支时 docs 文件的 CRLF 警告（无害）
 
 ### 踩坑记录
 - 禁止未审查直接合并 PR（PR #10→#11 revert 教训）

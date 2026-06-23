@@ -77,8 +77,8 @@ class L6ContractValidator:
         violations: list[L6ContractMatch] = []
         for ep in spec_endpoints:
             key = (ep["path"], ep["method"])
-            if key in code_endpoints:  # type: ignore[comparison-overlap]
-                code_ep = code_endpoints[key]  # type: ignore[index]
+            if key in code_endpoints:
+                code_ep = code_endpoints[key]
                 matches = self._compare_endpoint(ep, code_ep)
                 violations.extend([m for m in matches if not m.matched])
             # NOTE: spec 中定义但代码未实现的端点不报错（可能是其他文件定义）
@@ -150,12 +150,12 @@ class L6ContractValidator:
                 )
         return endpoints
 
-    def _extract_code_routes(self, code: str) -> dict[str, Any]:
+    def _extract_code_routes(self, code: str) -> dict[tuple[str, str], dict[str, Any]]:
         """从代码中 AST 提取 FastAPI 路由定义。
 
         返回 {(path, method): {"response_model": str, ...}}
         """
-        routes: dict[tuple[str, str], dict] = {}
+        routes: dict[tuple[str, str], dict[str, Any]] = {}
         try:
             tree = ast.parse(code)
         except SyntaxError:
@@ -198,11 +198,13 @@ class L6ContractValidator:
                 path = str(first.value)
         return {"path": path, "method": method, "response_model": ""}
 
-    def _compare_endpoint(self, spec_ep: dict[str, Any], code_ep: dict[str, Any]) -> list[L6ContractMatch]:
+    def _compare_endpoint(
+        self, spec_ep: dict[str, Any], code_ep: dict[str, Any]
+    ) -> list[L6ContractMatch]:
         """比对单个端点。"""
         matches: list[L6ContractMatch] = []
         spec_resp = spec_ep.get("response_model", "")
-        code_resp = code_ep.get("response_model", "")  # type: ignore[return-value]
+        code_resp = code_ep.get("response_model", "")
         matched = True
         differences: list[str] = []
 

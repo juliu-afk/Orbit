@@ -5,14 +5,27 @@
 ### 完成项
 - PR #6 Step 4.1：防幻觉 L1-L4（v0.6.0）
 - PR #7 Step 4.2：防幻觉 L5-L8 + CI 全修复（v0.7.0）
-  - L5 Z3 形式化验证（@formal pre/post SMT 求解）
-  - L6 OpenAPI 合约双向验证（spec vs 路由）
-  - L7 沙箱运行时验证（pytest assert 执行）
-  - L8 配置漂移检测（SHA256 基线 + 自动修复）
-  - CI: mypy 0 + ruff 0 + bandit pass + integration tests
-  - 8 层防幻觉体系全部交付（L1-L8）
+- PR #8 Step 5.1：调度器 DAG 拓扑排序 + 分层并发（v0.8.0）
+- PR #9：revert Step 5.2 误直接提交 master
+- PR #10：Step 5.2 Agent 角色（误未审查直接合并，已回退）
+- PR #11：revert PR #10
 
-### PR / Commit
+### 今日交付
+- 8 层防幻觉体系全部交付（L1-L8）
+- DAG 调度器（拓扑排序 + 分层并发 + 检查点恢复）
+- CI 全修复（mypy/ruff/bandit/integration）
+- 全量 174/174 通过
+
+### 待处理
+- Step 5.2 Agent 角色（代码在 feat/step5.2-agent-roles，待审查后重新 PR）
+- Step 6.1 前端驾驶舱
+- Step 7.1 灰度发布
+
+### 踩坑记录
+- 禁止未审查直接合并 PR（PR #10→#11 revert 教训）
+- git add -A 禁止，精确指定文件
+- 禁 force push
+- revert 时注意保留后续修复（ci.yml mypy continue-on-error）
 - PR #6 → v0.6.0（Step 4.1）
 - PR #7 → v0.7.0（Step 4.2 + CI fix）
 - 全量 150/150 通过

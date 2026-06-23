@@ -10,13 +10,13 @@ from typing import TypedDict
 class Concept(TypedDict):
     """知识图谱概念条目。"""
 
-    domain: str          # 领域：accounting / finance / legal
-    concept: str         # 概念名（英文标识符）
-    name_zh: str         # 中文名
-    definition: str      # 定义
-    formula: str         # 计算公式（无则为空）
-    source_uri: str      # 来源 URI
-    source_level: int    # 五级来源：1=国际标准 2=国家法规 3=行业规范 4=地方规章 5=企业内部
+    domain: str  # 领域：accounting / finance / legal
+    concept: str  # 概念名（英文标识符）
+    name_zh: str  # 中文名
+    definition: str  # 定义
+    formula: str  # 计算公式（无则为空）
+    source_uri: str  # 来源 URI
+    source_level: int  # 五级来源：1=国际标准 2=国家法规 3=行业规范 4=地方规章 5=企业内部
 
 
 # 会计领域 10 个核心概念（中国企业会计准则 + IFRS）

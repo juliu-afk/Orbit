@@ -62,15 +62,22 @@ class KnowledgeStore:
 
         # 插入种子数据（IGNORE 避免重复插入）
         for c in ACCOUNTING_CONCEPTS:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR IGNORE INTO knowledge_concepts
                     (domain, concept, name_zh, definition, formula, source_uri, source_level)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                c["domain"], c["concept"], c["name_zh"],
-                c["definition"], c.get("formula", ""),
-                c["source_uri"], c["source_level"],
-            ))
+            """,
+                (
+                    c["domain"],
+                    c["concept"],
+                    c["name_zh"],
+                    c["definition"],
+                    c.get("formula", ""),
+                    c["source_uri"],
+                    c["source_level"],
+                ),
+            )
         conn.commit()
 
         count = conn.execute("SELECT COUNT(*) FROM knowledge_concepts").fetchone()[0]
@@ -106,11 +113,14 @@ class KnowledgeStore:
         row = conn.execute("SELECT COUNT(*) FROM knowledge_concepts").fetchone()
         return int(row[0]) if row else 0
 
-    def close(self) -> None:
-        """关闭连接（测试 teardown）。"""
+    def close(self, cleanup: bool = False) -> None:
+        """关闭连接。
+
+        cleanup=True 仅测试使用——删除 DB 文件。
+        生产环境勿传 cleanup=True。
+        """
         if self._conn:
             self._conn.close()
             self._conn = None
-        # 清理 DB 文件（测试用）
-        if self._db_path.exists():
+        if cleanup and self._db_path.exists():
             self._db_path.unlink(missing_ok=True)

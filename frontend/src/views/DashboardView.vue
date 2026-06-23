@@ -111,14 +111,14 @@
         <ChatPanel />
       </el-tab-pane>
 
-      <!-- ── 运维 (F3 占位) ──────────────────── -->
+      <!-- ── 运维 ───────────────────────────── -->
       <el-tab-pane label="运维" name="ops">
-        <div class="placeholder-tab">运维面板即将上线</div>
+        <OpsPanel />
       </el-tab-pane>
 
-      <!-- ── 资源 (F4 占位) ──────────────────── -->
+      <!-- ── 资源 ───────────────────────────── -->
       <el-tab-pane label="资源" name="resources">
-        <div class="placeholder-tab">资源视图即将上线</div>
+        <ResourcePanel />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -137,6 +137,8 @@ import MetricsCard from '@/components/metrics/MetricsCard.vue'
 import CircuitBreakerLight from '@/components/metrics/CircuitBreakerLight.vue'
 import HealthPanel from '@/components/metrics/HealthPanel.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
+import OpsPanel from '@/components/ops/OpsPanel.vue'
+import ResourcePanel from '@/components/resources/ResourcePanel.vue'
 
 const ws = useWebSocket()
 const dashboardStore = useDashboardStore()

@@ -37,6 +37,14 @@ STATE_TRANSITIONS: dict[TaskState, TaskState] = {
     TaskState.VERIFYING: TaskState.DONE,
 }
 
+# Step O1 快车道路径（跳过 PLANNING，轻量验证）
+FAST_LANE_TRANSITIONS: dict[TaskState, TaskState] = {
+    TaskState.IDLE: TaskState.PARSING,
+    TaskState.PARSING: TaskState.CODING,  # 跳过 PLANNING
+    TaskState.CODING: TaskState.DONE,  # 跳过 VERIFYING
+    TaskState.DONE: TaskState.DONE,
+}
+
 # 终态（不可转换）
 TERMINAL_STATES = {TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED}
 
@@ -84,6 +92,8 @@ class Scheduler:
         self._message_bus = message_bus
         self._tool_registry = tool_registry
         self._audit_logger = audit_logger
+        # Step O1: 快车道模式
+        self._fast_lane = False
 
     def _publish_task_update(
         self, task_id: str, state: str, progress: float, dag: list[dict[str, Any]] | None = None
@@ -141,7 +151,22 @@ class Scheduler:
         """
         state = TaskState.IDLE
         await self._save_checkpoint(task_id, state, {"prd": prd})
-        context: dict[str, Any] = {"prd": prd, "artifacts": {}}
+        context: dict[str, Any] = {"prd": prd, "artifacts": {}, "mode": "auto"}
+
+        # Step O1: 任务复杂度评估 → 决定快车道还是完整流水线
+        if context.get("mode") == "auto":
+            from orbit.scheduler.complexity import ComplexityScorer
+
+            scorer = ComplexityScorer()
+            c_result = scorer.evaluate(prd)
+            self._fast_lane = c_result.recommended_mode == "fast"
+            context["complexity"] = c_result.to_dict()
+            logger.info(
+                "complexity_evaluated",
+                task_id=task_id,
+                score=c_result.score,
+                mode=c_result.recommended_mode,
+            )
 
         while state not in TERMINAL_STATES:
             try:
@@ -174,12 +199,13 @@ class Scheduler:
         return state
 
     def _transition(self, current: TaskState) -> TaskState:
-        """执行状态转换。非法转换抛 InvalidStateTransitionError。"""
+        """执行状态转换。快车道模式走简化路径。"""
         if current in TERMINAL_STATES:
             raise InvalidStateTransitionError(f"终态 {current.value} 不可转换")
-        if current not in STATE_TRANSITIONS:
+        transitions = FAST_LANE_TRANSITIONS if self._fast_lane else STATE_TRANSITIONS
+        if current not in transitions:
             raise InvalidStateTransitionError(f"状态 {current.value} 无定义的后继状态")
-        return STATE_TRANSITIONS[current]
+        return transitions[current]
 
     # ── Step I1 集成胶水 ──────────────────────────────
 
@@ -200,8 +226,13 @@ class Scheduler:
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
             if self._audit_logger:
-                self._audit_logger.log("orchestrator", "agent_build_failed",
-                                       task_id=task_id, status="error", error=str(e))
+                self._audit_logger.log(
+                    "orchestrator",
+                    "agent_build_failed",
+                    task_id=task_id,
+                    status="error",
+                    error=str(e),
+                )
             return f"[error] Agent {role} 创建失败: {e}"
 
         # 注入依赖
@@ -217,26 +248,25 @@ class Scheduler:
 
         # 记录审计
         if self._audit_logger:
-            self._audit_logger.log("orchestrator", "agent_start",
-                                   task_id=task_id, component=role)
+            self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, component=role)
 
         try:
-            result = await asyncio.wait_for(
-                agent.run(agent_context), timeout=timeout
-            )
+            result = await asyncio.wait_for(agent.run(agent_context), timeout=timeout)
             output = result.output if result.success else f"[error] {result.error}"
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("agent_timeout", role=role, task_id=task_id)
             output = f"[timeout] {role} 超时 (300s)"
             if self._audit_logger:
-                self._audit_logger.log("orchestrator", "agent_timeout",
-                                       task_id=task_id, component=role)
+                self._audit_logger.log(
+                    "orchestrator", "agent_timeout", task_id=task_id, component=role
+                )
         except Exception as e:
             logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
             output = f"[error] {role}: {e}"
             if self._audit_logger:
-                self._audit_logger.log("orchestrator", "agent_run_error",
-                                       task_id=task_id, component=role, error=str(e))
+                self._audit_logger.log(
+                    "orchestrator", "agent_run_error", task_id=task_id, component=role, error=str(e)
+                )
 
         return str(output)
 
@@ -255,8 +285,11 @@ class Scheduler:
             task_id=task_id,
             l1="遵循小企业会计准则; 禁止直接操作总账; 金额使用 Decimal",
             l2=context.get("l2", {}),  # 图谱查询结果由调用方注入
-            l3={"state": context.get("state", "UNKNOWN"), "prd": context.get("prd", ""),
-                "artifacts": context.get("artifacts", {})},
+            l3={
+                "state": context.get("state", "UNKNOWN"),
+                "prd": context.get("prd", ""),
+                "artifacts": context.get("artifacts", {}),
+            },
             l4={},  # 私有记忆——Agent 间通过 MessageBus 传递
             l5=context.get("l5", []),  # 教训库检索结果
         )

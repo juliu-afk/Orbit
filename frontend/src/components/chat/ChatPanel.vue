@@ -30,6 +30,12 @@
       </div>
     </div>
 
+    <!-- O2 批量确认卡片 -->
+    <div v-if="showBatchConfirm" class="chat-panel__batch">
+      <span class="batch-text">{{ batchConfirmText }}</span>
+      <el-button type="primary" size="small" @click="handleBatchConfirm">开始</el-button>
+    </div>
+
     <!-- 输入框 -->
     <div class="chat-panel__input">
       <el-input
@@ -53,12 +59,32 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import CandidateCard from './CandidateCard.vue'
 
 const chatStore = useChatStore()
 const inputText = ref('')
+const batchConfirmed = ref(false)
+
+// O2: 批量确认——候选人=1 且 >0.8 分时自动展示"开始"按钮
+const showBatchConfirm = computed(() => {
+  if (batchConfirmed.value) return false
+  const c = chatStore.candidates
+  return c.length === 1 && c[0].score >= 0.8 && !chatStore.requiresConfirmation
+})
+
+const batchConfirmText = computed(() => {
+  const c = chatStore.candidates[0]
+  return `准备就绪——项目: ${c?.project}, 匹配度: ${Math.round((c?.score ?? 0) * 100)}%`
+})
+
+function handleBatchConfirm() {
+  if (chatStore.candidates[0]) {
+    chatStore.confirm(chatStore.candidates[0].project)
+    batchConfirmed.value = true
+  }
+}
 const msgListRef = ref<HTMLElement | null>(null)
 
 function handleSend() {
@@ -105,5 +131,11 @@ watch(() => chatStore.messages.length, () => {
 .chat-msg--user { background: #1a3a5c; margin-left: auto; text-align: right; color: #e0e0e0; }
 .chat-msg--system { background: #16163a; margin-right: auto; color: #8888aa; font-size: 13px; }
 .chat-msg__text { word-break: break-word; }
+.chat-panel__batch {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; margin-top: 8px;
+  background: #0a3a0a; border: 1px solid #4caf50; border-radius: 8px;
+}
+.batch-text { font-size: 13px; color: #c0e0c0; flex: 1; margin-right: 12px; }
 .chat-panel__input { padding-top: 8px; border-top: 1px solid #2a2a4a; }
 </style>

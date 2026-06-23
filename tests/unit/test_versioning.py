@@ -104,8 +104,12 @@ class TestReleaseAudit:
         reg = VersionRegistry()
         try:
             reg.record_release(
-                "rollback", "v0.14.0", previous_version="v0.15.0",
-                trigger="auto_slo", success=True, details="错误率>5%触发自动回滚"
+                "rollback",
+                "v0.14.0",
+                previous_version="v0.15.0",
+                trigger="auto_slo",
+                success=True,
+                details="错误率>5%触发自动回滚",
             )
             last = reg.last_release()
             assert last is not None

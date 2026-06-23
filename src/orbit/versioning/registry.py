@@ -103,27 +103,43 @@ class VersionRegistry:
 
     def current_version(self) -> str | None:
         """返回当前活跃版本号。"""
-        row = self._get_conn().execute(
-            "SELECT version FROM versions WHERE is_active=1 ORDER BY installed_at DESC LIMIT 1"
-        ).fetchone()
+        row = (
+            self._get_conn()
+            .execute(
+                "SELECT version FROM versions WHERE is_active=1 ORDER BY installed_at DESC LIMIT 1"
+            )
+            .fetchone()
+        )
         return row["version"] if row else None
 
     def list_versions(self, limit: int = 20) -> list[VersionRecord]:
         """列出最近安装的版本。"""
         rows = (
             self._get_conn()
-            .execute("SELECT * FROM versions ORDER BY installed_at DESC, version DESC LIMIT ?", (limit,))
+            .execute(
+                "SELECT * FROM versions ORDER BY installed_at DESC, version DESC LIMIT ?", (limit,)
+            )
             .fetchall()
         )
-        return [VersionRecord(version=r["version"], installed_at=r["installed_at"],
-                              description=r["description"] or "",
-                              is_active=bool(r["is_active"])) for r in rows]
+        return [
+            VersionRecord(
+                version=r["version"],
+                installed_at=r["installed_at"],
+                description=r["description"] or "",
+                is_active=bool(r["is_active"]),
+            )
+            for r in rows
+        ]
 
     # ── 迁移管理 ──────────────────────────────────────────
 
     def record_migration(
-        self, migration_id: str, version: str, checksum: str = "", success: bool = True,
-        error_message: str = ""
+        self,
+        migration_id: str,
+        version: str,
+        checksum: str = "",
+        success: bool = True,
+        error_message: str = "",
     ) -> MigrationRecord:
         """记录 Schema 迁移。"""
         conn = self._get_conn()
@@ -137,34 +153,51 @@ class VersionRegistry:
         conn.commit()
         logger.info("migration_recorded", migration_id=migration_id, success=success)
         return MigrationRecord(
-            migration_id=migration_id, version=version, applied_at=now,
-            checksum=checksum, success=success, error_message=error_message
+            migration_id=migration_id,
+            version=version,
+            applied_at=now,
+            checksum=checksum,
+            success=success,
+            error_message=error_message,
         )
 
     def list_migrations(self) -> list[MigrationRecord]:
         """列出所有迁移记录。"""
-        rows = self._get_conn().execute(
-            "SELECT * FROM migrations ORDER BY applied_at ASC"
-        ).fetchall()
-        return [MigrationRecord(
-            migration_id=r["migration_id"], version=r["version"],
-            applied_at=r["applied_at"], checksum=r["checksum"] or "",
-            success=bool(r["success"]), error_message=r["error_message"] or ""
-        ) for r in rows]
+        rows = (
+            self._get_conn().execute("SELECT * FROM migrations ORDER BY applied_at ASC").fetchall()
+        )
+        return [
+            MigrationRecord(
+                migration_id=r["migration_id"],
+                version=r["version"],
+                applied_at=r["applied_at"],
+                checksum=r["checksum"] or "",
+                success=bool(r["success"]),
+                error_message=r["error_message"] or "",
+            )
+            for r in rows
+        ]
 
     def is_migration_applied(self, migration_id: str) -> bool:
         """检查迁移是否已应用。"""
-        row = self._get_conn().execute(
-            "SELECT 1 FROM migrations WHERE migration_id=? AND success=1", (migration_id,)
-        ).fetchone()
+        row = (
+            self._get_conn()
+            .execute("SELECT 1 FROM migrations WHERE migration_id=? AND success=1", (migration_id,))
+            .fetchone()
+        )
         return row is not None
 
     # ── 发布审计 ──────────────────────────────────────────
 
     def record_release(
-        self, event_type: str, version: str, previous_version: str = "",
-        traffic_ratio: float = 0.0, trigger: str = "manual",
-        success: bool = True, details: str = ""
+        self,
+        event_type: str,
+        version: str,
+        previous_version: str = "",
+        traffic_ratio: float = 0.0,
+        trigger: str = "manual",
+        success: bool = True,
+        details: str = "",
     ) -> ReleaseEvent:
         """记录发布/回滚事件。"""
         conn = self._get_conn()
@@ -173,14 +206,28 @@ class VersionRegistry:
             "INSERT INTO release_events "
             "(event_type, version, previous_version, traffic_ratio, trigger, timestamp, success, details) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (event_type, version, previous_version, traffic_ratio, trigger, now, int(success), details),
+            (
+                event_type,
+                version,
+                previous_version,
+                traffic_ratio,
+                trigger,
+                now,
+                int(success),
+                details,
+            ),
         )
         conn.commit()
         logger.info("release_event_recorded", event_type=event_type, version=version)
         return ReleaseEvent(
-            event_type=event_type, version=version, previous_version=previous_version,
-            traffic_ratio=traffic_ratio, trigger=trigger, timestamp=now,
-            success=success, details=details,
+            event_type=event_type,
+            version=version,
+            previous_version=previous_version,
+            traffic_ratio=traffic_ratio,
+            trigger=trigger,
+            timestamp=now,
+            success=success,
+            details=details,
         )
 
     def list_releases(self, limit: int = 20) -> list[ReleaseEvent]:
@@ -190,27 +237,38 @@ class VersionRegistry:
             .execute("SELECT * FROM release_events ORDER BY id DESC LIMIT ?", (limit,))
             .fetchall()
         )
-        return [ReleaseEvent(
-            event_type=r["event_type"], version=r["version"],
-            previous_version=r["previous_version"] or "",
-            traffic_ratio=r["traffic_ratio"] or 0.0,
-            trigger=r["trigger"] or "", timestamp=r["timestamp"],
-            success=bool(r["success"]), details=r["details"] or "",
-        ) for r in rows]
+        return [
+            ReleaseEvent(
+                event_type=r["event_type"],
+                version=r["version"],
+                previous_version=r["previous_version"] or "",
+                traffic_ratio=r["traffic_ratio"] or 0.0,
+                trigger=r["trigger"] or "",
+                timestamp=r["timestamp"],
+                success=bool(r["success"]),
+                details=r["details"] or "",
+            )
+            for r in rows
+        ]
 
     def last_release(self) -> ReleaseEvent | None:
         """返回最近一次发布事件。"""
-        row = self._get_conn().execute(
-            "SELECT * FROM release_events ORDER BY id DESC LIMIT 1"
-        ).fetchone()
+        row = (
+            self._get_conn()
+            .execute("SELECT * FROM release_events ORDER BY id DESC LIMIT 1")
+            .fetchone()
+        )
         if row is None:
             return None
         return ReleaseEvent(
-            event_type=row["event_type"], version=row["version"],
+            event_type=row["event_type"],
+            version=row["version"],
             previous_version=row["previous_version"] or "",
             traffic_ratio=row["traffic_ratio"] or 0.0,
-            trigger=row["trigger"] or "", timestamp=row["timestamp"],
-            success=bool(row["success"]), details=row["details"] or "",
+            trigger=row["trigger"] or "",
+            timestamp=row["timestamp"],
+            success=bool(row["success"]),
+            details=row["details"] or "",
         )
 
     def close(self) -> None:

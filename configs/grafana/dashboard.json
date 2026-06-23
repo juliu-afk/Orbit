@@ -1,0 +1,159 @@
+{
+  "dashboard": {
+    "title": "Orbit AgentOps Overview",
+    "uid": "orbit-agentops",
+    "panels": [
+      {
+        "title": "任务成功率 (5min)",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(orbit_tasks_total{status='success'}[5m])) / sum(rate(orbit_tasks_total[5m])) * 100",
+            "legendFormat": "成功率 %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 90},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "当前活跃任务",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "orbit_active_tasks",
+            "legendFormat": "活跃任务"
+          }
+        ]
+      },
+      {
+        "title": "LLM Token 消耗速率 (5min)",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(orbit_llm_tokens_total[5m])) by (type)",
+            "legendFormat": "{{ type }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "tokens/sec",
+            "custom": {"fillOpacity": 20, "lineWidth": 2}
+          }
+        }
+      },
+      {
+        "title": "各层防幻觉拦截率 (5min)",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(orbit_hallucination_intercepted_total[5m])) by (layer)",
+            "legendFormat": "{{ layer }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {"fillOpacity": 15, "lineWidth": 2, "stacking": {"mode": "none"}}
+          }
+        }
+      },
+      {
+        "title": "熔断器状态",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "orbit_circuit_breaker_state",
+            "legendFormat": "{{ breaker }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "value": "0", "text": "CLOSED"},
+              {"type": "value", "value": "1", "text": "OPEN"},
+              {"type": "value", "value": "2", "text": "HALF_OPEN"}
+            ],
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "orange", "value": 1},
+                {"color": "red", "value": 2}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "沙箱池可用实例",
+        "type": "gauge",
+        "gridPos": {"x": 18, "y": 8, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "orbit_sandbox_pool_available",
+            "legendFormat": "可用"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": -1,
+            "max": 10,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "green", "value": 3}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "任务执行耗时分布",
+        "type": "heatmap",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(orbit_task_duration_seconds_bucket[5m])) by (le)",
+            "format": "heatmap",
+            "legendFormat": "{{ le }}"
+          }
+        ]
+      },
+      {
+        "title": "合规检查结果 (5min)",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(orbit_compliance_checks_total[5m])) by (status)",
+            "legendFormat": "{{ status }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {"fillOpacity": 20, "lineWidth": 2, "stacking": {"mode": "normal"}}
+          }
+        }
+      }
+    ],
+    "time": {"from": "now-15m", "to": "now"},
+    "refresh": "5s",
+    "schemaVersion": 38,
+    "tags": ["orbit", "agentops"]
+  }
+}

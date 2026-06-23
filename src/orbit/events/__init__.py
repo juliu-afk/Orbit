@@ -6,16 +6,20 @@
 
 from orbit.events.bus import EventBus
 from orbit.events.schemas import (
+    AgentOpsAlertPayload,
     AlertPayload,
     DashboardEvent,
+    MetricsPayload,
     TaskUpdatePayload,
     TokenUpdatePayload,
 )
 
 __all__ = [
+    "AgentOpsAlertPayload",
     "AlertPayload",
     "DashboardEvent",
     "EventBus",
+    "MetricsPayload",
     "TaskUpdatePayload",
     "TokenUpdatePayload",
 ]

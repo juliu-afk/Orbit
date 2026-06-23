@@ -66,3 +66,28 @@ class AlertPayload(BaseModel):
     severity: Literal["warning", "critical"]
     message: str
     timestamp: str
+
+
+class MetricsPayload(BaseModel):
+    """metrics:snapshot 事件 payload。
+
+    定时（每 5s）推送到驾驶舱，前端 ECharts 刷新指标面板。
+    """
+
+    task_id: str  # "_system" 表示全局指标
+    snapshot: dict[str, Any]  # 来自 metrics.snapshot()
+    timestamp: str
+
+
+class AgentOpsAlertPayload(BaseModel):
+    """agentops:alert 事件 payload（Step 7.2 告警引擎）。
+
+    severity: warning 需关注 / critical 需立即处理
+    """
+
+    task_id: str
+    alert_name: str
+    severity: Literal["warning", "critical"]
+    message: str
+    metrics_snapshot: dict[str, Any]
+    timestamp: str

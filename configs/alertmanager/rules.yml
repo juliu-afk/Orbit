@@ -1,0 +1,88 @@
+# AlertManager 告警规则 —— Orbit AgentOps (Step 7.2)
+# 生产部署时挂载到 AlertManager ConfigMap，与内存 AlertEngine 互补。
+# 本文件为 P1 模板，需替换实际 webhook URL 后使用。
+
+groups:
+  - name: orbit-agentops
+    rules:
+      # 告警 1: 单任务 Token 消耗超限
+      - alert: HighTokenConsumption
+        expr: sum(orbit_llm_tokens_total) by (task_id) > 50
+        for: 1m
+        labels:
+          severity: warning
+          component: llm_gateway
+        annotations:
+          summary: "单任务 Token 消耗超限"
+          description: "任务 {{ $labels.task_id }} Token 消耗 {{ $value }} 超过阈值 50"
+
+      # 告警 2: Z3 验证超时率过高
+      - alert: HighZ3TimeoutRate
+        expr: |
+          (
+            rate(orbit_tasks_total{status="timeout"}[5m])
+            / rate(orbit_tasks_total[5m])
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: hallucination_l5
+        annotations:
+          summary: "Z3 验证超时率过高"
+          description: "Z3 超时率 {{ $value | humanize }}% 超过阈值 5%"
+
+      # 告警 3: LLM 输出熵值异常
+      - alert: HighEntropyDetected
+        expr: orbit_hallucination_entropy_gauge > 2.5
+        for: 3m
+        labels:
+          severity: warning
+          component: hallucination_l3
+        annotations:
+          summary: "LLM 输出熵值异常偏高"
+          description: "平均熵值 {{ $value }} bits 超过阈值 2.5 bits"
+
+      # 告警 4: 配置漂移
+      - alert: ConfigDriftDetected
+        expr: orbit_circuit_breaker_state{breaker="config"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: hallucination_l8
+        annotations:
+          summary: "检测到配置漂移"
+          description: "配置与 SHA256 基线不一致，需人工确认"
+
+      # 告警 5: 沙箱池耗尽
+      - alert: SandboxPoolExhausted
+        expr: orbit_sandbox_pool_available == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: sandbox
+        annotations:
+          summary: "沙箱池所有实例不可用"
+          description: "沙箱池可用数为 0，新任务无法在隔离环境中执行"
+
+# 路由配置 (生产环境替换 webhook URL)
+# route:
+#   group_by: ['alertname']
+#   group_wait: 10s
+#   group_interval: 10s
+#   repeat_interval: 12h
+#   receiver: 'webhook'
+#   routes:
+#     - match:
+#         severity: critical
+#       receiver: 'critical-webhook'
+#     - match:
+#         severity: warning
+#       receiver: 'warning-webhook'
+#
+# receivers:
+#   - name: 'warning-webhook'
+#     webhook_configs:
+#       - url: 'https://hooks.example.com/warning'
+#   - name: 'critical-webhook'
+#     webhook_configs:
+#       - url: 'https://hooks.example.com/critical'

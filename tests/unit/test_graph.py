@@ -59,14 +59,14 @@ class TestTopologicalSort:
             graph.topological_sort()
 
     def test_validate_cycle(self):
-        """validate() 也检测循环。"""
+        """validate_dag() 也检测循环。"""
         graph = TaskGraph(
             task_id="t1",
             nodes=[make_node("A"), make_node("B")],
             edges=[("A", "B"), ("B", "A")],
         )
         with pytest.raises(ValueError):
-            graph.validate()
+            graph.validate_dag()
 
     def test_validate_missing_node(self):
         """边引用不存在的节点。"""
@@ -76,12 +76,12 @@ class TestTopologicalSort:
             edges=[("A", "Z")],
         )
         with pytest.raises(ValueError, match="not in nodes"):
-            graph.validate()
+            graph.validate_dag()
 
     def test_empty_dag(self):
         """空 DAG 正常。"""
         graph = TaskGraph(task_id="t1", nodes=[], edges=[])
-        graph.validate()
+        graph.validate_dag()
         assert graph.topological_sort() == []
 
     def test_single_node(self):

@@ -329,7 +329,7 @@ class Scheduler:
             {node_id: NodeStatus} 各节点最终状态
         """
         # 验证 DAG 合法性
-        graph.validate()
+        graph.validate_dag()
         layers = graph.topological_sort()
         logger.info(
             "dag_execution_start",

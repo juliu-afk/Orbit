@@ -1,0 +1,50 @@
+# OpenTelemetry Collector 配置 —— Orbit AgentOps (P2 模板)
+# 待 K8s 环境就绪后启用。接收 OTel SDK 推送的 traces/metrics/logs，
+# 分发到 Tempo (tracing) + Prometheus (metrics) + Elasticsearch (logs)。
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+  # 采样策略：成功 span 采样 10%，失败/错误 span 全量保留
+  probabilistic_sampler:
+    sampling_percentage: 10
+
+exporters:
+  # 追踪 → Grafana Tempo
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  # 指标 → Prometheus (Remote Write)
+  prometheusremotewrite:
+    endpoint: "http://prometheus:9090/api/v1/write"
+  # 日志 → stdout (开发) 或 Elasticsearch (生产)
+  logging:
+    loglevel: debug
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, probabilistic_sampler]
+      exporters: [otlp/tempo, logging]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite, logging]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [logging]

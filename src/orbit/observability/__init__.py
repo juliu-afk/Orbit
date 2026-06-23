@@ -1,12 +1,30 @@
 """Step 7.2 AgentOps——可观测性基础设施。
 
-健康指标聚合 + JSON 结构化日志 + 组件状态 API。
+健康指标聚合 + Prometheus 业务指标 + 审计日志 + 告警引擎 + 反馈闭环。
 """
 
+from orbit.observability.alerts import Alert, AlertEngine, AlertRule, AlertSeverity
+from orbit.observability.audit import AuditLogger, Lesson, LessonStore
 from orbit.observability.collector import (
     ComponentHealth,
     ComponentStatus,
     HealthCollector,
 )
+from orbit.observability.config import AgentOpsConfig, agentops_config
+from orbit.observability.metrics import snapshot as metrics_snapshot
 
-__all__ = ["ComponentHealth", "ComponentStatus", "HealthCollector"]
+__all__ = [
+    "AgentOpsConfig",
+    "agentops_config",
+    "Alert",
+    "AlertEngine",
+    "AlertRule",
+    "AlertSeverity",
+    "AuditLogger",
+    "ComponentHealth",
+    "ComponentStatus",
+    "HealthCollector",
+    "Lesson",
+    "LessonStore",
+    "metrics_snapshot",
+]

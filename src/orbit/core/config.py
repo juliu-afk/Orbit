@@ -84,5 +84,11 @@ class Settings:
     MAX_RETRIES_PER_NODE: int = _get_int("MAX_RETRIES_PER_NODE", 2)
     L8_AUTO_FIX_ENABLED: bool = _get_bool("L8_AUTO_FIX_ENABLED", False)  # prod 默认 false
 
+    # ---- Step 7.2 AgentOps 可观测性 ----
+    # WHY 放 core/config 而非 observability/config：
+    # core/config 管系统启动参数，AgentOps 管运维阈值。
+    # 此处只放影响启动行为的开关，阈值细节在 observability/config.py。
+    AGENTOPS_ENABLED: bool = _get_bool("AGENTOPS_ENABLED", True)
+
 
 settings = Settings()

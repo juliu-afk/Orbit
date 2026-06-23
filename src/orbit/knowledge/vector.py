@@ -80,10 +80,7 @@ class VectorStore:
 
         n_docs = len(docs)
         # IDF = log(N / df)
-        self._idf = {
-            term: math.log(n_docs / (freq + 1)) + 1
-            for term, freq in df.items()
-        }
+        self._idf = {term: math.log(n_docs / (freq + 1)) + 1 for term, freq in df.items()}
         self._documents = docs
         logger.info("vector_index_built", documents=n_docs, terms=len(self._idf))
 
@@ -96,9 +93,7 @@ class VectorStore:
         max_freq = max(tf.values()) if tf else 1
         return {t: f / max_freq for t, f in tf.items()}
 
-    def search(
-        self, query: str, top_k: int = 5
-    ) -> list[dict[str, Any]]:
+    def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
         """语义检索——TF-IDF 余弦相似度排序。
 
         Args:
@@ -125,20 +120,20 @@ class VectorStore:
         results = []
         for concept, score in scores[:top_k]:
             doc = self._documents[concept]
-            results.append({
-                "concept": concept,
-                "name_zh": doc["name_zh"],
-                "definition": doc["definition"],
-                "formula": doc.get("formula", ""),
-                "score": round(score, 4),
-                "source_uri": doc["source_uri"],
-            })
+            results.append(
+                {
+                    "concept": concept,
+                    "name_zh": doc["name_zh"],
+                    "definition": doc["definition"],
+                    "formula": doc.get("formula", ""),
+                    "score": round(score, 4),
+                    "source_uri": doc["source_uri"],
+                }
+            )
 
         return results
 
-    def _cosine_similarity(
-        self, query_tf: dict[str, float], doc_tf: dict[str, float]
-    ) -> float:
+    def _cosine_similarity(self, query_tf: dict[str, float], doc_tf: dict[str, float]) -> float:
         """TF-IDF 加权余弦相似度。"""
         # 只计算查询中出现的 term
         dot = 0.0

@@ -1,0 +1,55 @@
+# E2E 集成测试——PR merge 门禁
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:15
+        ports: ["5433:5432"]
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: orbit_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7.2
+        ports: ["6380:6379"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pip install "poetry>=2.0"
+
+      - name: Configure Poetry
+        run: poetry config virtualenvs.create false
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Run E2E tests
+        env:
+          CI: true
+          ORBIT_DB_URL: postgresql://test:test@localhost:5433/orbit_test
+          ORBIT_REDIS_URL: redis://localhost:6380/0
+        run: poetry run pytest tests/e2e/ -v -m e2e --tb=long --timeout=120

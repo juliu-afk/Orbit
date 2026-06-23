@@ -63,6 +63,10 @@ build-backend = "poetry.core.masonry.api"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "--strict-markers -q"
+markers = [
+    "e2e: 端到端集成测试（需 Docker 或 ProcessSandbox）",
+    "slow: 耗时较长的测试",
+]
 
 [tool.coverage.run]
 source = ["src/orbit"]

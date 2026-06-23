@@ -1,0 +1,29 @@
+# E2E 测试基础设施
+# WHY 独立于 docker-compose.yml：
+# - 使用 test 数据库/用户避免污染开发数据
+# - 非标准端口避免冲突（5433/6380 vs 5432/6379）
+# - tmpfs 数据卷——速度快 + 自动清理
+services:
+  postgres-test:
+    image: postgres:15
+    container_name: orbit-e2e-postgres
+    restart: "no"
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: orbit_test
+    tmpfs: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d orbit_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  redis-test:
+    image: redis:7.2
+    container_name: orbit-e2e-redis
+    restart: "no"
+    ports:
+      - "6380:6379"

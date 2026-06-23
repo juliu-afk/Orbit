@@ -106,9 +106,9 @@
         </el-row>
       </el-tab-pane>
 
-      <!-- ── 聊天 (F2 占位) ──────────────────── -->
+      <!-- ── 聊天 ───────────────────────────── -->
       <el-tab-pane label="聊天" name="chat">
-        <div class="placeholder-tab">聊天功能即将上线</div>
+        <ChatPanel />
       </el-tab-pane>
 
       <!-- ── 运维 (F3 占位) ──────────────────── -->
@@ -136,6 +136,7 @@ import TokenChart from '@/components/charts/TokenChart.vue'
 import MetricsCard from '@/components/metrics/MetricsCard.vue'
 import CircuitBreakerLight from '@/components/metrics/CircuitBreakerLight.vue'
 import HealthPanel from '@/components/metrics/HealthPanel.vue'
+import ChatPanel from '@/components/chat/ChatPanel.vue'
 
 const ws = useWebSocket()
 const dashboardStore = useDashboardStore()

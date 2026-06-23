@@ -150,7 +150,7 @@ class L6ContractValidator:
                 )
         return endpoints
 
-    def _extract_code_routes(self, code: str) -> dict[str, Any]:
+    def _extract_code_routes(self, code: str) -> dict[tuple[str, str], dict[str, Any]]:  # type: ignore[return-value]
         """从代码中 AST 提取 FastAPI 路由定义。
 
         返回 {(path, method): {"response_model": str, ...}}
@@ -204,7 +204,7 @@ class L6ContractValidator:
         """比对单个端点。"""
         matches: list[L6ContractMatch] = []
         spec_resp = spec_ep.get("response_model", "")
-        code_resp = code_ep.get("response_model", "")  # type: ignore[return-value]
+        code_resp = code_ep.get("response_model", "")
         matched = True
         differences: list[str] = []
 

@@ -20,7 +20,7 @@ class GraphEngineBase:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self.session_factory = session_factory
 
-    async def upsert_node(self, model: type, node_id: str, **fields: Any) -> Any:
+    async def upsert_node(self, model: type, node_id: str, **fields: Any) -> Any:  # type: ignore[func-returns-value]
         """插入或更新节点（按 id upsert）。"""
         async with self.session_factory() as session:
             existing = await session.get(model, node_id)
@@ -31,7 +31,7 @@ class GraphEngineBase:
                 node = model(id=node_id, **fields)
                 session.add(node)
             await session.commit()
-            return await session.get(model, node_id)  # type: ignore[func-returns-value]
+            return await session.get(model, node_id)
 
     async def delete_nodes_by_file(self, model: type, file_path: str) -> int:
         """删除某文件的所有节点（增量更新前清理旧数据）。

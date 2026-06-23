@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import deque
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -37,8 +38,8 @@ class GraphNode(BaseModel):
 
     id: str
     agent_role: str = "developer"
-    input: dict = Field(default_factory=dict)
-    output: dict | None = None
+    input: dict[str, Any] = Field(default_factory=dict)
+    output: dict[str, Any] | None = None
     status: NodeStatus = NodeStatus.PENDING
     retry_count: int = 0
     error: str | None = None
@@ -55,7 +56,7 @@ class TaskGraph(BaseModel):
     nodes: list[GraphNode]
     edges: list[tuple[str, str]] = Field(default_factory=list)
 
-    def validate(self) -> None:
+    def validate(self) -> None:  # type: ignore[override]
         """验证 DAG 合法性：无循环、边引用的节点存在。
 
         Raises:

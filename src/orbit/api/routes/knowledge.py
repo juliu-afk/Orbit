@@ -30,7 +30,7 @@ def _get_engine() -> KnowledgeEngine:
 async def query_knowledge(
     domain: str = Query(..., min_length=1, description="领域：accounting/finance/legal"),
     concept: str = Query(..., min_length=1, description="概念名：CurrentRatio/ROE 等"),
-    mode: QueryMode = Query("exact", description="查询模式"),
+    mode: QueryMode = Query("exact", description="查询模式"),  # noqa: B008
 ) -> dict[str, Any]:
     """精确查询领域知识概念。
 
@@ -45,6 +45,17 @@ async def query_knowledge(
             detail=f"概念 {domain}/{concept} 不存在",
         )
     return result.to_dict()
+
+
+@router.get("/search", summary="语义搜索")
+async def search_knowledge(
+    q: str = Query(..., min_length=1, description="自然语言查询"),
+    top_k: int = Query(5, ge=1, le=20, description="返回数量"),
+) -> dict[str, Any]:
+    """语义搜索——用自然语言查询知识概念。"""
+    engine = _get_engine()
+    results = engine.search(q, top_k=top_k)
+    return {"query": q, "results": results, "count": len(results)}
 
 
 @router.get("/concepts", summary="列出领域概念")

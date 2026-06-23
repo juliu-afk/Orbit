@@ -10,7 +10,7 @@ from typing import Any
 
 import structlog
 
-from orbit.compliance.rule_engine import RuleEngine, RuleSeverity, RuleStatus
+from orbit.compliance.rule_engine import RuleEngine, RuleStatus
 from orbit.knowledge.store import KnowledgeStore
 
 logger = structlog.get_logger()

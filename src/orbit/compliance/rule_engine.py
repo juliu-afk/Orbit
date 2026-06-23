@@ -49,18 +49,16 @@ class ComplianceRule:
         reasons: list[str] = []
 
         # 来源等级检查
-        if self.min_source_level is not None and source_level is not None:
-            if source_level > self.min_source_level:
-                reasons.append(
-                    f"来源等级 {source_level} 低于要求 {self.min_source_level}"
-                )
+        if (
+            self.min_source_level is not None
+            and source_level is not None
+            and source_level > self.min_source_level
+        ):
+            reasons.append(f"来源等级 {source_level} 低于要求 {self.min_source_level}")
 
         # 关键词检查
         if self.required_keywords:
-            missing = [
-                kw for kw in self.required_keywords
-                if kw not in definition
-            ]
+            missing = [kw for kw in self.required_keywords if kw not in definition]
             if missing:
                 reasons.append(f"定义缺关键概念: {', '.join(missing)}")
 
@@ -84,27 +82,33 @@ class RuleEngine:
 
     def _register_default_rules(self) -> None:
         """预置会计合规规则。"""
-        self.register(ComplianceRule(
-            rule_id="source-level-minimum",
-            name="来源等级最低要求",
-            description="所有会计概念来源等级至少为国家法规(≤2)",
-            severity=RuleSeverity.WARNING,
-            min_source_level=2,
-        ))
-        self.register(ComplianceRule(
-            rule_id="definition-completeness",
-            name="定义完整性检查",
-            description="财务比率定义必须包含'衡量'或'度量'关键词",
-            severity=RuleSeverity.INFO,
-            required_keywords=["衡量", "度量", "计算", "比率"],
-        ))
-        self.register(ComplianceRule(
-            rule_id="ifrs-source-required",
-            name="IFRS 来源要求",
-            description="IFRS 定义的概念来源等级应为 1（国际标准）",
-            severity=RuleSeverity.WARNING,
-            min_source_level=1,
-        ))
+        self.register(
+            ComplianceRule(
+                rule_id="source-level-minimum",
+                name="来源等级最低要求",
+                description="所有会计概念来源等级至少为国家法规(≤2)",
+                severity=RuleSeverity.WARNING,
+                min_source_level=2,
+            )
+        )
+        self.register(
+            ComplianceRule(
+                rule_id="definition-completeness",
+                name="定义完整性检查",
+                description="财务比率定义必须包含'衡量'或'度量'关键词",
+                severity=RuleSeverity.INFO,
+                required_keywords=["衡量", "度量", "计算", "比率"],
+            )
+        )
+        self.register(
+            ComplianceRule(
+                rule_id="ifrs-source-required",
+                name="IFRS 来源要求",
+                description="IFRS 定义的概念来源等级应为 1（国际标准）",
+                severity=RuleSeverity.WARNING,
+                min_source_level=1,
+            )
+        )
 
     def register(self, rule: ComplianceRule) -> None:
         self._rules[rule.rule_id] = rule
@@ -123,6 +127,5 @@ class RuleEngine:
     ) -> dict[str, RuleStatus]:
         """运行所有规则，返回 {rule_id: status}。"""
         return {
-            rid: rule.check(concept, source_level, definition)
-            for rid, rule in self._rules.items()
+            rid: rule.check(concept, source_level, definition) for rid, rule in self._rules.items()
         }

@@ -1,6 +1,7 @@
 """Step 4.3 ComplianceValidator + RuleEngine 单元测试。"""
 
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -27,8 +28,9 @@ class TestRuleEngine:
             severity=RuleSeverity.INFO,
         )
         engine.register(rule)
-        assert engine.get("test-1") is not None
-        assert engine.get("test-1").name == "测试规则"
+        got = engine.get("test-1")
+        assert got is not None
+        assert got.name == "测试规则"
 
     def test_default_rules_registered(self) -> None:
         engine = RuleEngine()
@@ -36,14 +38,18 @@ class TestRuleEngine:
 
     def test_min_source_level_pass(self) -> None:
         rule = ComplianceRule(
-            rule_id="sl", name="来源", description="",
+            rule_id="sl",
+            name="来源",
+            description="",
             min_source_level=2,
         )
         assert rule.check("TEST", source_level=1) == RuleStatus.PASS  # IFRS
 
     def test_min_source_level_warning(self) -> None:
         rule = ComplianceRule(
-            rule_id="sl", name="来源", description="",
+            rule_id="sl",
+            name="来源",
+            description="",
             min_source_level=2,
             severity=RuleSeverity.WARNING,
         )
@@ -51,7 +57,9 @@ class TestRuleEngine:
 
     def test_min_source_level_critical_violation(self) -> None:
         rule = ComplianceRule(
-            rule_id="sl", name="来源", description="",
+            rule_id="sl",
+            name="来源",
+            description="",
             min_source_level=2,
             severity=RuleSeverity.CRITICAL,
         )
@@ -59,14 +67,18 @@ class TestRuleEngine:
 
     def test_keyword_check_pass(self) -> None:
         rule = ComplianceRule(
-            rule_id="kw", name="关键词", description="",
+            rule_id="kw",
+            name="关键词",
+            description="",
             required_keywords=["衡量"],
         )
         assert rule.check("TEST", definition="衡量企业盈利能力") == RuleStatus.PASS
 
     def test_keyword_check_fail(self) -> None:
         rule = ComplianceRule(
-            rule_id="kw", name="关键词", description="",
+            rule_id="kw",
+            name="关键词",
+            description="",
             required_keywords=["衡量", "度量"],
             severity=RuleSeverity.WARNING,
         )
@@ -83,7 +95,7 @@ class TestComplianceValidator:
     """合规验证器——validate/validate_all/降级。"""
 
     @pytest.fixture
-    def validator(self) -> ComplianceValidator:
+    def validator(self) -> Generator[ComplianceValidator, None, None]:
         path = Path(tempfile.mktemp(suffix=".db"))
         store = KnowledgeStore(db_path=path)
         store.initialize()

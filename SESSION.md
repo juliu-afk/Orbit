@@ -16,8 +16,10 @@
 - CI 全修复（mypy/ruff/bandit/integration）
 - 全量 174/174 通过
 
+### 版本
+- v0.9.0：5 Agent 角色定义（PR #12，tag 待 push）
+
 ### 待处理
-- Step 5.2 Agent 角色（代码在 feat/step5.2-agent-roles，待审查后重新 PR）
 - Step 6.1 前端驾驶舱
 - Step 7.1 灰度发布
 

@@ -65,6 +65,11 @@ class Scheduler:
         node_timeout: int = 30,
         max_retries: int = 2,
         fail_fast: bool = True,
+        # ── Step I1 集成胶水 ──────────────────────
+        agent_factory: Any = None,  # AgentFactory (延迟导入避免循环)
+        message_bus: Any = None,  # AgentMessageBus
+        tool_registry: Any = None,  # ToolRegistry
+        audit_logger: Any = None,  # AuditLogger
     ):
         self.llm = llm_client
         self.checkpoint = checkpoint_manager
@@ -74,6 +79,11 @@ class Scheduler:
         self._node_timeout = node_timeout
         self._max_retries = max_retries
         self._fail_fast = fail_fast
+        # Step I1 集成
+        self._agent_factory = agent_factory
+        self._message_bus = message_bus
+        self._tool_registry = tool_registry
+        self._audit_logger = audit_logger
 
     def _publish_task_update(
         self, task_id: str, state: str, progress: float, dag: list[dict[str, Any]] | None = None
@@ -171,22 +181,110 @@ class Scheduler:
             raise InvalidStateTransitionError(f"状态 {current.value} 无定义的后继状态")
         return STATE_TRANSITIONS[current]
 
-    async def _agent_cycle(self, task_id: str, state: TaskState, context: dict[str, Any]) -> str:
-        """单个 Agent 循环：思考（LLM）→ 行动 → 观察。
+    # ── Step I1 集成胶水 ──────────────────────────────
 
-        MVP 阶段每个状态都调一次 LLM，返回内容作为观察结果。
-        Step 5.2 会按状态分配不同 Agent 角色（架构/开发/审查）。
+    async def _run_agent(
+        self, role: str, task_id: str, context: dict[str, Any], timeout: int = 300
+    ) -> str:
+        """拉起 Agent 协程——AgentFactory 创建 + 注入依赖 + 超时保护。
+
+        role: architect | developer | reviewer | tester | devops
+        超时 5 分钟后取消协程。
         """
+        if self._agent_factory is None:
+            # 降级：无 AgentFactory 时走传统 LLM 调用
+            return await self._agent_cycle(task_id, TaskState.CODING, context)
+
+        try:
+            agent = self._agent_factory.create(role)
+        except Exception as e:
+            logger.error("agent_build_failed", role=role, error=str(e))
+            if self._audit_logger:
+                self._audit_logger.log("orchestrator", "agent_build_failed",
+                                       task_id=task_id, status="error", error=str(e))
+            return f"[error] Agent {role} 创建失败: {e}"
+
+        # 注入依赖
+        if self._message_bus is not None:
+            agent.message_bus = self._message_bus
+        if self._tool_registry is not None:
+            agent.tool_registry = self._tool_registry
+        if self.llm is not None:
+            agent.llm_client = self.llm
+
+        # 构建 L1-L5 上下文
+        agent_context = self._build_context(task_id, context)
+
+        # 记录审计
+        if self._audit_logger:
+            self._audit_logger.log("orchestrator", "agent_start",
+                                   task_id=task_id, component=role)
+
+        try:
+            result = await asyncio.wait_for(
+                agent.run(agent_context), timeout=timeout
+            )
+            output = result.output if result.success else f"[error] {result.error}"
+        except asyncio.TimeoutError:
+            logger.warning("agent_timeout", role=role, task_id=task_id)
+            output = f"[timeout] {role} 超时 (300s)"
+            if self._audit_logger:
+                self._audit_logger.log("orchestrator", "agent_timeout",
+                                       task_id=task_id, component=role)
+        except Exception as e:
+            logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
+            output = f"[error] {role}: {e}"
+            if self._audit_logger:
+                self._audit_logger.log("orchestrator", "agent_run_error",
+                                       task_id=task_id, component=role, error=str(e))
+
+        return str(output)
+
+    def _build_context(self, task_id: str, context: dict[str, Any]) -> Any:
+        """构建 L1-L5 TaskContext——注入给 Agent.run()。
+
+        L1: 协作宪法 (章程规则)
+        L2: 四图谱查询结果 (占位)
+        L3: 任务状态
+        L4: Agent 私有工作记忆
+        L5: 长期记忆 (教训库)
+        """
+        from orbit.agents.context import TaskContext
+
+        return TaskContext(
+            task_id=task_id,
+            l1="遵循小企业会计准则; 禁止直接操作总账; 金额使用 Decimal",
+            l2=context.get("l2", {}),  # 图谱查询结果由调用方注入
+            l3={"state": context.get("state", "UNKNOWN"), "prd": context.get("prd", ""),
+                "artifacts": context.get("artifacts", {})},
+            l4={},  # 私有记忆——Agent 间通过 MessageBus 传递
+            l5=context.get("l5", []),  # 教训库检索结果
+        )
+
+    async def _agent_cycle(self, task_id: str, state: TaskState, context: dict[str, Any]) -> str:
+        """单个 Agent 循环：优先用 Agent 角色 → 降级为直接 LLM 调用。
+
+        Step I1: 根据状态映射角色并用 _run_agent() 拉起。
+        """
+        # 状态→角色映射
+        role_map: dict[TaskState, str] = {
+            TaskState.PLANNING: "architect",
+            TaskState.CODING: "developer",
+            TaskState.VERIFYING: "reviewer",
+        }
+        role = role_map.get(state)
+        if role and self._agent_factory is not None:
+            context["state"] = state.value
+            return await self._run_agent(role, task_id, context)
+
+        # 降级：直接 LLM 调用（MVP 已有逻辑）
         if self.llm is None:
-            # MVP 无 LLM 时返回占位（测试用）
             return f"[mock] {state.value} 完成"
-        # 根据状态构造不同的 prompt（Step 5.2 细化为 Agent 角色模板）
         prompt = self._build_prompt(state, context)
         resp = await self.llm.generate(
             LLMRequest(prompt=prompt, system_prompt=self._system_prompt(state)),  # type: ignore[call-arg]
             task_id=task_id,
         )
-        # Step 6.1：推送 Token 消耗到 Dashboard
         if resp.usage:
             self._publish_token_update(
                 task_id,

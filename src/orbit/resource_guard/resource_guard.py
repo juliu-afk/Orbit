@@ -81,9 +81,7 @@ class ResourceGuard:
 
     # ── 核心 API ──────────────────────────────────────────
 
-    def guard_request(
-        self, task_id: str, estimated_tokens: int = 500
-    ) -> GuardResult:
+    def guard_request(self, task_id: str, estimated_tokens: int = 500) -> GuardResult:
         """请求放行——检查资源预算。
 
         Returns:
@@ -115,9 +113,7 @@ class ResourceGuard:
         # 全部通过
         return GuardResult(decision=GuardDecision.ALLOW)
 
-    def record_result(
-        self, task_id: str, success: bool, tokens_used: int = 0
-    ) -> None:
+    def record_result(self, task_id: str, success: bool, tokens_used: int = 0) -> None:
         """记录调用结果——更新熔断状态 + Token 预算。
 
         每次 LLM 调用后必须调用此方法。
@@ -153,9 +149,7 @@ class ResourceGuard:
         # 推送 Prometheus 指标
         self._push_metrics()
 
-    def degrade(
-        self, level: int, context: dict[str, Any] | None = None
-    ) -> DegradationResult:
+    def degrade(self, level: int, context: dict[str, Any] | None = None) -> DegradationResult:
         """执行降级路径。"""
         result = self._degradation.execute(level, context)
         # 统计

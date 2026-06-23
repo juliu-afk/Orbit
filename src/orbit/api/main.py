@@ -1,4 +1,4 @@
-"""FastAPI 应用入口（Step 1.1 + Step 6.1 WS 扩展）。
+"""FastAPI 应用入口（Step 1.1 + Step 6.1 WS 扩展 + Step 7.1 Prometheus）。
 
 WHY 分层：main 只负责组装 app（路由注册、中间件、异常处理），
 不写业务逻辑。路由在 routes/，模型在 schemas/，配置在 core/。
@@ -10,6 +10,7 @@ import asyncio
 
 import structlog
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.api.routes import health, tasks
 from orbit.core.config import settings
@@ -31,7 +32,7 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     """
     app = FastAPI(
         title=settings.PROJECT_NAME,
-        version="0.1.0",
+        version="0.11.0",
         description="轻量级多Agent软件开发自循环系统",
         docs_url="/docs",
         redoc_url="/redoc",
@@ -42,6 +43,9 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(health.router)
     # WebSocket 路由（Step 6.1 驾驶舱）
     app.include_router(ws_router)
+
+    # Prometheus 指标（Step 7.1 生产部署）
+    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
     # 启动 EventBus→WS 广播协程
     if event_bus is not None:

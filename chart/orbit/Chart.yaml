@@ -1,0 +1,6 @@
+apiVersion: v2
+name: orbit
+description: Orbit 多 Agent 软件开发自循环系统
+type: application
+version: 0.11.0
+appVersion: "0.11.0"

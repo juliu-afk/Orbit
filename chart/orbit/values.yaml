@@ -1,0 +1,53 @@
+# Orbit Helm Chart 默认值
+
+replicaCount: 3
+
+image:
+  repository: ghcr.io/juliu-afk/orbit
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 18888
+
+ingress:
+  enabled: false
+  className: nginx
+  hosts:
+    - host: orbit.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "500m"
+  limits:
+    memory: "2Gi"
+    cpu: "2000m"
+
+# 环境变量
+env:
+  ORBIT_LOG_LEVEL: info
+
+# Prometheus 指标
+metrics:
+  enabled: true
+  path: /metrics
+
+# 健康检查
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 18888
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 18888
+  initialDelaySeconds: 5
+  periodSeconds: 10

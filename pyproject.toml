@@ -56,6 +56,7 @@ pip-audit = ">=2.7.0"
 pre-commit = ">=3.6.0"
 websockets = "^16.0"
 pytest-timeout = "^2.4.0"
+pytest-benchmark = "^5.2.3"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]
@@ -67,6 +68,7 @@ asyncio_mode = "auto"
 addopts = "--strict-markers -q"
 markers = [
     "e2e: 端到端集成测试（需 Docker 或 ProcessSandbox）",
+    "perf: 性能基准测试（非阻塞 CI 检查）",
     "slow: 耗时较长的测试",
 ]
 

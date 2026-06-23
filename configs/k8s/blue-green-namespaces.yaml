@@ -1,0 +1,91 @@
+# Orbit 蓝绿部署——命名空间定义 (Step 7.4 PR #4)
+# 两个独立命名空间，共享 ConfigMap 和 Secret。
+# 流量切换通过 Argo Rollouts 控制，回滚秒级完成。
+#
+# 用法:
+#   kubectl apply -f configs/k8s/blue-green-namespaces.yaml
+#   # 初始部署到 blue，Argo Rollouts 管理切换
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orbit-blue
+  labels:
+    app: orbit
+    deployment: blue
+    version: stable
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: orbit-green
+  labels:
+    app: orbit
+    deployment: green
+    version: canary
+
+---
+# 共享 ConfigMap——两个命名空间共用配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orbit-config
+  namespace: orbit-blue
+data:
+  APP_ENV: "production"
+  API_V1_STR: "/api/v1"
+  AGENTOPS_ENABLED: "true"
+  RESOURCE_GUARD_ENABLED: "true"
+  AGENTOPS_TOKEN_THRESHOLD_WARNING: "50"
+  RESOURCE_GUARD_TOKEN_CAPACITY: "100000"
+  RESOURCE_GUARD_TOKEN_RATE: "5000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orbit-config
+  namespace: orbit-green
+data:
+  APP_ENV: "production"
+  API_V1_STR: "/api/v1"
+  AGENTOPS_ENABLED: "true"
+  RESOURCE_GUARD_ENABLED: "true"
+  AGENTOPS_TOKEN_THRESHOLD_WARNING: "50"
+  RESOURCE_GUARD_TOKEN_CAPACITY: "100000"
+  RESOURCE_GUARD_TOKEN_RATE: "5000"
+
+---
+# Service——指向 Argo Rollout 管理的 Pod
+apiVersion: v1
+kind: Service
+metadata:
+  name: orbit
+  namespace: orbit-blue
+spec:
+  selector:
+    app: orbit
+  ports:
+    - port: 18888
+      targetPort: 18888
+      name: http
+    - port: 9090
+      targetPort: 9090
+      name: metrics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orbit
+  namespace: orbit-green
+spec:
+  selector:
+    app: orbit
+  ports:
+    - port: 18888
+      targetPort: 18888
+      name: http
+    - port: 9090
+      targetPort: 9090
+      name: metrics

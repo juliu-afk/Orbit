@@ -28,8 +28,8 @@ async def test_perf_eventbus_throughput(benchmark: Any) -> None:
             bus.publish(event)
 
     benchmark(pump_events)
-    # 验证队列未满丢弃
-    assert bus._queue.qsize() > 0  # 还有事件在队列中
+    # 验证队列未满丢弃（not empty 而非 qsize()——避免 Windows 下多线程竞态）
+    assert not bus._queue.empty()
 
 
 @pytest.mark.perf

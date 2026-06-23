@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +30,7 @@ class AgentInput(BaseModel):
     """
 
     task: str = Field(..., min_length=1, description="任务描述")
-    context: dict = Field(default_factory=dict, description="上下文（上游节点输出等）")
+    context: dict[str, Any] = Field(default_factory=dict, description="上下文（上游节点输出等）")
     role: AgentRole = Field(default=AgentRole.DEVELOPER)
 
 
@@ -40,7 +41,7 @@ class AgentOutput(BaseModel):
     """
 
     status: str = "ok"  # ok | error
-    result: dict = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
 
 
@@ -53,7 +54,7 @@ class BaseAgent(ABC):
 
     role: AgentRole
 
-    def __init__(self, llm=None, graph=None, sandbox=None):
+    def __init__(self, llm: Any = None, graph: Any = None, sandbox: Any = None) -> None:
         self.llm = llm
         self.graph = graph
         self.sandbox = sandbox

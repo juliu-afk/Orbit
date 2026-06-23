@@ -33,7 +33,7 @@ class ArchitectAgent(BaseAgent):
         resp = await self.llm.generate(prompt, task_id=input_data.context.get("task_id", ""))
         return AgentOutput(result={"design": resp.content})
 
-    def _build_prompt(self, task: str, context: dict) -> str:
+    def _build_prompt(self, task: str, context: dict[str, Any]) -> str:
         return f"""基于以下需求设计系统架构：
 
 需求：{task}
@@ -71,7 +71,7 @@ class DeveloperAgent(BaseAgent):
         resp = await self.llm.generate(prompt, task_id=input_data.context.get("task_id", ""))
         return AgentOutput(result={"code": resp.content, "language": "python"})
 
-    def _build_prompt(self, design: str, context: dict) -> str:
+    def _build_prompt(self, design: str, context: dict[str, Any]) -> str:
         code_context = context.get("code_context", "")
         return f"""基于设计方案生成代码：
 
@@ -104,7 +104,7 @@ class ReviewerAgent(BaseAgent):
         resp = await self.llm.generate(prompt, task_id=input_data.context.get("task_id", ""))
         return AgentOutput(result={"review": resp.content, "issues": []})
 
-    def _build_prompt(self, code: str, context: dict) -> str:
+    def _build_prompt(self, code: str, context: dict[str, Any]) -> str:
         return f"""审查以下代码的质量和安全性：
 
 代码：
@@ -139,7 +139,7 @@ class QAAgent(BaseAgent):
         resp = await self.llm.generate(prompt, task_id=input_data.context.get("task_id", ""))
         return AgentOutput(result={"tests": resp.content, "passed": True})
 
-    def _build_prompt(self, code: str, context: dict) -> str:
+    def _build_prompt(self, code: str, context: dict[str, Any]) -> str:
         return f"""为以下代码生成 pytest 测试用例：
 
 代码：
@@ -171,7 +171,7 @@ class ConfigManagerAgent(BaseAgent):
         resp = await self.llm.generate(prompt, task_id=input_data.context.get("task_id", ""))
         return AgentOutput(result={"config": resp.content})
 
-    def _build_prompt(self, task: str, context: dict) -> str:
+    def _build_prompt(self, task: str, context: dict[str, Any]) -> str:
         return f"""管理以下环境配置：
 
 任务：{task}

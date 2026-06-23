@@ -198,7 +198,9 @@ class L6ContractValidator:
                 path = str(first.value)
         return {"path": path, "method": method, "response_model": ""}
 
-    def _compare_endpoint(self, spec_ep: dict[str, Any], code_ep: dict[str, Any]) -> list[L6ContractMatch]:
+    def _compare_endpoint(
+        self, spec_ep: dict[str, Any], code_ep: dict[str, Any]
+    ) -> list[L6ContractMatch]:
         """比对单个端点。"""
         matches: list[L6ContractMatch] = []
         spec_resp = spec_ep.get("response_model", "")

@@ -1,0 +1,78 @@
+# Argo Rollouts AnalysisTemplate——金丝雀 SLO 分析 (Step 7.4 PR #4)
+# 每步进后查询 Prometheus，满足以下任一条件则自动回滚:
+#   1. 错误率 >5%
+#   2. P99 延迟 >基线×1.5
+#   3. Token 消耗异常 >基线×2
+#
+# 依赖: Prometheus (metrics endpoint at orbit:9090)
+#
+# 用法:
+#   kubectl apply -f configs/k8s/analysis-template.yaml
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: orbit-canary-analysis
+spec:
+  metrics:
+    # 指标 1: 错误率 (5min 窗口)
+    - name: error-rate
+      interval: 30s
+      count: 5   # 连续 5 次失败才触发 (避免瞬时波动)
+      failureLimit: 3
+      provider:
+        prometheus:
+          address: "http://prometheus:9090"
+          query: |
+            sum(rate(orbit_tasks_total{status="failed"}[5m]))
+            / sum(rate(orbit_tasks_total[5m]))
+            * 100
+
+    # 指标 2: P99 任务延迟 (vs 基线)
+    - name: p99-latency-ratio
+      interval: 30s
+      count: 3
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: "http://prometheus:9090"
+          query: |
+            histogram_quantile(0.99,
+              sum(rate(orbit_task_duration_seconds_bucket{version="canary"}[5m])) by (le)
+            )
+            /
+            histogram_quantile(0.99,
+              sum(rate(orbit_task_duration_seconds_bucket{version="stable"}[5m])) by (le)
+            )
+
+    # 指标 3: Token 消耗比 (vs 基线，异常检测)
+    - name: token-consumption-ratio
+      interval: 60s
+      count: 3
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: "http://prometheus:9090"
+          query: |
+            sum(rate(orbit_llm_tokens_total{version="canary"}[5m]))
+            /
+            sum(rate(orbit_llm_tokens_total{version="stable"}[5m]))
+
+    # 指标 4: 熔断器状态 (任何 OPEN 则失败)
+    - name: circuit-breaker-status
+      interval: 15s
+      count: 1
+      failureLimit: 0   # 一旦 OPEN 立即失败
+      provider:
+        prometheus:
+          address: "http://prometheus:9090"
+          query: |
+            sum(orbit_circuit_breaker_state{version="canary"})
+
+  # 阈值定义——若任意指标超出则标记分析失败→触发回滚
+  successCondition: |
+    result[0] <= 5.0 &&          # 错误率 ≤5%
+    result[1] <= 1.5 &&          # P99 延迟 ≤基线×1.5
+    result[2] <= 2.0 &&          # Token 消耗 ≤基线×2
+    result[3] == 0               # 熔断器全部 CLOSED

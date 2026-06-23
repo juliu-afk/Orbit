@@ -1,0 +1,127 @@
+# Argo Rollouts——金丝雀渐进式交付 (Step 7.4 PR #4)
+# 固定步长: 1%→5%→20%→50%→100%
+# 每步进后自动查询 Prometheus 指标，超阈值则自动回滚。
+#
+# 依赖:
+#   - Argo Rollouts controller (kubectl apply -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml)
+#   - Prometheus (metrics endpoint)
+#
+# 用法:
+#   kubectl apply -f configs/k8s/argo-rollout.yaml
+#   kubectl argo rollouts promote orbit --namespace orbit-green  # 手动推进
+#   kubectl argo rollouts abort orbit --namespace orbit-green    # 手动中止
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: orbit
+  namespace: orbit-green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: orbit
+      version: canary
+  strategy:
+    canary:
+      # 金丝雀步进策略——固定步长 (Phase 0)
+      steps:
+        - setWeight: 1    # 1% 流量 → 观察 60s
+        - pause: {duration: 60s}
+        - setWeight: 5    # 5% 流量 → 观察 120s
+        - pause: {duration: 120s}
+        - setWeight: 20   # 20% 流量 → 观察 180s
+        - pause: {duration: 180s}
+        - setWeight: 50   # 50% 流量 → 观察 300s
+        - pause: {duration: 300s}
+        # 全量切换 (需要手动确认)
+        - setWeight: 100
+      # 自动回滚——基于 Prometheus 指标 (AnalysisTemplate)
+      analysis:
+        templates:
+          - templateName: orbit-canary-analysis
+        startingStep: 1  # 从第 2 步 (5%) 开始分析
+        args:
+          - name: service-name
+            value: orbit-canary
+  template:
+    metadata:
+      labels:
+        app: orbit
+        version: canary
+    spec:
+      containers:
+        - name: orbit
+          image: ghcr.io/juliu-afk/orbit:latest
+          ports:
+            - containerPort: 18888
+              name: http
+            - containerPort: 9090
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: orbit-config
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 18888
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 18888
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+
+---
+# 稳定版 (Blue)——保持运行，作为回滚目标
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orbit-stable
+  namespace: orbit-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: orbit
+      version: stable
+  template:
+    metadata:
+      labels:
+        app: orbit
+        version: stable
+    spec:
+      containers:
+        - name: orbit
+          image: ghcr.io/juliu-afk/orbit:stable
+          ports:
+            - containerPort: 18888
+              name: http
+            - containerPort: 9090
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: orbit-config
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 18888
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi

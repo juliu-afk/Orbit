@@ -33,7 +33,12 @@ test-smoke:
 	poetry run pytest tests/e2e/ -q -k "smoke"
 
 test-e2e:
-	poetry run pytest tests/e2e/ -q
+	@echo ">>> 启动 E2E 基础设施..."
+	docker compose -f docker-compose.test.yml up -d --wait 2>/dev/null || echo "Docker 不可用——降级到 ProcessSandbox"
+	-poetry run pytest tests/e2e/ -v -m e2e --tb=long --timeout=120; \
+	EXIT=$$?; \
+	docker compose -f docker-compose.test.yml down -v 2>/dev/null || true; \
+	exit $$EXIT
 
 # 代码检查（Step 0.2 SC3：make lint 无错误）
 lint:

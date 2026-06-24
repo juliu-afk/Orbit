@@ -1,7 +1,7 @@
-/** Chat Store??NL ??????????? Agent ?????
+/** Chat Store——NL 聊天状态管理 + Agent 验收交互
  *
- * ??????/????/??? PRD/???????
- * ????????? /api/v1/chat?ClarifierAgent????? LLM ???
+ * 管理消息/候选/结构化 PRD/任务状态。
+ * 对接后端 /api/v1/chat，ClarifierAgent 处理需求澄清和 LLM 调用。
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -36,7 +36,7 @@ export interface ClarifyResponse {
   structured_prd: StructuredPRD | null
   missing_fields: string[]
   candidates?: Candidate[]
-  // task_created ?
+  // task_created 时
   task_id?: string
   state?: string
 }
@@ -52,15 +52,11 @@ export const useChatStore = defineStore('chat', () => {
   const lastTaskId = ref<string | null>(null)
   const lastError = ref<string | null>(null)
 
-  // chat WS ?????? /api/v1/chat???? /ws/dashboard?
+  // chat WS 连接到 /api/v1/chat（非 /ws/dashboard）
   let chatWs: WebSocket | null = null
 
-  /** ?? chat WebSocket??? /api/v1/chat ??? */
-  function connectChatWs(sessionId: string, projectName: string) {
-    // ?????????????/????????? WS URL ??
-    void sessionId
-    void projectName
-    // ?????
+  /** 建立 chat WebSocket 连接到 /api/v1/chat 端点 */
+  function connectChatWs(_sessionId: string, _projectName: string) {
     disconnect()
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -77,7 +73,7 @@ export const useChatStore = defineStore('chat', () => {
         const resp = JSON.parse(event.data as string)
         handleChatResponse(resp)
       } catch {
-        console.warn('[chat] ??????', event.data)
+        console.warn('[chat] 消息解析失败', event.data)
       }
     }
 
@@ -88,15 +84,15 @@ export const useChatStore = defineStore('chat', () => {
 
     chatWs.onerror = () => {
       connecting.value = false
-      lastError.value = '????'
+      lastError.value = '连接失败'
     }
   }
 
-  /** ????? chat ???{code, data, message} ??? */
+  /** 处理后端 chat 响应 {code, data, message} 格式 */
   function handleChatResponse(resp: { code: number; data: ClarifyResponse; message: string }) {
     if (resp.code !== 0) {
       lastError.value = resp.message
-      // ???????????
+      // 错误消息也加入聊天记录
       messages.value.push({
         id: `e-${Date.now()}`,
         text: resp.message,
@@ -109,18 +105,18 @@ export const useChatStore = defineStore('chat', () => {
     const data = resp.data
 
     if (data.type === 'task_created') {
-      // ?????????
+      // 任务已创建
       lastTaskId.value = data.task_id ?? null
       messages.value.push({
         id: `t-${Date.now()}`,
-        text: data.reply ?? `??????${data.task_id}???????`,
+        text: data.reply ?? `任务已创建：${data.task_id}`,
         from: 'system',
         timestamp: Date.now(),
       })
       return
     }
 
-    // clarify ??
+    // clarify 状态
     clarificationStatus.value = data.clarification_status
     structuredPrd.value = data.structured_prd
     missingFields.value = data.missing_fields || []
@@ -128,7 +124,7 @@ export const useChatStore = defineStore('chat', () => {
       candidates.value = data.candidates
     }
 
-    // Agent ????????
+    // Agent 回复加入消息列表
     messages.value.push({
       id: `a-${Date.now()}`,
       text: data.reply,
@@ -140,11 +136,11 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /** ?????? */
+  /** 发送消息 */
   function send(text: string, sessionId: string, projectName: string) {
     if (!text.trim()) return
     if (!chatWs || chatWs.readyState !== WebSocket.OPEN) {
-      lastError.value = '?????????'
+      lastError.value = '未连接到聊天服务'
       return
     }
 
@@ -163,10 +159,10 @@ export const useChatStore = defineStore('chat', () => {
     }))
   }
 
-  /** ?? PRD???????? */
+  /** 确认 PRD 并提交任务 */
   function confirmPrd(sessionId: string, projectName: string, modifiedPrd?: StructuredPRD) {
     if (!chatWs || chatWs.readyState !== WebSocket.OPEN) {
-      lastError.value = '?????'
+      lastError.value = '未连接'
       return
     }
 
@@ -175,7 +171,7 @@ export const useChatStore = defineStore('chat', () => {
       session_id: sessionId,
       project_name: projectName,
     }
-    // ????? modified_prd????????????? prd ???
+    // 如果提供了 modified_prd 则使用，否则用 store 中的 prd
     if (modifiedPrd) {
       payload.modified_prd = modifiedPrd
     } else if (structuredPrd.value) {
@@ -185,17 +181,17 @@ export const useChatStore = defineStore('chat', () => {
     chatWs.send(JSON.stringify(payload))
   }
 
-  /** ????????????????? */
+  /** 清空候选列表 */
   function confirm(_projectName?: string) {
     candidates.value = []
   }
 
-  /** ??????? */
+  /** 解除跨项目警告 */
   function dismissWarning() {
     crossProjectWarning.value = null
   }
 
-  /** ?? chat WS */
+  /** 关闭 chat WS */
   function disconnect() {
     if (chatWs) {
       chatWs.close()
@@ -204,7 +200,7 @@ export const useChatStore = defineStore('chat', () => {
     connecting.value = false
   }
 
-  /** ???????? sessionStore ??? */
+  /** 恢复聊天消息（从 sessionStore 加载） */
   function restoreMessages(msgs: Array<{ role: string; content: string; created_at: number }>) {
     messages.value = msgs.map((m, i) => ({
       id: `r-${i}`,

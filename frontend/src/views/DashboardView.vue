@@ -256,7 +256,7 @@ watch(
     }
     tokenPoints.value = []
     agentOpsStore.fetchAll()
-    // session ????? chat WS
+    // session 切换时重连 chat WS
     if (newId) {
       chatStore.connectChatWs(newId, session.currentProjectName)
     }
@@ -278,7 +278,7 @@ onMounted(async () => {
     })))
   }
   agentOpsStore.startPolling()
-  // ?? chat WS????? Agent???? session ???
+  // 连接 chat WS，对接 Agent 需求澄清（session 存在时）
   if (session.currentSessionId) {
     chatStore.connectChatWs(session.currentSessionId, session.currentProjectName)
   }

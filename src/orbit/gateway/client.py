@@ -131,6 +131,81 @@ class LLMClient:
         usage = self._build_usage(model, usage_raw)
         return LLMResponse(content=content, model=model, usage=usage)
 
+    async def generate_stream(
+        self,
+        req: LLMRequest,
+        task_id: str,
+        entropy_monitor=None,
+    ) -> LLMResponse:
+        """流式生成 + V4 熵监控接入。
+
+        WHY 流式：实时喂给 L3EntropyMonitor 检测 LLM 不确定性。
+        熵超阈值→ HighEntropyError（调用方捕获后可打回重问）。
+        无 monitor 时退化为普通流式（仅拼接内容，不检熵）。
+        """
+        import litellm  # 延迟导入，避免未装包时 import 失败
+        from orbit.hallucination.schemas import HighEntropyError
+
+        try:
+            stream = await litellm.acompletion(
+                model=self.default_model,
+                messages=[
+                    {"role": "system", "content": req.system_prompt},
+                    {"role": "user", "content": req.prompt},
+                ],
+                temperature=req.temperature,
+                max_tokens=req.max_tokens,
+                stream=True,
+                logprobs=True if entropy_monitor else False,
+            )
+        except Exception as e:
+            # 主力失败 → 尝试备选（与 generate 一致的降级策略）
+            logger.warning("stream_primary_failed", model=self.default_model, error=str(e))
+            stream = await litellm.acompletion(
+                model=self.fallback_model,
+                messages=[
+                    {"role": "system", "content": req.system_prompt},
+                    {"role": "user", "content": req.prompt},
+                ],
+                temperature=req.temperature,
+                max_tokens=req.max_tokens,
+                stream=True,
+            )
+
+        # 拼接流式响应，逐 token 喂给熵监控
+        content_parts: list[str] = []
+        usage_raw = None
+        model_used = self.default_model
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            token_text = delta.content or ""
+            if token_text:
+                content_parts.append(token_text)
+            # V4：有 monitor 且有 logprobs 时检熵
+            if entropy_monitor and hasattr(delta, "logprobs") and delta.logprobs:
+                for lp in delta.logprobs.content if delta.logprobs.content else []:
+                    logprob_list = [t.logprob for t in lp.top_logprobs] if hasattr(lp, "top_logprobs") and lp.top_logprobs else [lp.logprob]
+                    entropy = entropy_monitor.on_token(lp.token, logprob_list)
+                    if entropy is not None:
+                        raise HighEntropyError(entropy=entropy, threshold=entropy_monitor.config.threshold)
+            # 记录模型名（备选降级时变化）
+            if hasattr(chunk, "model") and chunk.model:
+                model_used = chunk.model
+
+        content = "".join(content_parts)
+        # 流式下 usage 可能为 None，构造零值 usage
+        usage = LLMUsage()  # type: ignore[call-arg]
+        logger.info(
+            "llm_stream_ok",
+            model=model_used,
+            task_id=task_id,
+            chars=len(content),
+            entropy_checked=entropy_monitor is not None,
+        )
+        return LLMResponse(content=content, model=model_used, usage=usage)
+
     def _build_usage(self, model: str, usage_raw: Any) -> LLMUsage:
         """从 litellm usage 对象构造 LLMUsage（含成本计算）。"""
         prompt_t = getattr(usage_raw, "prompt_tokens", 0) or 0

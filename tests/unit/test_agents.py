@@ -93,7 +93,7 @@ def test_agent_input_validation() -> None:
 def test_agent_role_enum_values() -> None:
     """5 个角色枚举值正确。"""
     roles = list(AgentRole)
-    assert len(roles) == 5
+    assert len(roles) == 6
     assert AgentRole.ARCHITECT.value == "architect"
     assert AgentRole.DEVELOPER.value == "developer"
     assert AgentRole.REVIEWER.value == "reviewer"

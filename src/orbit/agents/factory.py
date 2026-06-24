@@ -13,6 +13,7 @@ from typing import Any
 import structlog
 
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
+from orbit.agents.clarifier import ClarifierAgent
 
 logger = structlog.get_logger()
 
@@ -200,6 +201,7 @@ class AgentFactory:
         AgentRole.REVIEWER: ReviewerAgent,
         AgentRole.QA: QAAgent,
         AgentRole.CONFIG_MANAGER: ConfigManagerAgent,
+        AgentRole.CLARIFIER: ClarifierAgent,  # 需求澄清 Agent
     }
 
     @classmethod

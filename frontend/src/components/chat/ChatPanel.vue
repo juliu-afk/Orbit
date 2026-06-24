@@ -1,24 +1,24 @@
-<!-- 自然语言聊天面板：输入框 + 候选列表 + 消息历史 -->
+<!-- ???????????? + Agent ?? + ???? + PRD ???? -->
 <template>
   <div class="chat-panel">
-    <!-- 候选项目卡片 -->
+    <!-- ?????????????? -->
     <div v-if="chatStore.candidates.length > 0" class="chat-panel__candidates">
       <div class="chat-panel__candidates-title">
-        匹配结果 ({{ chatStore.candidates.length }})
+        ???? ({{ chatStore.candidates.length }})
       </div>
       <CandidateCard
         v-for="(c, i) in chatStore.candidates.slice(0, 5)"
         :key="c.project"
         :candidate="c"
         :is-top="i === 0 && chatStore.candidates.length > 1"
-        @confirm="handleConfirm"
+        @confirm="handleConfirmProject"
       />
     </div>
 
-    <!-- 消息历史 -->
+    <!-- ?????user / agent / system? -->
     <div ref="msgListRef" class="chat-panel__messages">
       <div v-if="chatStore.messages.length === 0" class="chat-panel__empty">
-        输入自然语言描述，自动匹配项目
+        ???????????Agent ???????
       </div>
       <div
         v-for="m in chatStore.messages"
@@ -30,17 +30,75 @@
       </div>
     </div>
 
-    <!-- O2 批量确认卡片 -->
-    <div v-if="showBatchConfirm" class="chat-panel__batch">
-      <span class="batch-text">{{ batchConfirmText }}</span>
-      <el-button type="primary" size="small" @click="handleBatchConfirm">开始</el-button>
+    <!-- ???????Agent ??????? -->
+    <div
+      v-if="showAcceptanceOptions"
+      class="chat-panel__acceptance"
+    >
+      <div class="acceptance-title">????????????</div>
+      <label
+        v-for="opt in chatStore.structuredPrd?.acceptance_options"
+        :key="opt"
+        class="acceptance-option"
+      >
+        <input type="checkbox" :value="opt" v-model="selectedAcceptance" />
+        <span>{{ opt }}</span>
+      </label>
+      <!-- ?????????????? -->
+      <label class="acceptance-option">
+        <input type="checkbox" v-model="useCustomAcceptance" />
+        <span>??</span>
+      </label>
+      <input
+        v-if="useCustomAcceptance"
+        v-model="customAcceptance"
+        class="acceptance-input"
+        placeholder="?????????..."
+      />
+      <el-button type="primary" size="small" @click="submitAcceptance">??</el-button>
     </div>
 
-    <!-- 输入框 -->
+    <!-- PRD ?????clarification_status=ready ???? -->
+    <div v-if="showPrdConfirm" class="chat-panel__prd">
+      <div class="prd-title">?????????????</div>
+      <div class="prd-field">
+        <label>??</label>
+        <textarea v-model="editablePrd.goal" rows="2" class="prd-input"></textarea>
+      </div>
+      <div class="prd-field">
+        <label>??</label>
+        <textarea v-model="editablePrd.scope" rows="2" class="prd-input"></textarea>
+      </div>
+      <div class="prd-field">
+        <label>????</label>
+        <div
+          v-for="(ac, i) in editablePrd.acceptance_criteria"
+          :key="i"
+          class="prd-ac-item"
+        >
+          <input v-model="editablePrd.acceptance_criteria[i]" class="prd-input" />
+        </div>
+      </div>
+      <div class="prd-actions">
+        <el-button type="primary" @click="handleConfirmPrd">???????</el-button>
+      </div>
+    </div>
+
+    <!-- ??????? -->
+    <div v-if="chatStore.lastTaskId" class="chat-panel__task">
+      ??????{{ chatStore.lastTaskId }}???????
+    </div>
+
+    <!-- ???? -->
+    <div v-if="chatStore.lastError" class="chat-panel__error">
+      {{ chatStore.lastError }}
+    </div>
+
+    <!-- ??? -->
     <div class="chat-panel__input">
       <el-input
         v-model="inputText"
-        placeholder="描述你的需求..."
+        placeholder="??????..."
         :disabled="chatStore.connecting"
         @keyup.enter="handleSend"
         clearable
@@ -50,7 +108,7 @@
             :disabled="!inputText.trim() || chatStore.connecting"
             @click="handleSend"
           >
-            发送
+            ??
           </el-button>
         </template>
       </el-input>
@@ -59,39 +117,50 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import { useChatStore } from '@/stores/chat'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { useChatStore, type StructuredPRD } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
 import CandidateCard from './CandidateCard.vue'
 
 const chatStore = useChatStore()
 const sessionStore = useSessionStore()
 const inputText = ref('')
-const batchConfirmed = ref(false)
-
-// O2: 批量确认——候选人=1 且 >0.8 分时自动展示"开始"按钮
-const showBatchConfirm = computed(() => {
-  if (batchConfirmed.value) return false
-  const c = chatStore.candidates
-  return c.length === 1 && c[0].score >= 0.8 && !chatStore.requiresConfirmation
-})
-
-const batchConfirmText = computed(() => {
-  const c = chatStore.candidates[0]
-  return `准备就绪——项目: ${c?.project}, 匹配度: ${Math.round((c?.score ?? 0) * 100)}%`
-})
-
-function handleBatchConfirm() {
-  if (chatStore.candidates[0]) {
-    chatStore.confirm(chatStore.candidates[0].project)
-    batchConfirmed.value = true
-  }
-}
 const msgListRef = ref<HTMLElement | null>(null)
+
+// ????????
+const selectedAcceptance = ref<string[]>([])
+const useCustomAcceptance = ref(false)
+const customAcceptance = ref('')
+
+// PRD ????????????
+const editablePrd = reactive<StructuredPRD>({
+  goal: '',
+  scope: '',
+  acceptance_criteria: [],
+})
+
+// ???????? acceptance_options ????
+const showAcceptanceOptions = computed(() => {
+  const opts = chatStore.structuredPrd?.acceptance_options
+  return Array.isArray(opts) && opts.length > 0 && chatStore.clarificationStatus === 'clarifying'
+})
+
+// ?? PRD ???ready ?? structured_prd
+const showPrdConfirm = computed(() => {
+  return chatStore.clarificationStatus === 'ready' && chatStore.structuredPrd !== null
+})
+
+// ready ??????? PRD
+watch(showPrdConfirm, (show) => {
+  if (show && chatStore.structuredPrd) {
+    editablePrd.goal = chatStore.structuredPrd.goal
+    editablePrd.scope = chatStore.structuredPrd.scope
+    editablePrd.acceptance_criteria = [...chatStore.structuredPrd.acceptance_criteria]
+  }
+})
 
 function handleSend() {
   if (!inputText.value.trim()) return
-  // Session PR #3: 附 session_id + project_name
   chatStore.send(
     inputText.value,
     sessionStore.currentSessionId || '',
@@ -100,11 +169,42 @@ function handleSend() {
   inputText.value = ''
 }
 
-function handleConfirm(project: string) {
+function handleConfirmProject(project: string) {
   chatStore.confirm(project)
 }
 
-// 新消息到达时滚动到底部
+function submitAcceptance() {
+  // ??????? + ?????
+  const merged = [...selectedAcceptance.value]
+  if (useCustomAcceptance.value && customAcceptance.value.trim()) {
+    merged.push(customAcceptance.value.trim())
+  }
+  if (merged.length > 0 && chatStore.structuredPrd) {
+    // ?? acceptance_criteria ???
+    chatStore.structuredPrd.acceptance_criteria = merged
+    chatStore.structuredPrd.acceptance_options = []
+    // ??????? Agent
+    chatStore.send(
+      `????????${merged.join('?')}`,
+      sessionStore.currentSessionId || '',
+      sessionStore.currentProjectName,
+    )
+  }
+  selectedAcceptance.value = []
+  useCustomAcceptance.value = false
+  customAcceptance.value = ''
+}
+
+function handleConfirmPrd() {
+  // ???????????? PRD?
+  chatStore.confirmPrd(
+    sessionStore.currentSessionId || '',
+    sessionStore.currentProjectName,
+    { ...editablePrd },
+  )
+}
+
+// ???????????
 watch(() => chatStore.messages.length, () => {
   nextTick(() => {
     if (msgListRef.value) {
@@ -119,9 +219,7 @@ watch(() => chatStore.messages.length, () => {
   display: flex; flex-direction: column; height: 100%;
   min-height: 500px; padding: 12px;
 }
-.chat-panel__candidates {
-  margin-bottom: 12px;
-}
+.chat-panel__candidates { margin-bottom: 12px; }
 .chat-panel__candidates-title {
   font-size: 13px; color: #8888aa; margin-bottom: 8px;
 }
@@ -136,34 +234,46 @@ watch(() => chatStore.messages.length, () => {
 }
 .chat-msg { margin-bottom: 8px; padding: 8px 12px; border-radius: 8px; max-width: 85%; }
 .chat-msg--user { background: #1a3a5c; margin-left: auto; text-align: right; color: #e0e0e0; }
+.chat-msg--agent { background: #1a2a3a; margin-right: auto; color: #b0c4de; }
 .chat-msg--system { background: #16163a; margin-right: auto; color: #8888aa; font-size: 13px; }
 .chat-msg__text { word-break: break-word; }
-.chat-panel__batch {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; margin-top: 8px;
-  background: #0a3a0a; border: 1px solid #4caf50; border-radius: 8px;
-}
-.batch-text { font-size: 13px; color: #c0e0c0; flex: 1; margin-right: 12px; }
-.chat-panel__input { padding-top: 8px; border-top: 1px solid #2a2a4a; }
 
-/* 覆盖 Element Plus 默认浅色边框 → 暗色主题 */
-.chat-panel__input :deep(.el-input__wrapper) {
-  background: #0f0f1a;
-  box-shadow: 0 0 0 1px #2a2a4a;
-  border: none;
+.chat-panel__acceptance {
+  padding: 10px; margin-bottom: 12px;
+  background: #0a2a1a; border: 1px solid #4caf50; border-radius: 8px;
 }
-.chat-panel__input :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px #3a3a5a;
+.acceptance-title { font-size: 13px; color: #c0e0c0; margin-bottom: 8px; }
+.acceptance-option {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 0; font-size: 13px; color: #c0e0c0; cursor: pointer;
 }
-.chat-panel__input :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px #4caf50;
+.acceptance-input {
+  width: 100%; margin: 4px 0 8px;
+  padding: 6px 8px; background: #0a1a0a; color: #e0e0e0;
+  border: 1px solid #4caf50; border-radius: 4px;
 }
-.chat-panel__input :deep(.el-input__inner) {
-  color: #c0c0c0;
+.chat-panel__prd {
+  padding: 12px; margin-bottom: 12px;
+  background: #1a1a3a; border: 1px solid #646cff; border-radius: 8px;
 }
-.chat-panel__input :deep(.el-input-group__append) {
-  background: #1a1a2e;
-  border: 1px solid #2a2a4a;
-  border-left: none;
+.prd-title { font-size: 14px; color: #c0c0e0; margin-bottom: 10px; font-weight: 600; }
+.prd-field { margin-bottom: 10px; }
+.prd-field label { display: block; font-size: 12px; color: #8888aa; margin-bottom: 4px; }
+.prd-input {
+  width: 100%; padding: 6px 8px; background: #0a0a14; color: #e0e0e0;
+  border: 1px solid #2a2a4a; border-radius: 4px; font-size: 13px;
 }
+.prd-ac-item { margin-bottom: 4px; }
+.prd-actions { margin-top: 10px; }
+.chat-panel__task {
+  padding: 8px 12px; margin-bottom: 8px;
+  background: #0a2a0a; border: 1px solid #4caf50; border-radius: 8px;
+  color: #c0e0c0; font-size: 13px;
+}
+.chat-panel__error {
+  padding: 8px 12px; margin-bottom: 8px;
+  background: #2a0a0a; border: 1px solid #f44336; border-radius: 8px;
+  color: #e0c0c0; font-size: 13px;
+}
+.chat-panel__input { padding-top: 8px; border-top: 1px solid #2a2a4a; }
 </style>

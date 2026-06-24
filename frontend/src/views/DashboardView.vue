@@ -248,6 +248,10 @@ watch(
     }
     tokenPoints.value = []
     agentOpsStore.fetchAll()
+    // session ????? chat WS
+    if (newId) {
+      chatStore.connectChatWs(newId, session.currentProjectName)
+    }
   }
 )
 
@@ -266,10 +270,15 @@ onMounted(async () => {
     })))
   }
   agentOpsStore.startPolling()
+  // ?? chat WS????? Agent???? session ???
+  if (session.currentSessionId) {
+    chatStore.connectChatWs(session.currentSessionId, session.currentProjectName)
+  }
 })
 
 onUnmounted(() => {
   ws.disconnect()
+  chatStore.disconnect()
   agentOpsStore.reset()
 })
 </script>

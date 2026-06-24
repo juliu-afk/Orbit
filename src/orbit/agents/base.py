@@ -21,6 +21,7 @@ class AgentRole(StrEnum):
     REVIEWER = "reviewer"
     QA = "qa"
     CONFIG_MANAGER = "config_manager"
+    CLARIFIER = "clarifier"  # 需求澄清 Agent（自然语言交互 PR）
 
 
 class AgentInput(BaseModel):

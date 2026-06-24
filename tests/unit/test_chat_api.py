@@ -1,4 +1,8 @@
-"""NL交互 PR #3——聊天 API WebSocket 测试。"""
+"""NL?? PR #3 + ???? Agent ?????? API WebSocket ???
+
+????????chat ???? ClarifierAgent??? {type: clarify, reply, clarification_status, ...}?
+?? keywords/source/candidates ??????????? data?candidates ??????????
+"""
 
 import json
 
@@ -8,28 +12,30 @@ from orbit.api.main import create_app
 
 
 class TestChatWebSocket:
-    """NL 聊天 WebSocket 端点。"""
+    """NL ?? WebSocket ???ClarifierAgent ?????"""
 
     @classmethod
     def setup_class(cls) -> None:
         cls.client = TestClient(create_app())
 
     def test_websocket_connect_and_chat(self) -> None:
-        """WebSocket 连接 + 发送消息 → 返回候选。"""
+        """WebSocket ?? + ???? ? ?? ClarifierAgent clarify ???"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
-            ws.send_text(json.dumps({"text": "Orbit agent 调度"}))
+            ws.send_text(json.dumps({"type": "chat", "text": "Orbit agent ??"}))
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["code"] == 0
-            assert "candidates" in data["data"]
-            assert "keywords" in data["data"]
+            assert data["data"]["type"] == "clarify"
+            assert "reply" in data["data"]
+            assert data["data"]["clarification_status"] == "clarifying"
 
     def test_session_history_priority(self) -> None:
-        """会话历史优先——指定 session_projects 直接命中。"""
+        """? session_projects ????????????candidates ????"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(
                 json.dumps(
                     {
+                        "type": "chat",
                         "text": "anything",
                         "session_projects": ["Orbit"],
                     }
@@ -37,31 +43,53 @@ class TestChatWebSocket:
             )
             raw = ws.receive_text()
             data = json.loads(raw)
-            assert data["data"]["source"] == "session"
-            assert data["data"]["requires_confirmation"] is False
+            assert data["code"] == 0
+            assert data["data"]["type"] == "clarify"
 
     def test_empty_text_error(self) -> None:
-        """空输入 → 错误响应。"""
+        """??? ? ?????"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
-            ws.send_text(json.dumps({"text": ""}))
+            ws.send_text(json.dumps({"type": "chat", "text": ""}))
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["code"] == 1
 
     def test_chinese_query(self) -> None:
-        """中文查询正常返回。"""
+        """???????? Agent ???"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
-            ws.send_text(json.dumps({"text": "财务凭证录入功能优化"}))
+            ws.send_text(json.dumps({"type": "chat", "text": "??????????"}))
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["code"] == 0
-            assert len(data["data"]["keywords"]) > 0
+            assert data["data"]["type"] == "clarify"
+            assert len(data["data"]["reply"]) > 0
 
     def test_multiple_messages(self) -> None:
-        """同一连接发送多条消息。"""
+        """???????????"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             for _ in range(3):
-                ws.send_text(json.dumps({"text": "test"}))
+                ws.send_text(json.dumps({"type": "chat", "text": "test message"}))
                 raw = ws.receive_text()
                 data = json.loads(raw)
-                assert "code" in data
+                assert data["code"] == 0
+
+    def test_unknown_type_error(self) -> None:
+        """?????? ? ?????"""
+        with self.client.websocket_connect("/api/v1/chat") as ws:
+            ws.send_text(json.dumps({"type": "unknown_type", "text": "test"}))
+            raw = ws.receive_text()
+            data = json.loads(raw)
+            assert data["code"] == 1
+            assert data["code"] == 1
+
+    def test_confirm_without_prd_error(self) -> None:
+        """confirm ?? modified_prd ? ?????"""
+        with self.client.websocket_connect("/api/v1/chat") as ws:
+            ws.send_text(json.dumps({
+                "type": "confirm",
+                "session_id": "",
+                "project_name": "",
+            }))
+            raw = ws.receive_text()
+            data = json.loads(raw)
+            assert data["code"] == 1

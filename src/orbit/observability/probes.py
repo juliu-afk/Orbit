@@ -242,34 +242,25 @@ async def _probe_llm_gateway() -> str:
 
 
 async def _probe_sandbox() -> str:
-    """检测沙箱可用。Docker > 尝试启动Docker > ProcessSandbox降级 > 提示安装。"""
+    """检测沙箱可用。Docker → 尝试启动服务 → ProcessSandbox → 提示安装。"""
     # 先直接试 Docker
-    docker_available = await _check_docker_running()
-    if docker_available:
+    if await _check_docker_running():
         return "Docker沙箱已就绪"
 
-    # Docker 未运行——检查是否已安装
-    docker_installed = _docker_is_installed()
-    if docker_installed:
-        # 已安装但未运行——尝试启动 Docker（服务优先，不弹 GUI）
-        _start_docker_desktop()
-        # Docker Desktop 冷启动需 15-30s，给足时间
-        for _ in range(20):
+    # 未运行——检查是否已安装
+    if _docker_is_installed():
+        _start_docker_service()
+        for _ in range(15):
             await asyncio.sleep(2)
             if await _check_docker_running():
                 return "Docker已启动，沙箱就绪"
 
-    # Docker 不可用——降级 ProcessSandbox
+    # Docker 不可用——降级
     from orbit.sandbox.sandbox_factory import create_sandbox
-
     sandbox = await create_sandbox()
-    if sandbox.__class__.__name__ == "ProcessSandbox":
-        if not docker_installed:
-            raise RuntimeError(
-                "未检测到Docker安装。建议安装Docker Desktop以获得完整沙箱隔离。"
-            )
-        return "ProcessSandbox已就绪（Docker未成功启动，已降级）"
-    return "Docker沙箱已就绪"
+    if not _docker_is_installed():
+        raise RuntimeError("未检测到Docker。建议安装Docker Desktop以获得完整沙箱隔离。")
+    return f"Docker未运行，已降级 {sandbox.__class__.__name__}"
 
 
 async def _probe_knowledge_engine() -> str:
@@ -342,12 +333,11 @@ async def _repair_sandbox() -> str:
     """沙箱自愈：Docker 不可用先尝试启动，再降级 ProcessSandbox。"""
     docker_installed = _docker_is_installed()
     if docker_installed:
-        _start_docker_desktop()
+        _start_docker_service()
         for _ in range(10):
             await asyncio.sleep(2)
             if await _check_docker_running():
                 return "Docker服务已启动，沙箱就绪"
-        # 启动超时——降级
         from orbit.sandbox.sandbox_factory import create_sandbox
         sandbox = await create_sandbox()
         return f"Docker启动超时，已降级 {sandbox.__class__.__name__}"
@@ -412,18 +402,16 @@ async def _check_docker_running() -> bool:
         return False
 
 
-def _start_docker_desktop() -> None:
-    """静默启动 Docker——优先用 Docker Desktop 后台服务，避免弹 GUI 窗口。"""
+def _start_docker_service() -> None:
+    """静默启动 Docker 后台服务——绝不弹 GUI。Windows: sc start, Unix: systemctl。"""
     import os as _os
     import subprocess
 
-    if _os.name == "nt":
-        # WHY 静默: CREATE_NO_WINDOW 防终端闪现, 优先启动服务而非 GUI
-        si = subprocess.STARTUPINFO()
-        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        si.wShowWindow = subprocess.SW_HIDE
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = subprocess.SW_HIDE
 
-        # 尝试启动 Docker Desktop 服务（不弹 GUI）
+    if _os.name == "nt":
         try:
             subprocess.run(
                 ["sc", "start", "com.docker.service"],
@@ -434,25 +422,16 @@ def _start_docker_desktop() -> None:
             )
         except Exception:
             pass
-
-        # 如果服务启动不行，尝试直接启动 Docker Desktop（这会弹GUI，最后手段）
-        for path in [
-            r"C:\Program Files\Docker\Docker\Docker Desktop.exe",
-        ]:
-            if _os.path.exists(path):
-                subprocess.Popen(
-                    [path],
-                    startupinfo=si,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                return
     else:
-        subprocess.Popen(
-            ["systemctl", "start", "--quiet", "docker"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        try:
+            subprocess.run(
+                ["systemctl", "start", "docker"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+            )
+        except Exception:
+            pass
 
 
 async def install_docker() -> str:

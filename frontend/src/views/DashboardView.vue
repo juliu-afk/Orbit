@@ -147,6 +147,7 @@ import CircuitBreakerLight from '@/components/metrics/CircuitBreakerLight.vue'
 import HealthPanel from '@/components/metrics/HealthPanel.vue'
 import DagCanvas from '@/components/dag/DagCanvas.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
+import { useTaskStore } from '@/stores/task'
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 import CrossProjectWarning from '@/components/chat/CrossProjectWarning.vue'
 
@@ -154,6 +155,7 @@ const ws = useWebSocket()
 const session = useSessionStore()
 const agentOpsStore = useAgentOpsStore()
 const chatStore = useChatStore()
+const taskStore = useTaskStore()
 
 const showNewDialog = ref(false)
 const hallucinationChartRef = ref<HTMLElement | null>(null)
@@ -188,6 +190,12 @@ const totalIntercepted = computed(() => {
 
 ws.setMessageHandler((msg: WsMessage) => {
   switch (msg.type) {
+    case 'task:update':
+      taskStore.handleTaskUpdate(msg.payload as Record<string, unknown>)
+      break
+    case 'alert:new':
+      agentOpsStore.handleWsEvent('alert:new', msg.payload)
+      break
     case 'metrics:snapshot':
       agentOpsStore.handleWsEvent('metrics:snapshot', msg.payload)
       break
@@ -248,7 +256,7 @@ watch(
     }
     tokenPoints.value = []
     agentOpsStore.fetchAll()
-    // session ????? chat WS
+    // session 切换时重连 chat WS
     if (newId) {
       chatStore.connectChatWs(newId, session.currentProjectName)
     }
@@ -270,7 +278,7 @@ onMounted(async () => {
     })))
   }
   agentOpsStore.startPolling()
-  // ?? chat WS????? Agent???? session ???
+  // 连接 chat WS，对接 Agent 需求澄清（session 存在时）
   if (session.currentSessionId) {
     chatStore.connectChatWs(session.currentSessionId, session.currentProjectName)
   }

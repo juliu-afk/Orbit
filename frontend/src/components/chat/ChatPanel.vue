@@ -1,24 +1,24 @@
-<!-- ???????????? + Agent ?? + ???? + PRD ???? -->
+<!-- 自然语言聊天面板：输入框 + 候选列表 + Agent验收 + PRD确认 -->
 <template>
   <div class="chat-panel">
-    <!-- ?????????????? -->
+    <!-- 候选项目卡片 -->
     <div v-if="chatStore.candidates.length > 0" class="chat-panel__candidates">
       <div class="chat-panel__candidates-title">
-        ???? ({{ chatStore.candidates.length }})
+        匹配结果 ({{ chatStore.candidates.length }})
       </div>
       <CandidateCard
         v-for="(c, i) in chatStore.candidates.slice(0, 5)"
         :key="c.project"
         :candidate="c"
         :is-top="i === 0 && chatStore.candidates.length > 1"
-        @confirm="handleConfirmProject"
+        @confirm="handleConfirm"
       />
     </div>
 
-    <!-- ?????user / agent / system? -->
+    <!-- 消息历史（user / agent / system） -->
     <div ref="msgListRef" class="chat-panel__messages">
       <div v-if="chatStore.messages.length === 0" class="chat-panel__empty">
-        ???????????Agent ???????
+        输入自然语言描述，Agent自动分析需求
       </div>
       <div
         v-for="m in chatStore.messages"
@@ -30,12 +30,9 @@
       </div>
     </div>
 
-    <!-- ???????Agent ??????? -->
-    <div
-      v-if="showAcceptanceOptions"
-      class="chat-panel__acceptance"
-    >
-      <div class="acceptance-title">????????????</div>
+    <!-- Agent验收选项 -->
+    <div v-if="showAcceptanceOptions" class="chat-panel__acceptance">
+      <div class="acceptance-title">选择验收标准</div>
       <label
         v-for="opt in chatStore.structuredPrd?.acceptance_options"
         :key="opt"
@@ -44,33 +41,33 @@
         <input type="checkbox" :value="opt" v-model="selectedAcceptance" />
         <span>{{ opt }}</span>
       </label>
-      <!-- ?????????????? -->
+      <!-- 自定义验收标准 -->
       <label class="acceptance-option">
         <input type="checkbox" v-model="useCustomAcceptance" />
-        <span>??</span>
+        <span>自定义</span>
       </label>
       <input
         v-if="useCustomAcceptance"
         v-model="customAcceptance"
         class="acceptance-input"
-        placeholder="?????????..."
+        placeholder="请输入自定义验收标准..."
       />
-      <el-button type="primary" size="small" @click="submitAcceptance">??</el-button>
+      <el-button type="primary" size="small" @click="submitAcceptance">提交</el-button>
     </div>
 
-    <!-- PRD ?????clarification_status=ready ???? -->
+    <!-- PRD确认（clarification_status=ready时显示） -->
     <div v-if="showPrdConfirm" class="chat-panel__prd">
-      <div class="prd-title">?????????????</div>
+      <div class="prd-title">请确认需求文档</div>
       <div class="prd-field">
-        <label>??</label>
+        <label>目标</label>
         <textarea v-model="editablePrd.goal" rows="2" class="prd-input"></textarea>
       </div>
       <div class="prd-field">
-        <label>??</label>
+        <label>范围</label>
         <textarea v-model="editablePrd.scope" rows="2" class="prd-input"></textarea>
       </div>
       <div class="prd-field">
-        <label>????</label>
+        <label>验收标准</label>
         <div
           v-for="(_ac, i) in editablePrd.acceptance_criteria"
           :key="i"
@@ -80,25 +77,25 @@
         </div>
       </div>
       <div class="prd-actions">
-        <el-button type="primary" @click="handleConfirmPrd">???????</el-button>
+        <el-button type="primary" @click="handleConfirmPrd">确认并提交任务</el-button>
       </div>
     </div>
 
-    <!-- ??????? -->
+    <!-- 任务状态 -->
     <div v-if="chatStore.lastTaskId" class="chat-panel__task">
-      ??????{{ chatStore.lastTaskId }}???????
+      任务已创建：{{ chatStore.lastTaskId }}
     </div>
 
-    <!-- ???? -->
+    <!-- 错误提示 -->
     <div v-if="chatStore.lastError" class="chat-panel__error">
       {{ chatStore.lastError }}
     </div>
 
-    <!-- ??? -->
+    <!-- 输入框 -->
     <div class="chat-panel__input">
       <el-input
         v-model="inputText"
-        placeholder="??????..."
+        placeholder="描述你的需求..."
         :disabled="chatStore.connecting"
         @keyup.enter="handleSend"
         clearable
@@ -108,7 +105,7 @@
             :disabled="!inputText.trim() || chatStore.connecting"
             @click="handleSend"
           >
-            ??
+            发送
           </el-button>
         </template>
       </el-input>
@@ -127,30 +124,30 @@ const sessionStore = useSessionStore()
 const inputText = ref('')
 const msgListRef = ref<HTMLElement | null>(null)
 
-// ????????
+// 验收选项状态
 const selectedAcceptance = ref<string[]>([])
 const useCustomAcceptance = ref(false)
 const customAcceptance = ref('')
 
-// PRD ????????????
+// PRD可编辑副本
 const editablePrd = reactive<StructuredPRD>({
   goal: '',
   scope: '',
   acceptance_criteria: [],
 })
 
-// ???????? acceptance_options ????
+// 是否显示验收选项（acceptance_options非空时）
 const showAcceptanceOptions = computed(() => {
   const opts = chatStore.structuredPrd?.acceptance_options
   return Array.isArray(opts) && opts.length > 0 && chatStore.clarificationStatus === 'clarifying'
 })
 
-// ?? PRD ???ready ?? structured_prd
+// 是否显示PRD确认（clarification_status=ready时）
 const showPrdConfirm = computed(() => {
   return chatStore.clarificationStatus === 'ready' && chatStore.structuredPrd !== null
 })
 
-// ready ??????? PRD
+// ready时自动填充PRD到可编辑副本
 watch(showPrdConfirm, (show) => {
   if (show && chatStore.structuredPrd) {
     editablePrd.goal = chatStore.structuredPrd.goal
@@ -169,23 +166,22 @@ function handleSend() {
   inputText.value = ''
 }
 
-function handleConfirmProject(project: string) {
+function handleConfirm(project: string) {
   chatStore.confirm(project)
 }
 
 function submitAcceptance() {
-  // ??????? + ?????
+  // 合并已选+自定义验收标准
   const merged = [...selectedAcceptance.value]
   if (useCustomAcceptance.value && customAcceptance.value.trim()) {
     merged.push(customAcceptance.value.trim())
   }
   if (merged.length > 0 && chatStore.structuredPrd) {
-    // ?? acceptance_criteria ???
     chatStore.structuredPrd.acceptance_criteria = merged
     chatStore.structuredPrd.acceptance_options = []
-    // ??????? Agent
+    // 发送验收选择给Agent
     chatStore.send(
-      `????????${merged.join('?')}`,
+      `验收标准：${merged.join('；')}`,
       sessionStore.currentSessionId || '',
       sessionStore.currentProjectName,
     )
@@ -196,7 +192,7 @@ function submitAcceptance() {
 }
 
 function handleConfirmPrd() {
-  // ???????????? PRD?
+  // 确认PRD并提交任务
   chatStore.confirmPrd(
     sessionStore.currentSessionId || '',
     sessionStore.currentProjectName,
@@ -204,7 +200,7 @@ function handleConfirmPrd() {
   )
 }
 
-// ???????????
+// 新消息到达时滚动到底部
 watch(() => chatStore.messages.length, () => {
   nextTick(() => {
     if (msgListRef.value) {
@@ -242,38 +238,63 @@ watch(() => chatStore.messages.length, () => {
   padding: 10px; margin-bottom: 12px;
   background: #0a2a1a; border: 1px solid #4caf50; border-radius: 8px;
 }
-.acceptance-title { font-size: 13px; color: #c0e0c0; margin-bottom: 8px; }
+.acceptance-title { font-size: 13px; color: #c0e0c0; margin-bottom: 8px; font-weight: 500; }
 .acceptance-option {
   display: flex; align-items: center; gap: 6px;
-  padding: 4px 0; font-size: 13px; color: #c0e0c0; cursor: pointer;
+  padding: 4px 0; font-size: 13px; color: #c0c0c0; cursor: pointer;
 }
 .acceptance-input {
-  width: 100%; margin: 4px 0 8px;
-  padding: 6px 8px; background: #0a1a0a; color: #e0e0e0;
-  border: 1px solid #4caf50; border-radius: 4px;
+  width: 100%; margin-top: 6px; padding: 6px 10px;
+  background: #0f1f0f; border: 1px solid #2a5a2a; border-radius: 4px;
+  color: #c0c0c0; font-size: 13px;
 }
+
 .chat-panel__prd {
   padding: 12px; margin-bottom: 12px;
-  background: #1a1a3a; border: 1px solid #646cff; border-radius: 8px;
+  background: #0a0a1a; border: 1px solid #2a2a5a; border-radius: 8px;
 }
-.prd-title { font-size: 14px; color: #c0c0e0; margin-bottom: 10px; font-weight: 600; }
-.prd-field { margin-bottom: 10px; }
-.prd-field label { display: block; font-size: 12px; color: #8888aa; margin-bottom: 4px; }
+.prd-title { font-size: 14px; color: #e0e0e0; margin-bottom: 10px; font-weight: 500; }
+.prd-field { margin-bottom: 8px; }
+.prd-field label { font-size: 12px; color: #888; display: block; margin-bottom: 4px; }
 .prd-input {
-  width: 100%; padding: 6px 8px; background: #0a0a14; color: #e0e0e0;
-  border: 1px solid #2a2a4a; border-radius: 4px; font-size: 13px;
+  width: 100%; padding: 6px 10px;
+  background: #0f0f1a; border: 1px solid #2a2a4a; border-radius: 4px;
+  color: #c0c0c0; font-size: 13px; resize: vertical;
 }
 .prd-ac-item { margin-bottom: 4px; }
 .prd-actions { margin-top: 10px; }
+
 .chat-panel__task {
-  padding: 8px 12px; margin-bottom: 8px;
-  background: #0a2a0a; border: 1px solid #4caf50; border-radius: 8px;
-  color: #c0e0c0; font-size: 13px;
+  padding: 6px 10px; margin-bottom: 8px;
+  background: #0a2a0a; border: 1px solid #4caf50; border-radius: 4px;
+  font-size: 12px; color: #c0e0c0;
 }
 .chat-panel__error {
-  padding: 8px 12px; margin-bottom: 8px;
-  background: #2a0a0a; border: 1px solid #f44336; border-radius: 8px;
-  color: #e0c0c0; font-size: 13px;
+  padding: 6px 10px; margin-bottom: 8px;
+  background: #2a0a0a; border: 1px solid #f44336; border-radius: 4px;
+  font-size: 12px; color: #f44336;
 }
+
 .chat-panel__input { padding-top: 8px; border-top: 1px solid #2a2a4a; }
+
+/* 覆盖 Element Plus 默认浅色边框 → 暗色主题 */
+.chat-panel__input :deep(.el-input__wrapper) {
+  background: #0f0f1a;
+  box-shadow: 0 0 0 1px #2a2a4a;
+  border: none;
+}
+.chat-panel__input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #3a3a5a;
+}
+.chat-panel__input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #4caf50;
+}
+.chat-panel__input :deep(.el-input__inner) {
+  color: #c0c0c0;
+}
+.chat-panel__input :deep(.el-input-group__append) {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-left: none;
+}
 </style>

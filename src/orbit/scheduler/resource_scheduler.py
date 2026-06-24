@@ -94,9 +94,7 @@ class ResourceScheduler:
         # LLM 调用分钟级计数器: timestamp 列表
         self._llm_call_times: deque[float] = deque()
         # 调度轮转索引 (同优先级 round-robin)
-        self._round_robin_index: dict[TaskPriority, int] = {
-            p: 0 for p in TaskPriority
-        }
+        self._round_robin_index: dict[TaskPriority, int] = {p: 0 for p in TaskPriority}
 
     # ── 核心 API ──────────────────────────────────────────
 
@@ -108,8 +106,10 @@ class ResourceScheduler:
         # 检查是否可以准入
         if self._can_admit(priority):
             self._active[task_id] = TaskResource(
-                task_id=task_id, priority=priority,
-                started_at=time.time(), last_scheduled=time.time(),
+                task_id=task_id,
+                priority=priority,
+                started_at=time.time(),
+                last_scheduled=time.time(),
             )
             logger.info("task_admitted", task_id=task_id, priority=priority.name)
             return True
@@ -121,30 +121,42 @@ class ResourceScheduler:
                 self.release(victim_id)
                 logger.warning("task_preempted", victim=victim_id, by=task_id)
             self._active[task_id] = TaskResource(
-                task_id=task_id, priority=priority,
-                started_at=time.time(), last_scheduled=time.time(),
+                task_id=task_id,
+                priority=priority,
+                started_at=time.time(),
+                last_scheduled=time.time(),
             )
             return True
 
         # CRITICAL 也可抢占 LOW 活跃任务 (不在队列中的)
-        if priority == TaskPriority.CRITICAL and len(self._active) >= self._quota.max_concurrent_tasks:
+        if (
+            priority == TaskPriority.CRITICAL
+            and len(self._active) >= self._quota.max_concurrent_tasks
+        ):
             # 找最低优先级的活跃任务
-            victims = [(tid, r) for tid, r in self._active.items()
-                       if r.priority == TaskPriority.LOW]
+            victims = [
+                (tid, r) for tid, r in self._active.items() if r.priority == TaskPriority.LOW
+            ]
             if victims:
                 victim_id = min(victims, key=lambda x: x[1].started_at)[0]
                 self.release(victim_id)
                 logger.warning("task_preempted_active", victim=victim_id, by=task_id)
                 self._active[task_id] = TaskResource(
-                    task_id=task_id, priority=priority,
-                    started_at=time.time(), last_scheduled=time.time(),
+                    task_id=task_id,
+                    priority=priority,
+                    started_at=time.time(),
+                    last_scheduled=time.time(),
                 )
                 return True
 
         # 排队
         self._queues[priority].append(task_id)
-        logger.info("task_queued", task_id=task_id, priority=priority.name,
-                     queue_len=len(self._queues[priority]))
+        logger.info(
+            "task_queued",
+            task_id=task_id,
+            priority=priority.name,
+            queue_len=len(self._queues[priority]),
+        )
         return False
 
     def can_proceed(self, task_id: str, estimated_tokens: int = 0) -> bool:
@@ -153,7 +165,10 @@ class ResourceScheduler:
         if res is None:
             return False
         # Token 预算
-        if estimated_tokens > 0 and res.tokens_used + estimated_tokens > self._quota.max_tokens_per_task:
+        if (
+            estimated_tokens > 0
+            and res.tokens_used + estimated_tokens > self._quota.max_tokens_per_task
+        ):
             return False
         # Sandbox 实例
         if res.sandbox_count >= self._quota.max_sandbox_instances:

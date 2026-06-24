@@ -8,18 +8,15 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from orbit.agents.base import AgentInput
 from orbit.agents.clarifier import (
     ClarifierAgent,
     StructuredPRD,
-    ValidationResult,
     validate_prd,
 )
 
-
 # ---- V1-V3 校验 case ----
+
 
 class TestValidatePrd:
     """validate_prd 分层校验（技术方案 V-1 到 V-8）。"""
@@ -118,15 +115,14 @@ class TestValidatePrd:
 
 # ---- ClarifierAgent mock 模式 ----
 
+
 class TestClarifierAgentMock:
     """ClarifierAgent mock 模式（无 LLM，供 CI）。"""
 
     def test_a1_mock_returns_clarifying(self) -> None:
         """A1: llm=None → 返回模板回复。"""
         agent = ClarifierAgent(llm=None)
-        result = asyncio.run(agent.execute(
-            AgentInput(task="支付超时了修一下", context={})
-        ))
+        result = asyncio.run(agent.execute(AgentInput(task="支付超时了修一下", context={})))
         assert result.status == "ok"
         assert result.result["clarification_status"] == "clarifying"
         assert "mock" in result.result["reply"].lower()
@@ -134,37 +130,35 @@ class TestClarifierAgentMock:
     def test_a1_mock_includes_user_message(self) -> None:
         """mock 回复应包含用户输入。"""
         agent = ClarifierAgent(llm=None)
-        result = asyncio.run(agent.execute(
-            AgentInput(task="测试需求描述", context={})
-        ))
+        result = asyncio.run(agent.execute(AgentInput(task="测试需求描述", context={})))
         assert "测试需求描述" in result.result["reply"]
 
     def test_a3_invalid_json_returns_error(self) -> None:
         """A3: LLM 输出非 JSON → 降级回复。"""
+
         class MockLLM:
             async def generate(self, req, task_id):
                 class R:
                     content = "这不是 JSON 格式"
+
                 return R()
 
         agent = ClarifierAgent(llm=MockLLM())
-        result = asyncio.run(agent.execute(
-            AgentInput(task="测试", context={})
-        ))
+        result = asyncio.run(agent.execute(AgentInput(task="测试", context={})))
         assert result.status == "error"
         assert result.result["clarification_status"] == "clarifying"
 
     def test_a2_valid_json_returns_ok(self) -> None:
         """A2: LLM 输出合法 JSON → 成功解析。"""
+
         class MockLLM:
             async def generate(self, req, task_id):
                 class R:
                     content = """{"reply": "确认需求", "clarification_status": "clarifying", "structured_prd": {"goal": "", "scope": "", "acceptance_criteria": [], "edge_cases": [], "constraints": [], "acceptance_options": []}, "missing_fields": ["goal"]}"""
+
                 return R()
 
         agent = ClarifierAgent(llm=MockLLM())
-        result = asyncio.run(agent.execute(
-            AgentInput(task="测试", context={})
-        ))
+        result = asyncio.run(agent.execute(AgentInput(task="测试", context={})))
         assert result.status == "ok"
         assert result.result["clarification_status"] == "clarifying"

@@ -85,11 +85,15 @@ class TestChatWebSocket:
     def test_confirm_without_prd_error(self) -> None:
         """confirm ?? modified_prd ? ?????"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
-            ws.send_text(json.dumps({
-                "type": "confirm",
-                "session_id": "",
-                "project_name": "",
-            }))
+            ws.send_text(
+                json.dumps(
+                    {
+                        "type": "confirm",
+                        "session_id": "",
+                        "project_name": "",
+                    }
+                )
+            )
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["code"] == 1

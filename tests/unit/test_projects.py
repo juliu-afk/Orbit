@@ -133,8 +133,19 @@ def _cleanup() -> None:
     # WHY 不删 DB 文件: 多模块共享 projects.db 连接，删文件 → PermissionError
     reg = ProjectRegistry()
     try:
-        for name in ("Orbit", "X", "A", "B", "C", "Temp", "Finite", "Keshen",
-                     "Other", "Python Utils", "WebApp"):
+        for name in (
+            "Orbit",
+            "X",
+            "A",
+            "B",
+            "C",
+            "Temp",
+            "Finite",
+            "Keshen",
+            "Other",
+            "Python Utils",
+            "WebApp",
+        ):
             reg.deactivate(name)
     finally:
         reg.close()

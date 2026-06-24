@@ -84,8 +84,10 @@ class TestToolRegistry:
         reg = ToolRegistry()
         reg.register(
             ToolSchema(
-                name="old", version="1.0.0",
-                deprecated=True, deprecated_message="迁移到 new:v2",
+                name="old",
+                version="1.0.0",
+                deprecated=True,
+                deprecated_message="迁移到 new:v2",
             ),
             _echo_handler,
         )

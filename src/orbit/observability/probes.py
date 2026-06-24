@@ -7,9 +7,9 @@
 from __future__ import annotations
 
 import asyncio
-import os
+import contextlib
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
@@ -89,10 +89,7 @@ class StartupProbeEngine:
 
         async with self._lock:
             self._completed_at = time.time()
-            self._status = (
-                "failed" if any(c.status == "failed" for c in self._checks)
-                else "passed"
-            )
+            self._status = "failed" if any(c.status == "failed" for c in self._checks) else "passed"
 
     async def _run_probe(self, check: ProbeResult) -> None:
         """执行单个探针：检测 → 自愈 → 再检测。"""
@@ -111,7 +108,7 @@ class StartupProbeEngine:
             check.status = "passed"
             check.message = result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # 超时 → 尝试自愈
             repaired = await self._try_repair(check)
             if repaired:
@@ -139,9 +136,7 @@ class StartupProbeEngine:
 
         finally:
             check.completed_at = time.time()
-            check.duration_ms = int(
-                (check.completed_at - (check.started_at or 0)) * 1000
-            )
+            check.duration_ms = int((check.completed_at - (check.started_at or 0)) * 1000)
 
     async def _try_repair(self, check: ProbeResult) -> bool:
         """尝试自愈——每个探针有独立的修复策略。返回 True=修复成功。"""
@@ -209,9 +204,7 @@ async def _probe_database() -> str:
     try:
         conn.execute("SELECT 1")
         # 验证核心表存在
-        tables = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()
+        tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         table_names = [t[0] for t in tables]
     finally:
         conn.close()
@@ -226,7 +219,7 @@ async def _probe_agent() -> str:
         _ = AgentFactory
         return "Agent工厂可用"
     except ImportError:
-        raise RuntimeError("Agent工厂模块导入失败")
+        raise RuntimeError("Agent工厂模块导入失败") from None
 
 
 async def _probe_llm_gateway() -> str:
@@ -257,6 +250,7 @@ async def _probe_sandbox() -> str:
 
     # 降级 ProcessSandbox
     from orbit.sandbox.sandbox_factory import create_sandbox
+
     sandbox = await create_sandbox()
     if not _docker_is_installed():
         raise RuntimeError("未检测到Docker。建议安装Docker Desktop以获得完整沙箱隔离。")
@@ -271,7 +265,7 @@ async def _probe_knowledge_engine() -> str:
         _ = KnowledgeEngine
         return "知识引擎模块就绪"
     except ImportError:
-        raise RuntimeError("知识引擎模块导入失败")
+        raise RuntimeError("知识引擎模块导入失败") from None
 
 
 async def _probe_code_graph() -> str:
@@ -338,6 +332,7 @@ async def _repair_sandbox() -> str:
             if await _check_docker_running():
                 return "Docker服务已启动，沙箱就绪"
     from orbit.sandbox.sandbox_factory import create_sandbox
+
     sandbox = await create_sandbox()
     return f"已启用 {sandbox.__class__.__name__}"
 
@@ -347,8 +342,8 @@ async def _repair_sandbox() -> str:
 
 def _docker_is_installed() -> bool:
     """检测 Docker 是否已安装（检查可执行文件+注册表）。"""
-    import shutil
     import os as _os
+    import shutil
 
     if shutil.which("docker"):
         return True
@@ -409,7 +404,7 @@ def _start_docker_service() -> None:
     si.wShowWindow = subprocess.SW_HIDE
 
     if _os.name == "nt":
-        try:
+        with contextlib.suppress(Exception):
             subprocess.run(
                 ["sc", "start", "com.docker.service"],
                 startupinfo=si,
@@ -417,18 +412,14 @@ def _start_docker_service() -> None:
                 stderr=subprocess.DEVNULL,
                 timeout=10,
             )
-        except Exception:
-            pass
     else:
-        try:
+        with contextlib.suppress(Exception):
             subprocess.run(
                 ["systemctl", "start", "docker"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=10,
             )
-        except Exception:
-            pass
 
 
 async def install_docker() -> str:
@@ -441,8 +432,11 @@ async def install_docker() -> str:
 
     try:
         proc = await _asyncio.create_subprocess_exec(
-            "winget", "install", "Docker.DockerDesktop",
-            "--accept-source-agreements", "--accept-package-agreements",
+            "winget",
+            "install",
+            "Docker.DockerDesktop",
+            "--accept-source-agreements",
+            "--accept-package-agreements",
             "--silent",
             stdout=_asyncio.subprocess.PIPE,
             stderr=_asyncio.subprocess.PIPE,
@@ -452,7 +446,7 @@ async def install_docker() -> str:
             return "Docker Desktop 安装完成。请手动启动后重试。"
         err = stderr.decode("utf-8", errors="replace")[:200] if stderr else ""
         return f"安装失败: {err}"
-    except _asyncio.TimeoutError:
+    except TimeoutError:
         return "Docker 安装超时（10分钟），请手动安装。"
     except FileNotFoundError:
         return "未找到 winget。请手动下载 Docker Desktop: https://www.docker.com/products/docker-desktop"

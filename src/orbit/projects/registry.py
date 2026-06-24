@@ -5,6 +5,7 @@ SQLite 存储项目元数据——CRUD + 关键词搜索。
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sqlite3
@@ -62,12 +63,8 @@ class ProjectRegistry:
             )
         """)
         # WHY 存量兼容：旧 projects 表无 local_path 列，ALTER TABLE 加列
-        try:
-            self._get_conn().execute(
-                "ALTER TABLE projects ADD COLUMN local_path TEXT DEFAULT ''"
-            )
-        except sqlite3.OperationalError:
-            pass  # 列已存在，忽略
+        with contextlib.suppress(sqlite3.OperationalError):  # ???????
+            self._get_conn().execute("ALTER TABLE projects ADD COLUMN local_path TEXT DEFAULT ''")
         self._get_conn().execute(
             "CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(is_active)"
         )
@@ -252,10 +249,8 @@ class ProjectRegistry:
 
         # WHY 兼容存量：local_path 可能在旧数据中不存在，用 row key 可能缺失
         local_path = ""
-        try:
+        with contextlib.suppress(KeyError):
             local_path = row["local_path"] or ""
-        except KeyError:
-            pass
 
         return ProjectRecord(
             name=row["name"],

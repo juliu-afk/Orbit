@@ -59,9 +59,7 @@ class ToolRegistry:
 
     def register(self, schema: ToolSchema, handler: ToolHandler) -> None:
         """注册工具——同一 name 可注册多版本。"""
-        self._tools.setdefault(schema.name, []).append(
-            (schema.version, schema, handler)
-        )
+        self._tools.setdefault(schema.name, []).append((schema.version, schema, handler))
         logger.info("tool_registered", name=schema.name, version=schema.version)
 
     def get_schema(self, name: str, version: str | None = None) -> ToolSchema:
@@ -82,8 +80,11 @@ class ToolRegistry:
         return self.get_schema(name).version
 
     def invoke(
-        self, name: str, params: dict[str, Any],
-        agent_name: str, version: str | None = None,
+        self,
+        name: str,
+        params: dict[str, Any],
+        agent_name: str,
+        version: str | None = None,
     ) -> Any:
         """调用工具——权限检查 + 限流检查 + 执行 + 审计。
 
@@ -98,15 +99,15 @@ class ToolRegistry:
 
         # 废弃检查
         if schema.deprecated:
-            raise ToolDeprecatedError(
-                f"工具 {name} 已废弃: {schema.deprecated_message}"
-            )
+            raise ToolDeprecatedError(f"工具 {name} 已废弃: {schema.deprecated_message}")
 
         # 权限检查——允许空白名单 (所有 Agent 可调用)
         if schema.allowed_agents and agent_name not in schema.allowed_agents:
             inv = ToolInvocation(
-                tool_name=name, tool_version=schema.version,
-                agent_name=agent_name, parameters=params,
+                tool_name=name,
+                tool_version=schema.version,
+                agent_name=agent_name,
+                parameters=params,
                 status="permission_denied",
                 error=f"Agent {agent_name} 不在 {name} 白名单中",
                 timestamp=start,
@@ -119,8 +120,10 @@ class ToolRegistry:
             key = f"{name}:{schema.version}:{agent_name}"
             if not self._check_rate_limit(key, schema.rate_limit):
                 inv = ToolInvocation(
-                    tool_name=name, tool_version=schema.version,
-                    agent_name=agent_name, parameters=params,
+                    tool_name=name,
+                    tool_version=schema.version,
+                    agent_name=agent_name,
+                    parameters=params,
                     status="rate_limited",
                     error=f"工具 {name} 已达限流 ({schema.rate_limit}/min)",
                     timestamp=start,
@@ -140,9 +143,13 @@ class ToolRegistry:
             error = str(e)
 
         inv = ToolInvocation(
-            tool_name=name, tool_version=schema.version,
-            agent_name=agent_name, parameters=params,
-            result=result, error=error, status=status,
+            tool_name=name,
+            tool_version=schema.version,
+            agent_name=agent_name,
+            parameters=params,
+            result=result,
+            error=error,
+            status=status,
             duration_ms=(time.time() - start) * 1000,
             timestamp=start,
         )
@@ -157,13 +164,15 @@ class ToolRegistry:
         result = []
         for name in self._tools:
             schema = self.get_schema(name)
-            result.append({
-                "name": schema.name,
-                "latest_version": schema.version,
-                "description": schema.description,
-                "deprecated": schema.deprecated,
-                "rate_limit": schema.rate_limit,
-            })
+            result.append(
+                {
+                    "name": schema.name,
+                    "latest_version": schema.version,
+                    "description": schema.description,
+                    "deprecated": schema.deprecated,
+                    "rate_limit": schema.rate_limit,
+                }
+            )
         return result
 
     # ── 内部 ─────────────────────────────────────────────

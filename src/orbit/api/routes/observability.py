@@ -12,9 +12,8 @@ GET  /observability/lessons            查询教训库
 
 from __future__ import annotations
 
-from typing import Any
-
 import asyncio
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -258,10 +257,13 @@ async def startup_probe_reset() -> dict[str, Any]:
 async def startup_probe_install(name: str) -> dict[str, Any]:
     """后台安装指定组件（如 Docker Desktop）。"""
     if name == "docker":
-        from orbit.observability.probes import install_docker
 
         asyncio.create_task(_async_install_docker())
-        return {"code": 0, "data": {"status": "installing"}, "message": "正在后台安装 Docker Desktop..."}
+        return {
+            "code": 0,
+            "data": {"status": "installing"},
+            "message": "正在后台安装 Docker Desktop...",
+        }
     raise HTTPException(status_code=404, detail=f"未知组件: {name}")
 
 

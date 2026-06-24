@@ -51,8 +51,10 @@ class TestAgentMessageBus:
         bus = AgentMessageBus()
         bus.register("QA", _echo_handler)
         req = Request(
-            source_agent="Dev", target_agent="QA",
-            method="verify", params={"code": "ok"},
+            source_agent="Dev",
+            target_agent="QA",
+            method="verify",
+            params={"code": "ok"},
         )
         resp = await bus.request(req)
         assert resp.status == ResponseStatus.SUCCESS
@@ -75,15 +77,16 @@ class TestAgentMessageBus:
             nonlocal call_count
             call_count += 1
             return Response(
-                id=f"resp-{r.id}", correlation_id=r.id,
-                source_agent="QA", target_agent="Dev",
+                id=f"resp-{r.id}",
+                correlation_id=r.id,
+                source_agent="QA",
+                target_agent="Dev",
                 status=ResponseStatus.SUCCESS,
                 result={"called": call_count},
             )
 
         bus.register("QA", counting_handler)
-        req = Request(id="req-1", source_agent="Dev", target_agent="QA",
-                      method="test")
+        req = Request(id="req-1", source_agent="Dev", target_agent="QA", method="test")
         resp1 = await bus.request(req)
         assert resp1.result == {"called": 1}
         # 第二次相同 ID——应返回缓存
@@ -110,14 +113,17 @@ class TestAgentMessageBus:
         def notif_handler(r: Request) -> Response:
             received.append(r.method)
             return Response(
-                id=f"resp-{r.id}", correlation_id=r.id,
-                source_agent="QA", target_agent="Dev",
+                id=f"resp-{r.id}",
+                correlation_id=r.id,
+                source_agent="QA",
+                target_agent="Dev",
                 status=ResponseStatus.SUCCESS,
             )
 
         bus.register("QA", notif_handler)
         notif = Notification(
-            source_agent="Dev", event="task_completed",
+            source_agent="Dev",
+            event="task_completed",
             payload={"task_id": "t1"},
         )
         bus.notify(notif)
@@ -131,8 +137,10 @@ class TestAgentMessageBus:
         bus = AgentMessageBus()
         bus.register("Sandbox", _echo_handler)
         req = Request(
-            source_agent="Dev", target_agent="Sandbox",
-            method="execute", params={"script": "print(1)"},
+            source_agent="Dev",
+            target_agent="Sandbox",
+            method="execute",
+            params={"script": "print(1)"},
         )
         chunks = []
         async for chunk in bus.stream(req):

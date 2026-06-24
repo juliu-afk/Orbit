@@ -23,20 +23,24 @@ _registry = SessionRegistry()
 
 # ── Pydantic schemas（API 契约层，不放入 sessions/models.py）──
 
+
 class SessionCreateRequest(BaseModel):
     """创建会话请求。"""
+
     project_name: str = Field(..., min_length=1, max_length=200, description="项目名称")
     title: str = Field("", max_length=100, description="会话标题，可选")
 
 
 class SessionUpdateRequest(BaseModel):
     """更新会话请求。"""
+
     title: str | None = Field(None, max_length=100)
     status: str | None = Field(None, pattern=r"^(active|archived)$")
 
 
 class SessionResponse(BaseModel):
     """会话响应。"""
+
     session_id: str
     project_name: str
     local_path: str = ""  # 项目路径——区分同名文件夹
@@ -48,11 +52,13 @@ class SessionResponse(BaseModel):
 
 class SessionDetailResponse(BaseModel):
     """会话详情（含聊天记录）。"""
+
     session: SessionResponse
     messages: list[dict]
 
 
 # ── 路由 ─────────────────────────────────────────────
+
 
 @router.post(
     "",

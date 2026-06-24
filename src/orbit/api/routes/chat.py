@@ -190,7 +190,8 @@ async def _handle_chat(
             # 校验不过 → 打回 Agent 汇报（这里仅通知前端本轮未 ready，下轮重问）
             result_data["clarification_status"] = "clarifying"
             result_data["reply"] = (
-                result_data["reply"] + "\n\n（需求尚未完全明确："
+                result_data["reply"]
+                + "\n\n（需求尚未完全明确："
                 + "；".join(validation.reasons)
                 + "）"
             )
@@ -203,7 +204,9 @@ async def _handle_chat(
     if session_id:
         try:
             _session_registry.add_message(
-                session_id=session_id, role="user", content=text,
+                session_id=session_id,
+                role="user",
+                content=text,
             )
             _session_registry.add_message(
                 session_id=session_id,
@@ -233,7 +236,8 @@ async def _handle_confirm(
     validation = validate_prd(prd_data)
     if not validation.passed:
         await _send(
-            ws, 1,
+            ws,
+            1,
             {"validation": validation.model_dump()},
             "需求校验未通过：" + "；".join(validation.reasons),
         )
@@ -260,11 +264,30 @@ async def _handle_confirm(
         task_resp = await _create_task(task_req)
         task_id = task_resp.task_id
 
-        await _send(ws, 0, {
-            "type": "task_created",
-            "task_id": task_id,
-            "state": task_resp.state.value,
-            "message": "已创建任务，进入开发流程",
-        })
+        # WHY ????? Scheduler.run_task??????? task_id?????????
+        # Scheduler ????? publish ? EventBus ? WS ?? ? ?? DAG ???
+        import asyncio as _asyncio
+
+        try:
+            from orbit.api.main import _scheduler
+
+            if _scheduler is not None:
+                _asyncio.create_task(_scheduler.run_task(task_id, prd_text[:5000]))
+        except Exception as e:
+            # WHY ??????????????????????????
+            import structlog as _sl
+
+            _sl.get_logger().warning("run_task_trigger_failed", task_id=task_id, error=str(e))
+
+        await _send(
+            ws,
+            0,
+            {
+                "type": "task_created",
+                "task_id": task_id,
+                "state": task_resp.state.value,
+                "message": "已创建任务，进入开发流程",
+            },
+        )
     except Exception as e:
         await _send(ws, 1, None, f"创建任务失败: {e}")

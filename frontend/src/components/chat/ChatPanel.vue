@@ -145,4 +145,25 @@ watch(() => chatStore.messages.length, () => {
 }
 .batch-text { font-size: 13px; color: #c0e0c0; flex: 1; margin-right: 12px; }
 .chat-panel__input { padding-top: 8px; border-top: 1px solid #2a2a4a; }
+
+/* 覆盖 Element Plus 默认浅色边框 → 暗色主题 */
+.chat-panel__input :deep(.el-input__wrapper) {
+  background: #0f0f1a;
+  box-shadow: 0 0 0 1px #2a2a4a;
+  border: none;
+}
+.chat-panel__input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #3a3a5a;
+}
+.chat-panel__input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #4caf50;
+}
+.chat-panel__input :deep(.el-input__inner) {
+  color: #c0c0c0;
+}
+.chat-panel__input :deep(.el-input-group__append) {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-left: none;
+}
 </style>

@@ -16,7 +16,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from orbit.api.routes import chat, compliance, health, knowledge, observability, projects, sessions, tasks
+from orbit.api.routes import (
+    chat,
+    compliance,
+    health,
+    knowledge,
+    observability,
+    projects,
+    sessions,
+    tasks,
+)
 from orbit.gateway.client import LLMClient
 from orbit.agents.factory import AgentFactory
 from orbit.scheduler.orchestrator import Scheduler
@@ -79,7 +88,9 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     if getattr(sys, "frozen", False):
         static_dir = os.path.join(sys._MEIPASS, "static")  # type: ignore[attr-defined]
     if os.path.isdir(static_dir):
-        app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
+        app.mount(
+            "/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets"
+        )
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
     # 启动 EventBus→WS 广播协程

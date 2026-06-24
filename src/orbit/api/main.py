@@ -18,6 +18,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.agents.factory import AgentFactory
 from orbit.api.routes import (
+    backup,
     chat,
     compliance,
     health,
@@ -26,6 +27,7 @@ from orbit.api.routes import (
     projects,
     sessions,
     tasks,
+    versioning,
 )
 from orbit.checkpoint.manager import CheckpointManager
 from orbit.core.config import settings
@@ -70,6 +72,10 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     # 可观测性 API（Step 7.2）
     app.include_router(observability.router, prefix=settings.API_V1_STR)
     # 自然语言聊天 API（NL交互 PR #3）
+    # ???? API?Step 7.4/7.5?
+    app.include_router(backup.router, prefix=settings.API_V1_STR)
+    # ???? API?Step 7.4?
+    app.include_router(versioning.router, prefix=settings.API_V1_STR)
     app.include_router(chat.router, prefix=settings.API_V1_STR)
     # Session + Project API（Session PR #1）
     app.include_router(sessions.router, prefix=settings.API_V1_STR)

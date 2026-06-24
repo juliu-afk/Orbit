@@ -1,15 +1,13 @@
-"""å¯è§æµæ§ APIï¼Step 7.2 AgentOpsï¼ã
+"""可观测性 API（Step 7.2 AgentOps）。
 
-GET  /observability/health             å
-¨ç»ä»¶å¥åº·ç¶æ
-GET  /observability/health/{component}  åç»ä»¶å¥åº·ç¶æ
-GET  /observability/metrics            ä¸å¡ææ å¿«ç
-§
-GET  /observability/alerts             å½åæ´»è·åè­¦
-GET  /observability/alerts/history     åè­¦åå²
-GET  /observability/audit              å®¡è®¡æ¥å¿ï¼æ task_idï¼
-POST /observability/lessons            è®°å½æè®­
-GET  /observability/lessons            æ¥è¯¢æè®­åº
+GET  /observability/health             全组件健康状态
+GET  /observability/health/{component}  单组件健康状态
+GET  /observability/metrics            业务指标快照
+GET  /observability/alerts             当前活跃告警
+GET  /observability/alerts/history     告警历史
+GET  /observability/audit              审计日志（按 task_id）
+POST /observability/lessons            记录教训
+GET  /observability/lessons            查询教训库
 """
 
 from __future__ import annotations
@@ -27,7 +25,7 @@ from orbit.observability.probes import StartupProbeEngine
 
 router = APIRouter(prefix="/observability", tags=["observability"])
 
-# ââ æ¨¡åçº§åä¾ ââââââââââââââââââââââââââââââââââââââââââââ
+# ── 模块级单例 ────────────────────────────────────────────
 
 _collector = HealthCollector()
 _alert_engine = AlertEngine()
@@ -35,7 +33,7 @@ _alert_engine.add_builtin_rules()
 _audit = AuditLogger()
 _lessons = LessonStore()
 
-# æ³¨åæ ¸å¿ç»ä»¶ï¼å·²æé»è¾ï¼
+# 注册核心组件（已有逻辑）
 for _comp in [
     "scheduler",
     "llm_gateway",
@@ -49,23 +47,23 @@ for _comp in [
     _collector.register(_comp)
 
 
-# ââ å¥åº·æ£æ¥ï¼å·²æï¼ ââââââââââââââââââââââââââââââââââââââ
+# ── 健康检查（已有） ──────────────────────────────────────
 
 
-@router.get("/health", summary="å¨ç»ä»¶å¥åº·ç¶æ")
+@router.get("/health", summary="全组件健康状态")
 async def observability_health() -> dict[str, Any]:
-    """è¿åæææ ¸å¿ç»ä»¶çå¥åº·ç¶ææè¦ã"""
+    """返回所有核心组件的健康状态摘要。"""
     _collector.update("scheduler", ComponentStatus.HEALTHY)
     _collector.update("knowledge_engine", ComponentStatus.HEALTHY)
     _collector.update("llm_gateway", ComponentStatus.HEALTHY)
-    # 真实检测：CodeGraphEngine 可导入即健康
+    # WHY ?????CodeGraphEngine ?????????????????
     try:
         from orbit.graph.engines.code_graph import CodeGraphEngine
 
         _ = CodeGraphEngine  # noqa: F841
         _collector.update("code_graph", ComponentStatus.HEALTHY)
     except ImportError:
-        _collector.update("code_graph", ComponentStatus.DEGRADED, "代码图谱模块不可用")
+        _collector.update("code_graph", ComponentStatus.DEGRADED, "?????????")
     _collector.update("db_graph", ComponentStatus.HEALTHY)
     _collector.update("config_graph", ComponentStatus.HEALTHY)
     _collector.update("hallucination_layers", ComponentStatus.HEALTHY)
@@ -73,12 +71,12 @@ async def observability_health() -> dict[str, Any]:
     return _collector.summary()
 
 
-@router.get("/health/{component}", summary="åç»ä»¶å¥åº·ç¶æ")
+@router.get("/health/{component}", summary="单组件健康状态")
 async def component_health(component: str) -> dict[str, Any]:
-    """è¿ååä¸ªç»ä»¶çå¥åº·ç¶æã"""
+    """返回单个组件的健康状态。"""
     c = _collector.get(component)
     if c is None:
-        return {"error": f"æªç¥ç»ä»¶: {component}"}
+        return {"error": f"未知组件: {component}"}
     return {
         "name": c.name,
         "status": c.status.value,
@@ -87,36 +85,35 @@ async def component_health(component: str) -> dict[str, Any]:
     }
 
 
-# ââ ä¸å¡ææ ï¼æ°å¢ï¼ ââââââââââââââââââââââââââââââââââââââ
+# ── 业务指标（新增） ──────────────────────────────────────
 
 
-@router.get("/metrics", summary="ä¸å¡ææ å¿«ç§")
+@router.get("/metrics", summary="业务指标快照")
 async def observability_metrics() -> dict[str, Any]:
-    """è¿åææä¸å¡ææ çå½åå¿«ç
-    §ã
+    """返回所有业务指标的当前快照。
 
-        ä¸ /metrics (Prometheus) äºè¡¥ï¼æ¬ç«¯ç¹è¿å JSON æ ¼å¼ï¼
-        ä¾é©¾é©¶è±åç«¯ç´æ¥æ¶è´¹ã
+    与 /metrics (Prometheus) 互补：本端点返回 JSON 格式，
+    供驾驶舱前端直接消费。
     """
     return {"code": 0, "data": metrics_snapshot(), "message": "ok"}
 
 
-# ââ åè­¦ï¼æ°å¢ï¼ ââââââââââââââââââââââââââââââââââââââââââ
+# ── 告警（新增） ──────────────────────────────────────────
 
 
-@router.get("/alerts", summary="å½åæ´»è·åè­¦")
+@router.get("/alerts", summary="当前活跃告警")
 async def observability_alerts() -> dict[str, Any]:
-    """è¿åå½åæ´»è·åè­¦åè¡¨ï¼å·å´æåçåè­¦ä»è§ä¸ºæ´»è·ï¼ã"""
-    # è¯ä¼°ä¸æ¬¡ææ ï¼è§¦ååè­¦æ£æ¥
+    """返回当前活跃告警列表（冷却期内的告警仍视为活跃）。"""
+    # 评估一次指标，触发告警检查
     _alert_engine.evaluate(metrics_snapshot())
     return {"code": 0, "data": _alert_engine.get_active(), "message": "ok"}
 
 
-@router.get("/alerts/history", summary="åè­¦åå²")
+@router.get("/alerts/history", summary="告警历史")
 async def observability_alerts_history(
     limit: int = Query(default=50, ge=1, le=200),
 ) -> dict[str, Any]:
-    """è¿ååè­¦åå²è®°å½ï¼æå¤ 200 æ¡ï¼ã"""
+    """返回告警历史记录（最多 200 条）。"""
     return {
         "code": 0,
         "data": _alert_engine.get_history(limit=limit),
@@ -124,20 +121,18 @@ async def observability_alerts_history(
     }
 
 
-# ââ å®¡è®¡ï¼æ°å¢ï¼ ââââââââââââââââââââââââââââââââââââââââââ
+# ── 审计（新增） ──────────────────────────────────────────
 
 
-@router.get("/audit", summary="å®¡è®¡æ¥å¿æ¥è¯¢")
+@router.get("/audit", summary="审计日志查询")
 async def observability_audit(
-    task_id: str = Query(default="", description="æä»»å¡ ID è¿æ»¤ï¼ä¸ºç©ºè¿åç©ºåè¡¨"),
+    task_id: str = Query(default="", description="按任务 ID 过滤，为空返回空列表"),
 ) -> dict[str, Any]:
-    """æ task_id æ¥è¯¢å®¡è®¡ç¸å
-    ³æè®­è®°å½ã
+    """按 task_id 查询审计相关教训记录。
 
-        WHY ä¸è¿å structlog å®æ¶æµï¼
-        structlog è¾åºå° stdoutï¼ç±å®¹å¨æ¥å¿ç³»ç»ééã
-        æ¬ç«¯ç¹è¿å SQLite ä¸­æä¹
-    åçæè®­è®°å½ã
+    WHY 不返回 structlog 实时流：
+    structlog 输出到 stdout，由容器日志系统采集。
+    本端点返回 SQLite 中持久化的教训记录。
     """
     if not task_id:
         return {"code": 0, "data": [], "message": "ok"}
@@ -160,10 +155,10 @@ async def observability_audit(
     }
 
 
-# ââ æè®­åºï¼æ°å¢ï¼ ââââââââââââââââââââââââââââââââââââââââ
+# ── 教训库（新增） ────────────────────────────────────────
 
 
-@router.post("/lessons", summary="è®°å½æè®­", status_code=201)
+@router.post("/lessons", summary="记录教训", status_code=201)
 async def create_lesson(
     task_id: str = Query(default=""),
     domain: str = Query(default=""),
@@ -171,15 +166,15 @@ async def create_lesson(
     lesson: str = Query(default=""),
     tags: str = Query(default=""),
 ) -> dict[str, Any]:
-    """è®°å½ä¸æ¡æå/å¤±è´¥æè®­å°æè®­åºã
+    """记录一条成功/失败教训到教训库。
 
-    é¢åï¼domainï¼ï¼scheduler | llm | sandbox | graph | hallucination
-    ç»æï¼outcomeï¼ï¼success | failure
+    领域（domain）：scheduler | llm | sandbox | graph | hallucination
+    结果（outcome）：success | failure
     """
     if not task_id or not domain or not lesson:
-        raise HTTPException(status_code=422, detail="task_id, domain, lesson å¿å¡«")
+        raise HTTPException(status_code=422, detail="task_id, domain, lesson 必填")
     if outcome not in ("success", "failure"):
-        raise HTTPException(status_code=422, detail="outcome å¿é¡»ä¸º success æ failure")
+        raise HTTPException(status_code=422, detail="outcome 必须为 success 或 failure")
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
     result = _lessons.add(
@@ -201,12 +196,12 @@ async def create_lesson(
     }
 
 
-@router.get("/lessons", summary="æ¥è¯¢æè®­åº")
+@router.get("/lessons", summary="查询教训库")
 async def list_lessons(
-    domain: str = Query(default="", description="æé¢åè¿æ»¤ï¼ä¸ºç©ºè¿åç»è®¡"),
+    domain: str = Query(default="", description="按领域过滤，为空返回统计"),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> dict[str, Any]:
-    """æé¢åæ¥è¯¢æè®­è®°å½ã"""
+    """按领域查询教训记录。"""
     if domain:
         lessons = _lessons.list_by_domain(domain, limit=limit)
     else:
@@ -214,7 +209,7 @@ async def list_lessons(
             "code": 0,
             "data": {
                 "total": _lessons.count(),
-                "hint": "ä½¿ç¨ ?domain=scheduler æé¢åè¿æ»¤",
+                "hint": "使用 ?domain=scheduler 按领域过滤",
             },
             "message": "ok",
         }
@@ -236,15 +231,15 @@ async def list_lessons(
     }
 
 
-# ââ å¯å¨é¢æ£ï¼Session PR åç»­ï¼ ââââââââââââââââââââââââââââ
+# ── 启动预检（Session PR 后续） ────────────────────────────
 
 _probe_engine: StartupProbeEngine | None = None
 _probe_lock = asyncio.Lock()
 
 
-@router.get("/startup-probe", summary="å¯å¨é¢æ£æ¢é")
+@router.get("/startup-probe", summary="启动预检探针")
 async def startup_probe() -> dict[str, Any]:
-    """è¿åå¯å¨æ¢éæ§è¡ç¶æãé¦æ¬¡è¯·æ±è§¦åå¼æ­¥æ§è¡ã"""
+    """返回启动探针执行状态。首次请求触发异步执行。"""
     global _probe_engine
     if _probe_engine is None:
         async with _probe_lock:
@@ -255,9 +250,9 @@ async def startup_probe() -> dict[str, Any]:
     return {"code": 0, "data": _probe_engine.results(), "message": "ok"}
 
 
-@router.post("/startup-probe/reset", summary="éç½®å¹¶éè¯å¯å¨æ¢é")
+@router.post("/startup-probe/reset", summary="重置并重试启动探针")
 async def startup_probe_reset() -> dict[str, Any]:
-    """éç½®å¤±è´¥æ¢éï¼éæ°è¿è¡ã"""
+    """重置失败探针，重新运行。"""
     global _probe_engine
     if _probe_engine is not None:
         _probe_engine.reset()
@@ -265,28 +260,28 @@ async def startup_probe_reset() -> dict[str, Any]:
     return {"code": 0, "data": {"status": "reset"}, "message": "ok"}
 
 
-@router.post("/startup-probe/install/{name}", summary="å®è£æå®ç»ä»¶")
+@router.post("/startup-probe/install/{name}", summary="安装指定组件")
 async def startup_probe_install(name: str) -> dict[str, Any]:
-    """åå°å®è£æå®ç»ä»¶ï¼å¦ Docker Desktopï¼ã"""
+    """后台安装指定组件（如 Docker Desktop）。"""
     if name == "docker":
 
         asyncio.create_task(_async_install_docker())
         return {
             "code": 0,
             "data": {"status": "installing"},
-            "message": "æ­£å¨åå°å®è£ Docker Desktop...",
+            "message": "正在后台安装 Docker Desktop...",
         }
-    raise HTTPException(status_code=404, detail=f"æªç¥ç»ä»¶: {name}")
+    raise HTTPException(status_code=404, detail=f"未知组件: {name}")
 
 
 async def _async_install_docker() -> None:
-    """åå°å®è£ Dockerï¼å®æåéç½® sandbox æ¢éå¹¶éè·ã"""
+    """后台安装 Docker，完成后重置 sandbox 探针并重跑。"""
     from orbit.observability.probes import install_docker
 
     global _probe_engine
     result = await install_docker()
     if _probe_engine is not None:
-        # åªéç½® sandbox æ¢é
+        # 只重置 sandbox 探针
         for check in _probe_engine._checks:
             if check.name == "sandbox":
                 check.status = "pending"
@@ -294,7 +289,7 @@ async def _async_install_docker() -> None:
                 check.install_action = None
                 check.auto_repaired = False
                 break
-        # éè· sandbox
+        # 重跑 sandbox
         for check in _probe_engine._checks:
             if check.name == "sandbox" and check.status == "pending":
                 await _probe_engine._run_probe(check)

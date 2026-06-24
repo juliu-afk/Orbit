@@ -1,5 +1,27 @@
 # Orbit 开发会话记录
 
+## 2026-06-24
+
+### 完成项
+- **Tauri 桌面窗口迁移**（PR #40 → squash merge `7449fdb`）
+  - PyInstaller + 浏览器 → Tauri v2 原生窗口，单 exe 42MB
+  - `include_bytes!` 嵌入 orbit-backend.exe，运行时解压 %TEMP%
+  - WebView2 引导器嵌入，缺失时自动安装
+  - GUI 子系统（无控制台），窗口关闭自动杀后端
+  - launcher.py 删 webbrowser + 加 sys.stdout/stderr None 保护
+  - Cargo mirror：清华 403 → 中科大（ustc）
+
+### 改动文件
+- 新增 `src-tauri/` (10 文件)：Rust 工程 + 图标
+- 修改 `src/orbit/launcher.py`、`backend/orbit.spec`、`.gitignore`、`frontend/package.json`
+
+### 交付物
+- `D:\Orbit\Deliverables\Orbit.exe` (42MB) — 单文件，可直接分发
+
+### 待处理
+- exe 代码签名（消除 SmartScreen 警告）
+- 无边框标题栏 / 系统托盘 / 多窗口（后续 Tauri 迭代）
+
 ## 2026-06-23
 
 ### 完成项

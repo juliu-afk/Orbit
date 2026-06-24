@@ -2,11 +2,8 @@
 #![windows_subsystem = "windows"]
 
 use std::fs;
-use std::net::TcpStream;
 use std::path::PathBuf;
 use std::process::{Child, Command};
-use std::thread;
-use std::time::{Duration, Instant};
 
 /// 编译期嵌入 orbit-backend.exe，运行时解压到临时目录
 const BACKEND_EXE: &[u8] = include_bytes!("../orbit-backend.exe");
@@ -16,7 +13,6 @@ fn extract_backend() -> PathBuf {
     let dir = std::env::temp_dir().join("orbit");
     fs::create_dir_all(&dir).ok();
     let exe_path = dir.join("orbit-backend.exe");
-    // 每次启动强制写入——确保更新生效（SSD 上 ~0.5s，可接受）
     let _ = fs::remove_file(&exe_path);
     fs::write(&exe_path, BACKEND_EXE).expect("无法解压后端程序");
     exe_path
@@ -40,19 +36,7 @@ fn start_backend(exe_path: &PathBuf) -> Child {
         .expect("无法启动后端进程")
 }
 
-/// TCP 轮询等后端就绪，最多等 30 秒
-fn wait_for_backend(addr: &str, timeout_secs: u64) -> bool {
-    let deadline = Instant::now() + Duration::from_secs(timeout_secs);
-    while Instant::now() < deadline {
-        if TcpStream::connect_timeout(&addr.parse().unwrap(), Duration::from_secs(1)).is_ok() {
-            return true;
-        }
-        thread::sleep(Duration::from_millis(500));
-    }
-    false
-}
-
-/// 清理临时目录中的后端 exe（删不掉就留 %TEMP%，Windows 自动清）
+/// 清理临时目录中的后端 exe
 fn cleanup_backend(exe_path: &PathBuf) {
     let _ = fs::remove_file(exe_path);
 }
@@ -64,13 +48,9 @@ fn main() {
     println!("Orbit — 启动后端...");
     let mut backend = start_backend(&backend_path);
 
-    if wait_for_backend("127.0.0.1:18888", 30) {
-        println!("后端就绪，打开窗口...");
-    } else {
-        eprintln!("⚠ 后端启动超时，仍尝试打开窗口");
-    }
-
-    // Tauri v2——程序化创建窗口，直接加载后端 URL
+    // WHY 先开窗再等后端: PyInstaller one-file 解压+Python启动需 10-20s，
+    // 先开窗用户立刻看到界面（WebView 显示 connection 状态"连接中..."），
+    // 后端就绪后 WebSocket 自动连接，避免用户以为程序卡死。
     tauri::Builder::default()
         .setup(|app| {
             use tauri::WebviewUrl;

@@ -74,6 +74,38 @@
 - 禁止命令注入、XSS、SQL 注入、`eval()`、动态代码执行
 - 密钥/Token/API key 一律从环境变量读取，禁止硬编码
 - 不读/写 `.env`、credentials、`.pem`、`.key` 文件
+## ⚠️ 构建 exe 桌面版（强制两段式，禁止直接用 PyInstaller 产物）
+
+> **Deliverables/Orbit.exe 是 Tauri 桌面壳，不是裸 PyInstaller 产物。**
+> 裸 PyInstaller 产物是 39MB 后端-only，无 UI 窗口（`console=False`），用户双击看不到任何东西。
+> 桌面壳 = Tauri (Rust WebView) 内嵌 orbit-backend.exe，42MB，双击弹出原生窗口。
+
+**每次改完后端（任何 Python 文件变更）必须完整跑构建链，禁止跳过步骤：**
+
+```bash
+bash scripts/build-desktop.sh
+```
+
+**手工分步（调试时用）：**
+
+| 步骤 | 命令 | 产物 |
+|------|------|------|
+| 1. 杀旧进程 | `taskkill //F //IM Orbit.exe` | — |
+| 2. 前端构建 | `cd frontend && CI=true pnpm build` | `frontend/dist/` |
+| 3. 复制前端 | `cp -r frontend/dist/* backend/static/` | `backend/static/` |
+| 4. PyInstaller | `cd backend && python -m PyInstaller orbit.spec --distpath ../Deliverables --workpath build --noconfirm` | `Deliverables/Orbit.exe` (39MB 后端) |
+| 5. 替换 Tauri 内嵌 | `cp Deliverables/Orbit.exe src-tauri/orbit-backend.exe` | Tauri 壳用的后端 |
+| 6. Tauri 编译 | `cd src-tauri && cargo build --release` | `src-tauri/target/release/orbit.exe` (42MB 桌面壳) |
+| 7. 输出 | `cp src-tauri/target/release/orbit.exe Deliverables/Orbit.exe` | **最终产物** |
+
+**关键关系**：
+- `Deliverables/Orbit.exe` ← 覆盖自 Tauri 构建输出（步骤 7），不是 PyInstaller 产物
+- 步骤 4 生成的 `Deliverables/Orbit.exe` 会被步骤 7 覆盖——这是正确的
+- `src-tauri/orbit-backend.exe` 在 `.gitignore` 中，每次 `cargo build` 编译进 Tauri 壳
+- 仅改前端（未动 backend/）→ 跳步骤 4-5，跑步骤 2-3 + 6-7 即可
+- 改了 `orbit.spec` 的 `hiddenimports` → 必须加新模块路径后再跑完整链
+- `console=False` 是正确的——Tauri 提供窗口，后端不需要自己的控制台
+- 新增 backend 模块 → 必须加到 `orbit.spec` 的 `hiddenimports` 列表，否则 PyInstaller 漏打包
 - 永远不生成包含真实个人或企业信息的测试数据
 - API 响应统一：`{ code: 0, data: ..., message: "ok" }`；错误 `{ code: 错误码, data: null, message: "具体原因" }`
 - 路由层只做参数校验 + 响应格式化，不写业务逻辑

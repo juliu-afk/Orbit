@@ -1,19 +1,10 @@
-"""PyInstaller 启动入口——启动 uvicorn + 自动打开浏览器。
+"""PyInstaller 启动入口——启动 uvicorn 服务。
 """
 
 from __future__ import annotations
 
 import os
 import sys
-import threading
-import webbrowser
-
-
-def _open_browser(url: str, delay: float = 1.5) -> None:
-    """延迟打开浏览器——等 uvicorn 先绑定端口。"""
-    import time
-    time.sleep(delay)
-    webbrowser.open(url)
 
 
 def main() -> None:
@@ -30,9 +21,7 @@ def main() -> None:
     host = "127.0.0.1"
     port = 18888
 
-    url = f"http://{host}:{port}"
-    threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
-
+    print(f"Orbit 启动: http://{host}:{port}")
     config = uvicorn.Config(app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
     server.run()

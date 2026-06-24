@@ -1,10 +1,19 @@
-"""PyInstaller/Tauri 启动入口——直接 import 后启动 uvicorn。
-Tauri 主进程 spawn 此脚本后，加载 http://127.0.0.1:18888 到 WebView。
+"""PyInstaller 启动入口——启动 uvicorn + 自动打开浏览器。
 """
+
 from __future__ import annotations
 
 import os
 import sys
+import threading
+import webbrowser
+
+
+def _open_browser(url: str, delay: float = 1.5) -> None:
+    """延迟打开浏览器——等 uvicorn 先绑定端口。"""
+    import time
+    time.sleep(delay)
+    webbrowser.open(url)
 
 
 def main() -> None:
@@ -20,6 +29,9 @@ def main() -> None:
 
     host = "127.0.0.1"
     port = 18888
+
+    url = f"http://{host}:{port}"
+    threading.Thread(target=_open_browser, args=(url,), daemon=True).start()
 
     config = uvicorn.Config(app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)

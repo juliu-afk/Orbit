@@ -11,9 +11,9 @@
           <template #header>备份快照</template>
           <div v-if="opsStore.snapshots.length === 0" class="empty-hint">暂无快照</div>
           <div v-else class="snap-list">
-            <div v-for="s in opsStore.snapshots" :key="s.name" class="snap-item">
-              <span>{{ s.name }}</span>
-              <span>{{ s.size_mb }} MB</span>
+            <div v-for="s in opsStore.snapshots" :key="s.snapshot_id" class="snap-item">
+              <span>{{ s.path }}</span>
+              <span>{{ (s.size_bytes / 1048576).toFixed(1) }} MB</span>
             </div>
           </div>
         </el-card>

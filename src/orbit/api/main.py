@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from orbit.api.routes import chat, compliance, health, knowledge, observability, tasks
+from orbit.api.routes import chat, compliance, health, knowledge, observability, projects, sessions, tasks
 from orbit.core.config import settings
 from orbit.events.bus import EventBus
 from orbit.ws.router import router as ws_router
@@ -50,6 +50,9 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(observability.router, prefix=settings.API_V1_STR)
     # 自然语言聊天 API（NL交互 PR #3）
     app.include_router(chat.router, prefix=settings.API_V1_STR)
+    # Session + Project API（Session PR #1）
+    app.include_router(sessions.router, prefix=settings.API_V1_STR)
+    app.include_router(projects.router, prefix=settings.API_V1_STR)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
     # WebSocket 路由（Step 6.1 驾驶舱）

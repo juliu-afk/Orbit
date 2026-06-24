@@ -1,7 +1,5 @@
 """NL交互 PR #2——上下文匹配引擎单元测试。"""
 
-import os
-
 from orbit.context.matcher import ContextMatcher
 from orbit.projects.registry import ProjectRegistry
 
@@ -154,5 +152,11 @@ def _seeded_registry() -> ProjectRegistry:
 
 
 def _cleanup() -> None:
-    if os.path.exists("data/projects.db"):
-        os.remove("data/projects.db")
+    # WHY 不能删 DB 文件: chat.py 模块级 ProjectRegistry 保持连接，
+    # 删文件会 PermissionError。用 deactivate 清理测试数据。
+    reg = ProjectRegistry()
+    try:
+        for name in ("Orbit", "Finite", "Keshen", "PaymentService", "OrbitAgent"):
+            reg.deactivate(name)
+    finally:
+        reg.close()

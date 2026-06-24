@@ -1,15 +1,15 @@
-"""MVP-03 Docker 沙箱原型。
+"""MVP-03 Docker 沙箱原型 + Session PR #2 多卷挂载。
 
 WHY 沙箱：LLM 生成的代码必须隔离执行，禁止宿主机直接跑（安全 + 可重复）。
 Docker 隔离：每个代码片段在独立容器内执行，超时强杀，输出捕获，用后即删。
 
-生产级沙箱（Step 5.x）会加：资源限制（cgroup）、网络隔离、预热池。
-MVP 阶段实现最小可用：docker run --rm + 超时 + 输出捕获。
+Session PR #2 改动：挂载策略从单临时文件 → 项目路径多卷挂载。
 """
 
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 # MVP 用 Python 官方镜像（生产可换更小的 python:slim/alpine）
 DEFAULT_IMAGE = "python:3.12-slim"
 DEFAULT_TIMEOUT = settings.SANDBOX_TIMEOUT_SECONDS
+MAX_READONLY_MOUNTS = 5  # Session PR #2: 最多挂载 5 个只读项目路径
 
 
 class SandboxError(Exception):
@@ -42,24 +43,41 @@ class Sandbox:
 
     被调度器调用（Agent 的 CODING 阶段执行生成代码）。
     被防幻觉层 L5 调用（沙箱执行验证）。
+
+    Session PR #2: 支持项目路径绑定（rw）和其他项目只读挂载（ro）。
     """
 
     def __init__(
         self,
         image: str = DEFAULT_IMAGE,
         timeout: int = DEFAULT_TIMEOUT,
+        project_path: str = "",
+        readonly_paths: list[str] | None = None,
     ):
+        """
+        Args:
+            project_path: 当前项目路径 → 挂载为 /workspace:rw
+            readonly_paths: 其他项目路径列表 → 挂载为 /readonly/{name}:ro
+        """
         self.image = image
         self.timeout = timeout
+        self.project_path = project_path
+        self.readonly_paths = readonly_paths or []
         # WHY 运行时检测 Docker：避免在无 Docker 环境（CI/测试）import 时就失败
         self._docker_available: bool | None = None
 
-    async def run(self, code: str, language: str = "python") -> str:
+    async def run(
+        self,
+        code: str,
+        language: str = "python",
+        external_paths: list[str] | None = None,
+    ) -> str:
         """执行代码片段，返回 stdout。
 
         Args:
             code: 代码内容
             language: 语言（MVP 仅支持 python，其他抛错）
+            external_paths: LLM 代码引用的外部路径（Session PR #2）
 
         Raises:
             SandboxTimeoutError: 超时
@@ -80,7 +98,7 @@ class Sandbox:
             host_script = Path(f.name)
 
         try:
-            return await self._run_in_container(host_script)
+            return await self._run_in_container(host_script, external_paths=external_paths)
         finally:
             # 清理临时文件（防止泄漏）
             try:
@@ -88,7 +106,48 @@ class Sandbox:
             except Exception as e:
                 logger.warning("temp_cleanup_failed", path=str(host_script), error=str(e))
 
-    async def _run_in_container(self, host_script: Path) -> str:
+    def _build_mounts(self, host_script: Path,
+                      external_paths: list[str] | None = None) -> list[str]:
+        """生成 docker run -v 参数列表（Session PR #2）。
+
+        挂载顺序:
+          1. 临时脚本 → /tmp/xxx.py:ro
+          2. 绑定项目路径 → /workspace:rw
+          3. 其他已注册项目 → /readonly/{name}:ro（最多 MAX_READONLY_MOUNTS 个）
+          4. 外部引用路径 → /readonly/ext_{i}:ro（最多 MAX_READONLY_MOUNTS 个）
+
+        WHY ro 而非 rw: 防止沙箱内代码写越界到其他项目或外部路径。
+        WHY _to_docker_path 对 host_script: Windows Docker Desktop 需要 //d/ 格式，
+        与项目路径挂载一致的路径格式避免环境差异导致挂载失败。
+        """
+        docker_script = _to_docker_path(str(host_script))
+        mounts = [f"{docker_script}:/tmp/{host_script.name}:ro"]
+
+        # 绑定项目路径 → 读写
+        if self.project_path and os.path.isdir(self.project_path):
+            docker_path = _to_docker_path(self.project_path)
+            mounts.append(f"{docker_path}:/workspace:rw")
+
+        # 其他已注册项目 → 只读
+        for i, rp in enumerate(self.readonly_paths[:MAX_READONLY_MOUNTS]):
+            if os.path.isdir(rp) and rp != self.project_path:
+                name = Path(rp).name or f"proj_{i}"
+                docker_path = _to_docker_path(rp)
+                mounts.append(f"{docker_path}:/readonly/{name}:ro")
+
+        # 外部引用路径 → 只读
+        ext_paths = external_paths or []
+        for i, ep in enumerate(ext_paths[:MAX_READONLY_MOUNTS]):
+            if os.path.isdir(ep) and ep not in self.readonly_paths:
+                name = Path(ep).name or f"ext_{i}"
+                docker_path = _to_docker_path(ep)
+                mounts.append(f"{docker_path}:/readonly/ext/{name}:ro")
+
+        return mounts
+
+    async def _run_in_container(
+        self, host_script: Path, external_paths: list[str] | None = None
+    ) -> str:
         """在 Docker 容器内执行脚本。"""
         container_script = f"/tmp/{host_script.name}"  # nosec B108: 容器内路径，非宿主机
         cmd = [
@@ -97,12 +156,12 @@ class Sandbox:
             "--rm",
             "--network",
             "none",  # WHY 网络隔离：LLM 代码不应访问网络（防数据外泄）
-            "-v",
-            f"{host_script}:{container_script}:ro",
-            self.image,
-            "python",
-            container_script,
         ]
+        # Session PR #2: 多卷挂载
+        for mount in self._build_mounts(host_script, external_paths=external_paths):
+            cmd.extend(["-v", mount])
+
+        cmd.extend([self.image, "python", container_script])
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -149,3 +208,18 @@ class Sandbox:
             logger.warning("docker_check_failed", error=str(e))
             self._docker_available = False
         return self._docker_available
+
+
+def _to_docker_path(host_path: str) -> str:
+    """转换 Windows 路径为 Docker 可识别的格式。
+
+    WHY 路径转换: Windows Docker Desktop 需要特殊路径格式。
+    D:/xxx → //d/xxx  (Git Bash / MSYS2 兼容)
+    C:/xxx → //c/xxx
+    """
+    if os.name == "nt":
+        # Windows: D:/Code → //d/Code
+        drive = host_path[0].lower()
+        rest = host_path[2:].replace("\\", "/")
+        return f"//{drive}{rest}"
+    return host_path

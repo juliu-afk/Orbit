@@ -1,150 +1,163 @@
-<!-- 驾驶舱主视图：4 标签页 (监控/聊天/运维/资源) + 全局状态栏 -->
+<!-- 驾驶舱主视图：Session 为顶栏 → 指标 → 内容区 → 底部信息 (Session PR #3) -->
 <template>
   <div class="dashboard">
-    <GlobalStatusBar
-      :connection-status="ws.connectionStatus.value"
-      :task-id="dashboardStore.currentTaskId"
-      :last-update-time="dashboardStore.lastUpdateTime"
-    />
+    <div class="dashboard-top">
+      <!-- WS 连接状态灯 -->
+      <span class="connection-dot" :class="`dot--${dashboard.wsStatus}`" />
+      <span class="connection-label">
+        {{ dashboard.wsStatus === 'connected' ? '已连接' :
+           dashboard.wsStatus === 'connecting' ? '连接中...' : '已断开' }}
+      </span>
+      <!-- Session 栏 -->
+      <SessionBar class="session-bar" @new-session="showNewDialog = true" />
+    </div>
 
     <ConnectionOverlay
       v-if="ws.retryCount.value >= ws.maxRetries"
       @reconnect="handleReconnect"
     />
 
-    <el-tabs v-model="activeTab" class="dashboard-tabs" type="border-card">
-      <!-- ── 监控 ──────────────────────────────── -->
-      <el-tab-pane label="监控" name="monitor">
-        <!-- F1: AgentOps 指标卡片行 -->
-        <div class="metrics-row">
-          <MetricsCard
-            title="任务成功率"
-            :value="successRate"
-            unit="%"
-            :loading="agentOpsStore.loading"
-          />
-          <MetricsCard
-            title="活跃任务"
-            :value="agentOpsStore.metrics?.active_tasks ?? null"
-            :loading="agentOpsStore.loading"
-          />
-          <MetricsCard
-            title="Token 消耗"
-            :value="totalTokens"
-            :loading="agentOpsStore.loading"
-          />
-          <MetricsCard
-            title="防幻觉拦截"
-            :value="totalIntercepted"
-            :loading="agentOpsStore.loading"
-          />
+    <!-- 无 Session 引导页 -->
+    <div v-if="!session.currentSessionId" class="welcome">
+      <el-empty description="选择一个项目开始工作" :image-size="80">
+        <el-button type="primary" @click="showNewDialog = true">
+          打开或新建项目
+        </el-button>
+      </el-empty>
+    </div>
+
+    <!-- Session 工作台 -->
+    <template v-else>
+      <!-- 指标卡片行 -->
+      <div class="metrics-row">
+        <MetricsCard
+          title="任务成功率"
+          :value="successRate"
+          unit="%"
+          :loading="agentOpsStore.loading"
+        />
+        <MetricsCard
+          title="活跃任务"
+          :value="agentOpsStore.metrics?.active_tasks ?? null"
+          :loading="agentOpsStore.loading"
+        />
+        <MetricsCard
+          title="Token 消耗"
+          :value="totalTokens"
+          :loading="agentOpsStore.loading"
+        />
+        <MetricsCard
+          title="防幻觉拦截"
+          :value="totalIntercepted"
+          :loading="agentOpsStore.loading"
+        />
+      </div>
+
+      <!-- 熔断器指示灯 -->
+      <div class="cb-row">
+        <CircuitBreakerLight
+          name="ResourceGuard"
+          :state="agentOpsStore.metrics?.circuit_breaker_state?.resource_guard ?? -1"
+        />
+        <CircuitBreakerLight
+          name="Z3"
+          :state="agentOpsStore.metrics?.circuit_breaker_state?.z3 ?? -1"
+        />
+        <CircuitBreakerLight
+          name="Sandbox"
+          :state="agentOpsStore.metrics?.circuit_breaker_state?.sandbox ?? -1"
+        />
+      </div>
+
+      <!-- 主内容区——左右分栏 -->
+      <div class="content-row">
+        <!-- 左栏：DAG + 防幻觉 + Token 趋势 -->
+        <div class="left-panel">
+          <el-card shadow="never" class="panel-card">
+            <template #header>DAG 任务流</template>
+            <DagCanvas />
+          </el-card>
+          <el-card shadow="never" class="panel-card">
+            <template #header>Token 消耗趋势</template>
+            <TokenChart :data-points="tokenPoints" />
+          </el-card>
+          <el-card shadow="never" class="panel-card">
+            <template #header>防幻觉分层拦截</template>
+            <div ref="hallucinationChartRef" class="mini-chart" />
+          </el-card>
         </div>
 
-        <!-- F1: 熔断器指示灯 -->
-        <div class="cb-row">
-          <CircuitBreakerLight
-            name="ResourceGuard"
-            :state="agentOpsStore.metrics?.circuit_breaker_state?.resource_guard ?? -1"
-          />
-          <CircuitBreakerLight
-            name="Z3"
-            :state="agentOpsStore.metrics?.circuit_breaker_state?.z3 ?? -1"
-          />
-          <CircuitBreakerLight
-            name="Sandbox"
-            :state="agentOpsStore.metrics?.circuit_breaker_state?.sandbox ?? -1"
-          />
+        <!-- 右栏：聊天 -->
+        <div class="right-panel">
+          <ChatPanel />
         </div>
+      </div>
 
-        <el-row :gutter="12" class="dashboard-grid">
-          <!-- F1: Token 图 + 合规图 -->
-          <el-col :xs="24" :lg="14">
-            <el-card shadow="never" class="panel-card">
-              <template #header>Token 消耗趋势</template>
-              <TokenChart :data-points="tokenPoints" />
-            </el-card>
-            <el-card shadow="never" class="panel-card">
-              <template #header>防幻觉 L1-L9 拦截率</template>
-              <div ref="hallucinationChartRef" class="mini-chart"></div>
-            </el-card>
-          </el-col>
+      <!-- 底部：告警 + 健康 -->
+      <div class="bottom-row">
+        <el-card shadow="never" class="panel-card alert-card">
+          <template #header>
+            活跃告警
+            <el-tag v-if="agentOpsStore.alerts.length === 0" size="small" type="success" style="margin-left:8px">无</el-tag>
+            <el-tag v-else size="small" type="danger" style="margin-left:8px">{{ agentOpsStore.alerts.length }}</el-tag>
+          </template>
+          <div v-if="agentOpsStore.alerts.length === 0" class="empty-hint">✅ 无活跃告警</div>
+          <div v-else class="alert-list">
+            <div
+              v-for="a in agentOpsStore.alerts"
+              :key="a.name"
+              class="alert-item"
+              :class="`alert-item--${a.severity}`"
+            >
+              <span class="alert-item__name">{{ a.name }}</span>
+              <span class="alert-item__msg">{{ a.message }}</span>
+            </div>
+          </div>
+        </el-card>
+        <el-card shadow="never" class="panel-card">
+          <template #header>组件健康</template>
+          <HealthPanel
+            :components="agentOpsStore.health"
+            :overall="agentOpsStore.overallHealth"
+          />
+        </el-card>
+      </div>
+    </template>
 
-          <!-- F1: 告警列表 + 健康 -->
-          <el-col :xs="24" :lg="10">
-            <el-card shadow="never" class="panel-card alert-card">
-              <template #header>
-                活跃告警
-                <el-tag v-if="agentOpsStore.alerts.length === 0" size="small" type="success" style="margin-left:8px">
-                  无
-                </el-tag>
-                <el-tag v-else size="small" type="danger" style="margin-left:8px">
-                  {{ agentOpsStore.alerts.length }}
-                </el-tag>
-              </template>
-              <div v-if="agentOpsStore.alerts.length === 0" class="empty-hint">✅ 无活跃告警</div>
-              <div v-else class="alert-list">
-                <div
-                  v-for="a in agentOpsStore.alerts"
-                  :key="a.name"
-                  class="alert-item"
-                  :class="`alert-item--${a.severity}`"
-                >
-                  <span class="alert-item__name">{{ a.name }}</span>
-                  <span class="alert-item__msg">{{ a.message }}</span>
-                </div>
-              </div>
-            </el-card>
+    <!-- 新建 Session 弹窗 -->
+    <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
 
-            <el-card shadow="never" class="panel-card">
-              <template #header>组件健康</template>
-              <HealthPanel
-                :components="agentOpsStore.health"
-                :overall="agentOpsStore.overallHealth"
-              />
-            </el-card>
-          </el-col>
-        </el-row>
-      </el-tab-pane>
-
-      <!-- ── 聊天 ───────────────────────────── -->
-      <el-tab-pane label="聊天" name="chat">
-        <ChatPanel />
-      </el-tab-pane>
-
-      <!-- ── 运维 ───────────────────────────── -->
-      <el-tab-pane label="运维" name="ops">
-        <OpsPanel />
-      </el-tab-pane>
-
-      <!-- ── 资源 ───────────────────────────── -->
-      <el-tab-pane label="资源" name="resources">
-        <ResourcePanel />
-      </el-tab-pane>
-    </el-tabs>
+    <!-- 跨项目警告 -->
+    <CrossProjectWarning v-if="chatStore.crossProjectWarning" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useDashboardStore } from '@/stores/dashboard'
+import { useSessionStore } from '@/stores/session'
 import { useAgentOpsStore } from '@/stores/agentops'
+import { useChatStore } from '@/stores/chat'
 import type { TokenPoint, WsMessage } from '@/types/dashboard'
-import GlobalStatusBar from '@/components/layout/GlobalStatusBar.vue'
+import SessionBar from '@/components/layout/SessionBar.vue'
 import ConnectionOverlay from '@/components/common/ConnectionOverlay.vue'
 import TokenChart from '@/components/charts/TokenChart.vue'
 import MetricsCard from '@/components/metrics/MetricsCard.vue'
 import CircuitBreakerLight from '@/components/metrics/CircuitBreakerLight.vue'
 import HealthPanel from '@/components/metrics/HealthPanel.vue'
+import DagCanvas from '@/components/dag/DagCanvas.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
-import OpsPanel from '@/components/ops/OpsPanel.vue'
-import ResourcePanel from '@/components/resources/ResourcePanel.vue'
+import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
+import CrossProjectWarning from '@/components/chat/CrossProjectWarning.vue'
 
 const ws = useWebSocket()
-const dashboardStore = useDashboardStore()
+const dashboard = useDashboardStore()
+const session = useSessionStore()
 const agentOpsStore = useAgentOpsStore()
+const chatStore = useChatStore()
 
-const activeTab = ref('monitor')
+const showNewDialog = ref(false)
 const hallucinationChartRef = ref<HTMLElement | null>(null)
 const tokenPoints = ref<TokenPoint[]>([])
 const MAX_TOKEN_POINTS = 100
@@ -176,8 +189,6 @@ const totalIntercepted = computed(() => {
 // ── WS 消息路由 ──────────────────────────────────
 
 ws.setMessageHandler((msg: WsMessage) => {
-  dashboardStore.touch()
-
   switch (msg.type) {
     case 'metrics:snapshot':
       agentOpsStore.handleWsEvent('metrics:snapshot', msg.payload)
@@ -194,6 +205,10 @@ ws.setMessageHandler((msg: WsMessage) => {
       }
       tokenPoints.value.push(tp)
       if (tokenPoints.value.length > MAX_TOKEN_POINTS) tokenPoints.value.shift()
+      // WHY touch: 聊天活动更新 session updated_at
+      if (session.currentSessionId) {
+        session.currentSessionId  // keep session active in store
+      }
       break
     }
   }
@@ -208,8 +223,50 @@ function getWsUrl(): string {
   return `${protocol}//${location.host}/ws/dashboard`
 }
 
-onMounted(() => {
+async function onSessionCreated() {
+  // Session 创建完成后，恢复聊天消息、刷新指标
+  if (session.messages.length > 0) {
+    chatStore.restoreMessages(session.messages.map(m => ({
+      role: m.role,
+      content: m.content,
+      created_at: m.created_at,
+    })))
+  }
+  agentOpsStore.fetchAll()
+}
+
+// Session PR #3: 切换 Session 时同步消息 + 刷新指标
+watch(
+  () => session.currentSessionId,
+  (newId) => {
+    if (newId && session.messages.length > 0) {
+      chatStore.restoreMessages(session.messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        created_at: m.created_at,
+      })))
+    } else if (newId) {
+      chatStore.reset()
+    }
+    tokenPoints.value = []
+    agentOpsStore.fetchAll()
+  }
+)
+
+onMounted(async () => {
   ws.connect(getWsUrl())
+  // 先拉取历史 Session 列表
+  await session.fetchSessions()
+  // 如果有活跃 Session，自动恢复最后一个
+  const active = session.sessions.filter(s => s.status === 'active')
+  if (active.length > 0) {
+    await session.switchToSession(active[0].session_id)
+    chatStore.restoreMessages(session.messages.map(m => ({
+      role: m.role,
+      content: m.content,
+      created_at: m.created_at,
+    })))
+  }
   agentOpsStore.startPolling()
 })
 
@@ -225,20 +282,29 @@ onUnmounted(() => {
   background: #0a0a14;
   color: #e0e0e0;
 }
-.dashboard-tabs {
-  margin: 12px;
-  background: #0a0a14;
-  border: 1px solid #2a2a4a;
-}
-.dashboard-tabs :deep(.el-tabs__header) {
+.dashboard-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
   background: #12122a;
   border-bottom: 1px solid #2a2a4a;
 }
-.dashboard-tabs :deep(.el-tabs__item) {
-  color: #8888aa;
+.connection-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
-.dashboard-tabs :deep(.el-tabs__item.is-active) {
-  color: #4caf50;
+.dot--connected { background: #4caf50; }
+.dot--connecting { background: #ff9800; animation: pulse 1s infinite; }
+.dot--disconnected { background: #f44336; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+.connection-label { font-size: 11px; color: #888; margin-right: 12px; }
+.session-bar { flex: 1; }
+
+.welcome {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
 }
 
 .metrics-row {
@@ -252,10 +318,34 @@ onUnmounted(() => {
   gap: 12px;
   padding: 0 12px 12px;
 }
-.dashboard-grid {
-  padding: 12px;
-  margin: 0 !important;
+
+.content-row {
+  display: flex;
+  gap: 12px;
+  padding: 0 12px;
+  flex-wrap: wrap;
 }
+.left-panel {
+  flex: 1 1 58%;
+  min-width: 360px;
+}
+.right-panel {
+  flex: 1 1 38%;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bottom-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  flex-wrap: wrap;
+}
+.bottom-row .panel-card {
+  flex: 1 1 300px;
+}
+
 .panel-card {
   margin-bottom: 12px;
   background: #12122a;
@@ -288,5 +378,4 @@ onUnmounted(() => {
 .alert-item__msg { color: #888; }
 
 .empty-hint { text-align: center; padding: 24px; color: #4caf50; font-size: 14px; }
-.placeholder-tab { text-align: center; padding: 60px; color: #666; font-size: 16px; }
 </style>

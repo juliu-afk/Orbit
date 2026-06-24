@@ -25,7 +25,8 @@ class ProjectRegistry:
 
     用法:
         reg = ProjectRegistry()
-        reg.register("Orbit", repo_url="https://github.com/juliu-afk/Orbit",
+        reg.register("Orbit", local_path="D:/Orbit",
+                     repo_url="https://github.com/juliu-afk/Orbit",
                      description="多Agent开发自循环系统",
                      tags=["agent", "python", "llm"])
         projects = reg.search("agent")  # 关键词搜索
@@ -48,6 +49,7 @@ class ProjectRegistry:
         self._get_conn().execute("""
             CREATE TABLE IF NOT EXISTS projects (
                 name TEXT PRIMARY KEY,
+                local_path TEXT DEFAULT '',
                 repo_url TEXT DEFAULT '',
                 description TEXT DEFAULT '',
                 issue_tracker TEXT DEFAULT '',
@@ -59,8 +61,19 @@ class ProjectRegistry:
                 updated_at REAL NOT NULL
             )
         """)
+        # WHY 存量兼容：旧 projects 表无 local_path 列，ALTER TABLE 加列
+        try:
+            self._get_conn().execute(
+                "ALTER TABLE projects ADD COLUMN local_path TEXT DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass  # 列已存在，忽略
         self._get_conn().execute(
             "CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(is_active)"
+        )
+        self._get_conn().execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_local_path "
+            "ON projects(local_path) WHERE local_path != ''"
         )
 
     # ── CRUD ─────────────────────────────────────────────
@@ -68,6 +81,7 @@ class ProjectRegistry:
     def register(
         self,
         name: str,
+        local_path: str = "",
         repo_url: str = "",
         description: str = "",
         issue_tracker: str = "",
@@ -80,6 +94,7 @@ class ProjectRegistry:
         now = time.time()
         record = ProjectRecord(
             name=name,
+            local_path=local_path,
             repo_url=repo_url,
             description=description,
             issue_tracker=issue_tracker,
@@ -92,11 +107,12 @@ class ProjectRegistry:
         )
         conn.execute(
             "INSERT OR REPLACE INTO projects "
-            "(name, repo_url, description, issue_tracker, issue_tracker_config, "
+            "(name, local_path, repo_url, description, issue_tracker, issue_tracker_config, "
             " doc_sources, tags, is_active, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
             (
                 name,
+                local_path,
                 repo_url,
                 description,
                 issue_tracker,
@@ -108,7 +124,7 @@ class ProjectRegistry:
             ),
         )
         conn.commit()
-        logger.info("project_registered", name=name)
+        logger.info("project_registered", name=name, local_path=local_path)
         return record
 
     def get(self, name: str) -> ProjectRecord | None:
@@ -134,6 +150,31 @@ class ProjectRegistry:
         )
         conn.commit()
         return conn.total_changes > 0
+
+    def get_by_path(self, local_path: str) -> ProjectRecord | None:
+        """按路径查询项目——验证路径是否已注册。"""
+        row = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM projects WHERE local_path=? AND is_active=1",
+                (local_path,),
+            )
+            .fetchone()
+        )
+        return self._row_to_record(row) if row else None
+
+    def find_by_path_prefix(self, path: str) -> list[ProjectRecord]:
+        """查找路径前缀匹配的已注册项目（用于检测子目录归属）。"""
+        rows = (
+            self._get_conn()
+            .execute(
+                "SELECT * FROM projects WHERE is_active=1 AND local_path!='' "
+                "AND ? LIKE (local_path || '/%')",
+                (path,),
+            )
+            .fetchall()
+        )
+        return [self._row_to_record(r) for r in rows]
 
     # ── 搜索 ─────────────────────────────────────────────
 
@@ -209,8 +250,16 @@ class ProjectRegistry:
             except json.JSONDecodeError:
                 return {}
 
+        # WHY 兼容存量：local_path 可能在旧数据中不存在，用 row key 可能缺失
+        local_path = ""
+        try:
+            local_path = row["local_path"] or ""
+        except KeyError:
+            pass
+
         return ProjectRecord(
             name=row["name"],
+            local_path=local_path,
             repo_url=row["repo_url"] or "",
             description=row["description"] or "",
             issue_tracker=row["issue_tracker"] or "",

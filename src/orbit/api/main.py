@@ -12,6 +12,7 @@ import os
 
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
@@ -39,6 +40,13 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
         description="轻量级多Agent软件开发自循环系统",
         docs_url="/docs",
         redoc_url="/redoc",
+    )
+    # CORS——data: URI boot.html 跨域请求后端 API
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     # REST 路由（Step 1.1）
     app.include_router(tasks.router, prefix=settings.API_V1_STR)

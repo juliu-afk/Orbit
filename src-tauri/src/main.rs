@@ -71,17 +71,24 @@ fn cleanup_backend(exe_path: &PathBuf) {
     let _ = fs::remove_file(exe_path);
 }
 
-/// 简易百分号编码——data: URI 内 embed HTML 用。
-/// 仅编码 % # 和换行符，其余字面量传递。
+/// 百分号编码——data: URI 用。正确处理 UTF-8 多字节字符。
+/// 可打印 ASCII 保持原样，特殊字符和 UTF-8 字节百分号编码。
 fn percent_encode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
+    let bytes = s.as_bytes();
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for &b in bytes {
         match b {
             b'%' => out.push_str("%25"),
             b'#' => out.push_str("%23"),
             b'\n' => out.push_str("%0A"),
             b'\r' => out.push_str("%0D"),
-            _ => out.push(b as char),
+            // 可打印 ASCII（空格到 ~）保持原样
+            b' '..=b'~' => out.push(b as char),
+            // UTF-8 多字节和其他控制字符 → %XX
+            _ => {
+                use std::fmt::Write;
+                let _ = write!(out, "%{:02X}", b);
+            }
         }
     }
     out

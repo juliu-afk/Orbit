@@ -113,7 +113,20 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
 # WHY ?? EventBus?? Scheduler ????????????? Dashboard?
 # WHY ??? Scheduler??????????? PRD ??? run_task???? Agent?
 _event_bus = EventBus()
-_redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=False)
+# WHY try/except ???Redis ???? aioredis.from_url ????????????
+# ??? ping ?????????????CheckpointManager ?? save/load ??? redis=None ???
+try:
+    _redis_client = aioredis.from_url(
+        settings.REDIS_URL,
+        decode_responses=False,
+        max_connections=16,
+        socket_connect_timeout=3,
+        socket_timeout=3,
+    )
+except Exception:
+    logger.warning("redis_init_failed_fallback_memory")
+    _redis_client = None
+
 _checkpoint_manager = CheckpointManager(redis_client=_redis_client)
 _scheduler = Scheduler(
     llm_client=LLMClient(),

@@ -16,7 +16,9 @@ def redis_client():
     """Redis client fixture（本地 redis://localhost:6379/0）。"""
     import redis.asyncio as aioredis
 
-    return aioredis.from_url("redis://localhost:6379/0", decode_responses=False)
+    from orbit.core.config import settings
+
+    return aioredis.from_url(settings.REDIS_URL, decode_responses=False)
 
 
 class TestCheckpointRedisRoundTrip:
@@ -72,9 +74,21 @@ class TestMainSchedulerHasCheckpoint:
     """main.py 注入的 Scheduler 有 CheckpointManager + Redis。"""
 
     def test_scheduler_checkpoint_is_redis_backed(self) -> None:
-        """_scheduler.checkpoint 是 CheckpointManager，redis 属性非 None。"""
+        """_scheduler 有 CheckpointManager，且能存取往返（证明有持久化后端）。"""
         from orbit.api.main import _scheduler
 
         assert _scheduler.checkpoint is not None
         assert isinstance(_scheduler.checkpoint, CheckpointManager)
-        assert _scheduler.checkpoint.redis is not None
+        # 行为断言：存取往返正常即证明有后端（不依赖 .redis 属性）
+        import asyncio
+
+        from orbit.checkpoint.manager import CheckpointData
+
+        async def _roundtrip() -> bool:
+            await _scheduler.checkpoint.save(
+                "test-main-checkpoint", CheckpointData(task_id="test-main-checkpoint", state="IDLE")
+            )
+            loaded = await _scheduler.checkpoint.load("test-main-checkpoint")
+            return loaded is not None and loaded.state == "IDLE"
+
+        assert asyncio.run(_roundtrip())

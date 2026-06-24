@@ -35,3 +35,12 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 erl_crash.dump
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/orbit-backend.exe
+
+# 交付 + 构建产物
+Deliverables/
+backend/static/
+backend/build/

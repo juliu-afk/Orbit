@@ -1,0 +1,8 @@
+{
+  "identifier": "default",
+  "description": "默认权限——允许窗口操作和 HTTP 请求",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}

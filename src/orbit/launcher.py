@@ -1,32 +1,25 @@
-"""PyInstaller 启动入口——直接 import 后启动 uvicorn。
-
-WHY 不用 "orbit.api.main:app" 字符串：
-PyInstaller 的模块查找机制与 uvicorn importer 不兼容，
-直接 import app 对象是最可靠的方式。
+"""PyInstaller/Tauri 启动入口——直接 import 后启动 uvicorn。
+Tauri 主进程 spawn 此脚本后，加载 http://127.0.0.1:18888 到 WebView。
 """
 from __future__ import annotations
 
+import os
 import sys
-import threading
-import webbrowser
 
 
 def main() -> None:
+    # Windows GUI 子系统无控制台，sys.stdout/stderr 为 None，
+    # uvicorn 日志初始化 .isatty() 调用会崩
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
+
     import uvicorn
     from orbit.api.main import app
 
     host = "127.0.0.1"
     port = 18888
-
-    # 自动打开浏览器（仅 exe 构建）
-    def open_browser() -> None:
-        import time
-
-        time.sleep(1.5)
-        webbrowser.open(f"http://{host}:{port}")
-
-    if getattr(sys, "frozen", False):
-        threading.Thread(target=open_browser, daemon=True).start()
 
     config = uvicorn.Config(app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)

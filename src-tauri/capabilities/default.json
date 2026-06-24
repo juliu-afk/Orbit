@@ -3,6 +3,9 @@
   "description": "默认权限——允许窗口操作和 HTTP 请求",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize"
   ]
 }

@@ -51,6 +51,16 @@ function poll() {
       var data = JSON.parse(req.responseText);
       if (!data.data) throw new Error('no data');
       var s = data.data;
+      var checks = s.checks || [];
+      var done = checks.filter(function(c) { return c.status === 'passed' || c.status === 'repaired' || c.status === 'failed' || c.status === 'skipped'; }).length;
+      // 全部完成(8/8)→直接进入, 不等status字段(避免status未及时从running切passed)
+      if (done === checks.length && checks.length > 0) {
+        document.getElementById('status').textContent = '就绪，正在进入...';
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('bar').style.width = '100%';
+        setTimeout(function() { window.location.href = DASHBOARD; }, 400);
+        return;
+      }
       if (s.status === 'passed') {
         document.getElementById('status').textContent = '就绪，正在进入...';
         document.getElementById('spinner').style.display = 'none';
@@ -58,8 +68,6 @@ function poll() {
         setTimeout(function() { window.location.href = DASHBOARD; }, 400);
         return;
       }
-      var checks = s.checks || [];
-      var done = checks.filter(function(c) { return c.status === 'passed' || c.status === 'repaired' || c.status === 'failed' || c.status === 'skipped'; }).length;
       document.getElementById('status').textContent = '正在检查系统组件 (' + done + '/' + checks.length + ')';
       if (s.elapsed_ms) {
         document.getElementById('detail').textContent = '已耗时 ' + (s.elapsed_ms / 1000).toFixed(1) + 's';

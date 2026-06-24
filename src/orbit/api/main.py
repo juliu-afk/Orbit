@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import os
 
+import redis.asyncio as aioredis
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +27,7 @@ from orbit.api.routes import (
     sessions,
     tasks,
 )
+from orbit.checkpoint.manager import CheckpointManager
 from orbit.core.config import settings
 from orbit.events.bus import EventBus
 from orbit.gateway.client import LLMClient
@@ -111,9 +113,12 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
 # WHY ?? EventBus?? Scheduler ????????????? Dashboard?
 # WHY ??? Scheduler??????????? PRD ??? run_task???? Agent?
 _event_bus = EventBus()
+_redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=False)
+_checkpoint_manager = CheckpointManager(redis_client=_redis_client)
 _scheduler = Scheduler(
     llm_client=LLMClient(),
     event_bus=_event_bus,
-    agent_factory=AgentFactory,  # WHY ??? AgentFactory?? _run_agent ??? Agent.execute()
+    agent_factory=AgentFactory,
+    checkpoint_manager=_checkpoint_manager,
 )
 app = create_app(_event_bus)

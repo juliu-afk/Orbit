@@ -380,21 +380,34 @@ def _docker_is_installed() -> bool:
 
 
 async def _check_docker_running() -> bool:
-    """检测 Docker Engine 是否在运行。"""
+    """检测 Docker Engine 是否在运行（静默——不弹终端窗口）。"""
     import asyncio as _asyncio
+    import os as _os
     import shutil
+    import subprocess
 
     docker_path = shutil.which("docker")
     if not docker_path:
         return False
     try:
-        proc = await _asyncio.create_subprocess_exec(
-            docker_path, "info",
-            stdout=_asyncio.subprocess.DEVNULL,
-            stderr=_asyncio.subprocess.DEVNULL,
-        )
-        await _asyncio.wait_for(proc.communicate(), timeout=10)
-        return proc.returncode == 0
+        # WHY subprocess 而非 asyncio.create_subprocess_exec:
+        # Windows 上后者无法隐藏控制台窗口（无 creationflags 参数）
+        def _check() -> int:
+            si = subprocess.STARTUPINFO()
+            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            si.wShowWindow = subprocess.SW_HIDE
+            kwargs = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+            if _os.name == "nt":
+                kwargs["startupinfo"] = si
+            result = subprocess.run(
+                [docker_path, "info"],
+                timeout=10,
+                **kwargs,
+            )
+            return result.returncode
+
+        ret = await _asyncio.to_thread(_check)
+        return ret == 0
     except Exception:
         return False
 

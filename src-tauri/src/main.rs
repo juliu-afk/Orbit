@@ -5,6 +5,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 
+/// 编译期嵌入启动检查页，运行时作为 data: URI 加载——秒开不依赖后端。
+const BOOT_HTML: &str = include_str!("../boot.html");
+
 /// 编译期嵌入 orbit-backend.exe，运行时解压到临时目录
 const BACKEND_EXE: &[u8] = include_bytes!("../orbit-backend.exe");
 
@@ -68,6 +71,22 @@ fn cleanup_backend(exe_path: &PathBuf) {
     let _ = fs::remove_file(exe_path);
 }
 
+/// 简易百分号编码——data: URI 内 embed HTML 用。
+/// 仅编码 % # 和换行符，其余字面量传递。
+fn percent_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'%' => out.push_str("%25"),
+            b'#' => out.push_str("%23"),
+            b'\n' => out.push_str("%0A"),
+            b'\r' => out.push_str("%0D"),
+            _ => out.push(b as char),
+        }
+    }
+    out
+}
+
 fn main() {
     // 解压后端到临时目录
     let backend_path = extract_backend();
@@ -75,18 +94,22 @@ fn main() {
     println!("Orbit — 启动后端...");
     let mut backend = start_backend(&backend_path);
 
-    // WHY 先开窗再等后端: PyInstaller one-file 解压+Python启动需 10-20s，
-    // 先开窗用户立刻看到界面（WebView 显示 connection 状态"连接中..."），
-    // 后端就绪后 WebSocket 自动连接，避免用户以为程序卡死。
+    // WHY boot.html: 嵌入式启动检查页，Tauri 窗口秒开，轮询后端探针状态。
+    // 后端就绪后 boot.html 内 JS 自动跳转 http://127.0.0.1:18888 → Vue SPA。
+    let boot_url = format!(
+        "data:text/html;charset=utf-8,{}",
+        percent_encode(BOOT_HTML)
+    );
+
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(move |app| {
             use tauri::WebviewUrl;
             use tauri::WebviewWindowBuilder;
 
             let _window = WebviewWindowBuilder::new(
                 app,
                 "main",
-                WebviewUrl::External("http://127.0.0.1:18888".parse().unwrap()),
+                WebviewUrl::External(boot_url.parse().unwrap()),
             )
             .title("Orbit — 多 Agent 驾驶舱")
             .inner_size(1400.0, 900.0)

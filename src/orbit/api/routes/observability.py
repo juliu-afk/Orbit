@@ -14,12 +14,15 @@ from __future__ import annotations
 
 from typing import Any
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Query
 
 from orbit.observability.alerts import AlertEngine
 from orbit.observability.audit import AuditLogger, LessonStore
 from orbit.observability.collector import ComponentStatus, HealthCollector
 from orbit.observability.metrics import snapshot as metrics_snapshot
+from orbit.observability.probes import StartupProbeEngine
 
 router = APIRouter(prefix="/observability", tags=["observability"])
 
@@ -196,7 +199,6 @@ async def list_lessons(
     if domain:
         lessons = _lessons.list_by_domain(domain, limit=limit)
     else:
-        # 无领域参数时返回所有域的统计
         return {
             "code": 0,
             "data": {
@@ -221,3 +223,32 @@ async def list_lessons(
         ],
         "message": "ok",
     }
+
+
+# ── 启动预检（Session PR 后续） ────────────────────────────
+
+_probe_engine: StartupProbeEngine | None = None
+_probe_lock = asyncio.Lock()
+
+
+@router.get("/startup-probe", summary="启动预检探针")
+async def startup_probe() -> dict[str, Any]:
+    """返回启动探针执行状态。首次请求触发异步执行。"""
+    global _probe_engine
+    if _probe_engine is None:
+        async with _probe_lock:
+            if _probe_engine is None:
+                engine = StartupProbeEngine()
+                asyncio.create_task(engine.start())
+                _probe_engine = engine
+    return {"code": 0, "data": _probe_engine.results(), "message": "ok"}
+
+
+@router.post("/startup-probe/reset", summary="重置并重试启动探针")
+async def startup_probe_reset() -> dict[str, Any]:
+    """重置失败探针，重新运行。"""
+    global _probe_engine
+    if _probe_engine is not None:
+        _probe_engine.reset()
+        asyncio.create_task(_probe_engine.start())
+    return {"code": 0, "data": {"status": "reset"}, "message": "ok"}

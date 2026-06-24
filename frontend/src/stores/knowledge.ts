@@ -38,7 +38,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     loading.value = true
     error.value = null
     try {
-      const r = await fetch(`${KNOWLEDGE_URL}?domain=${domain}&concept=${concept}`)
+      const r = await fetch(`${KNOWLEDGE_URL}?domain=${encodeURIComponent(domain)}&concept=${encodeURIComponent(concept)}`)
       const j = await r.json()
       if (r.ok) {
         currentConcept.value = j
@@ -57,7 +57,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   async function search(query: string) {
     loading.value = true
     try {
-      const r = await fetch(`${KNOWLEDGE_URL}/search?q=${query}`)
+      const r = await fetch(`${KNOWLEDGE_URL}/search?q=${encodeURIComponent(query)}`)
       const j = await r.json()
       if (j.code === 0) {
         concepts.value = j.data || []
@@ -73,7 +73,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   async function listConcepts(domain: string) {
     loading.value = true
     try {
-      const r = await fetch(`${KNOWLEDGE_URL}/concepts?domain=${domain}`)
+      const r = await fetch(`${KNOWLEDGE_URL}/concepts?domain=${encodeURIComponent(domain)}`)
       const j = await r.json()
       if (j.code === 0) {
         concepts.value = j.data || []
@@ -90,7 +90,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     loading.value = true
     error.value = null
     try {
-      const r = await fetch(`${COMPLIANCE_URL}/validate?domain=${domain}&concept=${concept}`)
+      const r = await fetch(`${COMPLIANCE_URL}/validate?domain=${encodeURIComponent(domain)}&concept=${encodeURIComponent(concept)}`)
       const j = await r.json()
       complianceResult.value = j
     } catch (e) {

@@ -34,7 +34,7 @@ export const useAuditStore = defineStore('audit', () => {
   async function fetchAudit(taskId: string) {
     loading.value = true
     try {
-      const r = await fetch(`${OBSERVABILITY_URL}/audit?task_id=${taskId}`)
+      const r = await fetch(`${OBSERVABILITY_URL}/audit?task_id=${encodeURIComponent(taskId)}`)
       const j = await r.json()
       if (j.code === 0) {
         auditLogs.value = j.data || []

@@ -187,25 +187,23 @@ class Sandbox:
         return stdout
 
     async def is_available(self) -> bool:
-        """检测 Docker 是否可用（缓存结果）。"""
+        """检测 Docker 是否可用（缓存结果，3s 超时）。"""
         if self._docker_available is not None:
             return self._docker_available
-        # docker 不在 PATH 时返回不可用
         docker_path = shutil.which("docker")
         if docker_path is None:
             self._docker_available = False
             return False
+        # WHY docker version 而非 info: version 更快，且 Docker 在运行则 <1s 响应
         try:
             proc = await asyncio.create_subprocess_exec(
-                "docker",
-                "info",
+                docker_path, "version",
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
-            await asyncio.wait_for(proc.communicate(), timeout=10)
+            await asyncio.wait_for(proc.communicate(), timeout=3)
             self._docker_available = proc.returncode == 0
-        except Exception as e:
-            logger.warning("docker_check_failed", error=str(e))
+        except (asyncio.TimeoutError, Exception):
             self._docker_available = False
         return self._docker_available
 

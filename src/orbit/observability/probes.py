@@ -16,8 +16,8 @@ import structlog
 
 logger = structlog.get_logger("orbit.probes")
 
-# 单个探针超时——防止某个组件阻塞整个启动流程
-PROBE_TIMEOUT_SECONDS = 10
+# 单个探针超时。沙箱探针需等 Docker 冷启动(~40s), 其余 <1s。
+PROBE_TIMEOUT_SECONDS = 60
 
 
 @dataclass
@@ -242,20 +242,20 @@ async def _probe_llm_gateway() -> str:
 
 
 async def _probe_sandbox() -> str:
-    """检测沙箱可用。Docker → 尝试启动服务 → ProcessSandbox → 提示安装。"""
-    # 先直接试 Docker
+    """检测沙箱可用。Docker已运行→直接过, 已安装未运行→尝试启动, 未安装→提示。"""
+    # 快速检测——Docker 在运行就直接过
     if await _check_docker_running():
         return "Docker沙箱已就绪"
 
-    # 未运行——检查是否已安装
     if _docker_is_installed():
+        # 已安装未运行——尝试启动服务，最多等 40s
         _start_docker_service()
-        for _ in range(15):
+        for _ in range(20):
             await asyncio.sleep(2)
             if await _check_docker_running():
                 return "Docker已启动，沙箱就绪"
 
-    # Docker 不可用——降级
+    # 降级 ProcessSandbox
     from orbit.sandbox.sandbox_factory import create_sandbox
     sandbox = await create_sandbox()
     if not _docker_is_installed():
@@ -330,22 +330,16 @@ async def _repair_environment() -> str:
 
 
 async def _repair_sandbox() -> str:
-    """沙箱自愈：Docker 不可用先尝试启动，再降级 ProcessSandbox。"""
-    docker_installed = _docker_is_installed()
-    if docker_installed:
+    """沙箱自愈：已安装→尝试启动服务, 未安装→降级 ProcessSandbox。"""
+    if _docker_is_installed():
         _start_docker_service()
-        for _ in range(10):
+        for _ in range(15):
             await asyncio.sleep(2)
             if await _check_docker_running():
                 return "Docker服务已启动，沙箱就绪"
-        from orbit.sandbox.sandbox_factory import create_sandbox
-        sandbox = await create_sandbox()
-        return f"Docker启动超时，已降级 {sandbox.__class__.__name__}"
-
-    # Docker 未安装——降级为 ProcessSandbox
     from orbit.sandbox.sandbox_factory import create_sandbox
     sandbox = await create_sandbox()
-    return f"Docker未安装，已降级 {sandbox.__class__.__name__}"
+    return f"已启用 {sandbox.__class__.__name__}"
 
 
 # ── Docker 辅助函数 ──
@@ -370,7 +364,9 @@ def _docker_is_installed() -> bool:
 
 
 async def _check_docker_running() -> bool:
-    """检测 Docker Engine 是否在运行（静默——不弹终端窗口）。"""
+    """检测 Docker Engine 是否在运行。
+    先试 docker version(快), 失败试 docker info, 3s 超时——Docker 在运行则 <1s 响应。
+    """
     import asyncio as _asyncio
     import os as _os
     import shutil
@@ -379,27 +375,28 @@ async def _check_docker_running() -> bool:
     docker_path = shutil.which("docker")
     if not docker_path:
         return False
-    try:
-        # WHY subprocess 而非 asyncio.create_subprocess_exec:
-        # Windows 上后者无法隐藏控制台窗口（无 creationflags 参数）
-        def _check() -> int:
-            si = subprocess.STARTUPINFO()
-            si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            si.wShowWindow = subprocess.SW_HIDE
-            kwargs = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
-            if _os.name == "nt":
-                kwargs["startupinfo"] = si
-            result = subprocess.run(
-                [docker_path, "info"],
-                timeout=10,
+
+    si = subprocess.STARTUPINFO()
+    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    si.wShowWindow = subprocess.SW_HIDE
+    kwargs: dict = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    if _os.name == "nt":
+        kwargs["startupinfo"] = si
+
+    # 两条命令任一成功即认为 Docker 在运行
+    for cmd in (["version"], ["info"]):
+        try:
+            result = await _asyncio.to_thread(
+                subprocess.run,
+                [docker_path] + cmd,
+                timeout=3,
                 **kwargs,
             )
-            return result.returncode
-
-        ret = await _asyncio.to_thread(_check)
-        return ret == 0
-    except Exception:
-        return False
+            if result.returncode == 0:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def _start_docker_service() -> None:

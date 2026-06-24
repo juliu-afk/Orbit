@@ -75,7 +75,7 @@
         <div class="left-panel">
           <el-card shadow="never" class="panel-card">
             <template #header>DAG 任务流</template>
-            <DagCanvas :task-id="session.currentSessionId" />
+            <DagCanvas />
           </el-card>
           <el-card shadow="never" class="panel-card">
             <template #header>Token 消耗趋势</template>

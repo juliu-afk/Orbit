@@ -1,7 +1,5 @@
 """NL交互 PR #1——项目注册表单元测试。"""
 
-import os
-
 from orbit.projects.registry import ProjectRegistry
 
 

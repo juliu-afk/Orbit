@@ -1,7 +1,5 @@
 """NL交互 PR #2——上下文匹配引擎单元测试。"""
 
-import os
-
 from orbit.context.matcher import ContextMatcher
 from orbit.projects.registry import ProjectRegistry
 

@@ -144,6 +144,7 @@ class LLMClient:
         无 monitor 时退化为普通流式（仅拼接内容，不检熵）。
         """
         import litellm  # 延迟导入，避免未装包时 import 失败
+
         from orbit.hallucination.schemas import HighEntropyError
 
         try:
@@ -156,7 +157,7 @@ class LLMClient:
                 temperature=req.temperature,
                 max_tokens=req.max_tokens,
                 stream=True,
-                logprobs=True if entropy_monitor else False,
+                logprobs=bool(entropy_monitor),
             )
         except Exception as e:
             # 主力失败 → 尝试备选（与 generate 一致的降级策略）
@@ -174,7 +175,6 @@ class LLMClient:
 
         # 拼接流式响应，逐 token 喂给熵监控
         content_parts: list[str] = []
-        usage_raw = None
         model_used = self.default_model
         async for chunk in stream:
             if not chunk.choices:

@@ -25,7 +25,6 @@ class TestLauncher:
 
     def test_launcher_stdout_none_guard(self, monkeypatch) -> None:
         """sys.stdout=None 时不崩源（Windows GUI 子系统）。"""
-        import os
         import sys
 
         from orbit import launcher
@@ -66,7 +65,7 @@ class TestGatewayClientStream:
         """generate_stream 无 monitor 时退化（litellm 未装时抛 RuntimeError）。"""
         client = LLMClient()
         req = LLMRequest(prompt="test")
-        with pytest.raises(Exception):
+        with pytest.raises((RuntimeError, ImportError, Exception)):  # noqa: B017
             await client.generate_stream(req, "task-1")
 
     def test_build_usage_zero(self) -> None:

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 
 import pytest
 
@@ -38,7 +39,7 @@ class TestOrchestratorRunAgent:
     @pytest.mark.asyncio
     async def test_run_agent_calls_execute(self) -> None:
         """C2: _run_agent ? execute ?? run?mock factory ??? execute ? agent?"""
-        from orbit.agents.base import AgentInput, AgentOutput
+        from orbit.agents.base import AgentOutput
 
         class FakeAgent:
             role = AgentRole.DEVELOPER
@@ -85,10 +86,8 @@ class TestSchedulerRunTaskProgress:
             pass
 
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
         # ???????????
         assert len(events) > 0, "EventBus ?????????"
@@ -113,9 +112,9 @@ class TestRunAgentRealFactory:
     async def test_scheduler_full_state_machine(self) -> None:
         """Scheduler.run_task ???????? DONE?mock llm??"""
         from orbit.agents.factory import AgentFactory
+        from orbit.api.schemas.task import TaskState
         from orbit.events.bus import EventBus
         from orbit.scheduler.orchestrator import Scheduler
-        from orbit.api.schemas.task import TaskState
 
         bus = EventBus()
         sched = Scheduler(

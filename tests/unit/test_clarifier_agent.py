@@ -8,13 +8,10 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from orbit.agents.base import AgentInput
 from orbit.agents.clarifier import (
     ClarifierAgent,
     StructuredPRD,
-    ValidationResult,
     validate_prd,
 )
 

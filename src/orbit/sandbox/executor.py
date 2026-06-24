@@ -205,7 +205,7 @@ class Sandbox:
             )
             await asyncio.wait_for(proc.communicate(), timeout=3)
             self._docker_available = proc.returncode == 0
-        except (asyncio.TimeoutError, Exception):
+        except (TimeoutError, Exception):
             self._docker_available = False
         return self._docker_available
 

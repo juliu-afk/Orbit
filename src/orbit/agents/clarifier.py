@@ -254,7 +254,7 @@ class ClarifierAgent(BaseAgent):
         if text.startswith("```"):
             lines = text.split("\n")
             # 去首行 ``` 和末行 ```
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [ln for ln in lines if not ln.strip().startswith("```")]
             text = "\n".join(lines).strip()
 
         try:
@@ -382,10 +382,7 @@ def _goal_has_resonance(goal: str, scope: str, acceptance: list[str]) -> bool:
     """goal 核心词在 scope 或 acceptance 中至少出现一次。"""
     keywords = _extract_keywords(goal)
     combined = (scope + " " + " ".join(acceptance)).lower()
-    for kw in keywords:
-        if kw.lower() in combined:
-            return True
-    return False
+    return any(kw.lower() in combined for kw in keywords)
 
 
 def _has_observable_verb(text: str) -> bool:

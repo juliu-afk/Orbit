@@ -168,8 +168,7 @@ class SessionRegistry:
             return None
 
         # 终态检查
-        if "status" in kwargs:
-            if rec.status == "archived" and kwargs["status"] != "archived":
+        if "status" in kwargs and rec.status == "archived" and kwargs["status"] != "archived":
                 raise ValueError(f"Session {session_id} 已归档，不可恢复为活跃状态")
 
         now = time.time()
@@ -261,10 +260,7 @@ class SessionRegistry:
     @staticmethod
     def _row_to_session(row: sqlite3.Row) -> SessionRecord:
         local_path = ""
-        try:
-            local_path = row["local_path"] or ""
-        except KeyError:
-            pass  # 存量 session 无 local_path 列
+        local_path = (row["local_path"] or "") if "local_path" in row else ""  # 存量 session 无 local_path 列
         return SessionRecord(
             session_id=row["id"],
             project_name=row["project_name"] or "",

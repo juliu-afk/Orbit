@@ -9,6 +9,7 @@ import { ref } from 'vue'
 export interface SessionSummary {
   session_id: string
   project_name: string
+  local_path: string
   title: string
   status: 'active' | 'archived'
   created_at: number

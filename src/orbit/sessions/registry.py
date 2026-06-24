@@ -114,25 +114,38 @@ class SessionRegistry:
         )
 
     def get(self, session_id: str) -> SessionRecord | None:
-        """按 ID 查询 Session。"""
+        """按 ID 查询 Session。LEFT JOIN projects 取 local_path。"""
         row = (
             self._get_conn()
-            .execute("SELECT * FROM sessions WHERE id=?", (session_id,))
+            .execute(
+                "SELECT s.*, p.local_path "
+                "FROM sessions s "
+                "LEFT JOIN projects p ON s.project_name = p.name "
+                "WHERE s.id=?",
+                (session_id,),
+            )
             .fetchone()
         )
         return self._row_to_session(row) if row else None
 
     def list_all(self, status: str | None = None) -> list[SessionRecord]:
-        """列出所有 Session，按 updated_at DESC。可选过滤 status。"""
+        """列出所有 Session，按 updated_at DESC。可选过滤 status。
+        LEFT JOIN projects 取 local_path——区分同名不同路径的项目。
+        """
         conn = self._get_conn()
+        base_sql = (
+            "SELECT s.*, p.local_path "
+            "FROM sessions s "
+            "LEFT JOIN projects p ON s.project_name = p.name "
+        )
         if status:
             rows = conn.execute(
-                "SELECT * FROM sessions WHERE status=? ORDER BY updated_at DESC",
+                base_sql + "WHERE s.status=? ORDER BY s.updated_at DESC",
                 (status,),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT * FROM sessions ORDER BY updated_at DESC"
+                base_sql + "ORDER BY s.updated_at DESC"
             ).fetchall()
         return [self._row_to_session(r) for r in rows]
 
@@ -141,7 +154,10 @@ class SessionRegistry:
         rows = (
             self._get_conn()
             .execute(
-                "SELECT * FROM sessions WHERE project_name=? ORDER BY updated_at DESC",
+                "SELECT s.*, p.local_path "
+                "FROM sessions s "
+                "LEFT JOIN projects p ON s.project_name = p.name "
+                "WHERE s.project_name=? ORDER BY s.updated_at DESC",
                 (project_name,),
             )
             .fetchall()
@@ -256,9 +272,15 @@ class SessionRegistry:
 
     @staticmethod
     def _row_to_session(row: sqlite3.Row) -> SessionRecord:
+        local_path = ""
+        try:
+            local_path = row["local_path"] or ""
+        except KeyError:
+            pass  # 存量 session 无 local_path 列
         return SessionRecord(
             session_id=row["id"],
             project_name=row["project_name"] or "",
+            local_path=local_path,
             title=row["title"] or "",
             status=row["status"] or "active",
             created_at=row["created_at"] or 0.0,

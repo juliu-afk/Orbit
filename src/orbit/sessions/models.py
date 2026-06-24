@@ -16,6 +16,7 @@ class SessionRecord:
 
     session_id: str  # UUID4 hex, 32 chars
     project_name: str  # FK → projects.name (denormalized)
+    local_path: str = ""  # 项目路径，来自 projects 表 JOIN
     title: str = ""
     status: str = "active"  # active | archived
     created_at: float = 0.0
@@ -25,6 +26,7 @@ class SessionRecord:
         return {
             "session_id": self.session_id,
             "project_name": self.project_name,
+            "local_path": self.local_path,
             "title": self.title,
             "status": self.status,
             "created_at": self.created_at,

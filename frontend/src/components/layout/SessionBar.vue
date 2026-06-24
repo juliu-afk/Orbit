@@ -30,6 +30,7 @@
             >
               <span class="dd-title">{{ s.title || '未命名会话' }}</span>
               <span class="dd-project">{{ s.project_name }}</span>
+              <span v-if="s.local_path" class="dd-path">{{ s.local_path }}</span>
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -103,6 +104,12 @@ function handleSwitch(sessionId: string) {
   margin-left: 8px;
   font-size: 11px;
   color: #888;
+}
+.dd-path {
+  display: block;
+  margin-top: 1px;
+  font-size: 10px;
+  color: #666;
 }
 .is-active .dd-title {
   color: #4caf50;

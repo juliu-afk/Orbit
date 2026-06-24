@@ -39,6 +39,7 @@ class SessionResponse(BaseModel):
     """会话响应。"""
     session_id: str
     project_name: str
+    local_path: str = ""  # 项目路径——区分同名文件夹
     title: str
     status: str
     created_at: float

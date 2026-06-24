@@ -64,9 +64,7 @@ class ProjectRegistry:
         """)
         # WHY 存量兼容：旧 projects 表无 local_path 列，ALTER TABLE 加列
         with contextlib.suppress(sqlite3.OperationalError):  # ???????
-            self._get_conn().execute(
-                "ALTER TABLE projects ADD COLUMN local_path TEXT DEFAULT ''"
-            )
+            self._get_conn().execute("ALTER TABLE projects ADD COLUMN local_path TEXT DEFAULT ''")
         self._get_conn().execute(
             "CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(is_active)"
         )

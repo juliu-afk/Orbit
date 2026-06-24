@@ -222,7 +222,7 @@ class Scheduler:
             return await self._agent_cycle(task_id, TaskState.CODING, context)
 
         try:
-            agent = self._agent_factory.create(role)
+            agent = self._agent_factory.create(role, llm=self.llm)
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
             if self._audit_logger:
@@ -251,8 +251,22 @@ class Scheduler:
             self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, component=role)
 
         try:
-            result = await asyncio.wait_for(agent.run(agent_context), timeout=timeout)
-            output = result.output if result.success else f"[error] {result.error}"
+            # WHY ? execute(AgentInput) ?? run(context)?BaseAgent ????? execute
+            from orbit.agents.base import AgentInput
+
+            ctx_dict = agent_context.to_dict() if hasattr(agent_context, "to_dict") else {}
+            agent_input = AgentInput(
+                task=ctx_dict.get("l3", {}).get("prd", ""),
+                context=ctx_dict,
+                role=role,  # type: ignore[arg-type]
+            )
+            output_obj = await asyncio.wait_for(agent.execute(agent_input), timeout=timeout)
+            # WHY ?? AgentOutput?? result dict ??????
+            if output_obj.status == "ok":
+                r = output_obj.result
+                output = r.get("design") or r.get("code") or r.get("review") or str(r)
+            else:
+                output = f"[error] {output_obj.error}"
         except TimeoutError:
             logger.warning("agent_timeout", role=role, task_id=task_id)
             output = f"[timeout] {role} 超时 (300s)"

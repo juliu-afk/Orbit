@@ -260,6 +260,20 @@ async def _handle_confirm(
         task_resp = await _create_task(task_req)
         task_id = task_resp.task_id
 
+        # WHY ????? Scheduler.run_task??????? task_id?????????
+        # Scheduler ????? publish ? EventBus ? WS ?? ? ?? DAG ???
+        import asyncio as _asyncio
+
+        try:
+            from orbit.api.main import _scheduler
+
+            if _scheduler is not None:
+                _asyncio.create_task(_scheduler.run_task(task_id, prd_text[:5000]))
+        except Exception as e:
+            # WHY ??????????????????????????
+            import structlog as _sl
+            _sl.get_logger().warning("run_task_trigger_failed", task_id=task_id, error=str(e))
+
         await _send(ws, 0, {
             "type": "task_created",
             "task_id": task_id,

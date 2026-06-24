@@ -147,6 +147,7 @@ import CircuitBreakerLight from '@/components/metrics/CircuitBreakerLight.vue'
 import HealthPanel from '@/components/metrics/HealthPanel.vue'
 import DagCanvas from '@/components/dag/DagCanvas.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
+import { useTaskStore } from '@/stores/task'
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 import CrossProjectWarning from '@/components/chat/CrossProjectWarning.vue'
 
@@ -154,6 +155,7 @@ const ws = useWebSocket()
 const session = useSessionStore()
 const agentOpsStore = useAgentOpsStore()
 const chatStore = useChatStore()
+const taskStore = useTaskStore()
 
 const showNewDialog = ref(false)
 const hallucinationChartRef = ref<HTMLElement | null>(null)
@@ -188,6 +190,12 @@ const totalIntercepted = computed(() => {
 
 ws.setMessageHandler((msg: WsMessage) => {
   switch (msg.type) {
+    case 'task:update':
+      taskStore.handleTaskUpdate(msg.payload as Record<string, unknown>)
+      break
+    case 'alert:new':
+      agentOpsStore.handleWsEvent('alert:new', msg.payload)
+      break
     case 'metrics:snapshot':
       agentOpsStore.handleWsEvent('metrics:snapshot', msg.payload)
       break

@@ -236,9 +236,9 @@ class Scheduler:
             return f"[error] Agent {role} 创建失败: {e}"
 
         # 注入依赖
-        # WHY ??????? BaseAgent ?????llm/graph/sandbox??
-        # message_bus/tool_registry ? MCP/A2A ???Step I1??BaseAgent ??????
-        # ?? PR5 ?? communication ?????? BaseAgent?????? llm?
+        # ?????
+        # ?????
+        # ?????
         if self.llm is not None:
             agent.llm = self.llm
 
@@ -250,7 +250,7 @@ class Scheduler:
             self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, component=role)
 
         try:
-            # WHY ? execute(AgentInput) ?? run(context)?BaseAgent ????? execute
+            # ?????
             from orbit.agents.base import AgentInput
 
             ctx_dict = agent_context.to_dict() if hasattr(agent_context, "to_dict") else {}
@@ -260,7 +260,7 @@ class Scheduler:
                 role=role,  # type: ignore[arg-type]
             )
             output_obj = await asyncio.wait_for(agent.execute(agent_input), timeout=timeout)
-            # WHY ?? AgentOutput?? result dict ??????
+            # ?????
             if output_obj.status == "ok":
                 r = output_obj.result
                 output = r.get("design") or r.get("code") or r.get("review") or str(r)

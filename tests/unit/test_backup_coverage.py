@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from orbit.api.main import create_app
 from orbit.backup.snapshot import Snapshotter
 
-# WHY ??? tmpdir?pytest ?? tmp_path ???? Temp ?????????
+# ?????
 _TMP_BASE = Path(tempfile.gettempdir())
 
 

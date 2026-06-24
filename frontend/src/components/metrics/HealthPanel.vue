@@ -12,7 +12,12 @@
         class="health-panel__item"
         :class="`health-panel__item--${c.status}`"
       >
-        <span class="health-panel__dot" :class="`health-panel__dot--${c.status}`"></span>
+        <span
+          class="health-panel__dot"
+          :class="`health-panel__dot--${c.status}`"
+          @click="handleComponentClick(c.name)"
+          style="cursor: pointer"
+        ></span>
         <span class="health-panel__name">{{ c.name }}</span>
         <span v-if="c.message" class="health-panel__msg">{{ c.message }}</span>
       </div>
@@ -39,6 +44,13 @@ const overallLabel = computed(() => {
 })
 
 const overallClass = computed(() => `health-panel__overall--${props.overall}`)
+import { useHealthStore } from '@/stores/health'
+
+const healthStore = useHealthStore()
+
+function handleComponentClick(name: string) {
+  healthStore.fetchComponent(name)
+}
 </script>
 
 <style scoped>

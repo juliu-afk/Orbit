@@ -1,12 +1,15 @@
-/** Ops Store——备份/版本/SOP 数据管理。 */
+/** Ops Store????/??/SOP ???????? API?? */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export interface SnapshotItem {
-  name: string
+  snapshot_id: string
   path: string
-  size_mb: number
-  modified: number
+  size_bytes: number
+  integrity_hash: string
+  created_at: number
+  db_type: string
+  verified: boolean
 }
 
 export interface ReleaseEvent {
@@ -24,6 +27,9 @@ export interface VersionInfo {
   description: string
 }
 
+const BACKUP_URL = '/api/v1/backup/snapshots'
+const VERSIONING_URL = '/api/v1/versioning'
+
 export const useOpsStore = defineStore('ops', () => {
   const snapshots = ref<SnapshotItem[]>([])
   const releases = ref<ReleaseEvent[]>([])
@@ -33,24 +39,35 @@ export const useOpsStore = defineStore('ops', () => {
 
   async function fetchSnapshots() {
     try {
-      // 占位：后续用专用备份列表端点
-      snapshots.value = []
+      const r = await fetch(BACKUP_URL)
+      const j = await r.json()
+      if (j.code === 0) {
+        snapshots.value = j.data as SnapshotItem[]
+      }
     } catch {
-      // 静默
+      // ??
     }
   }
 
   async function fetchReleases() {
-    // 占位：后续用专用版本端点 GET /api/v1/versioning/releases
-    releases.value = []
+    try {
+      const r = await fetch(`${VERSIONING_URL}/releases`)
+      const j = await r.json()
+      if (j.code === 0) {
+        releases.value = j.data as ReleaseEvent[]
+      }
+    } catch {
+      // ??
+    }
   }
 
   async function fetchVersion() {
     try {
-      // 占位：后续 GET /api/v1/versioning/current
-      const r = await fetch('/api/v1/observability/health')
+      const r = await fetch(`${VERSIONING_URL}/current`)
       const j = await r.json()
-      currentVersion.value = j.overall || '未知'
+      if (j.code === 0) {
+        currentVersion.value = j.data.version || '??'
+      }
     } catch {
       currentVersion.value = '---'
     }
@@ -58,12 +75,12 @@ export const useOpsStore = defineStore('ops', () => {
 
   async function fetchSop() {
     try {
-      const r = await fetch('/SOP-灾难恢复手册.md')
+      const r = await fetch('/SOP-??????.md')
       if (r.ok) {
         sopContent.value = await r.text()
       }
     } catch {
-      sopContent.value = '# SOP 手册暂不可用'
+      sopContent.value = '# SOP ??????'
     }
   }
 

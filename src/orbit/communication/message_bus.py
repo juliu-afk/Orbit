@@ -99,8 +99,7 @@ class AgentMessageBus:
         """注销 Agent。"""
         self._agents.pop(name, None)
         # 取消该 Agent 的所有未完成请求
-        to_cancel = [rid for rid, fut in self._pending.items()
-                     if rid.startswith(f"{name}:")]
+        to_cancel = [rid for rid, fut in self._pending.items() if rid.startswith(f"{name}:")]
         for rid in to_cancel:
             fut = self._pending.pop(rid, None)
             if fut and not fut.done():
@@ -259,18 +258,22 @@ class AgentMessageBus:
         # 检查目标
         if req.target_agent not in self._agents:
             yield StreamChunk(
-                sequence=0, is_last=True,
+                sequence=0,
+                is_last=True,
                 error=f"Agent {req.target_agent} 未注册",
-                source_agent=req.target_agent, target_agent=req.source_agent,
+                source_agent=req.target_agent,
+                target_agent=req.source_agent,
             )
             return
 
         # 熔断检查
         if self._circuit_open.get(req.target_agent, False):
             yield StreamChunk(
-                sequence=0, is_last=True,
+                sequence=0,
+                is_last=True,
                 error="AGENT_003: 熔断开启",
-                source_agent=req.target_agent, target_agent=req.source_agent,
+                source_agent=req.target_agent,
+                target_agent=req.source_agent,
             )
             return
 
@@ -298,16 +301,24 @@ class AgentMessageBus:
                 result = await result
             # 将结果包装为单个 StreamChunk (后续可扩展为多次推送)
             content = str(result) if not isinstance(result, str) else result
-            await queue.put(StreamChunk(
-                data=content, is_last=True,
-                source_agent=req.target_agent, target_agent=req.source_agent,
-                timestamp=time.time(),
-            ))
+            await queue.put(
+                StreamChunk(
+                    data=content,
+                    is_last=True,
+                    source_agent=req.target_agent,
+                    target_agent=req.source_agent,
+                    timestamp=time.time(),
+                )
+            )
         except Exception as e:
-            await queue.put(StreamChunk(
-                is_last=True, error=str(e),
-                source_agent=req.target_agent, target_agent=req.source_agent,
-            ))
+            await queue.put(
+                StreamChunk(
+                    is_last=True,
+                    error=str(e),
+                    source_agent=req.target_agent,
+                    target_agent=req.source_agent,
+                )
+            )
 
     # ── 查询 ──────────────────────────────────────────────
 

@@ -66,10 +66,15 @@ class Request(Message):
 
     def to_dict(self) -> dict[str, Any]:
         d = super().to_dict()
-        d.update({
-            "type": self.type, "method": self.method, "params": self.params,
-            "timeout_seconds": self.timeout_seconds, "retry_count": self.retry_count,
-        })
+        d.update(
+            {
+                "type": self.type,
+                "method": self.method,
+                "params": self.params,
+                "timeout_seconds": self.timeout_seconds,
+                "retry_count": self.retry_count,
+            }
+        )
         return d
 
 
@@ -86,11 +91,16 @@ class Response(Message):
 
     def to_dict(self) -> dict[str, Any]:
         d = super().to_dict()
-        d.update({
-            "type": self.type, "status": self.status, "result": self.result,
-            "error_code": self.error_code, "error_message": self.error_message,
-            "duration_ms": self.duration_ms,
-        })
+        d.update(
+            {
+                "type": self.type,
+                "status": self.status,
+                "result": self.result,
+                "error_code": self.error_code,
+                "error_message": self.error_message,
+                "duration_ms": self.duration_ms,
+            }
+        )
         return d
 
 
@@ -120,8 +130,13 @@ class StreamChunk(Message):
 
     def to_dict(self) -> dict[str, Any]:
         d = super().to_dict()
-        d.update({
-            "type": self.type, "sequence": self.sequence,
-            "data": self.data, "is_last": self.is_last, "error": self.error,
-        })
+        d.update(
+            {
+                "type": self.type,
+                "sequence": self.sequence,
+                "data": self.data,
+                "is_last": self.is_last,
+                "error": self.error,
+            }
+        )
         return d

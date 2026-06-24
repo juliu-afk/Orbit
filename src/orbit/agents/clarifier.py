@@ -29,6 +29,7 @@ logger = structlog.get_logger()
 
 # ---- V5 结构契约：Agent 输出的结构化 PRD schema ----
 
+
 class StructuredPRD(BaseModel):
     """结构化 PRD——ClarifierAgent 输出的需求文档。
 
@@ -108,14 +109,40 @@ CLARIFIER_SYSTEM_PROMPT = """你是 Orbit 系统的需求澄清 Agent（Clarifie
 # ---- 可观测动词白名单（V2 用） ----
 # WHY 固定白名单：验收标准必须可验证，"用户体验好"这种主观描述无法验收。
 _OBSERVABLE_VERBS: tuple[str, ...] = (
-    "返回", "更新", "触发", "显示", "拒绝", "锁定", "创建", "删除",
-    "保存", "发送", "重试", "取消", "关闭", "记录", "通知", "生成",
-    "校验", "跳过", "等待", "清理", "迁移", "回滚",
+    "返回",
+    "更新",
+    "触发",
+    "显示",
+    "拒绝",
+    "锁定",
+    "创建",
+    "删除",
+    "保存",
+    "发送",
+    "重试",
+    "取消",
+    "关闭",
+    "记录",
+    "通知",
+    "生成",
+    "校验",
+    "跳过",
+    "等待",
+    "清理",
+    "迁移",
+    "回滚",
 )
 
 # 占位词黑名单（V1 用）
 _PLACEHOLDER_WORDS: tuple[str, ...] = (
-    "待定", "tbd", "todo", "...", "？？？", "??", "暂无", "未知",
+    "待定",
+    "tbd",
+    "todo",
+    "...",
+    "？？？",
+    "??",
+    "暂无",
+    "未知",
 )
 
 # 矛盾方向对（V3 用，借鉴 ClarificationEngine.CONTRADICTION_PAIRS 思路）
@@ -262,6 +289,7 @@ class ClarifierAgent(BaseAgent):
 
 # ---- V1-V3 校验函数 ----
 
+
 def validate_prd(prd: StructuredPRD | dict[str, Any]) -> ValidationResult:
     """V1-V3 分层校验（纯 Python，零 LLM 成本）。
 
@@ -273,7 +301,8 @@ def validate_prd(prd: StructuredPRD | dict[str, Any]) -> ValidationResult:
             prd = StructuredPRD.model_validate(prd)
         except Exception:
             return ValidationResult(
-                passed=False, failed_layer="V1",
+                passed=False,
+                failed_layer="V1",
                 reasons=["structured_prd 结构不符合 schema"],
             )
 
@@ -328,6 +357,7 @@ def validate_prd(prd: StructuredPRD | dict[str, Any]) -> ValidationResult:
 
 # ---- 校验辅助函数 ----
 
+
 def _is_placeholder(text: str) -> bool:
     """检查是否为占位词。"""
     lower = text.strip().lower()
@@ -345,12 +375,10 @@ def _extract_keywords(text: str, min_len: int = 2) -> list[str]:
     clean = "".join(c for c in text if c.isalnum() or "\u4e00" <= c <= "\u9fff")
     if len(clean) < min_len:
         return [clean] if clean else []
-    return [clean[i:i + 2] for i in range(len(clean) - 1)]
+    return [clean[i : i + 2] for i in range(len(clean) - 1)]
 
 
-def _goal_has_resonance(
-    goal: str, scope: str, acceptance: list[str]
-) -> bool:
+def _goal_has_resonance(goal: str, scope: str, acceptance: list[str]) -> bool:
     """goal 核心词在 scope 或 acceptance 中至少出现一次。"""
     keywords = _extract_keywords(goal)
     combined = (scope + " " + " ".join(acceptance)).lower()

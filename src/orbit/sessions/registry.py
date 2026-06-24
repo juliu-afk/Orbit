@@ -59,15 +59,9 @@ class SessionRegistry:
                 FOREIGN KEY (project_name) REFERENCES projects(name) ON DELETE CASCADE
             )
         """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_name)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)"
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at DESC)"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_name)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at DESC)")
         # chat_messages 表
         conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_messages (
@@ -81,9 +75,7 @@ class SessionRegistry:
                 FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
             )
         """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id)"
-        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id)")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(session_id, created_at)"
         )
@@ -144,9 +136,7 @@ class SessionRegistry:
                 (status,),
             ).fetchall()
         else:
-            rows = conn.execute(
-                base_sql + "ORDER BY s.updated_at DESC"
-            ).fetchall()
+            rows = conn.execute(base_sql + "ORDER BY s.updated_at DESC").fetchall()
         return [self._row_to_session(r) for r in rows]
 
     def list_by_project(self, project_name: str) -> list[SessionRecord]:
@@ -247,9 +237,7 @@ class SessionRegistry:
             created_at=now,
         )
 
-    def get_messages(
-        self, session_id: str, limit: int = 50
-    ) -> list[ChatMessageRecord]:
+    def get_messages(self, session_id: str, limit: int = 50) -> list[ChatMessageRecord]:
         """获取 Session 的最近 N 条消息。"""
         rows = (
             self._get_conn()

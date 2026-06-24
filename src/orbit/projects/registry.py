@@ -63,9 +63,7 @@ class ProjectRegistry:
         """)
         # WHY 存量兼容：旧 projects 表无 local_path 列，ALTER TABLE 加列
         try:
-            self._get_conn().execute(
-                "ALTER TABLE projects ADD COLUMN local_path TEXT DEFAULT ''"
-            )
+            self._get_conn().execute("ALTER TABLE projects ADD COLUMN local_path TEXT DEFAULT ''")
         except sqlite3.OperationalError:
             pass  # 列已存在，忽略
         self._get_conn().execute(

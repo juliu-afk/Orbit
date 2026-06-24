@@ -89,10 +89,7 @@ class StartupProbeEngine:
 
         async with self._lock:
             self._completed_at = time.time()
-            self._status = (
-                "failed" if any(c.status == "failed" for c in self._checks)
-                else "passed"
-            )
+            self._status = "failed" if any(c.status == "failed" for c in self._checks) else "passed"
 
     async def _run_probe(self, check: ProbeResult) -> None:
         """执行单个探针：检测 → 自愈 → 再检测。"""
@@ -139,9 +136,7 @@ class StartupProbeEngine:
 
         finally:
             check.completed_at = time.time()
-            check.duration_ms = int(
-                (check.completed_at - (check.started_at or 0)) * 1000
-            )
+            check.duration_ms = int((check.completed_at - (check.started_at or 0)) * 1000)
 
     async def _try_repair(self, check: ProbeResult) -> bool:
         """尝试自愈——每个探针有独立的修复策略。返回 True=修复成功。"""
@@ -209,9 +204,7 @@ async def _probe_database() -> str:
     try:
         conn.execute("SELECT 1")
         # 验证核心表存在
-        tables = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()
+        tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         table_names = [t[0] for t in tables]
     finally:
         conn.close()
@@ -257,6 +250,7 @@ async def _probe_sandbox() -> str:
 
     # 降级 ProcessSandbox
     from orbit.sandbox.sandbox_factory import create_sandbox
+
     sandbox = await create_sandbox()
     if not _docker_is_installed():
         raise RuntimeError("未检测到Docker。建议安装Docker Desktop以获得完整沙箱隔离。")
@@ -338,6 +332,7 @@ async def _repair_sandbox() -> str:
             if await _check_docker_running():
                 return "Docker服务已启动，沙箱就绪"
     from orbit.sandbox.sandbox_factory import create_sandbox
+
     sandbox = await create_sandbox()
     return f"已启用 {sandbox.__class__.__name__}"
 
@@ -441,8 +436,11 @@ async def install_docker() -> str:
 
     try:
         proc = await _asyncio.create_subprocess_exec(
-            "winget", "install", "Docker.DockerDesktop",
-            "--accept-source-agreements", "--accept-package-agreements",
+            "winget",
+            "install",
+            "Docker.DockerDesktop",
+            "--accept-source-agreements",
+            "--accept-package-agreements",
             "--silent",
             stdout=_asyncio.subprocess.PIPE,
             stderr=_asyncio.subprocess.PIPE,

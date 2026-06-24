@@ -1,5 +1,4 @@
-"""PyInstaller 启动入口——启动 uvicorn 服务。
-"""
+"""PyInstaller 启动入口——启动 uvicorn 服务。"""
 
 from __future__ import annotations
 

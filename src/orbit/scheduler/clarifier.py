@@ -37,9 +37,13 @@ class ClarificationResult:
             "score": self.score,
             "passed": self.passed,
             "issues": [
-                {"type": i.type, "severity": i.severity,
-                 "field": i.field, "description": i.description,
-                 "suggestion": i.suggestion}
+                {
+                    "type": i.type,
+                    "severity": i.severity,
+                    "field": i.field,
+                    "description": i.description,
+                    "suggestion": i.suggestion,
+                }
                 for i in self.issues
             ],
             "completeness": self.completeness,
@@ -87,22 +91,29 @@ class ClarificationEngine:
             found = bool(re.search(pattern, prd_text, re.IGNORECASE))
             completeness[f"has_{name}"] = found
             if not found:
-                issues.append(ClarificationIssue(
-                    type="missing_field", severity="warning",
-                    field=name, description=desc,
-                    suggestion=f"请补充{name}相关内容",
-                ))
+                issues.append(
+                    ClarificationIssue(
+                        type="missing_field",
+                        severity="warning",
+                        field=name,
+                        description=desc,
+                        suggestion=f"请补充{name}相关内容",
+                    )
+                )
 
         # 2. 矛盾检测
         for pattern_a, pattern_b, desc in self.CONTRADICTION_PAIRS:
             if re.search(pattern_a, prd_text, re.IGNORECASE) and re.search(
                 pattern_b, prd_text, re.IGNORECASE
             ):
-                issues.append(ClarificationIssue(
-                    type="contradiction", severity="blocking",
-                    description=desc,
-                    suggestion="请明确优先级或移除其中一个约束",
-                ))
+                issues.append(
+                    ClarificationIssue(
+                        type="contradiction",
+                        severity="blocking",
+                        description=desc,
+                        suggestion="请明确优先级或移除其中一个约束",
+                    )
+                )
 
         # 3. 可行性评分
         score = self._score(prd_text, completeness, issues)
@@ -116,7 +127,9 @@ class ClarificationEngine:
         )
 
     def _score(
-        self, prd_text: str, completeness: dict[str, bool],
+        self,
+        prd_text: str,
+        completeness: dict[str, bool],
         issues: list[ClarificationIssue],
     ) -> int:
         """可行性评分 0-100。

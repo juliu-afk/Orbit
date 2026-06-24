@@ -1,6 +1,5 @@
 """Step 5.6 PR #3——资源调度器单元测试。"""
 
-
 from orbit.scheduler.resource_scheduler import (
     ResourceQuota,
     ResourceScheduler,

@@ -186,10 +186,16 @@ class LLMClient:
             # V4：有 monitor 且有 logprobs 时检熵
             if entropy_monitor and hasattr(delta, "logprobs") and delta.logprobs:
                 for lp in delta.logprobs.content if delta.logprobs.content else []:
-                    logprob_list = [t.logprob for t in lp.top_logprobs] if hasattr(lp, "top_logprobs") and lp.top_logprobs else [lp.logprob]
+                    logprob_list = (
+                        [t.logprob for t in lp.top_logprobs]
+                        if hasattr(lp, "top_logprobs") and lp.top_logprobs
+                        else [lp.logprob]
+                    )
                     entropy = entropy_monitor.on_token(lp.token, logprob_list)
                     if entropy is not None:
-                        raise HighEntropyError(entropy=entropy, threshold=entropy_monitor.config.threshold)
+                        raise HighEntropyError(
+                            entropy=entropy, threshold=entropy_monitor.config.threshold
+                        )
             # 记录模型名（备选降级时变化）
             if hasattr(chunk, "model") and chunk.model:
                 model_used = chunk.model

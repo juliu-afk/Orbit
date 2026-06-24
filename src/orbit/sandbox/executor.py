@@ -106,8 +106,9 @@ class Sandbox:
             except Exception as e:
                 logger.warning("temp_cleanup_failed", path=str(host_script), error=str(e))
 
-    def _build_mounts(self, host_script: Path,
-                      external_paths: list[str] | None = None) -> list[str]:
+    def _build_mounts(
+        self, host_script: Path, external_paths: list[str] | None = None
+    ) -> list[str]:
         """生成 docker run -v 参数列表（Session PR #2）。
 
         挂载顺序:
@@ -197,7 +198,8 @@ class Sandbox:
         # WHY docker version 而非 info: version 更快，且 Docker 在运行则 <1s 响应
         try:
             proc = await asyncio.create_subprocess_exec(
-                docker_path, "version",
+                docker_path,
+                "version",
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )

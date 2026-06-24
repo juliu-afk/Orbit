@@ -23,8 +23,10 @@ _registry = ProjectRegistry()
 
 # ── Pydantic schemas ─────────────────────────────────
 
+
 class ProjectCreateRequest(BaseModel):
     """注册或更新项目请求。"""
+
     name: str = Field(..., min_length=1, max_length=200, description="项目名称（文件夹名）")
     local_path: str = Field(..., min_length=1, max_length=1000, description="项目文件夹绝对路径")
     repo_url: str = Field("", max_length=500)
@@ -33,6 +35,7 @@ class ProjectCreateRequest(BaseModel):
 
 
 # ── 路由 ─────────────────────────────────────────────
+
 
 @router.post(
     "",

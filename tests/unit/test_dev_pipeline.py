@@ -92,3 +92,36 @@ class TestSchedulerRunTaskProgress:
 
         # ???????????
         assert len(events) > 0, "EventBus ?????????"
+
+
+class TestRunAgentRealFactory:
+    """?? AgentFactory ???C2 ?????"""
+
+    @pytest.mark.asyncio
+    async def test_run_agent_with_real_factory_calls_execute(self) -> None:
+        """_run_agent ??? AgentFactory ? execute ????? AttributeError?"""
+        from orbit.agents.factory import AgentFactory
+        from orbit.scheduler.orchestrator import Scheduler
+
+        sched = Scheduler(llm_client=None, agent_factory=AgentFactory)
+        # mock ???llm=None??Agent ?? mock ??
+        output = await sched._run_agent("developer", "test-real", {"prd": "???"})
+        # mock DeveloperAgent ?? {"code": "# [mock] code for: ..."}
+        assert "mock" in output.lower() or "code" in output.lower()
+
+    @pytest.mark.asyncio
+    async def test_scheduler_full_state_machine(self) -> None:
+        """Scheduler.run_task ???????? DONE?mock llm??"""
+        from orbit.agents.factory import AgentFactory
+        from orbit.events.bus import EventBus
+        from orbit.scheduler.orchestrator import Scheduler
+        from orbit.api.schemas.task import TaskState
+
+        bus = EventBus()
+        sched = Scheduler(
+            llm_client=None,
+            event_bus=bus,
+            agent_factory=AgentFactory,
+        )
+        state = await sched.run_task("test-full", "??????????")
+        assert state == TaskState.DONE

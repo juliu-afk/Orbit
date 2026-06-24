@@ -236,12 +236,11 @@ class Scheduler:
             return f"[error] Agent {role} 创建失败: {e}"
 
         # 注入依赖
-        if self._message_bus is not None:
-            agent.message_bus = self._message_bus
-        if self._tool_registry is not None:
-            agent.tool_registry = self._tool_registry
+        # WHY ??????? BaseAgent ?????llm/graph/sandbox??
+        # message_bus/tool_registry ? MCP/A2A ???Step I1??BaseAgent ??????
+        # ?? PR5 ?? communication ?????? BaseAgent?????? llm?
         if self.llm is not None:
-            agent.llm_client = self.llm
+            agent.llm = self.llm
 
         # 构建 L1-L5 上下文
         agent_context = self._build_context(task_id, context)

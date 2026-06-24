@@ -18,6 +18,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.api.routes import chat, compliance, health, knowledge, observability, projects, sessions, tasks
 from orbit.gateway.client import LLMClient
+from orbit.agents.factory import AgentFactory
 from orbit.scheduler.orchestrator import Scheduler
 from orbit.core.config import settings
 from orbit.events.bus import EventBus
@@ -103,6 +104,6 @@ _event_bus = EventBus()
 _scheduler = Scheduler(
     llm_client=LLMClient(),
     event_bus=_event_bus,
-    agent_factory=None,  # WHY None??? _agent_cycle ? role_map ?????????? factory ???
+    agent_factory=AgentFactory,  # WHY ??? AgentFactory?? _run_agent ??? Agent.execute()
 )
 app = create_app(_event_bus)

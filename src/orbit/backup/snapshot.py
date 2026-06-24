@@ -80,6 +80,42 @@ class Snapshotter:
             db_type=db_type,
         )
 
+    def list_snapshots(self, db_type: str = "") -> list[SnapshotMeta]:
+        """????????????????
+
+        db_type ??????????????????sqlite/knowledge/checkpoint??
+        """
+        import glob
+
+        pattern = (
+            os.path.join(self._dir, "*.db")
+            if not db_type
+            else os.path.join(self._dir, f"{db_type}_*.db")
+        )
+        results: list[SnapshotMeta] = []
+        for path in sorted(glob.glob(pattern), reverse=True):
+            snap_id = os.path.splitext(os.path.basename(path))[0]
+            try:
+                size = os.path.getsize(path)
+                integrity_hash = compute_hash(path)
+                created = os.path.getmtime(path)
+                # ? snap_id ?? db_type????{type}_{timestamp}?
+                parts = snap_id.split("_", 1)
+                dtype = parts[0] if len(parts) > 1 else ""
+                results.append(
+                    SnapshotMeta(
+                        snapshot_id=snap_id,
+                        path=path,
+                        size_bytes=size,
+                        integrity_hash=integrity_hash,
+                        created_at=created,
+                        db_type=dtype,
+                    )
+                )
+            except OSError:
+                continue
+        return results
+
     @property
     def backup_dir(self) -> str:
         return self._dir

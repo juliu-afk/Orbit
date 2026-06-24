@@ -1,4 +1,4 @@
-/** Resources Store??????/???????? observability metrics?? */
+/** Resources Store??????/???????? observability metrics? */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -25,7 +25,7 @@ export const useResourcesStore = defineStore('resources', () => {
   const loading = ref(false)
 
   async function fetchQueue() {
-    // WHY ? observability metrics ? active_tasks?MVP ????????
+    // ? observability metrics ? active_tasks?MVP ????????
     try {
       const r = await fetch(METRICS_URL)
       const j = await r.json()
@@ -35,13 +35,13 @@ export const useResourcesStore = defineStore('resources', () => {
           active: j.data.active_tasks ?? 0,
         }
       }
-    } catch {
-      // ??
+    } catch (e) {
+      console.warn('[resources] fetchQueue ??', e)
     }
   }
 
   async function fetchTools() {
-    // WHY ? metrics ? sandbox_executions ???????MVP ????????
+    // ? metrics ? sandbox_executions ???????MVP ????????
     try {
       const r = await fetch(METRICS_URL)
       const j = await r.json()
@@ -56,8 +56,8 @@ export const useResourcesStore = defineStore('resources', () => {
           },
         ]
       }
-    } catch {
-      // ??
+    } catch (e) {
+      console.warn('[resources] fetchTools ??', e)
     }
   }
 

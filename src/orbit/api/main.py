@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.api.routes import chat, compliance, health, knowledge, observability, projects, sessions, tasks
+from orbit.gateway.client import LLMClient
 from orbit.core.config import settings
 from orbit.events.bus import EventBus
 from orbit.ws.router import router as ws_router
@@ -86,6 +87,11 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
         async def _start_broadcaster() -> None:
             asyncio.create_task(start_broadcaster(event_bus))
             logger.info("ws_broadcaster_started")
+
+    # WHY ?? LLMClient ??? ClarifierAgent?? chat ??? Agent ??? LLM ?? mock?
+    # chat ??????? LLMClient????? Agent ???????????
+    # ??? DEEPSEEK_API_KEY ??????key ??? litellm ????????????? Agent/chat ????
+    chat.set_clarifier_llm(LLMClient())
 
     return app
 

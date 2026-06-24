@@ -133,7 +133,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useSessionStore } from '@/stores/session'
@@ -234,6 +234,24 @@ async function onSessionCreated() {
   }
   agentOpsStore.fetchAll()
 }
+
+// Session PR #3: 切换 Session 时同步消息 + 刷新指标
+watch(
+  () => session.currentSessionId,
+  (newId) => {
+    if (newId && session.messages.length > 0) {
+      chatStore.restoreMessages(session.messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        created_at: m.created_at,
+      })))
+    } else if (newId) {
+      chatStore.reset()
+    }
+    tokenPoints.value = []
+    agentOpsStore.fetchAll()
+  }
+)
 
 onMounted(async () => {
   ws.connect(getWsUrl())

@@ -44,9 +44,10 @@ class TaskCreateRequest(BaseModel):
     language: Literal["python", "javascript", "java", "go"] = Field(
         "python", description="目标语言"
     )
-    session_id: str = Field(
-        ..., min_length=32, max_length=32, pattern=r"^[0-9a-f]{32}$",
-        description="归属 Session ID (UUID4 hex)"
+    # Session PR #1: 可选——不传时任务不关联 session（向后兼容旧 API 调用方）
+    session_id: str | None = Field(
+        None, min_length=32, max_length=32, pattern=r"^[0-9a-f]{32}$",
+        description="归属 Session ID (UUID4 hex)，可选"
     )
     callback_url: HttpUrl | None = Field(None, description="可选回调 URL，任务完成时推送结果")
 

@@ -35,17 +35,22 @@ _session_registry = SessionRegistry()  # Session PR #1: 验证 session 存在
     description="提交 PRD 创建任务，返回初始 IDLE 状态。prd 长度 10-5000。",
 )
 async def create_task(req: TaskCreateRequest) -> TaskStatusResponse:
-    # Session PR #1: 验证 session 存在 + 取 project_name
-    session = _session_registry.get(req.session_id)
-    if session is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={
-                "detail": f"会话 {req.session_id} 不存在",
-                "error_code": "SESSION_NOT_FOUND",
-                "timestamp": datetime.now(UTC).isoformat(),
-            },
-        )
+    # Session PR #1: 验证 session 存在（仅当传入 session_id 时）
+    session_id = ""
+    project_name = ""
+    if req.session_id:
+        session = _session_registry.get(req.session_id)
+        if session is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={
+                    "detail": f"会话 {req.session_id} 不存在",
+                    "error_code": "SESSION_NOT_FOUND",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+            )
+        session_id = session.session_id
+        project_name = session.project_name
 
     now = datetime.now(UTC)
     resp = TaskStatusResponse(
@@ -53,8 +58,8 @@ async def create_task(req: TaskCreateRequest) -> TaskStatusResponse:
         state=TaskState.IDLE,
         progress=0.0,
         result=None,
-        session_id=session.session_id,
-        project_name=session.project_name,
+        session_id=session_id,
+        project_name=project_name,
         created_at=now,
         updated_at=now,
     )

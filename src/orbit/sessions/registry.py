@@ -166,22 +166,16 @@ class SessionRegistry:
             if rec.status == "archived" and kwargs["status"] != "archived":
                 raise ValueError(f"Session {session_id} 已归档，不可恢复为活跃状态")
 
-        # 构建 SET 子句
-        set_parts: list[str] = []
-        values: list[Any] = []
-        for key in ("title", "status"):
-            if key in kwargs:
-                set_parts.append(f"{key}=?")
-                values.append(kwargs[key])
-        set_parts.append("updated_at=?")
         now = time.time()
-        values.append(now)
-        values.append(session_id)
+        new_title = kwargs.get("title", rec.title)
+        new_status = kwargs.get("status", rec.status)
 
+        # WHY 显式列名而非 f-string: bandit B608 标记任何拼接 SQL。
+        # 只有 2 个可更新列，分支写更安全。
         conn = self._get_conn()
         conn.execute(
-            f"UPDATE sessions SET {', '.join(set_parts)} WHERE id=?",
-            values,
+            "UPDATE sessions SET title=?, status=?, updated_at=? WHERE id=?",
+            (new_title, new_status, now, session_id),
         )
         conn.commit()
         return self.get(session_id)

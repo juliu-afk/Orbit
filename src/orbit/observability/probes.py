@@ -251,10 +251,10 @@ async def _probe_sandbox() -> str:
     # Docker 未运行——检查是否已安装
     docker_installed = _docker_is_installed()
     if docker_installed:
-        # 已安装但未运行——尝试启动 Docker Desktop
+        # 已安装但未运行——尝试启动 Docker（服务优先，不弹 GUI）
         _start_docker_desktop()
-        # 等 Docker 启动
-        for _ in range(8):
+        # Docker Desktop 冷启动需 15-30s，给足时间
+        for _ in range(20):
             await asyncio.sleep(2)
             if await _check_docker_running():
                 return "Docker已启动，沙箱就绪"
@@ -343,11 +343,11 @@ async def _repair_sandbox() -> str:
     docker_installed = _docker_is_installed()
     if docker_installed:
         _start_docker_desktop()
-        for _ in range(5):
+        for _ in range(10):
             await asyncio.sleep(2)
             if await _check_docker_running():
-                return "Docker已启动，沙箱就绪"
-        # 启动失败——降级
+                return "Docker服务已启动，沙箱就绪"
+        # 启动超时——降级
         from orbit.sandbox.sandbox_factory import create_sandbox
         sandbox = await create_sandbox()
         return f"Docker启动超时，已降级 {sandbox.__class__.__name__}"
@@ -400,31 +400,43 @@ async def _check_docker_running() -> bool:
 
 
 def _start_docker_desktop() -> None:
-    """尝试启动 Docker Desktop（异步 fire-and-forget）。"""
+    """静默启动 Docker——优先用 Docker Desktop 后台服务，避免弹 GUI 窗口。"""
     import os as _os
     import subprocess
 
     if _os.name == "nt":
+        # WHY 静默: CREATE_NO_WINDOW 防终端闪现, 优先启动服务而非 GUI
+        si = subprocess.STARTUPINFO()
+        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        si.wShowWindow = subprocess.SW_HIDE
+
+        # 尝试启动 Docker Desktop 服务（不弹 GUI）
+        try:
+            subprocess.run(
+                ["sc", "start", "com.docker.service"],
+                startupinfo=si,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+            )
+        except Exception:
+            pass
+
+        # 如果服务启动不行，尝试直接启动 Docker Desktop（这会弹GUI，最后手段）
         for path in [
-            r"C:\Program Files\Docker\Docker\Docker Desktop.exe",
             r"C:\Program Files\Docker\Docker\Docker Desktop.exe",
         ]:
             if _os.path.exists(path):
                 subprocess.Popen(
                     [path],
+                    startupinfo=si,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
                 return
-        # winget 安装后 docker 在 PATH 中
-        subprocess.Popen(
-            ["docker", "info"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
     else:
         subprocess.Popen(
-            ["systemctl", "start", "docker"],
+            ["systemctl", "start", "--quiet", "docker"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

@@ -39,6 +39,7 @@ erl_crash.dump
 # Rust / Tauri
 src-tauri/target/
 src-tauri/orbit-backend.exe
+src-tauri/gen/
 
 # 交付 + 构建产物
 Deliverables/

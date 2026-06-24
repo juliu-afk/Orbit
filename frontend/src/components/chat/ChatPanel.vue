@@ -61,9 +61,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import { useSessionStore } from '@/stores/session'
 import CandidateCard from './CandidateCard.vue'
 
 const chatStore = useChatStore()
+const sessionStore = useSessionStore()
 const inputText = ref('')
 const batchConfirmed = ref(false)
 
@@ -89,7 +91,12 @@ const msgListRef = ref<HTMLElement | null>(null)
 
 function handleSend() {
   if (!inputText.value.trim()) return
-  chatStore.send(inputText.value)
+  // Session PR #3: 附 session_id + project_name
+  chatStore.send(
+    inputText.value,
+    sessionStore.currentSessionId || '',
+    sessionStore.currentProjectName,
+  )
   inputText.value = ''
 }
 

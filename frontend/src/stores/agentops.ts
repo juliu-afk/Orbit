@@ -1,10 +1,12 @@
 /** AgentOps Store——指标/告警/健康数据集中管理。
  *
  * 双通道更新：WebSocket 推送 (实时) + HTTP 轮询 (5s 兜底)。
+ * Session PR #3: 加 session_id 过滤参数。
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AgentOpsAlert, ComponentHealth, MetricsSnapshot } from '@/types/dashboard'
+import { useSessionStore } from '@/stores/session'
 
 const POLL_INTERVAL_MS = 5000
 const METRICS_URL = '/api/v1/observability/metrics'
@@ -23,9 +25,16 @@ export const useAgentOpsStore = defineStore('agentops', () => {
 
   // ── HTTP 轮询 (兜底) ────────────────────────────
 
+  function _buildUrl(base: string): string {
+    // Session PR #3: 按 current session 过滤
+    const sessionStore = useSessionStore()
+    const sid = sessionStore.currentSessionId
+    return sid ? `${base}?session_id=${sid}` : base
+  }
+
   async function fetchMetrics() {
     try {
-      const r = await fetch(METRICS_URL)
+      const r = await fetch(_buildUrl(METRICS_URL))
       const j = await r.json()
       if (j.code === 0) {
         metrics.value = j.data as MetricsSnapshot
@@ -38,7 +47,7 @@ export const useAgentOpsStore = defineStore('agentops', () => {
 
   async function fetchAlerts() {
     try {
-      const r = await fetch(ALERTS_URL)
+      const r = await fetch(_buildUrl(ALERTS_URL))
       const j = await r.json()
       if (j.code === 0) {
         alerts.value = (j.data || []) as AgentOpsAlert[]

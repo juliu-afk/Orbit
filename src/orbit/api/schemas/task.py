@@ -36,12 +36,17 @@ class TaskCreateRequest(BaseModel):
 
     - prd：产品需求文档，长度 10-5000 字符（Step 1.1 AC2：<10 返回 422）
     - language：目标语言，限制 4 种（后续可扩展）
+    - session_id：归属 Session ID，UUID4 hex 32 字符（Session PR #1）
     - callback_url：可选 webhook，任务完成时回调（V1 仅定义字段，不实现推送）
     """
 
     prd: constr(min_length=10, max_length=5000) = Field(..., description="产品需求文档")  # type: ignore[valid-type]
     language: Literal["python", "javascript", "java", "go"] = Field(
         "python", description="目标语言"
+    )
+    session_id: str = Field(
+        ..., min_length=32, max_length=32, pattern=r"^[0-9a-f]{32}$",
+        description="归属 Session ID (UUID4 hex)"
     )
     callback_url: HttpUrl | None = Field(None, description="可选回调 URL，任务完成时推送结果")
 
@@ -57,6 +62,8 @@ class TaskStatusResponse(BaseModel):
     state: TaskState
     progress: float = Field(ge=0.0, le=1.0)
     result: str | None = Field(None, description="任务产物（完成时填充）")
+    session_id: str = Field("", description="归属 Session ID (Session PR #1)")
+    project_name: str = Field("", description="归属项目名称 (Session PR #1)")
     created_at: datetime
     updated_at: datetime
 

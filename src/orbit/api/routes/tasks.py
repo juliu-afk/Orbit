@@ -17,12 +17,14 @@ from orbit.api.schemas.task import (
     TaskState,
     TaskStatusResponse,
 )
+from orbit.sessions.registry import SessionRegistry
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 # WHY 进程内 mock 存储：MVP 阶段不依赖数据库，仅验证 API 契约。
 # Step 2.2 接入检查点后替换为持久化存储。
 _mock_store: dict[str, TaskStatusResponse] = {}
+_session_registry = SessionRegistry()  # Session PR #1: 验证 session 存在
 
 
 @router.post(
@@ -33,12 +35,26 @@ _mock_store: dict[str, TaskStatusResponse] = {}
     description="提交 PRD 创建任务，返回初始 IDLE 状态。prd 长度 10-5000。",
 )
 async def create_task(req: TaskCreateRequest) -> TaskStatusResponse:
+    # Session PR #1: 验证 session 存在 + 取 project_name
+    session = _session_registry.get(req.session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "detail": f"会话 {req.session_id} 不存在",
+                "error_code": "SESSION_NOT_FOUND",
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
     now = datetime.now(UTC)
     resp = TaskStatusResponse(
         task_id=uuid.uuid4().hex,
         state=TaskState.IDLE,
         progress=0.0,
         result=None,
+        session_id=session.session_id,
+        project_name=session.project_name,
         created_at=now,
         updated_at=now,
     )

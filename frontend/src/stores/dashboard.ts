@@ -1,27 +1,16 @@
-/** 驾驶舱全局状态。
+/** 驾驶舱全局状态（精简版——Session PR #3）。
  *
- * 管理当前订阅任务和最后更新时间。
- * WS 连接状态由 useWebSocket composable 管理，不在此 Store。
+ * 仅管理 WS 连接状态。任务/指标/Session 由各自 Store 管理。
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useDashboardStore = defineStore('dashboard', () => {
-  const currentTaskId = ref<string | null>(null)
-  const lastUpdateTime = ref<number | null>(null)
+  const wsStatus = ref<'connected' | 'connecting' | 'disconnected'>('disconnected')
 
-  function setTask(taskId: string) {
-    currentTaskId.value = taskId
+  function setWsStatus(s: 'connected' | 'connecting' | 'disconnected') {
+    wsStatus.value = s
   }
 
-  function clearTask() {
-    currentTaskId.value = null
-    lastUpdateTime.value = null
-  }
-
-  function touch() {
-    lastUpdateTime.value = Date.now()
-  }
-
-  return { currentTaskId, lastUpdateTime, setTask, clearTask, touch }
+  return { wsStatus, setWsStatus }
 })

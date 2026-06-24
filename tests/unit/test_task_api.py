@@ -13,6 +13,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from orbit.api.main import create_app
+from orbit.sessions.registry import SessionRegistry
 
 
 @pytest.fixture
@@ -27,6 +28,20 @@ async def client(app):
         yield ac
 
 
+@pytest.fixture
+def session_id() -> str:
+    """Session PR #1: 创建测试 Session，返回 session_id 供 Task 测试用。"""
+    # WHY 注册项目 + 创建 session: TaskCreateRequest 强制要求 session_id，
+    # 必须先有项目 + session 才能测试任务创建
+    sr = SessionRegistry()
+    try:
+        # 确保 project 已存在（由 chat.py 预注册的 "Orbit" 项目）
+        s = sr.create("Orbit", title="测试会话")
+        return s.session_id
+    finally:
+        sr.close()
+
+
 @pytest.mark.asyncio
 async def test_health(client):
     resp = await client.get("/health")
@@ -35,10 +50,10 @@ async def test_health(client):
 
 
 @pytest.mark.asyncio
-async def test_create_task(client):
+async def test_create_task(client, session_id):
     resp = await client.post(
         "/api/v1/tasks",
-        json={"prd": "write a sum function"},
+        json={"prd": "write a sum function", "session_id": session_id},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -47,23 +62,28 @@ async def test_create_task(client):
     assert len(data["task_id"]) == 32
     assert data["state"] == "IDLE"
     assert data["progress"] == 0.0
+    # Session PR #1: 响应含 session_id 和 project_name
+    assert data["session_id"] == session_id
+    assert data["project_name"] == "Orbit"
 
 
 @pytest.mark.asyncio
-async def test_invalid_prd_too_short(client):
+async def test_invalid_prd_too_short(client, session_id):
     """AC2: prd 长度 <10 返回 422，错误信息含字段级校验失败。"""
-    resp = await client.post("/api/v1/tasks", json={"prd": "short"})
+    resp = await client.post("/api/v1/tasks", json={
+        "prd": "short", "session_id": session_id,
+    })
     assert resp.status_code == 422
     errors = resp.json()["detail"]
     assert any("prd" in str(err["loc"]) for err in errors)
 
 
 @pytest.mark.asyncio
-async def test_invalid_language(client):
+async def test_invalid_language(client, session_id):
     """language 不在允许列表返回 422。"""
     resp = await client.post(
         "/api/v1/tasks",
-        json={"prd": "write a sum function", "language": "rust"},
+        json={"prd": "write a sum function", "language": "rust", "session_id": session_id},
     )
     assert resp.status_code == 422
 
@@ -79,9 +99,11 @@ async def test_get_task_not_found(client):
 
 
 @pytest.mark.asyncio
-async def test_cancel_task(client):
+async def test_cancel_task(client, session_id):
     """创建后可取消，状态变更为 CANCELLED。"""
-    create = await client.post("/api/v1/tasks", json={"prd": "write a sum function"})
+    create = await client.post("/api/v1/tasks", json={
+        "prd": "write a sum function", "session_id": session_id,
+    })
     task_id = create.json()["task_id"]
     cancel = await client.post(f"/api/v1/tasks/{task_id}/cancel")
     assert cancel.status_code == 200
@@ -93,9 +115,11 @@ async def test_cancel_task(client):
 
 
 @pytest.mark.asyncio
-async def test_cancel_already_cancelled(client):
+async def test_cancel_already_cancelled(client, session_id):
     """重复取消已取消任务返回 409。"""
-    create = await client.post("/api/v1/tasks", json={"prd": "write a sum function"})
+    create = await client.post("/api/v1/tasks", json={
+        "prd": "write a sum function", "session_id": session_id,
+    })
     task_id = create.json()["task_id"]
     await client.post(f"/api/v1/tasks/{task_id}/cancel")
     second = await client.post(f"/api/v1/tasks/{task_id}/cancel")
@@ -125,38 +149,49 @@ async def test_openapi_schema(client):
 
 
 @pytest.mark.asyncio
-async def test_prd_boundary_min_length(client):
+async def test_prd_boundary_min_length(client, session_id):
     """prd 恰好 10 字符（最小边界）应通过。"""
-    resp = await client.post("/api/v1/tasks", json={"prd": "1234567890"})
+    resp = await client.post("/api/v1/tasks", json={
+        "prd": "1234567890", "session_id": session_id,
+    })
     assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
-async def test_prd_boundary_too_short(client):
+async def test_prd_boundary_too_short(client, session_id):
     """prd 9 字符（边界-1）应返回 422。"""
-    resp = await client.post("/api/v1/tasks", json={"prd": "123456789"})
+    resp = await client.post("/api/v1/tasks", json={
+        "prd": "123456789", "session_id": session_id,
+    })
     assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_prd_exceeds_max_length(client):
+async def test_prd_exceeds_max_length(client, session_id):
     """prd 5001 字符（边界+1）应返回 422。"""
-    resp = await client.post("/api/v1/tasks", json={"prd": "x" * 5001})
+    resp = await client.post("/api/v1/tasks", json={
+        "prd": "x" * 5001, "session_id": session_id,
+    })
     assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_prd_max_boundary(client):
+async def test_prd_max_boundary(client, session_id):
     """prd 恰好 5000 字符（最大边界）应通过。"""
-    resp = await client.post("/api/v1/tasks", json={"prd": "x" * 5000})
+    resp = await client.post("/api/v1/tasks", json={
+        "prd": "x" * 5000, "session_id": session_id,
+    })
     assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
-async def test_language_allows_javascript(client):
+async def test_language_allows_javascript(client, session_id):
     """language=javascript 应通过。"""
     resp = await client.post(
-        "/api/v1/tasks", json={"prd": "write a sum function", "language": "javascript"}
+        "/api/v1/tasks", json={
+            "prd": "write a sum function", "language": "javascript",
+            "session_id": session_id,
+        }
     )
     assert resp.status_code == 200
 

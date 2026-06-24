@@ -9,6 +9,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from orbit.api.main import create_app
+from orbit.sessions.registry import SessionRegistry
 
 
 @pytest.fixture
@@ -21,6 +22,17 @@ async def client(app):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
+
+
+@pytest.fixture
+def session_id() -> str:
+    """Session PR #1: 创建测试 Session。"""
+    sr = SessionRegistry()
+    try:
+        s = sr.create("Orbit", title="集成测试会话")
+        return s.session_id
+    finally:
+        sr.close()
 
 
 @pytest.mark.asyncio
@@ -44,13 +56,14 @@ async def test_create_task_validation(client):
 
 
 @pytest.mark.asyncio
-async def test_create_task_success(client):
+async def test_create_task_success(client, session_id):
     """合法请求返回 200 + task_id。"""
     resp = await client.post(
         "/api/v1/tasks",
         json={
             "prd": "构建一个简单的 Python 计算器应用，支持加减乘除运算",
             "language": "python",
+            "session_id": session_id,
         },
     )
     assert resp.status_code == 200

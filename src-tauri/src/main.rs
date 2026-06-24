@@ -13,9 +13,36 @@ fn extract_backend() -> PathBuf {
     let dir = std::env::temp_dir().join("orbit");
     fs::create_dir_all(&dir).ok();
     let exe_path = dir.join("orbit-backend.exe");
+
+    // WHY 先杀旧进程再写: 上次异常退出（崩溃/强制结束）时旧进程可能
+    // 仍占用 exe 文件，直接 remove+write 会失败（Os code 32）
+    kill_existing_backend(&exe_path);
+
     let _ = fs::remove_file(&exe_path);
     fs::write(&exe_path, BACKEND_EXE).expect("无法解压后端程序");
     exe_path
+}
+
+/// 强制结束可能残留的旧后端进程
+#[cfg(target_os = "windows")]
+fn kill_existing_backend(_exe_path: &PathBuf) {
+    use std::os::windows::process::CommandExt;
+    // taskkill /F /IM orbit-backend.exe —— 结束所有同名进程
+    let _ = std::process::Command::new("taskkill")
+        .args(["/F", "/IM", "orbit-backend.exe"])
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .output();
+    // 短等进程退出 + 释放文件锁
+    std::thread::sleep(std::time::Duration::from_millis(800));
+}
+
+#[cfg(not(target_os = "windows"))]
+fn kill_existing_backend(_exe_path: &PathBuf) {
+    // Unix: pkill orbit-backend
+    let _ = std::process::Command::new("pkill")
+        .args(["-f", "orbit-backend"])
+        .output();
+    std::thread::sleep(std::time::Duration::from_millis(800));
 }
 
 /// 启动后端进程，隐藏控制台窗口

@@ -25,8 +25,8 @@ export const useHealthStore = defineStore('health', () => {
       const r = await fetch(`${HEALTH_URL}/${component}`)
       const j = await r.json()
       componentDetail.value = j
-    } catch {
-      // ??
+    } catch (e) {
+      console.warn("[store] ????", e)
     } finally {
       loading.value = false
     }

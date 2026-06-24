@@ -62,8 +62,8 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       if (j.code === 0) {
         concepts.value = j.data || []
       }
-    } catch {
-      // ??
+    } catch (e) {
+      console.warn("[store] ????", e)
     } finally {
       loading.value = false
     }
@@ -78,8 +78,8 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       if (j.code === 0) {
         concepts.value = j.data || []
       }
-    } catch {
-      // ??
+    } catch (e) {
+      console.warn("[store] ????", e)
     } finally {
       loading.value = false
     }

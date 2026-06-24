@@ -27,6 +27,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useHealthStore } from '@/stores/health'
 import type { ComponentHealth } from '@/types/dashboard'
 
 const props = defineProps<{
@@ -44,7 +45,6 @@ const overallLabel = computed(() => {
 })
 
 const overallClass = computed(() => `health-panel__overall--${props.overall}`)
-import { useHealthStore } from '@/stores/health'
 
 const healthStore = useHealthStore()
 

@@ -39,8 +39,8 @@ export const useAuditStore = defineStore('audit', () => {
       if (j.code === 0) {
         auditLogs.value = j.data || []
       }
-    } catch {
-      // ??
+    } catch (e) {
+      console.warn("[store] ????", e)
     } finally {
       loading.value = false
     }
@@ -55,8 +55,8 @@ export const useAuditStore = defineStore('audit', () => {
       if (j.code === 0) {
         lessons.value = j.data || []
       }
-    } catch {
-      // ??
+    } catch (e) {
+      console.warn("[store] ????", e)
     } finally {
       loading.value = false
     }
@@ -75,8 +75,8 @@ export const useAuditStore = defineStore('audit', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
-    } catch {
-      // ??
+    } catch (e) {
+      console.warn("[store] ????", e)
     }
   }
 

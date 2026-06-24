@@ -29,21 +29,24 @@ class ProbeResult:
     status: str = "pending"  # pending/running/passed/failed/skipped/repaired
     message: str = ""
     auto_repaired: bool = False
+    install_action: str | None = None  # "install_docker"——前端显示安装按钮
     started_at: float | None = None
     completed_at: float | None = None
     duration_ms: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "name": self.name,
             "label": self.label,
             "status": self.status,
             "message": self.message,
             "auto_repaired": self.auto_repaired,
+            "install_action": self.install_action,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "duration_ms": self.duration_ms,
         }
+        return d
 
 
 class StartupProbeEngine:
@@ -130,6 +133,9 @@ class StartupProbeEngine:
             else:
                 check.status = "failed"
                 check.message = str(e)[:500]
+                # WHY install_action: Docker 未安装时提示用户可一键安装
+                if check.name == "sandbox" and _docker_is_installed() is False:
+                    check.install_action = "install_docker"
 
         finally:
             check.completed_at = time.time()
@@ -176,6 +182,7 @@ class StartupProbeEngine:
             check.status = "pending"
             check.message = ""
             check.auto_repaired = False
+            check.install_action = None
             check.started_at = None
             check.completed_at = None
             check.duration_ms = 0
@@ -235,12 +242,33 @@ async def _probe_llm_gateway() -> str:
 
 
 async def _probe_sandbox() -> str:
-    """检测沙箱可用。Docker → ProcessSandbox 自动降级。"""
+    """检测沙箱可用。Docker > 尝试启动Docker > ProcessSandbox降级 > 提示安装。"""
+    # 先直接试 Docker
+    docker_available = await _check_docker_running()
+    if docker_available:
+        return "Docker沙箱已就绪"
+
+    # Docker 未运行——检查是否已安装
+    docker_installed = _docker_is_installed()
+    if docker_installed:
+        # 已安装但未运行——尝试启动 Docker Desktop
+        _start_docker_desktop()
+        # 等 Docker 启动
+        for _ in range(8):
+            await asyncio.sleep(2)
+            if await _check_docker_running():
+                return "Docker已启动，沙箱就绪"
+
+    # Docker 不可用——降级 ProcessSandbox
     from orbit.sandbox.sandbox_factory import create_sandbox
 
     sandbox = await create_sandbox()
     if sandbox.__class__.__name__ == "ProcessSandbox":
-        return "ProcessSandbox已就绪（Docker不可用，已自动降级）"
+        if not docker_installed:
+            raise RuntimeError(
+                "未检测到Docker安装。建议安装Docker Desktop以获得完整沙箱隔离。"
+            )
+        return "ProcessSandbox已就绪（Docker未成功启动，已降级）"
     return "Docker沙箱已就绪"
 
 
@@ -311,11 +339,122 @@ async def _repair_environment() -> str:
 
 
 async def _repair_sandbox() -> str:
-    """沙箱自愈：Docker 不可用时降级 ProcessSandbox。"""
-    from orbit.sandbox.sandbox_factory import create_sandbox
+    """沙箱自愈：Docker 不可用先尝试启动，再降级 ProcessSandbox。"""
+    docker_installed = _docker_is_installed()
+    if docker_installed:
+        _start_docker_desktop()
+        for _ in range(5):
+            await asyncio.sleep(2)
+            if await _check_docker_running():
+                return "Docker已启动，沙箱就绪"
+        # 启动失败——降级
+        from orbit.sandbox.sandbox_factory import create_sandbox
+        sandbox = await create_sandbox()
+        return f"Docker启动超时，已降级 {sandbox.__class__.__name__}"
 
+    # Docker 未安装——降级为 ProcessSandbox
+    from orbit.sandbox.sandbox_factory import create_sandbox
     sandbox = await create_sandbox()
-    return f"已启用 {sandbox.__class__.__name__}"
+    return f"Docker未安装，已降级 {sandbox.__class__.__name__}"
+
+
+# ── Docker 辅助函数 ──
+
+
+def _docker_is_installed() -> bool:
+    """检测 Docker 是否已安装（检查可执行文件+注册表）。"""
+    import shutil
+    import os as _os
+
+    if shutil.which("docker"):
+        return True
+    # Windows: 检查默认安装路径
+    if _os.name == "nt":
+        for path in [
+            r"C:\Program Files\Docker\Docker\Docker Desktop.exe",
+            r"C:\Program Files\Docker\Docker\resources\bin\docker.exe",
+        ]:
+            if _os.path.exists(path):
+                return True
+    return False
+
+
+async def _check_docker_running() -> bool:
+    """检测 Docker Engine 是否在运行。"""
+    import asyncio as _asyncio
+    import shutil
+
+    docker_path = shutil.which("docker")
+    if not docker_path:
+        return False
+    try:
+        proc = await _asyncio.create_subprocess_exec(
+            docker_path, "info",
+            stdout=_asyncio.subprocess.DEVNULL,
+            stderr=_asyncio.subprocess.DEVNULL,
+        )
+        await _asyncio.wait_for(proc.communicate(), timeout=10)
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
+def _start_docker_desktop() -> None:
+    """尝试启动 Docker Desktop（异步 fire-and-forget）。"""
+    import os as _os
+    import subprocess
+
+    if _os.name == "nt":
+        for path in [
+            r"C:\Program Files\Docker\Docker\Docker Desktop.exe",
+            r"C:\Program Files\Docker\Docker\Docker Desktop.exe",
+        ]:
+            if _os.path.exists(path):
+                subprocess.Popen(
+                    [path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return
+        # winget 安装后 docker 在 PATH 中
+        subprocess.Popen(
+            ["docker", "info"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    else:
+        subprocess.Popen(
+            ["systemctl", "start", "docker"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
+async def install_docker() -> str:
+    """后台安装 Docker Desktop（Windows: winget）。"""
+    import asyncio as _asyncio
+    import os as _os
+
+    if _os.name != "nt":
+        return "自动安装仅支持 Windows。请手动安装 Docker。"
+
+    try:
+        proc = await _asyncio.create_subprocess_exec(
+            "winget", "install", "Docker.DockerDesktop",
+            "--accept-source-agreements", "--accept-package-agreements",
+            "--silent",
+            stdout=_asyncio.subprocess.PIPE,
+            stderr=_asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await _asyncio.wait_for(proc.communicate(), timeout=600)
+        if proc.returncode == 0:
+            return "Docker Desktop 安装完成。请手动启动后重试。"
+        err = stderr.decode("utf-8", errors="replace")[:200] if stderr else ""
+        return f"安装失败: {err}"
+    except _asyncio.TimeoutError:
+        return "Docker 安装超时（10分钟），请手动安装。"
+    except FileNotFoundError:
+        return "未找到 winget。请手动下载 Docker Desktop: https://www.docker.com/products/docker-desktop"
 
 
 async def _repair_session_store() -> str:

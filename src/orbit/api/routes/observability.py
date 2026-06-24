@@ -252,3 +252,36 @@ async def startup_probe_reset() -> dict[str, Any]:
         _probe_engine.reset()
         asyncio.create_task(_probe_engine.start())
     return {"code": 0, "data": {"status": "reset"}, "message": "ok"}
+
+
+@router.post("/startup-probe/install/{name}", summary="安装指定组件")
+async def startup_probe_install(name: str) -> dict[str, Any]:
+    """后台安装指定组件（如 Docker Desktop）。"""
+    if name == "docker":
+        from orbit.observability.probes import install_docker
+
+        asyncio.create_task(_async_install_docker())
+        return {"code": 0, "data": {"status": "installing"}, "message": "正在后台安装 Docker Desktop..."}
+    raise HTTPException(status_code=404, detail=f"未知组件: {name}")
+
+
+async def _async_install_docker() -> None:
+    """后台安装 Docker，完成后重置 sandbox 探针并重跑。"""
+    from orbit.observability.probes import install_docker
+
+    global _probe_engine
+    result = await install_docker()
+    if _probe_engine is not None:
+        # 只重置 sandbox 探针
+        for check in _probe_engine._checks:
+            if check.name == "sandbox":
+                check.status = "pending"
+                check.message = result
+                check.install_action = None
+                check.auto_repaired = False
+                break
+        # 重跑 sandbox
+        for check in _probe_engine._checks:
+            if check.name == "sandbox" and check.status == "pending":
+                await _probe_engine._run_probe(check)
+                break

@@ -15,6 +15,7 @@ export interface PreFlightCheck {
   status: CheckStatus
   message: string
   auto_repaired: boolean
+  install_action: string | null
   duration_ms: number
 }
 
@@ -109,6 +110,24 @@ export const usePreFlightStore = defineStore('preflight', () => {
     startPolling()
   }
 
+  async function installComponent(name: string) {
+    status.value = 'running'
+    errorMessage.value = ''
+    // 标记探针为安装中
+    const check = checks.value.find(c => c.name === 'sandbox')
+    if (check) {
+      check.status = 'running'
+      check.message = '正在安装...'
+    }
+    try {
+      await fetch(`${PROBE_URL}/install/${name}`, { method: 'POST' })
+    } catch {
+      // 静默
+    }
+    // 恢复轮询——后端安装完成后会自动重置该探针
+    startPolling()
+  }
+
   function reset() {
     stopPolling()
     status.value = 'booting'
@@ -121,6 +140,6 @@ export const usePreFlightStore = defineStore('preflight', () => {
   return {
     status, checks, autoRepairs, errorMessage, elapsedMs,
     progress, hasFailed, repairedItems,
-    startPolling, stopPolling, retry, reset,
+    startPolling, stopPolling, retry, installComponent, reset,
   }
 })

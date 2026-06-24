@@ -60,23 +60,40 @@
       <!-- 失败 + 重试 -->
       <div v-if="preflight.hasFailed" class="failed-section">
         <p class="failed-msg">{{ preflight.errorMessage }}</p>
-        <el-button type="primary" @click="preflight.retry()" :loading="retrying">
-          重新检测
-        </el-button>
+        <div class="failed-actions">
+          <el-button type="primary" @click="preflight.retry()">
+            重新检测
+          </el-button>
+          <template v-for="c in preflight.checks" :key="'btn-' + c.name">
+            <el-button
+              v-if="c.status === 'failed' && c.install_action"
+              type="warning"
+              :loading="installing[c.name]"
+              @click="handleInstall(c.name, c.install_action)"
+            >
+              安装 {{ c.label }}
+            </el-button>
+          </template>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { reactive } from 'vue'
 import { usePreFlightStore } from '@/stores/preflight'
 
 const preflight = usePreFlightStore()
-const retrying = ref(false)
+const installing = reactive<Record<string, boolean>>({})
 
-// 监听 passed——500ms后通知父组件
-// 父组件（BootView）通过 watch 触发路由跳转
+async function handleInstall(name: string, _action: string) {
+  installing[name] = true
+  preflight.stopPolling()
+  await preflight.installComponent(name)
+  installing[name] = false
+}
+
 defineExpose({ preflight })
 </script>
 
@@ -179,5 +196,10 @@ defineExpose({ preflight })
   font-size: 13px;
   color: #f44336;
   margin-bottom: 12px;
+}
+.failed-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 </style>

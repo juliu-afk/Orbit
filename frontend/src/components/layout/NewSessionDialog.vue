@@ -15,11 +15,15 @@
     <div v-if="mode === 'open'" class="tab-content">
       <el-input
         v-model="openPath"
-        placeholder="项目文件夹路径，如 D:/Code-Insight-Financial"
+        placeholder="粘贴项目文件夹路径，如 D:/Code-Insight-Financial"
         clearable
-      />
+      >
+        <template #prefix>
+          <span style="color:#888;font-size:12px">📁</span>
+        </template>
+      </el-input>
       <p class="hint">
-        输入已有项目文件夹的绝对路径，系统将自动注册并创建会话。
+        在文件管理器中右键文件夹 →「复制为路径」→ 粘贴到此处
       </p>
       <p v-if="pathError" class="error">{{ pathError }}</p>
     </div>

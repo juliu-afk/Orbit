@@ -3,10 +3,10 @@
   <div class="dashboard">
     <div class="dashboard-top">
       <!-- WS 连接状态灯 -->
-      <span class="connection-dot" :class="`dot--${dashboard.wsStatus}`" />
+      <span class="connection-dot" :class="`dot--${ws.connectionStatus.value}`" />
       <span class="connection-label">
-        {{ dashboard.wsStatus === 'connected' ? '已连接' :
-           dashboard.wsStatus === 'connecting' ? '连接中...' : '已断开' }}
+        {{ ws.connectionStatus.value === 'connected' ? '已连接' :
+           ws.connectionStatus.value === 'connecting' ? '连接中...' : '已断开' }}
       </span>
       <!-- Session 栏 -->
       <SessionBar class="session-bar" @new-session="showNewDialog = true" />
@@ -135,7 +135,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useWebSocket } from '@/composables/useWebSocket'
-import { useDashboardStore } from '@/stores/dashboard'
 import { useSessionStore } from '@/stores/session'
 import { useAgentOpsStore } from '@/stores/agentops'
 import { useChatStore } from '@/stores/chat'
@@ -152,7 +151,6 @@ import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 import CrossProjectWarning from '@/components/chat/CrossProjectWarning.vue'
 
 const ws = useWebSocket()
-const dashboard = useDashboardStore()
 const session = useSessionStore()
 const agentOpsStore = useAgentOpsStore()
 const chatStore = useChatStore()

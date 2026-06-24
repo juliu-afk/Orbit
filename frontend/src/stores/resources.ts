@@ -1,4 +1,4 @@
-/** Resources Store——资源调度/队列/工具数据管理。 */
+/** Resources Store??????/???????? observability metrics?? */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -17,19 +17,48 @@ export interface ToolStat {
   rate_limited: boolean
 }
 
+const METRICS_URL = '/api/v1/observability/metrics'
+
 export const useResourcesStore = defineStore('resources', () => {
   const queueStatus = ref<QueueStatus>({ critical: 0, high: 0, normal: 0, low: 0, active: 0 })
   const toolStats = ref<ToolStat[]>([])
   const loading = ref(false)
 
   async function fetchQueue() {
-    // 占位：后续 GET /api/v1/scheduler/queue-status
-    queueStatus.value = { critical: 0, high: 0, normal: 0, low: 0, active: 0 }
+    // WHY ? observability metrics ? active_tasks?MVP ????????
+    try {
+      const r = await fetch(METRICS_URL)
+      const j = await r.json()
+      if (j.code === 0 && j.data) {
+        queueStatus.value = {
+          ...queueStatus.value,
+          active: j.data.active_tasks ?? 0,
+        }
+      }
+    } catch {
+      // ??
+    }
   }
 
   async function fetchTools() {
-    // 占位：后续 GET /api/v1/tools/stats
-    toolStats.value = []
+    // WHY ? metrics ? sandbox_executions ???????MVP ????????
+    try {
+      const r = await fetch(METRICS_URL)
+      const j = await r.json()
+      if (j.code === 0 && j.data?.sandbox_executions_total) {
+        const execs = j.data.sandbox_executions_total
+        toolStats.value = [
+          {
+            tool_name: 'sandbox',
+            count: (execs.success ?? 0) + (execs.failed ?? 0),
+            last_used: 0,
+            rate_limited: false,
+          },
+        ]
+      }
+    } catch {
+      // ??
+    }
   }
 
   async function fetchAll() {

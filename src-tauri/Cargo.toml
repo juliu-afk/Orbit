@@ -1,0 +1,25 @@
+[package]
+name = "orbit"
+version = "0.10.0"
+description = "Orbit — 轻量级多 Agent 软件开发自循环系统"
+authors = ["Orbit Team"]
+edition = "2021"
+
+[lib]
+name = "orbit_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

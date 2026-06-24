@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
+  "productName": "Orbit",
+  "version": "0.10.0",
+  "identifier": "dev.orbit.desktop",
+  "build": {
+    "frontendDist": "../frontend/dist",
+    "devUrl": "http://127.0.0.1:18888",
+    "beforeDevCommand": "echo 'Tauri dev mode — start Python backend separately: uvicorn orbit.api.main:app --host 127.0.0.1 --port 18888'",
+    "beforeBuildCommand": "echo 'Skipping frontend build — already built by Makefile/pyinstaller flow'"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      }
+    }
+  }
+}

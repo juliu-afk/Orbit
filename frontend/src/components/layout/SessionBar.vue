@@ -1,8 +1,8 @@
 <!-- SessionBar.vue: 顶栏——项目名 + Session 下拉 + 新建按钮 -->
 <template>
-  <div class="session-bar">
+  <!-- data-tauri-drag-region: 无框窗口可拖拽区 -->
+  <div class="session-bar" data-tauri-drag-region>
     <div class="session-bar__left">
-      <!-- 项目名 badge -->
       <span v-if="session.currentProjectName" class="project-badge">
         📁 {{ session.currentProjectName }}
       </span>
@@ -10,7 +10,6 @@
         未选择项目
       </span>
 
-      <!-- Session 下拉 -->
       <el-dropdown
         v-if="session.sessions.length > 0"
         @command="handleSwitch"
@@ -41,14 +40,19 @@
       <el-button size="small" type="primary" @click="$emit('new-session')">
         + 新建会话
       </el-button>
+      <!-- 窗口控制按钮——无原生标题栏时的替代 -->
+      <button class="win-btn" title="最小化" @click="winMinimize">─</button>
+      <button class="win-btn" title="关闭" @click="winClose">✕</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useSessionStore } from '@/stores/session'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const session = useSessionStore()
+const appWindow = getCurrentWindow()
 
 defineEmits<{
   'new-session': []
@@ -57,6 +61,14 @@ defineEmits<{
 
 function handleSwitch(sessionId: string) {
   session.switchToSession(sessionId)
+}
+
+function winMinimize() {
+  appWindow.minimize()
+}
+
+function winClose() {
+  appWindow.close()
 }
 </script>
 
@@ -114,4 +126,14 @@ function handleSwitch(sessionId: string) {
 .is-active .dd-title {
   color: #4caf50;
 }
+
+.win-btn {
+  width: 32px; height: 24px;
+  border: none; background: transparent;
+  color: #888; font-size: 14px; cursor: pointer;
+  border-radius: 2px;
+  margin-left: 4px;
+}
+.win-btn:hover { background: rgba(255,255,255,0.08); color: #e0e0e0; }
+.win-btn:last-child:hover { background: #f44336; color: #fff; }
 </style>

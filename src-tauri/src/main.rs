@@ -121,6 +121,7 @@ fn main() {
             .title("Orbit — 多 Agent 驾驶舱")
             .inner_size(1400.0, 900.0)
             .resizable(true)
+            .decorations(false)  // 去掉 Windows 原生标题栏，用前端自绘
             .build()?;
 
             Ok(())

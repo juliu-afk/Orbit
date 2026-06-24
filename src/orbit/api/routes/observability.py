@@ -56,7 +56,14 @@ async def observability_health() -> dict[str, Any]:
     _collector.update("scheduler", ComponentStatus.HEALTHY)
     _collector.update("knowledge_engine", ComponentStatus.HEALTHY)
     _collector.update("llm_gateway", ComponentStatus.HEALTHY)
-    _collector.update("code_graph", ComponentStatus.DEGRADED, "MVP 占位，未连接 Tree-sitter")
+    # WHY ?????CodeGraphEngine ?????????????????
+    try:
+        from orbit.graph.engines.code_graph import CodeGraphEngine
+
+        _ = CodeGraphEngine  # noqa: F841
+        _collector.update("code_graph", ComponentStatus.HEALTHY)
+    except ImportError:
+        _collector.update("code_graph", ComponentStatus.DEGRADED, "?????????")
     _collector.update("db_graph", ComponentStatus.HEALTHY)
     _collector.update("config_graph", ComponentStatus.HEALTHY)
     _collector.update("hallucination_layers", ComponentStatus.HEALTHY)

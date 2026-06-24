@@ -1,7 +1,6 @@
 <!-- SessionBar.vue: 顶栏——项目名 + Session 下拉 + 新建按钮 -->
 <template>
-  <!-- data-tauri-drag-region: 无框窗口可拖拽区 -->
-  <div class="session-bar" data-tauri-drag-region>
+  <div class="session-bar">
     <div class="session-bar__left">
       <span v-if="session.currentProjectName" class="project-badge">
         📁 {{ session.currentProjectName }}

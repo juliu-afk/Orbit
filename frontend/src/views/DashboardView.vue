@@ -1,7 +1,7 @@
 <!-- 驾驶舱主视图：Session 为顶栏 → 指标 → 内容区 → 底部信息 (Session PR #3) -->
 <template>
   <div class="dashboard">
-    <div class="dashboard-top">
+    <div class="dashboard-top" data-tauri-drag-region>
       <!-- WS 连接状态灯 -->
       <span class="connection-dot" :class="`dot--${ws.connectionStatus.value}`" />
       <span class="connection-label">

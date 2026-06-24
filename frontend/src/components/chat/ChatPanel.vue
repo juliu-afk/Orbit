@@ -72,7 +72,7 @@
       <div class="prd-field">
         <label>????</label>
         <div
-          v-for="(ac, i) in editablePrd.acceptance_criteria"
+          v-for="(_ac, i) in editablePrd.acceptance_criteria"
           :key="i"
           class="prd-ac-item"
         >

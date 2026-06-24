@@ -87,10 +87,12 @@ import { usePreFlightStore } from '@/stores/preflight'
 const preflight = usePreFlightStore()
 const installing = reactive<Record<string, boolean>>({})
 
-async function handleInstall(name: string, _action: string) {
+async function handleInstall(name: string, action: string) {
   installing[name] = true
   preflight.stopPolling()
-  await preflight.installComponent(name)
+  // action 如 "install_docker" → 取 "docker" 拼 URL
+  const component = action.replace('install_', '')
+  await preflight.installComponent(component)
   installing[name] = false
 }
 

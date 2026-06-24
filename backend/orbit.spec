@@ -42,6 +42,11 @@ a = Analysis(
         "orbit.projects",
         "orbit.projects.models",
         "orbit.projects.registry",
+        "orbit.sessions",                # Session PR
+        "orbit.sessions.models",         # Session PR
+        "orbit.sessions.registry",       # Session PR
+        "orbit.api.routes.sessions",     # Session PR
+        "orbit.api.routes.projects",     # Session PR
         "orbit.resource_guard",
         "orbit.resource_guard.models",
         "orbit.resource_guard.token_bucket",

@@ -97,11 +97,16 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .expect("Tauri 启动失败")
-        .run(|_app, _event| {});
-
-    // 窗口关闭 → 杀后端 → 清临时文件
-    let _ = backend.kill();
-    let _ = backend.wait();
-    cleanup_backend(&backend_path);
-    println!("Orbit 已退出");
+        .run(move |_app, event| {
+            // WHY Tauri 生命周期: 窗口关闭（正常/异常/崩溃退出）时
+            // 强制杀后端进程+清临时文件，防止残留进程锁文件导致下轮启动失败
+            if let tauri::RunEvent::Exit = event {
+                println!("Orbit — 关闭后端进程...");
+                kill_existing_backend(&backend_path);
+                let _ = backend.kill();
+                let _ = backend.wait();
+                cleanup_backend(&backend_path);
+                println!("Orbit 已退出");
+            }
+        });
 }

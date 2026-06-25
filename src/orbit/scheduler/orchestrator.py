@@ -184,14 +184,16 @@ class Scheduler:
                 # Think-Act-Observe 循环
                 observation = await self._agent_cycle(task_id, state, context)
                 context["artifacts"][state.value] = observation
+                # Step 6.1：推送状态变更到 Dashboard（含代码产物）
+                # WHY 先推后转：转换后 state 已变（如 CODING→VERIFYING），
+                # 此时推送 state.value 才是当前阶段的正确状态，output 才能匹配
+                self._publish_task_update(
+                    task_id, state.value, self._state_to_progress(state), context=context
+                )
                 # 状态转换
                 next_state = self._transition(state)
                 state = next_state
                 await self._save_checkpoint(task_id, state, context)
-                # Step 6.1：推送状态变更到 Dashboard（含代码产物）
-                self._publish_task_update(
-                    task_id, state.value, self._state_to_progress(state), context=context
-                )
                 logger.info(
                     "state_transition",
                     task_id=task_id,

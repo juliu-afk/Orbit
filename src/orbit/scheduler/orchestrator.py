@@ -189,7 +189,9 @@ class Scheduler:
                 state = next_state
                 await self._save_checkpoint(task_id, state, context)
                 # Step 6.1：推送状态变更到 Dashboard（含代码产物）
-                self._publish_task_update(task_id, state.value, self._state_to_progress(state), context=context)
+                self._publish_task_update(
+                    task_id, state.value, self._state_to_progress(state), context=context
+                )
                 logger.info(
                     "state_transition",
                     task_id=task_id,

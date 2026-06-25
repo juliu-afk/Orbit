@@ -1,5 +1,28 @@
 # Orbit 开发会话记录
 
+## 2026-06-25-26
+
+### 完成项
+- PR #50 fix: knowledge db init chicken-egg — 自动建表+测试隔离
+- PR #52 fix: chat WS retry + static path + resource_guard breaker
+- PR #54 feat: 仪表盘UI三修复 — 去外层滚动+统一边框+代码diff弹出
+- PR #55 fix: body+.dashboard overflow:hidden
+- PR #56 fix: 聊天框输入区裁剪 — flex布局替代硬编码calc
+- PR #57 fix: flex消滚动+代码diff API时序修正
+- PR #58 feat: Agent回复带角色头像+名称
+- 4次exe重建 + Playwright UI验证
+
+### 待处理
+- `test_task_failure_propagates` / `test_generate_stream` 预存失败
+- exe 代码签名
+
+### 踩坑
+- linter多次revert文件→commit前必确认文件状态
+- 禁未审查直接合并（PR #53教训）
+- overflow:hidden在body上导致内容裁剪→只在workspace层级
+- 硬编码calc(100vh-40px)有像素偏差→改flex布局
+- Agent角色名大小写不一致→统一toLowerCase()
+
 ## 2026-06-24
 
 ### 完成项

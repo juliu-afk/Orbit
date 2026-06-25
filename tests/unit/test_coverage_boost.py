@@ -61,12 +61,24 @@ class TestGatewayClientStream:
     """gateway/client.py generate_stream 路径。"""
 
     @pytest.mark.asyncio
-    async def test_generate_stream_no_monitor_no_litellm(self) -> None:
-        """generate_stream 无 monitor 时退化（litellm 未装时抛 RuntimeError）。"""
+    async def test_generate_stream_basic(self) -> None:
+        """generate_stream 代码路径——mock _stream_completion 避免真实 API。"""
+        from unittest.mock import AsyncMock
+
         client = LLMClient()
         req = LLMRequest(prompt="test")
-        with pytest.raises((RuntimeError, ImportError, Exception)):  # noqa: B017
-            await client.generate_stream(req, "task-1")
+
+        # 构造一个可 async-for 的空流
+        class _EmptyStream:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                raise StopAsyncIteration
+
+        client._stream_completion = AsyncMock(return_value=_EmptyStream())
+        resp = await client.generate_stream(req, "task-1")
+        assert isinstance(resp.content, str)
 
     def test_build_usage_zero(self) -> None:
         """_build_usage 零值输入返回零成本。"""
@@ -77,7 +89,7 @@ class TestGatewayClientStream:
             completion_tokens = 0
             total_tokens = 0
 
-        usage = client._build_usage("deepseek/deepseek-chat", FakeUsage())
+        usage = client._build_usage("deepseek/deepseek-v4-pro", FakeUsage())
         assert usage.cost_usd == 0.0
         assert usage.total_tokens == 0
 
@@ -90,7 +102,7 @@ class TestGatewayClientStream:
             total_tokens = 1500
 
         client = LLMClient()
-        usage = client._build_usage("deepseek/deepseek-chat", FakeUsage())
+        usage = client._build_usage("deepseek/deepseek-v4-pro", FakeUsage())
         assert usage.cost_usd > 0
         assert usage.prompt_tokens == 1000
 

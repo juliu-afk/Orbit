@@ -1,7 +1,7 @@
 # 基础设施容器（Step 0.2 ADR）
 # PostgreSQL：审计存储（task_audit_trail、成本记录）
 # Redis：审计缓存（热点数据、熔断器状态）
-# LiteLLM：LLM 统一网关（DeepSeek/Qwen/Ollama）
+# LiteLLM：LLM 统一网关（DeepSeek V4 Pro/Flash + GLM-5.2/4.7 Flash）
 services:
   postgres:
     image: postgres:15
@@ -41,6 +41,8 @@ services:
     restart: unless-stopped
     environment:
       LITELLM_MASTER_KEY: sk-123456
+      ZAI_API_KEY: ${ZAI_API_KEY:-sk-dummy}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-sk-dummy}
     ports:
       - "4000:4000"
     # WHY 仅 MVP：用内存存储，生产阶段再配 PostgreSQL 持久化（Step 0.2 待定决议）

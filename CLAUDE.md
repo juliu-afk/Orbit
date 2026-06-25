@@ -50,7 +50,7 @@
 | 主语言 | Python | 3.11+（实测 3.14） |
 | 包管理 | Poetry | 1.8.2（开发计划 Step 0.2 指定） |
 | LLM 网关 | LiteLLM | >=1.40 |
-| LLM 模型 | DeepSeek-V3 / Qwen-3-8B / Ollama | 主力 / 轻量 / 离线 |
+| LLM 模型 | DeepSeek V4 Pro / Flash / GLM-5.2 | 主力/轻量/审查测试，降级 GLM-4.7 Flash（免费） |
 | 代码图谱 | CodeGraph（Tree-sitter） | latest |
 | 数据库图谱 | SQLLineage | latest |
 | 配置漂移 | Driftctl | latest |

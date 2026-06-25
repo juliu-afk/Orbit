@@ -15,6 +15,7 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
+from orbit.agents.factory import AgentFactory
 from orbit.api.main import create_app
 from orbit.checkpoint.manager import CheckpointManager
 from orbit.events.bus import EventBus
@@ -75,10 +76,11 @@ async def e2e_app(use_docker: bool) -> Any:
     返回 AsyncClient（用 Any 避 mypy 严格检查 _scheduler/_app 属性注入）。
     """
     bus = EventBus()
-    llm = MockLLMClient(fail_count=0, fixed_response="[mock] E2E OK")
     _ = await create_sandbox()  # 验证沙箱可用
     cp = CheckpointManager()
-    scheduler = Scheduler(llm_client=llm, checkpoint_manager=cp, event_bus=bus)
+    scheduler = Scheduler(
+        agent_llms=None, checkpoint_manager=cp, event_bus=bus, agent_factory=AgentFactory
+    )
     app = create_app(event_bus=bus)
     app.state.scheduler = scheduler
 

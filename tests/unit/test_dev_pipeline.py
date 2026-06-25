@@ -51,7 +51,7 @@ class TestOrchestratorRunAgent:
 
         from orbit.scheduler.orchestrator import Scheduler
 
-        sched = Scheduler(llm_client=None, agent_factory=FakeFactory)
+        sched = Scheduler(agent_llms=None, agent_factory=FakeFactory)
         output = await sched._run_agent("developer", "test-task", {"prd": "write add function"})
         assert "add" in output or "code" in output.lower() or "ok" in output.lower()
 
@@ -62,11 +62,12 @@ class TestSchedulerRunTaskProgress:
     @pytest.mark.asyncio
     async def test_run_task_publishes_to_event_bus(self) -> None:
         """run_task publishes state transitions to EventBus."""
+        from orbit.agents.factory import AgentFactory
         from orbit.events.bus import EventBus
         from orbit.scheduler.orchestrator import Scheduler
 
         bus = EventBus()
-        sched = Scheduler(llm_client=None, event_bus=bus)
+        sched = Scheduler(agent_llms={}, event_bus=bus, agent_factory=AgentFactory)
 
         task = asyncio.create_task(sched.run_task("test-123", "write add function"))
         await asyncio.sleep(0.3)
@@ -95,7 +96,7 @@ class TestRunAgentRealFactory:
         from orbit.agents.factory import AgentFactory
         from orbit.scheduler.orchestrator import Scheduler
 
-        sched = Scheduler(llm_client=None, agent_factory=AgentFactory)
+        sched = Scheduler(agent_llms=None, agent_factory=AgentFactory)
         output = await sched._run_agent("developer", "test-real", {"prd": "write add function"})
         assert "mock" in output.lower() or "code" in output.lower()
 
@@ -109,7 +110,7 @@ class TestRunAgentRealFactory:
 
         bus = EventBus()
         sched = Scheduler(
-            llm_client=None,
+            agent_llms=None,
             event_bus=bus,
             agent_factory=AgentFactory,
         )

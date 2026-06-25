@@ -1,4 +1,4 @@
-/** Knowledge Store??????????
+/** Knowledge Store - concept query and compliance validation.
  *
  */
 import { defineStore } from 'pinia'
@@ -41,7 +41,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
       if (r.ok) {
         currentConcept.value = j
       } else {
-        error.value = j.detail || '?????'
+        error.value = j.detail || 'Not found'
         currentConcept.value = null
       }
     } catch (e) {
@@ -60,7 +60,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
         concepts.value = j.data || []
       }
     } catch (e) {
-      console.warn("[store] ????", e)
+      console.warn("[knowledge] request failed", e)
     } finally {
       loading.value = false
     }
@@ -75,7 +75,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
         concepts.value = j.data || []
       }
     } catch (e) {
-      console.warn("[store] ????", e)
+      console.warn("[knowledge] request failed", e)
     } finally {
       loading.value = false
     }

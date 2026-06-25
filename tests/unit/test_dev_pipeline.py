@@ -1,7 +1,4 @@
-"""PR1 ???????????
-
-???AgentFactory.create + orchestrator._run_agent ? execute + Scheduler.run_task ????
-"""
+"""PR1 dev pipeline integration tests."""
 
 from __future__ import annotations
 
@@ -15,20 +12,20 @@ from orbit.agents.factory import AgentFactory
 
 
 class TestAgentFactoryCreate:
-    """AgentFactory.create ???C1/C3??"""
+    """Test case description."""
 
     def test_create_string_role(self) -> None:
-        """C1/C3: ??????? create?"""
+        """Create agent with string role name."""
         agent = AgentFactory.create("developer")
         assert agent.role == AgentRole.DEVELOPER
 
     def test_create_enum_role(self) -> None:
-        """????? create?"""
+        """Create agent with AgentRole enum."""
         agent = AgentFactory.create(AgentRole.ARCHITECT)
         assert agent.role == AgentRole.ARCHITECT
 
     def test_create_injects_llm(self) -> None:
-        """C4: create ? llm ??? agent?"""
+        """Create injects llm into agent."""
         agent = AgentFactory.create("developer", llm="fake_llm")  # type: ignore[arg-type]
         assert agent.llm == "fake_llm"
 
@@ -38,7 +35,7 @@ class TestOrchestratorRunAgent:
 
     @pytest.mark.asyncio
     async def test_run_agent_calls_execute(self) -> None:
-        """C2: _run_agent ? execute ?? run?mock factory ??? execute ? agent?"""
+        """_run_agent calls execute via AgentFactory."""
         from orbit.agents.base import AgentOutput
 
         class FakeAgent:
@@ -55,23 +52,23 @@ class TestOrchestratorRunAgent:
         from orbit.scheduler.orchestrator import Scheduler
 
         sched = Scheduler(llm_client=None, agent_factory=FakeFactory)
-        output = await sched._run_agent("developer", "test-task", {"prd": "???"})
+        output = await sched._run_agent("developer", "test-task", {"prd": "write add function"})
         assert "add" in output or "code" in output.lower() or "ok" in output.lower()
 
 
 class TestSchedulerRunTaskProgress:
-    """Scheduler.run_task ????C6/C9??"""
+    """Test case description."""
 
     @pytest.mark.asyncio
     async def test_run_task_publishes_to_event_bus(self) -> None:
-        """C9: run_task ???? publish ? EventBus?"""
+        """run_task publishes state transitions to EventBus."""
         from orbit.events.bus import EventBus
         from orbit.scheduler.orchestrator import Scheduler
 
         bus = EventBus()
         sched = Scheduler(llm_client=None, event_bus=bus)
 
-        task = asyncio.create_task(sched.run_task("test-123", "?????????????"))
+        task = asyncio.create_task(sched.run_task("test-123", "write add function"))
         await asyncio.sleep(0.3)
 
         events = []
@@ -86,25 +83,25 @@ class TestSchedulerRunTaskProgress:
         with contextlib.suppress(asyncio.CancelledError):
             await task
 
-        assert len(events) > 0, "EventBus ?????????"
+        assert len(events) > 0, "write add function"
 
 
 class TestRunAgentRealFactory:
-    """?? AgentFactory ???C2 ?????"""
+    """Test case description."""
 
     @pytest.mark.asyncio
     async def test_run_agent_with_real_factory_calls_execute(self) -> None:
-        """_run_agent ??? AgentFactory ? execute ????? AttributeError?"""
+        """_run_agent with real AgentFactory calls execute."""
         from orbit.agents.factory import AgentFactory
         from orbit.scheduler.orchestrator import Scheduler
 
         sched = Scheduler(llm_client=None, agent_factory=AgentFactory)
-        output = await sched._run_agent("developer", "test-real", {"prd": "???"})
+        output = await sched._run_agent("developer", "test-real", {"prd": "write add function"})
         assert "mock" in output.lower() or "code" in output.lower()
 
     @pytest.mark.asyncio
     async def test_scheduler_full_state_machine(self) -> None:
-        """Scheduler.run_task ???????? DONE?mock llm??"""
+        """Scheduler.run_task completes full state machine to DONE."""
         from orbit.agents.factory import AgentFactory
         from orbit.api.schemas.task import TaskState
         from orbit.events.bus import EventBus
@@ -116,5 +113,5 @@ class TestRunAgentRealFactory:
             event_bus=bus,
             agent_factory=AgentFactory,
         )
-        state = await sched.run_task("test-full", "??????????")
+        state = await sched.run_task("test-full", "write add function")
         assert state == TaskState.DONE

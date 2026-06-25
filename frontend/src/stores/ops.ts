@@ -1,4 +1,4 @@
-/** Ops Store????/??/SOP ???????? API?? */
+/** Ops Store - backup/version/SOP management. */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -64,7 +64,7 @@ export const useOpsStore = defineStore('ops', () => {
       const r = await fetch(`${VERSIONING_URL}/current`)
       const j = await r.json()
       if (j.code === 0) {
-        currentVersion.value = j.data.version || '??'
+        currentVersion.value = j.data.version || 'unknown'
       }
     } catch {
       currentVersion.value = '---'
@@ -73,12 +73,12 @@ export const useOpsStore = defineStore('ops', () => {
 
   async function fetchSop() {
     try {
-      const r = await fetch('/SOP-??????.md')
+      const r = await fetch('/SOP-disaster-recovery.md')
       if (r.ok) {
         sopContent.value = await r.text()
       }
     } catch {
-      sopContent.value = '# SOP ??????'
+      sopContent.value = '# SOP unavailable'
     }
   }
 

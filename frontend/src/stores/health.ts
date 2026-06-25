@@ -1,4 +1,4 @@
-/** Health Store??????????
+/** Health Store - single component health query.
  *
  */
 import { defineStore } from 'pinia'
@@ -24,7 +24,7 @@ export const useHealthStore = defineStore('health', () => {
       const j = await r.json()
       componentDetail.value = j
     } catch (e) {
-      console.warn("[store] ????", e)
+      console.warn("[health] request failed", e)
     } finally {
       loading.value = false
     }

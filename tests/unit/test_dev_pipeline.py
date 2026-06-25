@@ -72,7 +72,7 @@ class TestSchedulerRunTaskProgress:
         sched = Scheduler(llm_client=None, event_bus=bus)
 
         task = asyncio.create_task(sched.run_task("test-123", "?????????????"))
-        await asyncio.sleep(0.3)  # ??????
+        await asyncio.sleep(0.3)
 
         events = []
         try:

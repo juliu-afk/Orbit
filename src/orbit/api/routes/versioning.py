@@ -1,9 +1,9 @@
 """???? API?Step 7.4??
 
-  GET  /api/v1/versioning/current        ????
-  GET  /api/v1/versioning/versions       ????
-  POST /api/v1/versioning/install        ????
-  GET  /api/v1/versioning/releases       ???????
+GET  /api/v1/versioning/current        ????
+GET  /api/v1/versioning/versions       ????
+POST /api/v1/versioning/install        ????
+GET  /api/v1/versioning/releases       ???????
 """
 
 from __future__ import annotations

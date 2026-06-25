@@ -213,7 +213,7 @@ watch(() => chatStore.messages.length, () => {
 <style scoped>
 .chat-panel {
   display: flex; flex-direction: column; height: 100%;
-  min-height: 500px; padding: 12px;
+  padding: 12px;
 }
 .chat-panel__candidates { margin-bottom: 12px; }
 .chat-panel__candidates-title {

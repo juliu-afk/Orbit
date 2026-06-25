@@ -50,7 +50,7 @@ class Settings:
     LITELLM_MASTER_KEY: str = _get("LITELLM_MASTER_KEY", "sk-dummy")
     LITELLM_PROXY_URL: str = _get("LITELLM_PROXY_URL", "http://localhost:4000")
 
-    # 模型 key 占位——禁止填真实值进仓库
+    # 模型 API Keys
     OPENAI_API_KEY: str = _get("OPENAI_API_KEY", "sk-dummy")
     DEEPSEEK_API_KEY: str = _get("DEEPSEEK_API_KEY", "sk-dummy")
 
@@ -64,10 +64,10 @@ class Settings:
     ENABLE_L3: bool = _get_bool("ENABLE_L3", True)
     ENABLE_L4: bool = _get_bool("ENABLE_L4", True)
 
-    # L3 熵阈值（PRD Q1 决议：DeepSeek 0.75，Qwen 0.70）
+    # L3 熵阈值——模型级配置，Qwen 0.70）
     # 模型级配置——不同模型 token 分布差异大，统一阈值误报率高
     ENTROPY_THRESHOLD_DEEPSEEK: float = float(_get("ENTROPY_THRESHOLD_DEEPSEEK", "0.75"))
-    ENTROPY_THRESHOLD_QWEN: float = float(_get("ENTROPY_THRESHOLD_QWEN", "0.70"))
+    ENTROPY_THRESHOLD_GLM: float = float(_get("ENTROPY_THRESHOLD_GLM", "0.70"))
 
     # ---- Step 4.2 防幻觉层 L5-L8 ----
     ENABLE_L5: bool = _get_bool("ENABLE_L5", True)

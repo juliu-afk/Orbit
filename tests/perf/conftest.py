@@ -24,7 +24,7 @@ async def e2e_app() -> Any:
     llm = MockLLMClient(fail_count=0, fixed_response="[mock] PERF OK")
     _ = await create_sandbox()
     cp = CheckpointManager()
-    scheduler = Scheduler(llm_client=llm, checkpoint_manager=cp, event_bus=bus)
+    scheduler = Scheduler(agent_llms=None, checkpoint_manager=cp, event_bus=bus)
     app = create_app(event_bus=bus)
     app.state.scheduler = scheduler
 

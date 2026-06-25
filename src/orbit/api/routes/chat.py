@@ -177,6 +177,7 @@ async def _handle_chat(
         "clarification_status": output.result.get("clarification_status", "clarifying"),
         "structured_prd": output.result.get("structured_prd"),
         "missing_fields": output.result.get("missing_fields", []),
+        "agent_role": "Clarifier",
     }
     # 首轮带项目匹配结果
     if candidates:

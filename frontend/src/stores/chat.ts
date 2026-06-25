@@ -11,6 +11,7 @@ export interface ChatMessage {
   text: string
   from: 'user' | 'agent' | 'system'
   timestamp: number
+  role?: string  // Agent 角色名（Clarifier/Developer/Reviewer等）
 }
 
 export interface Candidate {
@@ -36,6 +37,7 @@ export interface ClarifyResponse {
   structured_prd: StructuredPRD | null
   missing_fields: string[]
   candidates?: Candidate[]
+  agent_role?: string  // 当前回复的 Agent 角色名
   // task_created 时
   task_id?: string
   state?: string
@@ -141,12 +143,13 @@ export const useChatStore = defineStore('chat', () => {
       candidates.value = data.candidates
     }
 
-    // Agent 回复加入消息列表
+    // Agent 回复加入消息列表（含角色名）
     messages.value.push({
       id: `a-${Date.now()}`,
       text: data.reply,
       from: 'agent',
       timestamp: Date.now(),
+      role: data.agent_role || 'Agent',
     })
     if (messages.value.length > 50) {
       messages.value = messages.value.slice(-50)

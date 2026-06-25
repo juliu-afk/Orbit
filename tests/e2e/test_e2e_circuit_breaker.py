@@ -21,7 +21,12 @@ async def test_e2e_circuit_breaker_with_failing_llm(e2e_app: Any) -> None:
     assert scheduler is not None
 
     failing_llm = MockLLMClient(fail_count=999, fixed_response="should not reach")
-    scheduler.llm = failing_llm
+    scheduler._agent_llms = {
+        "developer": failing_llm,
+        "clarifier": failing_llm,
+        "architect": failing_llm,
+        "reviewer": failing_llm,
+    }
 
     task_id = "circuit-breaker-test-id-000000000"
     state = await asyncio.wait_for(
@@ -38,7 +43,8 @@ async def test_e2e_normal_llm_recovers(e2e_app: Any) -> None:
     scheduler: Scheduler = getattr(e2e_app, "_scheduler", None)
     assert scheduler is not None
 
-    scheduler.llm = MockLLMClient(fail_count=0)
+    ok = MockLLMClient(fail_count=0)
+    scheduler._agent_llms = {"developer": ok, "clarifier": ok, "architect": ok, "reviewer": ok}
 
     task_id = "recovery-test-id-00000000000000"
     state = await asyncio.wait_for(

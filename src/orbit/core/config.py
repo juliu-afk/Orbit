@@ -64,7 +64,7 @@ class Settings:
     ENABLE_L3: bool = _get_bool("ENABLE_L3", True)
     ENABLE_L4: bool = _get_bool("ENABLE_L4", True)
 
-    # L3 熵阈值——模型级配置，Qwen 0.70）
+    # L3 熵阈值——模型级配置，GLM 0.73）
     # 模型级配置——不同模型 token 分布差异大，统一阈值误报率高
     ENTROPY_THRESHOLD_DEEPSEEK: float = float(_get("ENTROPY_THRESHOLD_DEEPSEEK", "0.75"))
     ENTROPY_THRESHOLD_GLM: float = float(_get("ENTROPY_THRESHOLD_GLM", "0.70"))

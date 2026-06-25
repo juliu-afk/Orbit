@@ -128,3 +128,27 @@
 - mypy: ⚠️ 2 残余错误（已有，非本次引入）
 - integration: ⚠️ 无测试（已有）
 - dependency scan: ⚠️ 待查
+
+## 2026-06-25/26
+
+### 完成
+- PR #59: 模型体系重构——DS V4 Pro/Flash + GLM-5.2 + GLM-4.7 Flash 降级
+- 架构变更: llm_client 单例→agent_llms dict 按角色注入
+- Scheduler 不再直接调 LLM，只编排 Agent
+- 删 Qwen/Ollama 所有引用
+- GLM 走 Coding Plan /api/coding/paas/v4 订阅端点
+- .env: ZAI_API_KEY + DEEPSEEK_API_KEY 就位
+- 18 文件，10 轮 CI 修复，全绿合并
+
+### 模型体系
+| 角色 | 模型 | 计费 |
+|------|------|------|
+| architect/developer | DeepSeek V4 Pro | 按量 |
+| config_manager/clarifier | DeepSeek V4 Flash | 按量 |
+| reviewer/qa | GLM-5.2 | Coding Plan 订阅 |
+| 降级 | GLM-4.7 Flash | 免费→挂起人工 |
+
+### 关键决策
+- GLM 必须走 Coding Plan 端点，不能用标准端点（扣余额）
+- 本地部署不考虑——单卡 5090 也跑不动 GLM-5.2 (750B)
+- API 直接调最划算

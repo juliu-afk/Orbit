@@ -96,7 +96,12 @@ class Scheduler:
         self._fast_lane = False
 
     def _publish_task_update(
-        self, task_id: str, state: str, progress: float, dag: list[dict[str, Any]] | None = None
+        self,
+        task_id: str,
+        state: str,
+        progress: float,
+        dag: list[dict[str, Any]] | None = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """发布 task:update 事件到 EventBus（非阻塞）。
 
@@ -106,6 +111,11 @@ class Scheduler:
         """
         if self._event_bus is None:
             return
+        # 提取代码产物——CODING/DONE 状态时推送生成的代码到前端
+        output: str | None = None
+        if state in ("CODING", "DONE") and context:
+            artifacts = context.get("artifacts", {})
+            output = artifacts.get("CODING")
         self._event_bus.publish(
             DashboardEvent(
                 type="task:update",
@@ -116,6 +126,7 @@ class Scheduler:
                     progress=progress,
                     dag=dag or [],
                     timestamp=datetime.now(UTC).isoformat(),
+                    output=output,
                 ).model_dump(),
             )
         )
@@ -177,8 +188,10 @@ class Scheduler:
                 next_state = self._transition(state)
                 state = next_state
                 await self._save_checkpoint(task_id, state, context)
-                # Step 6.1：推送状态变更到 Dashboard
-                self._publish_task_update(task_id, state.value, self._state_to_progress(state))
+                # Step 6.1：推送状态变更到 Dashboard（含代码产物）
+                self._publish_task_update(
+                    task_id, state.value, self._state_to_progress(state), context=context
+                )
                 logger.info(
                     "state_transition",
                     task_id=task_id,

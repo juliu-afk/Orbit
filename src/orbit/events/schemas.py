@@ -39,6 +39,7 @@ class TaskUpdatePayload(BaseModel):
     progress: float
     dag: list[dict[str, Any]]  # 简化 GraphNode：{id, agent_role, status, duration_ms, error}
     timestamp: str
+    output: str | None = None  # CODING/DONE 状态的代码产物
 
 
 class TokenUpdatePayload(BaseModel):

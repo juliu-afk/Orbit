@@ -37,6 +37,8 @@ export const useTaskStore = defineStore('task', () => {
   const progress = ref<number>(0)
   const dagNodes = ref<Map<string, DagNode>>(new Map())
   const dagEdges = ref<Array<{ from: string; to: string }>>([])
+  const codeOutput = ref<string | null>(null)
+  const hasCodeOutput = ref(false)
 
   /** 转换为 vis-network 消费的格式 */
   const visData = computed<{ nodes: VisNode[]; edges: VisEdge[] }>(() => {
@@ -62,6 +64,12 @@ export const useTaskStore = defineStore('task', () => {
     taskState.value = (payload.state as string) || taskState.value
     progress.value = (payload.progress as number) ?? progress.value
 
+    // 提取代码产物——CODING/DONE 状态时后端推送生成的代码
+    if (payload.output && typeof payload.output === 'string') {
+      codeOutput.value = payload.output
+      hasCodeOutput.value = true
+    }
+
     // 解析 DAG 节点列表
     const dag = payload.dag as Array<Record<string, unknown>> | undefined
     if (dag && Array.isArray(dag)) {
@@ -76,7 +84,10 @@ export const useTaskStore = defineStore('task', () => {
         dagNodes.value.set(node.id, node)
       }
     }
-    // 简单假设：DAG 边由后端维护，当前 MVP 仅推送节点
+  }
+
+  function consumeCodeOutput() {
+    hasCodeOutput.value = false
   }
 
   function reset() {
@@ -84,7 +95,10 @@ export const useTaskStore = defineStore('task', () => {
     progress.value = 0
     dagNodes.value.clear()
     dagEdges.value = []
+    codeOutput.value = null
+    hasCodeOutput.value = false
   }
 
-  return { taskState, progress, dagNodes, dagEdges, visData, handleTaskUpdate, reset }
+  return { taskState, progress, dagNodes, dagEdges, visData,
+    codeOutput, hasCodeOutput, handleTaskUpdate, consumeCodeOutput, reset }
 })

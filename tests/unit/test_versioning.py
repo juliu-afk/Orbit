@@ -19,6 +19,7 @@ def reg():
     r = VersionRegistry(db_path=str(db_path))
     yield r
     r.close()
+    # 清理临时目录
     import shutil
 
     shutil.rmtree(tmpdir, ignore_errors=True)
@@ -37,6 +38,7 @@ class TestVersionRegistry:
         assert reg.current_version() == "v0.15.0"
         versions = reg.list_versions()
         assert len(versions) == 2
+        # v0.14.0 应标记为非活跃
         v14 = [v for v in versions if v.version == "v0.14.0"][0]
         assert v14.is_active is False
 
@@ -45,7 +47,7 @@ class TestVersionRegistry:
         reg.install_version("v0.2.0")
         reg.install_version("v0.3.0")
         versions = reg.list_versions()
-        assert versions[0].version == "v0.3.0"
+        assert versions[0].version == "v0.3.0"  # 最新在前
 
 
 class TestMigrationTracking:
@@ -100,7 +102,7 @@ class TestReleaseAudit:
         reg.record_release("deploy", "v0.2.0")
         reg.record_release("rollback", "v0.1.0")
         events = reg.list_releases()
-        assert len(events) == 3
+        assert len(events) == 3  # 3 个发布事件
 
     def test_canary_events(self, reg) -> None:
         reg.record_release("canary_start", "v0.15.0", traffic_ratio=0.01)

@@ -1,6 +1,5 @@
 /** Health Store??????????
  *
- * ?????
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -18,7 +17,6 @@ export const useHealthStore = defineStore('health', () => {
   const componentDetail = ref<ComponentHealthDetail | null>(null)
   const loading = ref(false)
 
-  /** ????????? */
   async function fetchComponent(component: string) {
     loading.value = true
     try {

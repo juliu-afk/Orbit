@@ -45,7 +45,6 @@ export const useOpsStore = defineStore('ops', () => {
         snapshots.value = j.data as SnapshotItem[]
       }
     } catch {
-      // ?????
     }
   }
 
@@ -57,7 +56,6 @@ export const useOpsStore = defineStore('ops', () => {
         releases.value = j.data as ReleaseEvent[]
       }
     } catch {
-      // ?????
     }
   }
 

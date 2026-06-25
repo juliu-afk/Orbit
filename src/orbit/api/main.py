@@ -72,9 +72,7 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     # 可观测性 API（Step 7.2）
     app.include_router(observability.router, prefix=settings.API_V1_STR)
     # 自然语言聊天 API（NL交互 PR #3）
-    # ?????
     app.include_router(backup.router, prefix=settings.API_V1_STR)
-    # ?????
     app.include_router(versioning.router, prefix=settings.API_V1_STR)
     app.include_router(chat.router, prefix=settings.API_V1_STR)
     # Session + Project API（Session PR #1）
@@ -108,19 +106,12 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
             asyncio.create_task(start_broadcaster(event_bus))
             logger.info("ws_broadcaster_started")
 
-    # ?????
-    # ?????
-    # ?????
     chat.set_clarifier_llm(LLMClient())
 
     return app
 
 
-# ?????
-# ?????
 _event_bus = EventBus()
-# ?????
-# ?????
 try:
     _redis_client = aioredis.from_url(
         settings.REDIS_URL,

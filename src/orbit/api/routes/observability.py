@@ -56,7 +56,6 @@ async def observability_health() -> dict[str, Any]:
     _collector.update("scheduler", ComponentStatus.HEALTHY)
     _collector.update("knowledge_engine", ComponentStatus.HEALTHY)
     _collector.update("llm_gateway", ComponentStatus.HEALTHY)
-    # ?????
     try:
         from orbit.graph.engines.code_graph import CodeGraphEngine
 

@@ -14,14 +14,12 @@ from orbit.checkpoint.manager import CheckpointManager
 from orbit.events.bus import EventBus
 from orbit.sandbox.sandbox_factory import create_sandbox
 from orbit.scheduler.orchestrator import Scheduler
-from tests.e2e.mock_llm import MockLLMClient
 
 
 @pytest_asyncio.fixture(scope="session")
 async def e2e_app() -> Any:
     """独立 perf app——与 E2E 相同的堆栈但独立实例。"""
     bus = EventBus()
-    llm = MockLLMClient(fail_count=0, fixed_response="[mock] PERF OK")
     _ = await create_sandbox()
     cp = CheckpointManager()
     scheduler = Scheduler(agent_llms=None, checkpoint_manager=cp, event_bus=bus)

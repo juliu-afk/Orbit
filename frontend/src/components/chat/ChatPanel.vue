@@ -26,6 +26,14 @@
         class="chat-msg"
         :class="`chat-msg--${m.from}`"
       >
+        <template v-if="m.from === 'agent' && m.role">
+          <div class="chat-msg__agent-head">
+            <span class="chat-msg__avatar" :style="{background: agentColor(m.role)}">
+              {{ agentEmoji(m.role) }}
+            </span>
+            <span class="chat-msg__name">{{ agentLabel(m.role) }}</span>
+          </div>
+        </template>
         <span class="chat-msg__text">{{ m.text }}</span>
       </div>
     </div>
@@ -118,6 +126,19 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useChatStore, type StructuredPRD } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
 import CandidateCard from './CandidateCard.vue'
+
+// Agent 角色 → 展示名 + emoji + 颜色 映射
+const AGENT_META: Record<string, { label: string; emoji: string; color: string }> = {
+  clarifier:    { label: 'Clarifier',  emoji: '💬', color: '#4caf50' },
+  architect:    { label: 'Architect',  emoji: '📐', color: '#2196f3' },
+  developer:    { label: 'Developer',  emoji: '💻', color: '#ff9800' },
+  reviewer:     { label: 'Reviewer',   emoji: '🔎', color: '#9c27b0' },
+  qa:           { label: 'QA',         emoji: '✅', color: '#00bcd4' },
+  config_manager:{ label: 'Config',    emoji: '⚙️', color: '#607d8b' },
+}
+function agentLabel(role: string): string { return AGENT_META[role.toLowerCase()]?.label ?? role }
+function agentEmoji(role: string): string { return AGENT_META[role.toLowerCase()]?.emoji ?? '🤖' }
+function agentColor(role: string): string { return AGENT_META[role.toLowerCase()]?.color ?? '#666' }
 
 const chatStore = useChatStore()
 const sessionStore = useSessionStore()
@@ -233,6 +254,28 @@ watch(() => chatStore.messages.length, () => {
 .chat-msg--agent { background: #1a2a3a; margin-right: auto; color: #b0c4de; }
 .chat-msg--system { background: #16163a; margin-right: auto; color: #8888aa; font-size: 13px; }
 .chat-msg__text { word-break: break-word; }
+.chat-msg__agent-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.chat-msg__avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.chat-msg__name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #c0c0c0;
+  letter-spacing: 0.5px;
+}
 
 .chat-panel__acceptance {
   padding: 10px; margin-bottom: 12px;

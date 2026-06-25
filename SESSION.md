@@ -1,5 +1,34 @@
 # Orbit 开发会话记录
 
+## 2026-06-25-26
+
+### 完成项
+- **系统索检**：全链路审查，发现 compliance/knowledge DB 初始化鸡生蛋问题、测试隔离泄漏、chat WS 无重试、RG 熔断灯不亮、静态路径错误等 8 个 bug
+- **PR #50** fix: knowledge db init chicken-egg — `_get_conn()` 自动建表 + 测试隔离
+- **PR #52** fix: chat WS retry + static path + resource_guard breaker light
+- **PR #54** feat: 仪表盘UI三修复 — 去外层滚动+统一边框+代码diff弹出
+- **PR #55** fix: body+.dashboard overflow:hidden
+- **PR #56** fix: 聊天框输入区裁剪 — flex 布局替代硬编码 calc
+- **PR #57** fix: flex 布局消滚动 + 代码 diff API 时序修正（publish 移到 transition 前）
+- **PR #58** feat: Agent 回复带角色头像+名称 — emoji 头像+彩色标签+大小写匹配修复
+- 4 次 exe 重建，Playwright UI 验证（滚动条/输入区/代码diff链路）
+
+### 版本
+- exe 交付物: `D:\Orbit\Deliverables\Orbit.exe` (156MB)
+
+### 待处理
+- `test_task_failure_propagates` 预存失败（`_run_agent` 吞异常不会触发 FAILED）
+- `test_generate_stream_no_monitor_no_litellm` 预存失败
+- exe 代码签名
+- CI lint-typecheck 偶发 black 格式化失败
+
+### 踩坑记录
+- linter 多次 revert 文件改动 → 必须 commit 前确认文件状态
+- 禁止未审查直接合并（PR #53 教训）
+- `overflow:hidden` 在 body 上会导致内容裁剪 → 只应在 workspace 层级
+- 硬编码 `calc(100vh - 40px)` 有像素偏差 → 改用 flex 布局
+- Agent 角色名大小写不一致（后端 `"Clarifier"` vs 前端 `"clarifier"`）→ 统一 `toLowerCase()`
+
 ## 2026-06-24
 
 ### 完成项

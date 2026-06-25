@@ -16,7 +16,7 @@
           style="width: 160px; margin-right: 8px"
           @keyup.enter="handleQuery"
         />
-        <el-button size="small" @click="handleQuery" :loading="store.loading">??</el-button>
+        <el-button size="small" @click="handleQuery" :loading="store.loading">Query</el-button>
         <el-button size="small" type="warning" @click="handleValidate">????</el-button>
       </div>
 

@@ -1,10 +1,8 @@
-"""Step 5.2 AgentFactory + 5 Agent å®ç°ã
+"""Step 5.2 AgentFactory + 5 Agent 实现。
 
-WHY åæä»¶èé 5 æä»¶ï¼æ¯ä¸ª Agent MVP é¶æ®µæ¯è½»é Prompt å
-è£
-å¨ï¼
-æ ¸å¿å·®å¼å¨ System Prompt åè¾åºè§£æãè¿æ©ææä»¶å¢å ç»´æ¤ææ¬ã
-Step 5.x å Agent é»è¾å¤æååå¯æåã
+WHY 单文件而非 5 文件：每个 Agent MVP 阶段是轻量 Prompt 包装器，
+核心差异在 System Prompt 和输出解析。过早拆文件增加维护成本。
+Step 5.x 各 Agent 逻辑复杂化后可拆分。
 """
 
 from __future__ import annotations
@@ -21,10 +19,10 @@ logger = structlog.get_logger()
 
 
 class ArchitectAgent(BaseAgent):
-    """æ¶æå¸ Agentï¼ç³»ç»è®¾è®¡ã
+    """架构师 Agent：系统设计。
 
-    WHY èè´£åç¦»ï¼æ¶æå¸åªåé«å±è®¾è®¡ï¼ç»ä»¶/æ°æ®æµ/ææ¯éåï¼ï¼
-    ä¸åä»£ç ãè®¾è®¡ç»æä¾ Developer Agent æ¶è´¹ã
+    WHY 职责分离：架构师只做高层设计（组件/数据流/技术选型），
+    不写代码。设计结果供 Developer Agent 消费。
     """
 
     role = AgentRole.ARCHITECT
@@ -32,35 +30,34 @@ class ArchitectAgent(BaseAgent):
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         prompt = self._build_prompt(input_data.task, input_data.context)
         if self.llm is None:
-            return AgentOutput(result={"design": f"[mock] æ¶æè®¾è®¡: {input_data.task}"})
+            return AgentOutput(result={"design": f"[mock] 架构设计: {input_data.task}"})
         resp = await self.llm.generate(prompt, task_id=input_data.context.get("task_id", ""))
         return AgentOutput(result={"design": resp.content})
 
     def _build_prompt(self, task: str, context: dict[str, Any]) -> str:
-        return f"""åºäºä»¥ä¸éæ±è®¾è®¡ç³»ç»æ¶æï¼
+        return f"""基于以下需求设计系统架构：
 
-éæ±ï¼{task}
-ä¸ä¸æï¼{json.dumps(context, ensure_ascii=False)}
+需求：{task}
+上下文：{json.dumps(context, ensure_ascii=False)}
 
-è¾åºè¦æ±ï¼
-1. ç»ä»¶åè¡¨ï¼æ¨¡å/ç±»ï¼
-2. æ°æ®æµæè¿°
-3. ææ¯éåå»ºè®®
+输出要求：
+1. 组件列表（模块/类）
+2. 数据流描述
+3. 技术选型建议
 """
 
     def system_prompt(self) -> str:
         return (
-            f"ä½ æ¯ V14.1 å¤æºè½ä½åä½ç½ç»ä¸­ç {self.role.value} Agentã"
-            "ä¸æ³¨äºç³»ç»æ¶æè®¾è®¡ï¼è¾åºç»æåçè®¾è®¡ææ¡£ã"
+            f"你是 V14.1 多智能体协作网络中的 {self.role.value} Agent。"
+            "专注于系统架构设计，输出结构化的设计文档。"
         )
 
 
 class DeveloperAgent(BaseAgent):
-    """å¼åè
-    Agentï¼ä»£ç å®ç°ã
+    """开发者 Agent：代码实现。
 
-       WHY èè´£åç¦»ï¼Developer æ¥æ¶æ¶æå¸çè®¾è®¡ï¼è¾åºå¯æ§è¡ä»£ç ã
-       ä¸è´è´£æµè¯ï¼QA Agentï¼åå®¡æ¥ï¼Reviewer Agentï¼ã
+    WHY 职责分离：Developer 接收架构师的设计，输出可执行代码。
+    不负责测试（QA Agent）和审查（Reviewer Agent）。
     """
 
     role = AgentRole.DEVELOPER
@@ -77,26 +74,25 @@ class DeveloperAgent(BaseAgent):
 
     def _build_prompt(self, design: str, context: dict[str, Any]) -> str:
         code_context = context.get("code_context", "")
-        return f"""åºäºè®¾è®¡æ¹æ¡çæä»£ç ï¼
+        return f"""基于设计方案生成代码：
 
-è®¾è®¡ï¼{design}
-ä»£ç ä¸ä¸æï¼å·²æä»£ç ï¼ï¼{code_context}
+设计：{design}
+代码上下文（已有代码）：{code_context}
 
-è¾åºå¯ç´æ¥è¿è¡ç Python ä»£ç ï¼åå«å½æ°å®ä¹åç±»åæ³¨è§£ã
+输出可直接运行的 Python 代码，包含函数定义和类型注解。
 """
 
     def system_prompt(self) -> str:
         return (
-            f"ä½ æ¯ V14.1 å¤æºè½ä½åä½ç½ç»ä¸­ç {self.role.value} Agentã"
-            "ä¸æ³¨äºç¼åé«è´¨é Python ä»£ç ï¼ä¸¥æ ¼ç±»åæ³¨è§£ï¼ç¬¦å PEP è§èã"
+            f"你是 V14.1 多智能体协作网络中的 {self.role.value} Agent。"
+            "专注于编写高质量 Python 代码，严格类型注解，符合 PEP 规范。"
         )
 
 
 class ReviewerAgent(BaseAgent):
-    """å®¡æ¥å Agentï¼ä»£ç è´¨éæ£æ¥ã
+    """审查员 Agent：代码质量检查。
 
-        WHY èè´£åç¦»ï¼ç¬ç«å®¡æ¥é¿å
-     Developer èªå®¡ç²åºã
+    WHY 职责分离：独立审查避免 Developer 自审盲区。
     """
 
     role = AgentRole.REVIEWER
@@ -105,31 +101,31 @@ class ReviewerAgent(BaseAgent):
         code = input_data.context.get("code", input_data.task)
         prompt = self._build_prompt(code, input_data.context)
         if self.llm is None:
-            return AgentOutput(result={"review": "[mock] å®¡æ¥éè¿", "issues": []})
+            return AgentOutput(result={"review": "[mock] 审查通过", "issues": []})
         resp = await self.llm.generate(prompt, task_id=input_data.context.get("task_id", ""))
         return AgentOutput(result={"review": resp.content, "issues": []})
 
     def _build_prompt(self, code: str, context: dict[str, Any]) -> str:
-        return f"""å®¡æ¥ä»¥ä¸ä»£ç çè´¨éåå®å¨æ§ï¼
+        return f"""审查以下代码的质量和安全性：
 
-ä»£ç ï¼
+代码：
 {code}
 
-æ£æ¥é¡¹ï¼ç±»åæ³¨è§£ãå¼å¸¸å¤çãSQLæ³¨å¥ãå½ä»¤æ³¨å¥ãç©ºå¼å¤çãé»è¾éè¯¯ã
-è¾åºæ ¼å¼ï¼éæ¡ååºé®é¢ï¼ä¸¥é/ä¸è¬ï¼ï¼æ é®é¢åå"å®¡æ¥éè¿"ã
+检查项：类型注解、异常处理、SQL注入、命令注入、空值处理、逻辑错误。
+输出格式：逐条列出问题（严重/一般），无问题则写"审查通过"。
 """
 
     def system_prompt(self) -> str:
         return (
-            f"ä½ æ¯ V14.1 å¤æºè½ä½åä½ç½ç»ä¸­ç {self.role.value} Agentã"
-            "ä¸æ³¨äºä»£ç å®¡æ¥ï¼åç°æ½å¨ç¼ºé·ãå®å¨éæ£ãæ§è½é®é¢ã"
+            f"你是 V14.1 多智能体协作网络中的 {self.role.value} Agent。"
+            "专注于代码审查，发现潜在缺陷、安全隐患、性能问题。"
         )
 
 
 class QAAgent(BaseAgent):
-    """QA éªè¯å Agentï¼æµè¯ä¸éªè¯ã
+    """QA 验证员 Agent：测试与验证。
 
-    WHY èè´£åç¦»ï¼QA ç¬ç«ç¼åæµè¯ç¨ä¾ï¼ä¸ Developer å½¢æåäººå¼åæ¨¡å¼ã
+    WHY 职责分离：QA 独立编写测试用例，与 Developer 形成双人开发模式。
     """
 
     role = AgentRole.QA
@@ -145,30 +141,26 @@ class QAAgent(BaseAgent):
         return AgentOutput(result={"tests": resp.content, "passed": True})
 
     def _build_prompt(self, code: str, context: dict[str, Any]) -> str:
-        return f"""ä¸ºä»¥ä¸ä»£ç çæ pytest æµè¯ç¨ä¾ï¼
+        return f"""为以下代码生成 pytest 测试用例：
 
-ä»£ç ï¼
+代码：
 {code}
 
-è¦æ±ï¼è¦çæ­£å¸¸è·¯å¾åå¼å¸¸æåµï¼ä½¿ç¨ pytest é£æ ¼ã
+要求：覆盖正常路径和异常情况，使用 pytest 风格。
 """
 
     def system_prompt(self) -> str:
         return (
-            f"ä½ æ¯ V14.1 å¤æºè½ä½åä½ç½ç»ä¸­ç {self.role.value} Agentã"
-            "ä¸æ³¨äºæµè¯ç¨ä¾çæï¼è¦çè¾¹çåå¼å¸¸åºæ¯ã"
+            f"你是 V14.1 多智能体协作网络中的 {self.role.value} Agent。"
+            "专注于测试用例生成，覆盖边界和异常场景。"
         )
 
 
 class ConfigManagerAgent(BaseAgent):
-    """é
-    ç½®ç®¡çå Agentï¼ç¯å¢é
-    ç½®ç®¡çã
+    """配置管理员 Agent：环境配置管理。
 
-        WHY èè´£åç¦»ï¼é
-    ç½®æ¼ç§»æ£æµï¼L8ï¼éè¦ Agent ä¸»å¨ç®¡çé
-    ç½®æä»¶ï¼
-        èä¸æ¯è¢«å¨åè­¦ã
+    WHY 职责分离：配置漂移检测（L8）需要 Agent 主动管理配置文件，
+    而不是被动告警。
     """
 
     role = AgentRole.CONFIG_MANAGER
@@ -181,28 +173,26 @@ class ConfigManagerAgent(BaseAgent):
         return AgentOutput(result={"config": resp.content})
 
     def _build_prompt(self, task: str, context: dict[str, Any]) -> str:
-        return f"""ç®¡çä»¥ä¸ç¯å¢éç½®ï¼
+        return f"""管理以下环境配置：
 
-ä»»å¡ï¼{task}
-å½åç¯å¢åéï¼{json.dumps(context.get('env', {}), ensure_ascii=False)}
+任务：{task}
+当前环境变量：{json.dumps(context.get('env', {}), ensure_ascii=False)}
 
-è¾åºéç½®åæ´å»ºè®®ææ§è¡éç½®æ´æ°ã
+输出配置变更建议或执行配置更新。
 """
 
     def system_prompt(self) -> str:
         return (
-            f"ä½ æ¯ V14.1 å¤æºè½ä½åä½ç½ç»ä¸­ç {self.role.value} Agentã"
-            "ä¸æ³¨äºç¯å¢éç½®ç®¡çï¼ç¡®ä¿éç½®ä¸è´æ§ã"
+            f"你是 V14.1 多智能体协作网络中的 {self.role.value} Agent。"
+            "专注于环境配置管理，确保配置一致性。"
         )
 
 
 class AgentFactory:
-    """Agent å·¥åï¼æ ¹æ®è§è²è¿åå®ä¾ã
+    """Agent 工厂：根据角色返回实例。
 
-        WHY å·¥åæ¨¡å¼ï¼è°åº¦å¨ä¸å
-    ³å¿å
-    ·ä½ Agent ç±»ï¼åªéè°ç¨ get_agent(role)ã
-        æ·»å æ°è§è²ä¸æ¹è°åº¦å¨ä»£ç ã
+    WHY 工厂模式：调度器不关心具体 Agent 类，只需调用 get_agent(role)。
+    添加新角色不改调度器代码。
     """
 
     _registry: dict[AgentRole, type[BaseAgent]] = {
@@ -211,7 +201,7 @@ class AgentFactory:
         AgentRole.REVIEWER: ReviewerAgent,
         AgentRole.QA: QAAgent,
         AgentRole.CONFIG_MANAGER: ConfigManagerAgent,
-        AgentRole.CLARIFIER: ClarifierAgent,  # éæ±æ¾æ¸ Agent
+        AgentRole.CLARIFIER: ClarifierAgent,  # 需求澄清 Agent
     }
 
     @classmethod
@@ -222,7 +212,7 @@ class AgentFactory:
         graph: Any = None,
         sandbox: Any = None,
     ) -> BaseAgent:
-        """create = get_agent alias."""
+        """create = get_agent alias for orchestrator."""
         return cls.get_agent(role, llm=llm, graph=graph, sandbox=sandbox)
 
     @classmethod
@@ -233,19 +223,19 @@ class AgentFactory:
         graph: Any = None,
         sandbox: Any = None,
     ) -> BaseAgent:
-        """æè§è²åå»º Agent å®ä¾ã
+        """按角色创建 Agent 实例。
 
         Args:
-            role: AgentRole æä¸¾æå­ç¬¦ä¸²
-            llm: LLMClient å®ä¾ï¼å¯éï¼mock æ¨¡å¼ä¸ä¼ ï¼
-            graph: CodeGraphEngine å®ä¾ï¼å¯éï¼
-            sandbox: Sandbox å®ä¾ï¼å¯éï¼
+            role: AgentRole 枚举或字符串
+            llm: LLMClient 实例（可选，mock 模式不传）
+            graph: CodeGraphEngine 实例（可选）
+            sandbox: Sandbox 实例（可选）
 
         Returns:
-            å¯¹åºè§è²ç BaseAgent å®ä¾
+            对应角色的 BaseAgent 实例
 
         Raises:
-            ValueError: æªç¥è§è²
+            ValueError: 未知角色
         """
         if isinstance(role, str):
             role = AgentRole(role)
@@ -256,5 +246,5 @@ class AgentFactory:
 
     @classmethod
     def register(cls, role: AgentRole, agent_cls: type[BaseAgent]) -> None:
-        """æ³¨åæ° Agentï¼æ©å±ç¨ï¼ã"""
+        """注册新 Agent（扩展用）。"""
         cls._registry[role] = agent_cls

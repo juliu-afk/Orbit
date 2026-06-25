@@ -62,7 +62,7 @@ async def observability_health() -> dict[str, Any]:
         _ = CodeGraphEngine  # noqa: F841
         _collector.update("code_graph", ComponentStatus.HEALTHY)
     except ImportError:
-        _collector.update("code_graph", ComponentStatus.DEGRADED, "?")
+        _collector.update("code_graph", ComponentStatus.DEGRADED, "Code graph module unavailable")
     _collector.update("db_graph", ComponentStatus.HEALTHY)
     _collector.update("config_graph", ComponentStatus.HEALTHY)
     _collector.update("hallucination_layers", ComponentStatus.HEALTHY)

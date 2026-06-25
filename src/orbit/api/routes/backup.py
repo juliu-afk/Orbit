@@ -1,4 +1,4 @@
-"""docstring"""
+"""Backup management API (Step 7.4/7.5)."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class RestoreRequest(BaseModel):
 
 
 @router.get("/snapshots", summary="")
-async def list_snapshots(db_type: str = Query("", description="?")) -> dict[str, Any]:
+async def list_snapshots(db_type: str = Query("", description="Filter by type")) -> dict[str, Any]:
     snapshots = _snapshotter.list_snapshots(db_type=db_type)
     return {
         "code": 0,
@@ -40,31 +40,30 @@ async def list_snapshots(db_type: str = Query("", description="?")) -> dict[str,
     }
 
 
-@router.post("/snapshots", summary="")
+@router.post("/snapshots", summary="Create snapshot")
 async def create_snapshot(req: SnapshotCreateRequest) -> dict[str, Any]:
-    """docstring"""
     try:
         if req.db_type in ("sqlite", "knowledge", "checkpoint"):
             meta = _snapshotter.snapshot_sqlite(req.source_path, db_type=req.db_type)
         else:
             meta = _snapshotter.snapshot_file(req.source_path, db_type=req.db_type)
     except (FileNotFoundError, sqlite3.OperationalError, sqlite3.DatabaseError) as e:
-        raise HTTPException(status_code=404, detail="?") from e
+        raise HTTPException(status_code=404, detail=f"Source not available: {e}") from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail="?") from e
+        raise HTTPException(status_code=500, detail=f"Operation failed: {e}") from e
     return {"code": 0, "data": meta.to_dict(), "message": "ok"}
 
 
-@router.post("/restore", summary="")
+@router.post("/restore", summary="Create snapshot")
 async def restore_snapshot(req: RestoreRequest) -> dict[str, Any]:
     snapshots = _snapshotter.list_snapshots()
     target = next((s for s in snapshots if s.snapshot_id == req.snapshot_id), None)
     if target is None:
-        raise HTTPException(status_code=404, detail="?")
+        raise HTTPException(status_code=404, detail="Resource not found")
     try:
         result: RestoreResult = _restorer.restore(target, req.target_path)
     except Exception as e:
-        raise HTTPException(status_code=500, detail="?") from e
+        raise HTTPException(status_code=500, detail=f"Operation failed: {e}") from e
     if not result.success:
         raise HTTPException(status_code=500, detail=result.reason)
     return {"code": 0, "data": {"restored": True, "target": req.target_path}, "message": "ok"}

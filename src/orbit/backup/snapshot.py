@@ -81,7 +81,7 @@ class Snapshotter:
         )
 
     def list_snapshots(self, db_type: str = "") -> list[SnapshotMeta]:
-        """docstring"""
+        """List snapshots (descending by creation time)."""
         import glob
 
         pattern = (

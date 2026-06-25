@@ -1,4 +1,4 @@
-"""docstring"""
+"""Chat API WebSocket tests (ClarifierAgent integration)."""
 
 import json
 
@@ -8,16 +8,16 @@ from orbit.api.main import create_app
 
 
 class TestChatWebSocket:
-    """docstring"""
+    """Test ClarifierAgent response."""
 
     @classmethod
     def setup_class(cls) -> None:
         cls.client = TestClient(create_app())
 
     def test_websocket_connect_and_chat(self) -> None:
-        """docstring"""
+        """Test ClarifierAgent response."""
         with self.client.websocket_connect("/api/v1/chat") as ws:
-            ws.send_text(json.dumps({"type": "chat", "text": "?"}))
+            ws.send_text(json.dumps({"type": "chat", "text": "Orbit agent ??"}))
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["code"] == 0
@@ -26,7 +26,7 @@ class TestChatWebSocket:
             assert data["data"]["clarification_status"] == "clarifying"
 
     def test_session_history_priority(self) -> None:
-        """docstring"""
+        """Test ClarifierAgent response."""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(
                 json.dumps(
@@ -50,9 +50,9 @@ class TestChatWebSocket:
             assert data["code"] == 1
 
     def test_chinese_query(self) -> None:
-        """docstring"""
+        """Test ClarifierAgent response."""
         with self.client.websocket_connect("/api/v1/chat") as ws:
-            ws.send_text(json.dumps({"type": "chat", "text": "?"}))
+            ws.send_text(json.dumps({"type": "chat", "text": "Orbit agent scheduling"}))
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["code"] == 0
@@ -76,7 +76,7 @@ class TestChatWebSocket:
             assert data["code"] == 1
 
     def test_confirm_without_prd_error(self) -> None:
-        """docstring"""
+        """Test ClarifierAgent response."""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(
                 json.dumps(

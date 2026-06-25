@@ -211,6 +211,7 @@ class TestLessonStore:
         yield s
         s.close()
         import shutil
+
         shutil.rmtree(tmpdir, ignore_errors=True)
 
     def test_add_and_count(self, store) -> None:

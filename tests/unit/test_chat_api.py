@@ -15,7 +15,7 @@ class TestChatWebSocket:
         cls.client = TestClient(create_app())
 
     def test_websocket_connect_and_chat(self) -> None:
-        """Test ClarifierAgent response."""
+        """WebSocket connect and send chat message."""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(json.dumps({"type": "chat", "text": "Orbit agent ??"}))
             raw = ws.receive_text()
@@ -26,7 +26,7 @@ class TestChatWebSocket:
             assert data["data"]["clarification_status"] == "clarifying"
 
     def test_session_history_priority(self) -> None:
-        """Test ClarifierAgent response."""
+        """Session history priority with session_projects."""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(
                 json.dumps(
@@ -50,7 +50,7 @@ class TestChatWebSocket:
             assert data["code"] == 1
 
     def test_chinese_query(self) -> None:
-        """Test ClarifierAgent response."""
+        """Chinese query returns valid ClarifierAgent response."""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(json.dumps({"type": "chat", "text": "Orbit agent scheduling"}))
             raw = ws.receive_text()
@@ -76,7 +76,7 @@ class TestChatWebSocket:
             assert data["code"] == 1
 
     def test_confirm_without_prd_error(self) -> None:
-        """Test ClarifierAgent response."""
+        """Confirm without PRD returns error."""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(
                 json.dumps(

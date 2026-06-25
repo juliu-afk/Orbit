@@ -15,17 +15,17 @@ class TestAgentFactoryCreate:
     """Test case description."""
 
     def test_create_string_role(self) -> None:
-        """Test case description."""
+        """Create agent with string role name."""
         agent = AgentFactory.create("developer")
         assert agent.role == AgentRole.DEVELOPER
 
     def test_create_enum_role(self) -> None:
-        """Test case description."""
+        """Create agent with AgentRole enum."""
         agent = AgentFactory.create(AgentRole.ARCHITECT)
         assert agent.role == AgentRole.ARCHITECT
 
     def test_create_injects_llm(self) -> None:
-        """Test case description."""
+        """Create injects llm into agent."""
         agent = AgentFactory.create("developer", llm="fake_llm")  # type: ignore[arg-type]
         assert agent.llm == "fake_llm"
 
@@ -35,7 +35,7 @@ class TestOrchestratorRunAgent:
 
     @pytest.mark.asyncio
     async def test_run_agent_calls_execute(self) -> None:
-        """Test case description."""
+        """_run_agent calls execute via AgentFactory."""
         from orbit.agents.base import AgentOutput
 
         class FakeAgent:
@@ -61,7 +61,7 @@ class TestSchedulerRunTaskProgress:
 
     @pytest.mark.asyncio
     async def test_run_task_publishes_to_event_bus(self) -> None:
-        """Test case description."""
+        """run_task publishes state transitions to EventBus."""
         from orbit.events.bus import EventBus
         from orbit.scheduler.orchestrator import Scheduler
 
@@ -91,7 +91,7 @@ class TestRunAgentRealFactory:
 
     @pytest.mark.asyncio
     async def test_run_agent_with_real_factory_calls_execute(self) -> None:
-        """Test case description."""
+        """_run_agent with real AgentFactory calls execute."""
         from orbit.agents.factory import AgentFactory
         from orbit.scheduler.orchestrator import Scheduler
 
@@ -101,7 +101,7 @@ class TestRunAgentRealFactory:
 
     @pytest.mark.asyncio
     async def test_scheduler_full_state_machine(self) -> None:
-        """Test case description."""
+        """Scheduler.run_task completes full state machine to DONE."""
         from orbit.agents.factory import AgentFactory
         from orbit.api.schemas.task import TaskState
         from orbit.events.bus import EventBus

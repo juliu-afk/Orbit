@@ -31,20 +31,26 @@ class KnowledgeStore:
         self._conn: sqlite3.Connection | None = None
 
     def _get_conn(self) -> sqlite3.Connection:
-        """延迟连接（按需建立）。"""
+        """延迟连接（按需建立）。
+
+        WHY 在 _get_conn 内自动建表：count()/query_exact() 等方法直接查询
+        knowledge_concepts 表，若表不存在会抛 "no such table"。
+        在连接建立时自动建表保证所有入口安全，消除鸡生蛋问题。
+        """
         if self._conn is None:
-            self._conn = sqlite3.connect(str(self._db_path))
+            self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
             self._conn.row_factory = sqlite3.Row
             self._conn.execute("PRAGMA journal_mode=WAL")
+            self._ensure_table()
         return self._conn
 
-    def initialize(self) -> None:
-        """建表 + 插入种子数据。
+    def _ensure_table(self) -> None:
+        """幂等建表——仅建表不插入种子数据。
 
-        可重复执行——IF NOT EXISTS 保证幂等。
+        与 initialize() 分离：_ensure_table 保证查询不报错，
+        initialize() 负责种子数据导入（调用方显式触发）。
         """
-        conn = self._get_conn()
-        conn.execute("""
+        self._conn.execute("""
             CREATE TABLE IF NOT EXISTS knowledge_concepts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 domain TEXT NOT NULL,
@@ -58,7 +64,14 @@ class KnowledgeStore:
                 UNIQUE(domain, concept)
             )
         """)
-        conn.commit()
+        self._conn.commit()
+
+    def initialize(self) -> None:
+        """建表 + 插入种子数据。
+
+        可重复执行——_ensure_table() + INSERT OR IGNORE 保证幂等。
+        """
+        conn = self._get_conn()
 
         # 插入种子数据（IGNORE 避免重复插入）
         for c in ACCOUNTING_CONCEPTS:

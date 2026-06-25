@@ -56,8 +56,9 @@ class KnowledgeEngine:
         vector_store: VectorStore | None = None,
     ) -> None:
         self._store = store or KnowledgeStore()
-        if self._store.count() == 0:
-            self._store.initialize()
+        # WHY 无条件 initialize：_get_conn() 已自动建表，initialize()
+        # 负责种子数据导入。INSERT OR IGNORE 保证幂等。
+        self._store.initialize()
         # 惰性初始化 VectorStore（只在 semantic/hybrid 模式需要）
         self._vector: VectorStore | None = vector_store
 

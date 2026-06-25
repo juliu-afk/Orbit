@@ -52,8 +52,9 @@ class ComplianceValidator:
         engine: RuleEngine | None = None,
     ) -> None:
         self._store = store or KnowledgeStore()
-        if self._store.count() == 0:
-            self._store.initialize()
+        # WHY 无条件 initialize：_get_conn() 已自动建表，initialize()
+        # 负责种子数据导入。INSERT OR IGNORE 保证幂等，重复调用无害。
+        self._store.initialize()
         self._engine = engine or RuleEngine()
 
     def validate(self, domain: str, concept: str) -> ComplianceResult | None:

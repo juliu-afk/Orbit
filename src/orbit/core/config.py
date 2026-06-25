@@ -53,6 +53,7 @@ class Settings:
     # 模型 API Keys
     OPENAI_API_KEY: str = _get("OPENAI_API_KEY", "sk-dummy")
     DEEPSEEK_API_KEY: str = _get("DEEPSEEK_API_KEY", "sk-dummy")
+    ZAI_API_KEY: str = _get("ZAI_API_KEY", "sk-dummy")
 
     # 沙箱
     SANDBOX_TIMEOUT_SECONDS: int = _get_int("SANDBOX_TIMEOUT_SECONDS", 30)

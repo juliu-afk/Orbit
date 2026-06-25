@@ -35,8 +35,11 @@ MODEL_GLM5 = "openai/glm-5.2"
 MODEL_GLM_FALLBACK = "openai/glm-4.7-flash"
 GLM_API_BASE = "https://open.bigmodel.cn/api/coding/paas/v4"
 
+
 class LLMClient:
-    def __init__(self, circuit_breaker=None, default_model=MODEL_PRO, fallback_model=MODEL_GLM_FALLBACK):
+    def __init__(
+        self, circuit_breaker=None, default_model=MODEL_PRO, fallback_model=MODEL_GLM_FALLBACK
+    ):
         self.cb = circuit_breaker or CircuitBreaker()
         self.default_model = default_model
         self.fallback_model = fallback_model
@@ -65,7 +68,13 @@ class LLMClient:
             resp = await self._do_completion(model, req)
             await self.cb.record_success(model)
             self._log_usage(task_id, resp.usage)
-            logger.info("llm_call_ok", model=model, task_id=task_id, tokens=resp.usage.total_tokens, cost=resp.usage.cost_usd)
+            logger.info(
+                "llm_call_ok",
+                model=model,
+                task_id=task_id,
+                tokens=resp.usage.total_tokens,
+                cost=resp.usage.cost_usd,
+            )
             return resp
         except Exception as e:
             await self.cb.record_failure(model)
@@ -80,15 +89,24 @@ class LLMClient:
         if model.startswith("openai/glm"):
             result = await litellm.acompletion(
                 model=model,
-                messages=[{"role": "system", "content": req.system_prompt}, {"role": "user", "content": req.prompt}],
-                temperature=req.temperature, max_tokens=req.max_tokens,
-                api_base=GLM_API_BASE, api_key=settings.ZAI_API_KEY,
+                messages=[
+                    {"role": "system", "content": req.system_prompt},
+                    {"role": "user", "content": req.prompt},
+                ],
+                temperature=req.temperature,
+                max_tokens=req.max_tokens,
+                api_base=GLM_API_BASE,
+                api_key=settings.ZAI_API_KEY,
             )
         else:
             result = await litellm.acompletion(
                 model=model,
-                messages=[{"role": "system", "content": req.system_prompt}, {"role": "user", "content": req.prompt}],
-                temperature=req.temperature, max_tokens=req.max_tokens,
+                messages=[
+                    {"role": "system", "content": req.system_prompt},
+                    {"role": "user", "content": req.prompt},
+                ],
+                temperature=req.temperature,
+                max_tokens=req.max_tokens,
             )
         content = result.choices[0].message.content or ""
         usage = self._build_usage(model, result.usage)
@@ -97,6 +115,7 @@ class LLMClient:
     async def generate_stream(self, req, task_id, entropy_monitor=None):
         import litellm
         from orbit.hallucination.schemas import HighEntropyError
+
         model = self.default_model
         try:
             stream = await self._stream_completion(model, req, entropy_monitor)
@@ -106,38 +125,72 @@ class LLMClient:
             stream = await self._stream_completion(model, req, entropy_monitor)
         content_parts = []
         async for chunk in stream:
-            if not chunk.choices: continue
+            if not chunk.choices:
+                continue
             delta = chunk.choices[0].delta
             token_text = delta.content or ""
-            if token_text: content_parts.append(token_text)
+            if token_text:
+                content_parts.append(token_text)
             if entropy_monitor and hasattr(delta, "logprobs") and delta.logprobs:
                 for lp in (delta.logprobs.content if delta.logprobs.content else []):
-                    logprob_list = [t.logprob for t in lp.top_logprobs] if hasattr(lp, "top_logprobs") and lp.top_logprobs else [lp.logprob]
+                    logprob_list = (
+                        [t.logprob for t in lp.top_logprobs]
+                        if hasattr(lp, "top_logprobs") and lp.top_logprobs
+                        else [lp.logprob]
+                    )
                     entropy = entropy_monitor.on_token(lp.token, logprob_list)
                     if entropy is not None:
-                        raise HighEntropyError(entropy=entropy, threshold=entropy_monitor.config.threshold)
+                        raise HighEntropyError(
+                            entropy=entropy, threshold=entropy_monitor.config.threshold
+                        )
         content = "".join(content_parts)
         return LLMResponse(content=content, model=model, usage=LLMUsage())  # type: ignore[call-arg]
 
     async def _stream_completion(self, model, req, entropy_monitor=None):
         import litellm
-        kwargs = dict(model=model, messages=[{"role": "system", "content": req.system_prompt}, {"role": "user", "content": req.prompt}], temperature=req.temperature, max_tokens=req.max_tokens, stream=True)
-        if model.startswith("openai/glm"): kwargs["api_base"] = GLM_API_BASE; kwargs["api_key"] = settings.ZAI_API_KEY
-        if entropy_monitor: kwargs["logprobs"] = True
+
+        kwargs = dict(
+            model=model,
+            messages=[
+                {"role": "system", "content": req.system_prompt},
+                {"role": "user", "content": req.prompt},
+            ],
+            temperature=req.temperature,
+            max_tokens=req.max_tokens,
+            stream=True,
+        )
+        if model.startswith("openai/glm"):
+            kwargs["api_base"] = GLM_API_BASE
+            kwargs["api_key"] = settings.ZAI_API_KEY
+        if entropy_monitor:
+            kwargs["logprobs"] = True
         return await litellm.acompletion(**kwargs)
 
     def _build_usage(self, model, usage_raw):
         prompt_t = getattr(usage_raw, "prompt_tokens", 0) or 0
         completion_t = getattr(usage_raw, "completion_tokens", 0) or 0
-        total_t = getattr(usage_raw, "total_tokens", prompt_t + completion_t) or (prompt_t + completion_t)
+        total_t = getattr(usage_raw, "total_tokens", prompt_t + completion_t) or (
+            prompt_t + completion_t
+        )
         price = PRICES.get(model, {"prompt": 0.0, "completion": 0.0})
         cost = (prompt_t / 1000.0 * price["prompt"]) + (completion_t / 1000.0 * price["completion"])
-        return LLMUsage(prompt_tokens=prompt_t, completion_tokens=completion_t, total_tokens=total_t, cost_usd=round(cost, 6))
+        return LLMUsage(
+            prompt_tokens=prompt_t,
+            completion_tokens=completion_t,
+            total_tokens=total_t,
+            cost_usd=round(cost, 6),
+        )
 
     def _log_usage(self, task_id, usage):
         self._usage_log.setdefault(task_id, []).append(usage)
 
     def get_usage_stats(self, task_id):
         records = self._usage_log.get(task_id, [])
-        if not records: return LLMUsage()  # type: ignore[call-arg]
-        return LLMUsage(prompt_tokens=sum(r.prompt_tokens for r in records), completion_tokens=sum(r.completion_tokens for r in records), total_tokens=sum(r.total_tokens for r in records), cost_usd=round(sum(r.cost_usd for r in records), 6))
+        if not records:
+            return LLMUsage()  # type: ignore[call-arg]
+        return LLMUsage(
+            prompt_tokens=sum(r.prompt_tokens for r in records),
+            completion_tokens=sum(r.completion_tokens for r in records),
+            total_tokens=sum(r.total_tokens for r in records),
+            cost_usd=round(sum(r.cost_usd for r in records), 6),
+        )

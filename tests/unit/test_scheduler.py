@@ -22,8 +22,8 @@ from orbit.scheduler.orchestrator import (
     Scheduler,
 )
 
-
 # ── Mock Agent ──
+
 
 class MockAgent(BaseAgent):
     def __init__(self, llm=None, graph=None, sandbox=None, role=AgentRole.DEVELOPER):
@@ -31,13 +31,18 @@ class MockAgent(BaseAgent):
         self.role = role  # type: ignore[assignment]
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
-        key = {AgentRole.ARCHITECT: "design", AgentRole.DEVELOPER: "code",
-               AgentRole.REVIEWER: "review", AgentRole.QA: "tests",
-               AgentRole.CLARIFIER: "clarify"}.get(self.role, "result")
+        key = {
+            AgentRole.ARCHITECT: "design",
+            AgentRole.DEVELOPER: "code",
+            AgentRole.REVIEWER: "review",
+            AgentRole.QA: "tests",
+            AgentRole.CLARIFIER: "clarify",
+        }.get(self.role, "result")
         return AgentOutput(status="ok", result={key: f"[mock {self.role.value}] ok"})
 
 
 # ── Fixtures ──
+
 
 @pytest.fixture
 def scheduler():
@@ -47,8 +52,11 @@ def scheduler():
 @pytest.fixture
 def dag_scheduler():
     return Scheduler(
-        agent_llms={}, checkpoint_manager=MagicMock(),
-        max_concurrent=3, node_timeout=30, max_retries=2,
+        agent_llms={},
+        checkpoint_manager=MagicMock(),
+        max_concurrent=3,
+        node_timeout=30,
+        max_retries=2,
     )
 
 
@@ -56,15 +64,18 @@ def dag_scheduler():
 def diamond_graph():
     return TaskGraph(
         task_id="dag-test",
-        nodes=[GraphNode(id="A", agent_role="developer"),
-               GraphNode(id="B", agent_role="reviewer"),
-               GraphNode(id="C", agent_role="developer"),
-               GraphNode(id="D", agent_role="qa")],
+        nodes=[
+            GraphNode(id="A", agent_role="developer"),
+            GraphNode(id="B", agent_role="reviewer"),
+            GraphNode(id="C", agent_role="developer"),
+            GraphNode(id="D", agent_role="qa"),
+        ],
         edges=[("A", "B"), ("A", "C"), ("B", "D"), ("C", "D")],
     )
 
 
 # ── 状态转换 ──
+
 
 def test_state_transitions_complete():
     for state in TaskState:
@@ -80,16 +91,24 @@ def test_terminal_states_no_transition(scheduler):
 
 
 def test_state_sequence_correct(scheduler):
-    seq = [scheduler._transition(TaskState.IDLE),
-           scheduler._transition(TaskState.PARSING),
-           scheduler._transition(TaskState.PLANNING),
-           scheduler._transition(TaskState.CODING),
-           scheduler._transition(TaskState.VERIFYING)]
-    assert seq == [TaskState.PARSING, TaskState.PLANNING, TaskState.CODING,
-                   TaskState.VERIFYING, TaskState.DONE]
+    seq = [
+        scheduler._transition(TaskState.IDLE),
+        scheduler._transition(TaskState.PARSING),
+        scheduler._transition(TaskState.PLANNING),
+        scheduler._transition(TaskState.CODING),
+        scheduler._transition(TaskState.VERIFYING),
+    ]
+    assert seq == [
+        TaskState.PARSING,
+        TaskState.PLANNING,
+        TaskState.CODING,
+        TaskState.VERIFYING,
+        TaskState.DONE,
+    ]
 
 
 # ── Agent 循环 ──
+
 
 @pytest.mark.asyncio
 async def test_agent_cycle_through_factory():
@@ -114,6 +133,7 @@ async def test_no_factory_raises():
 async def test_agent_error_handled():
     class FailingAgent(BaseAgent):
         role = AgentRole.DEVELOPER
+
         async def execute(self, input_data):
             raise RuntimeError("boom")
 
@@ -129,6 +149,7 @@ async def test_agent_error_handled():
 
 # ── 检查点 ──
 
+
 @pytest.mark.asyncio
 async def test_checkpoint_saved_on_transition():
     save_log = []
@@ -140,8 +161,9 @@ async def test_checkpoint_saved_on_transition():
     for role in [AgentRole.ARCHITECT, AgentRole.DEVELOPER, AgentRole.REVIEWER, AgentRole.CLARIFIER]:
         AgentFactory.register(role, MockAgent)
 
-    sched = Scheduler(agent_llms={}, checkpoint_manager=FakeCheckpoint(),
-                       agent_factory=AgentFactory)
+    sched = Scheduler(
+        agent_llms={}, checkpoint_manager=FakeCheckpoint(), agent_factory=AgentFactory
+    )
     await sched.run_task("task-ckpt", "x")
     assert "IDLE" in save_log
     assert "DONE" in save_log
@@ -153,8 +175,10 @@ async def test_resume_from_checkpoint():
         def __init__(self, state, context):
             self.state = state
             self.context = context
+
         async def load(self, task_id):
             from orbit.checkpoint.manager import CheckpointData
+
             return CheckpointData(task_id=task_id, state=self.state, context=self.context)
 
     sched = Scheduler(agent_llms=None, checkpoint_manager=FakeCheckpoint("DONE", {"prd": "x"}))
@@ -168,17 +192,23 @@ async def test_resume_mid_state_continues():
         def __init__(self, state, context):
             self.state = state
             self.context = context
+
         async def load(self, task_id):
             from orbit.checkpoint.manager import CheckpointData
+
             return CheckpointData(task_id=task_id, state=self.state, context=self.context)
+
         async def save(self, task_id, data):
             pass
 
     AgentFactory.register(AgentRole.DEVELOPER, MockAgent)
     AgentFactory.register(AgentRole.REVIEWER, MockAgent)
 
-    sched = Scheduler(agent_llms={}, checkpoint_manager=FakeCheckpoint("CODING", {"prd": "x"}),
-                       agent_factory=AgentFactory)
+    sched = Scheduler(
+        agent_llms={},
+        checkpoint_manager=FakeCheckpoint("CODING", {"prd": "x"}),
+        agent_factory=AgentFactory,
+    )
     result = await sched.resume("task-mid")
     assert result == TaskState.DONE
 
@@ -189,6 +219,7 @@ def test_state_to_progress_mapping():
 
 
 # ── DAG ──
+
 
 @pytest.mark.asyncio
 async def test_dag_topological_order(dag_scheduler, diamond_graph):
@@ -206,7 +237,11 @@ async def test_dag_execution_all_success(dag_scheduler, diamond_graph):
 
 @pytest.mark.asyncio
 async def test_dag_concurrent_execution(dag_scheduler):
-    graph = TaskGraph(task_id="concurrent", nodes=[GraphNode(id="A"), GraphNode(id="B"), GraphNode(id="C")], edges=[])
+    graph = TaskGraph(
+        task_id="concurrent",
+        nodes=[GraphNode(id="A"), GraphNode(id="B"), GraphNode(id="C")],
+        edges=[],
+    )
     start = time.monotonic()
     await dag_scheduler.run_dag(graph)
     assert time.monotonic() - start < 0.15
@@ -223,9 +258,18 @@ async def test_dag_resume_skips_completed(dag_scheduler, diamond_graph):
 
 @pytest.mark.asyncio
 async def test_dag_node_timeout():
-    sched = Scheduler(agent_llms={}, checkpoint_manager=MagicMock(),
-                       max_concurrent=1, node_timeout=0.01, max_retries=0)
-    async def slow(n): await asyncio.sleep(0.1); return {}
+    sched = Scheduler(
+        agent_llms={},
+        checkpoint_manager=MagicMock(),
+        max_concurrent=1,
+        node_timeout=0.01,
+        max_retries=0,
+    )
+
+    async def slow(n):
+        await asyncio.sleep(0.1)
+        return {}
+
     sched._execute_node = slow
     graph = TaskGraph(task_id="to", nodes=[GraphNode(id="A")], edges=[])
     results = await sched.run_dag(graph)
@@ -234,8 +278,13 @@ async def test_dag_node_timeout():
 
 @pytest.mark.asyncio
 async def test_dag_max_retries_exceeded():
-    sched = Scheduler(agent_llms={}, checkpoint_manager=MagicMock(),
-                       max_concurrent=1, node_timeout=30, max_retries=2)
+    sched = Scheduler(
+        agent_llms={},
+        checkpoint_manager=MagicMock(),
+        max_concurrent=1,
+        node_timeout=30,
+        max_retries=2,
+    )
     sched._execute_node = AsyncMock(side_effect=RuntimeError("boom"))
     graph = TaskGraph(task_id="retry", nodes=[GraphNode(id="A")], edges=[])
     results = await sched.run_dag(graph)
@@ -251,13 +300,25 @@ async def test_dag_empty_graph(dag_scheduler):
 
 @pytest.mark.asyncio
 async def test_dag_fail_fast_abort():
-    sched = Scheduler(agent_llms={}, checkpoint_manager=MagicMock(),
-                       max_concurrent=1, node_timeout=30, max_retries=0, fail_fast=True)
+    sched = Scheduler(
+        agent_llms={},
+        checkpoint_manager=MagicMock(),
+        max_concurrent=1,
+        node_timeout=30,
+        max_retries=0,
+        fail_fast=True,
+    )
+
     async def fail_a(node):
-        if node.id == "A": raise RuntimeError("A failed")
+        if node.id == "A":
+            raise RuntimeError("A failed")
         return {}
+
     sched._execute_node = fail_a
-    graph = TaskGraph(task_id="ff", nodes=[GraphNode(id="A"), GraphNode(id="B"), GraphNode(id="C")],
-                       edges=[("A", "B"), ("A", "C")])
+    graph = TaskGraph(
+        task_id="ff",
+        nodes=[GraphNode(id="A"), GraphNode(id="B"), GraphNode(id="C")],
+        edges=[("A", "B"), ("A", "C")],
+    )
     results = await sched.run_dag(graph)
     assert results["A"] == NodeStatus.FAILED

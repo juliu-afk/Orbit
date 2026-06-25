@@ -110,6 +110,7 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
 
     # ClarifierAgent 用 Flash 轻量模型
     from orbit.gateway.client import LLMClient as _LLMClient
+
     chat.set_clarifier_llm(_LLMClient(default_model=MODEL_FLASH))
 
     return app

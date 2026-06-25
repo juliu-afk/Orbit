@@ -235,10 +235,11 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.dashboard { min-height: 100vh; background: #0a0a14; color: #e0e0e0; }
+.dashboard { height: 100vh; overflow: hidden; display: flex; flex-direction: column; background: #0a0a14; color: #e0e0e0; }
 .dashboard-top {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 12px; background: #12122a; border-bottom: 1px solid #2a2a4a;
+  flex-shrink: 0;
 }
 .connection-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .dot--connected { background: #4caf50; }
@@ -253,7 +254,7 @@ onUnmounted(() => {
 /* ── 工作台 ── */
 .workspace {
   display: flex;
-  height: calc(100vh - 40px);
+  flex: 1;
   overflow: hidden;
 }
 .chat-col {

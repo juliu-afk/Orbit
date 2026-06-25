@@ -103,7 +103,9 @@ class LessonStore:
             import os
 
             os.makedirs("data", exist_ok=True)
-            self._conn = sqlite3.connect(self._db_path)
+            # WHY check_same_thread=False：FastAPI TestClient 线程池 + 模块级单例
+            # 可能在不同线程访问同一 SQLite 连接，此参数允许跨线程使用。
+            self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.row_factory = sqlite3.Row
             self._ensure_table()

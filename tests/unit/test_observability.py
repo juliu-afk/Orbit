@@ -1,5 +1,8 @@
 """Step 7.2 HealthCollector 单元测试。"""
 
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from orbit.observability.collector import (
@@ -197,61 +200,47 @@ class TestAuditLogger:
 class TestLessonStore:
     """教训库——SQLite 存储 CRUD。"""
 
-    def test_add_and_count(self) -> None:
+    @pytest.fixture
+    def store(self):
+        """每个测试独立的 LessonStore——临时 SQLite 避免跨测试状态泄漏。"""
         from orbit.observability.audit import LessonStore
 
-        store = LessonStore()
-        try:
-            store.add("task-001", "scheduler", "failure", "DAG timeout", ["timeout"])
-            store.add("task-002", "llm", "success", "Good prompt engineering")
-            assert store.count() == 2
-        finally:
-            store.close()
-            _cleanup_lesson_db()
+        tmpdir = tempfile.mkdtemp(prefix="orbit_test_lessons_")
+        db_path = Path(tmpdir) / "lessons.db"
+        s = LessonStore(db_path=str(db_path))
+        yield s
+        s.close()
+        import shutil
 
-    def test_list_by_domain(self) -> None:
-        from orbit.observability.audit import LessonStore
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
-        store = LessonStore()
-        try:
-            store.add("t1", "scheduler", "failure", "err1")
-            store.add("t2", "scheduler", "success", "ok1")
-            store.add("t3", "llm", "failure", "err2")
-            results = store.list_by_domain("scheduler")
-            assert len(results) == 2
-            assert all(r.domain == "scheduler" for r in results)
-        finally:
-            store.close()
-            _cleanup_lesson_db()
+    def test_add_and_count(self, store) -> None:
+        store.add("task-001", "scheduler", "failure", "DAG timeout", ["timeout"])
+        store.add("task-002", "llm", "success", "Good prompt engineering")
+        assert store.count() == 2
 
-    def test_list_by_task(self) -> None:
-        from orbit.observability.audit import LessonStore
+    def test_list_by_domain(self, store) -> None:
+        store.add("t1", "scheduler", "failure", "err1")
+        store.add("t2", "scheduler", "success", "ok1")
+        store.add("t3", "llm", "failure", "err2")
+        results = store.list_by_domain("scheduler")
+        assert len(results) == 2
+        assert all(r.domain == "scheduler" for r in results)
 
-        store = LessonStore()
-        try:
-            store.add("task-001", "scheduler", "failure", "err")
-            store.add("task-002", "llm", "success", "ok")
-            results = store.list_by_task("task-001")
-            assert len(results) == 1
-            assert results[0].task_id == "task-001"
-            assert results[0].outcome == "failure"
-        finally:
-            store.close()
-            _cleanup_lesson_db()
+    def test_list_by_task(self, store) -> None:
+        store.add("task-001", "scheduler", "failure", "err")
+        store.add("task-002", "llm", "success", "ok")
+        results = store.list_by_task("task-001")
+        assert len(results) == 1
+        assert results[0].task_id == "task-001"
+        assert results[0].outcome == "failure"
 
-    def test_tags_parsing(self) -> None:
-        from orbit.observability.audit import LessonStore
-
-        store = LessonStore()
-        try:
-            store.add("t1", "sandbox", "failure", "timeout", ["timeout", "docker"])
-            results = store.list_by_task("t1")
-            assert len(results) == 1
-            assert "timeout" in results[0].tags
-            assert "docker" in results[0].tags
-        finally:
-            store.close()
-            _cleanup_lesson_db()
+    def test_tags_parsing(self, store) -> None:
+        store.add("t1", "sandbox", "failure", "timeout", ["timeout", "docker"])
+        results = store.list_by_task("t1")
+        assert len(results) == 1
+        assert "timeout" in results[0].tags
+        assert "docker" in results[0].tags
 
 
 # ── Step 7.2 扩展：告警规则引擎 ──────────────────────────
@@ -417,13 +406,3 @@ class TestAgentOpsConfig:
         monkeypatch.delenv("AGENTOPS_TOKEN_THRESHOLD_WARNING")
         monkeypatch.delenv("AGENTOPS_AUTO_FIX_ENABLED")
         importlib.reload(orbit.observability.config)
-
-
-# ── 辅助函数 ─────────────────────────────────────────────
-
-
-def _cleanup_lesson_db() -> None:
-    import os
-
-    if os.path.exists("data/lessons.db"):
-        os.remove("data/lessons.db")

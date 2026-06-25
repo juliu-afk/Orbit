@@ -54,38 +54,55 @@ export const useChatStore = defineStore('chat', () => {
 
   // chat WS 连接到 /api/v1/chat（非 /ws/dashboard）
   let chatWs: WebSocket | null = null
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
-  /** 建立 chat WebSocket 连接到 /api/v1/chat 端点 */
+  /** 建立 chat WebSocket 连接到 /api/v1/chat 端点，失败自动重试最多 5 次 */
   function connectChatWs(_sessionId: string, _projectName: string) {
     disconnect()
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
     const url = `${protocol}//${location.host}/api/v1/chat`
-    connecting.value = true
-    chatWs = new WebSocket(url)
+    let retries = 0
+    const MAX_RETRIES = 5
 
-    chatWs.onopen = () => {
-      connecting.value = false
-    }
+    function doConnect() {
+      connecting.value = true
+      chatWs = new WebSocket(url)
 
-    chatWs.onmessage = (event: MessageEvent) => {
-      try {
-        const resp = JSON.parse(event.data as string)
-        handleChatResponse(resp)
-      } catch {
-        console.warn('[chat] 消息解析失败', event.data)
+      chatWs.onopen = () => {
+        connecting.value = false
+        lastError.value = null
+        retries = 0
+      }
+
+      chatWs.onmessage = (event: MessageEvent) => {
+        try {
+          const resp = JSON.parse(event.data as string)
+          handleChatResponse(resp)
+        } catch {
+          console.warn('[chat] 消息解析失败', event.data)
+        }
+      }
+
+      chatWs.onclose = () => {
+        connecting.value = false
+        chatWs = null
+      }
+
+      chatWs.onerror = () => {
+        connecting.value = false
+        chatWs = null
+        retries++
+        if (retries <= MAX_RETRIES) {
+          const delay = Math.min(1000 * Math.pow(2, retries - 1), 16000)
+          reconnectTimer = setTimeout(doConnect, delay)
+        } else {
+          lastError.value = '连接失败'
+        }
       }
     }
 
-    chatWs.onclose = () => {
-      connecting.value = false
-      chatWs = null
-    }
-
-    chatWs.onerror = () => {
-      connecting.value = false
-      lastError.value = '连接失败'
-    }
+    doConnect()
   }
 
   /** 处理后端 chat 响应 {code, data, message} 格式 */
@@ -191,8 +208,12 @@ export const useChatStore = defineStore('chat', () => {
     crossProjectWarning.value = null
   }
 
-  /** 关闭 chat WS */
+  /** 关闭 chat WS，取消重试 */
   function disconnect() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
     if (chatWs) {
       chatWs.close()
       chatWs = null

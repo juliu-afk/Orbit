@@ -89,7 +89,9 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     # 前端静态文件 (PyInstaller 打包时 static/ 在 sys._MEIPASS 下)
     import sys
 
-    static_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "static")
+    # WHY backend/static/：源代码目录结构要加 backend/ 前缀，
+    # PyInstaller 打包时 datas 映射 backend/static → static/
+    static_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "backend", "static")
     if getattr(sys, "frozen", False):
         static_dir = os.path.join(sys._MEIPASS, "static")  # type: ignore[attr-defined]
     if os.path.isdir(static_dir):

@@ -20,7 +20,6 @@ def reg():
     yield r
     r.close()
     import shutil
-
     shutil.rmtree(tmpdir, ignore_errors=True)
 
 

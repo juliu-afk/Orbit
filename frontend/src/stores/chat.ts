@@ -149,7 +149,7 @@ export const useChatStore = defineStore('chat', () => {
       text: data.reply,
       from: 'agent',
       timestamp: Date.now(),
-      role: data.agent_role || 'Agent',
+      role: data.agent_role || undefined,
     })
     if (messages.value.length > 50) {
       messages.value = messages.value.slice(-50)

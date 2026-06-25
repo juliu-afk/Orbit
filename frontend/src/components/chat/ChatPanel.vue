@@ -136,9 +136,9 @@ const AGENT_META: Record<string, { label: string; emoji: string; color: string }
   qa:           { label: 'QA',         emoji: '✅', color: '#00bcd4' },
   config_manager:{ label: 'Config',    emoji: '⚙️', color: '#607d8b' },
 }
-function agentLabel(role: string): string { return AGENT_META[role]?.label ?? role }
-function agentEmoji(role: string): string { return AGENT_META[role]?.emoji ?? '🤖' }
-function agentColor(role: string): string { return AGENT_META[role]?.color ?? '#666' }
+function agentLabel(role: string): string { return AGENT_META[role.toLowerCase()]?.label ?? role }
+function agentEmoji(role: string): string { return AGENT_META[role.toLowerCase()]?.emoji ?? '🤖' }
+function agentColor(role: string): string { return AGENT_META[role.toLowerCase()]?.color ?? '#666' }
 
 const chatStore = useChatStore()
 const sessionStore = useSessionStore()

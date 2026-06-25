@@ -1,8 +1,4 @@
-"""NL?? PR #3 + ???? Agent ?????? API WebSocket ???
-
-????????chat ???? ClarifierAgent??? {type: clarify, reply, clarification_status, ...}?
-?? keywords/source/candidates ??????????? data?candidates ??????????
-"""
+"""docstring"""
 
 import json
 
@@ -12,16 +8,16 @@ from orbit.api.main import create_app
 
 
 class TestChatWebSocket:
-    """NL ?? WebSocket ???ClarifierAgent ?????"""
+    """docstring"""
 
     @classmethod
     def setup_class(cls) -> None:
         cls.client = TestClient(create_app())
 
     def test_websocket_connect_and_chat(self) -> None:
-        """WebSocket ?? + ???? ? ?? ClarifierAgent clarify ???"""
+        """docstring"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
-            ws.send_text(json.dumps({"type": "chat", "text": "Orbit agent ??"}))
+            ws.send_text(json.dumps({"type": "chat", "text": "?"}))
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["code"] == 0
@@ -30,7 +26,7 @@ class TestChatWebSocket:
             assert data["data"]["clarification_status"] == "clarifying"
 
     def test_session_history_priority(self) -> None:
-        """? session_projects ????????????candidates ????"""
+        """docstring"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(
                 json.dumps(
@@ -54,9 +50,9 @@ class TestChatWebSocket:
             assert data["code"] == 1
 
     def test_chinese_query(self) -> None:
-        """???????? Agent ???"""
+        """docstring"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
-            ws.send_text(json.dumps({"type": "chat", "text": "??????????"}))
+            ws.send_text(json.dumps({"type": "chat", "text": "?"}))
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["code"] == 0
@@ -80,7 +76,7 @@ class TestChatWebSocket:
             assert data["code"] == 1
 
     def test_confirm_without_prd_error(self) -> None:
-        """confirm ?? modified_prd ? ?????"""
+        """docstring"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(
                 json.dumps(

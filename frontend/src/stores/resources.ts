@@ -1,4 +1,4 @@
-/** Resources Store??????/???????? observability metrics?? */
+/** Resources Store - queue and tool stats from observability metrics. */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 

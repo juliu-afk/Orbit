@@ -1,4 +1,4 @@
-/** Audit Store??????/??????
+/** Audit Store - audit logs and lessons.
  *
  */
 import { defineStore } from 'pinia'
@@ -29,7 +29,7 @@ export const useAuditStore = defineStore('audit', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  /** ? task_id ????? */
+  /** Fetch audit logs by task_id. */
   async function fetchAudit(taskId: string) {
     loading.value = true
     try {
@@ -39,7 +39,7 @@ export const useAuditStore = defineStore('audit', () => {
         auditLogs.value = j.data || []
       }
     } catch (e) {
-      console.warn("[store] ????", e)
+      console.warn("[audit] request failed", e)
     } finally {
       loading.value = false
     }
@@ -54,7 +54,7 @@ export const useAuditStore = defineStore('audit', () => {
         lessons.value = j.data || []
       }
     } catch (e) {
-      console.warn("[store] ????", e)
+      console.warn("[audit] request failed", e)
     } finally {
       loading.value = false
     }
@@ -73,7 +73,7 @@ export const useAuditStore = defineStore('audit', () => {
         body: JSON.stringify(data),
       })
     } catch (e) {
-      console.warn("[store] ????", e)
+      console.warn("[audit] request failed", e)
     }
   }
 

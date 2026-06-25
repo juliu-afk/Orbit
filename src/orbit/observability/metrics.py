@@ -130,9 +130,7 @@ def snapshot() -> dict[str, Any]:
             "z3": orbit_circuit_breaker_state.labels(breaker="z3")._value.get(),
             "sandbox": orbit_circuit_breaker_state.labels(breaker="sandbox")._value.get(),
             "llm": orbit_circuit_breaker_state.labels(breaker="llm")._value.get(),
-            "resource_guard": orbit_circuit_breaker_state.labels(
-                breaker="resource_guard"
-            )._value.get(),
+            "resource_guard": orbit_circuit_breaker_state.labels(breaker="resource_guard")._value.get(),
         },
         "sandbox_pool_available": orbit_sandbox_pool_available._value.get(),
         "sandbox_executions_total": {

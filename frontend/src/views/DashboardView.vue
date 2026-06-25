@@ -92,11 +92,6 @@
       <HealthPanel :components="agentOpsStore.health" :overall="agentOpsStore.overallHealth" />
     </el-drawer>
 
-    <!-- 代码输出弹出——任务 CODING/DONE 时自动打开 -->
-    <el-drawer v-model="showCodeDiff" title="Generated Code" direction="rtl" size="520px" @close="handleCloseCodeDiff">
-      <CodeDiffPanel v-if="taskStore.codeOutput" :code="taskStore.codeOutput" />
-    </el-drawer>
-
     <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
     <CrossProjectWarning v-if="chatStore.crossProjectWarning" />
   </div>
@@ -118,7 +113,6 @@ import HealthPanel from '@/components/metrics/HealthPanel.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 import CrossProjectWarning from '@/components/chat/CrossProjectWarning.vue'
-import CodeDiffPanel from '@/components/chat/CodeDiffPanel.vue'
 
 const ws = useWebSocket()
 const session = useSessionStore()
@@ -128,7 +122,6 @@ const taskStore = useTaskStore()
 
 const showNewDialog = ref(false)
 const showDetail = ref(false)
-const showCodeDiff = ref(false)
 const tokenPoints = ref<TokenPoint[]>([])
 const MAX_TOKEN_POINTS = 100
 
@@ -185,16 +178,6 @@ async function onSessionCreated() {
     })))
   }
   agentOpsStore.fetchAll()
-}
-
-// 代码产物就绪 → 自动弹出抽屉
-watch(() => taskStore.hasCodeOutput, (show) => {
-  if (show) showCodeDiff.value = true
-})
-
-function handleCloseCodeDiff() {
-  showCodeDiff.value = false
-  taskStore.consumeCodeOutput()
 }
 
 // Session 切换: 同步消息 + 刷新指标 + 重连 chat WS
@@ -254,7 +237,6 @@ onUnmounted(() => {
 .workspace {
   display: flex;
   height: calc(100vh - 40px);
-  overflow: hidden;
 }
 .chat-col {
   flex: 1;

@@ -280,15 +280,14 @@ watch(() => chatStore.messages.length, () => {
 /* 覆盖 Element Plus 默认浅色边框 → 暗色主题 */
 .chat-panel__input :deep(.el-input__wrapper) {
   background: #0f0f1a;
-  border: 1px solid #2a2a4a;
-  border-right: none;
-  box-shadow: none;
+  box-shadow: 0 0 0 1px #2a2a4a;
+  border: none;
 }
 .chat-panel__input :deep(.el-input__wrapper:hover) {
-  border-color: #3a3a5a;
+  box-shadow: 0 0 0 1px #3a3a5a;
 }
 .chat-panel__input :deep(.el-input__wrapper.is-focus) {
-  border-color: #4caf50;
+  box-shadow: 0 0 0 1px #4caf50;
 }
 .chat-panel__input :deep(.el-input__inner) {
   color: #c0c0c0;
@@ -297,23 +296,5 @@ watch(() => chatStore.messages.length, () => {
   background: #1a1a2e;
   border: 1px solid #2a2a4a;
   border-left: none;
-}
-/* 发送按钮——覆盖 Element Plus 默认亮色样式 */
-.chat-panel__input :deep(.el-input-group__append .el-button) {
-  background: transparent;
-  border: none;
-  color: #4caf50;
-  font-size: 13px;
-  padding: 0 12px;
-  height: 100%;
-  margin: 0;
-}
-.chat-panel__input :deep(.el-input-group__append .el-button:hover) {
-  background: rgba(76, 175, 80, 0.08);
-  color: #66bb6a;
-}
-.chat-panel__input :deep(.el-input-group__append .el-button:disabled) {
-  color: #555;
-  background: transparent;
 }
 </style>

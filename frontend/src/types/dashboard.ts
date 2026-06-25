@@ -7,16 +7,6 @@
 /** DAG 节点状态（对应后端 NodeStatus） */
 export type NodeStatus = 'pending' | 'running' | 'success' | 'failed' | 'skipped'
 
-/** 后端 TaskUpdatePayload 对应前端消费结构 */
-export interface TaskUpdatePayload {
-  task_id: string
-  state: string
-  progress: number
-  dag: Array<Record<string, unknown>>
-  timestamp: string
-  output?: string  // CODING/DONE 状态的代码产物
-}
-
 /** DAG 节点 */
 export interface DagNode {
   id: string

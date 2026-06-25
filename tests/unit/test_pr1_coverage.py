@@ -69,8 +69,8 @@ class TestRunAgentInputConstruction:
         assert received["role"] == AgentRole.DEVELOPER
 
     @pytest.mark.asyncio
-    async def test_run_agent_error_returns_error_output(self) -> None:
-        """agent.execute 抛异常 → _run_agent 返回 error 标记。"""
+    async def test_run_agent_error_raises(self) -> None:
+        """agent.execute 抛异常 → 向上传播 RuntimeError。"""
 
         class CrashAgent:
             role = "developer"
@@ -87,8 +87,8 @@ class TestRunAgentInputConstruction:
         from orbit.scheduler.orchestrator import Scheduler
 
         sched = Scheduler(agent_factory=CrashFactory)
-        output = await sched._run_agent("developer", "t1", {"prd": "test"})
-        assert "error" in output.lower() or "boom" in output.lower()
+        with pytest.raises(RuntimeError, match="boom"):
+            await sched._run_agent("developer", "t1", {"prd": "test"})
 
 
 class TestMainSchedulerInit:

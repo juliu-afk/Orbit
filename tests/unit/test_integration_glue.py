@@ -71,7 +71,7 @@ class TestRunAgent:
 
     @pytest.mark.asyncio
     async def test_run_agent_timeout(self) -> None:
-        """Agent 超时 → 返回 timeout 标记。"""
+        """Agent 超时 → 向上抛 TimeoutError。"""
 
         class SlowAgent:
             role = "developer"
@@ -87,8 +87,8 @@ class TestRunAgent:
                 return SlowAgent()
 
         sched = Scheduler(agent_factory=SlowFactory)
-        output = await sched._run_agent("developer", "t1", {"prd": "test"}, timeout=0.05)
-        assert "timeout" in output.lower()
+        with pytest.raises(TimeoutError):
+            await sched._run_agent("developer", "t1", {"prd": "test"}, timeout=0.05)
 
     @pytest.mark.asyncio
     async def test_dependency_injection(self) -> None:

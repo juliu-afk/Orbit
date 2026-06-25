@@ -9,12 +9,12 @@
       <div class="audit-search">
         <el-input
           v-model="taskId"
-          placeholder="? task_id ?????"
+          placeholder="Audit by task_id"
           size="small"
           style="width: 200px; margin-right: 8px"
           @keyup.enter="handleFetchAudit"
         />
-        <el-button size="small" @click="handleFetchAudit">??</el-button>
+        <el-button size="small" @click="handleFetchAudit">Query</el-button>
       </div>
 
       <div v-if="store.auditLogs.length > 0" class="audit-list">
@@ -30,7 +30,7 @@
       </div>
 
       <div v-if="store.lessons.length > 0" class="lesson-list">
-        <div class="lesson-title">??? ({{ store.lessons.length }})</div>
+        <div class="lesson-title">Lessons ({{ store.lessons.length }})</div>
         <div v-for="ls in store.lessons.slice(0, 10)" :key="ls.lesson_id" class="lesson-item">
           <span class="lesson-domain">{{ ls.domain }}</span>
           <span class="lesson-text">{{ ls.lesson }}</span>

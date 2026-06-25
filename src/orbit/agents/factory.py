@@ -212,11 +212,7 @@ class AgentFactory:
         graph: Any = None,
         sandbox: Any = None,
     ) -> BaseAgent:
-        """create = get_agent ???
-
-        WHY ?????orchestrator._run_agent ? _agent_factory.create(role)?
-        ????? create????????????? get_agent?
-        """
+        """create = get_agent alias for orchestrator."""
         return cls.get_agent(role, llm=llm, graph=graph, sandbox=sandbox)
 
     @classmethod

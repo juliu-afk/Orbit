@@ -1,7 +1,7 @@
 <template>
   <div class="knowledge-panel">
     <el-card shadow="never" class="panel-card">
-      <template #header>???</template>
+      <template #header>Knowledge</template>
       <div class="kb-search">
         <el-input
           v-model="domain"
@@ -11,20 +11,20 @@
         />
         <el-input
           v-model="concept"
-          placeholder="???"
+          placeholder="Concept name"
           size="small"
           style="width: 160px; margin-right: 8px"
           @keyup.enter="handleQuery"
         />
         <el-button size="small" @click="handleQuery" :loading="store.loading">Query</el-button>
-        <el-button size="small" type="warning" @click="handleValidate">????</el-button>
+        <el-button size="small" type="warning" @click="handleValidate">Validate</el-button>
       </div>
 
       <div v-if="store.currentConcept" class="kb-result">
         <div class="kb-concept-name">{{ store.currentConcept.concept }}</div>
         <div class="kb-definition">{{ store.currentConcept.definition }}</div>
         <div v-if="store.currentConcept.formula" class="kb-formula">
-          ???{{ store.currentConcept.formula }}
+          Formula: {{ store.currentConcept.formula }}
         </div>
       </div>
 

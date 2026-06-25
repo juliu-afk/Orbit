@@ -23,7 +23,6 @@ from orbit.checkpoint.manager import CheckpointData, CheckpointManager
 from orbit.events.bus import EventBus
 from orbit.events.schemas import DashboardEvent, TaskUpdatePayload, TokenUpdatePayload
 from orbit.gateway.client import LLMClient
-from orbit.gateway.schemas import LLMRequest
 from orbit.scheduler.graph import GraphNode, NodeStatus, TaskGraph
 
 logger = structlog.get_logger()
@@ -60,13 +59,13 @@ class InvalidStateTransitionError(SchedulerError):
 class Scheduler:
     """MVP 调度器骨架：单任务串行状态机 + Agent 循环原型。
 
-    被调度器 API 调用（Step 1.1 的 /tasks POST 创建后触发）。
-    依赖 LLMClient（思考）+ CheckpointManager（状态持久化）。
+    Orbit 定位编排层——只调度 Agent，不直接调用 LLM。
+    每个 Agent 角色通过注入的 LLMClient 实例调用其配置的模型。
     """
 
     def __init__(
         self,
-        llm_client: LLMClient | None = None,
+        agent_llms: dict[str, LLMClient] | None = None,
         checkpoint_manager: CheckpointManager | None = None,
         event_bus: EventBus | None = None,
         max_concurrent: int = 3,
@@ -79,7 +78,7 @@ class Scheduler:
         tool_registry: Any = None,  # ToolRegistry
         audit_logger: Any = None,  # AuditLogger
     ):
-        self.llm = llm_client
+        self._agent_llms = agent_llms or {}
         self.checkpoint = checkpoint_manager
         self._event_bus = event_bus
         # Step 5.1 DAG 配置
@@ -233,11 +232,15 @@ class Scheduler:
         超时 5 分钟后取消协程。
         """
         if self._agent_factory is None:
-            # 降级：无 AgentFactory 时走传统 LLM 调用
-            return await self._agent_cycle(task_id, TaskState.CODING, context)
+            raise RuntimeError(
+                "AgentFactory 未配置。Orbit 编排层必须通过 Agent 执行任务，"
+                "不支持直接 LLM 调用。请在 Scheduler 初始化时注入 AgentFactory。"
+            )
+
+        agent_llm = self._agent_llms.get(role) if self._agent_llms else None
 
         try:
-            agent = self._agent_factory.create(role, llm=self.llm)
+            agent = self._agent_factory.create(role, llm=agent_llm)
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
             if self._audit_logger:
@@ -249,10 +252,6 @@ class Scheduler:
                     error=str(e),
                 )
             return f"[error] Agent {role} 创建失败: {e}"
-
-        # 注入依赖
-        if self.llm is not None:
-            agent.llm = self.llm
 
         # 构建 L1-L5 上下文
         agent_context = self._build_context(task_id, context)
@@ -318,12 +317,14 @@ class Scheduler:
         )
 
     async def _agent_cycle(self, task_id: str, state: TaskState, context: dict[str, Any]) -> str:
-        """单个 Agent 循环：优先用 Agent 角色 → 降级为直接 LLM 调用。
+        """单个 Agent 循环：按状态映射角色 → 拉起 Agent 执行。
 
-        Step I1: 根据状态映射角色并用 _run_agent() 拉起。
+        Orbit 只编排 Agent，不直接调 LLM。无 AgentFactory 时抛错。
         """
         # 状态→角色映射
         role_map: dict[TaskState, str] = {
+            TaskState.IDLE: "clarifier",
+            TaskState.PARSING: "clarifier",
             TaskState.PLANNING: "architect",
             TaskState.CODING: "developer",
             TaskState.VERIFYING: "reviewer",
@@ -333,46 +334,9 @@ class Scheduler:
             context["state"] = state.value
             return await self._run_agent(role, task_id, context)
 
-        # 降级：直接 LLM 调用（MVP 已有逻辑）
-        if self.llm is None:
-            return f"[mock] {state.value} 完成"
-        prompt = self._build_prompt(state, context)
-        resp = await self.llm.generate(
-            LLMRequest(prompt=prompt, system_prompt=self._system_prompt(state)),  # type: ignore[call-arg]
-            task_id=task_id,
-        )
-        if resp.usage:
-            self._publish_token_update(
-                task_id,
-                resp.usage.prompt_tokens,
-                resp.usage.completion_tokens,
-                resp.usage.total_tokens,
-            )
-        return resp.content
-
-    def _build_prompt(self, state: TaskState, context: dict[str, Any]) -> str:
-        """按状态构造 prompt。"""
-        prd = context.get("prd", "")
-        if state == TaskState.IDLE:
-            return f"分析以下需求，输出关键信息：\n{prd}"
-        if state == TaskState.PARSING:
-            return f"解析需求，列出功能点：\n{prd}"
-        if state == TaskState.PLANNING:
-            prev = context.get("artifacts", {}).get("PARSING", "")
-            return f"基于解析结果设计实现方案：\n{prev}"
-        if state == TaskState.CODING:
-            plan = context.get("artifacts", {}).get("PLANNING", "")
-            return f"基于方案生成代码：\n{plan}"
-        if state == TaskState.VERIFYING:
-            code = context.get("artifacts", {}).get("CODING", "")
-            return f"验证以下代码的正确性：\n{code}"
-        return prd  # type: ignore[no-any-return]
-
-    def _system_prompt(self, state: TaskState) -> str:
-        """编排层风格的 System Prompt（Step 0.4 架构锚定）。"""
-        return (
-            f"你是 V14.1 多智能体协作网络中的 {state.value} 阶段执行 Agent。"
-            "在协作契约约束下工作，输出必须通过 L1-L8 验证。"
+        raise RuntimeError(
+            f"状态 {state.value} 无 Agent 角色映射，且 Orbit 不支持直接 LLM 调用。"
+            "请配置 AgentFactory 和 agent_llms。"
         )
 
     async def _save_checkpoint(

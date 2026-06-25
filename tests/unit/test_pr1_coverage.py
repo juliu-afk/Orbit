@@ -100,7 +100,7 @@ class TestMainSchedulerInit:
 
         assert _scheduler is not None
         assert _scheduler._agent_factory is not None
-        assert _scheduler.llm is not None
+        assert len(_scheduler._agent_llms) > 0
         assert _scheduler._event_bus is not None
 
     def test_app_created_with_event_bus(self) -> None:

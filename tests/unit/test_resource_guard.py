@@ -124,11 +124,11 @@ class TestDegradationPath:
 
     def test_l1_backup_model(self) -> None:
         dp = DegradationPath()
-        r = dp.execute(1, {"model": "deepseek/deepseek-chat"})
+        r = dp.execute(1, {"model": "deepseek/deepseek-v4-pro"})
         assert r.path == "L1_BACKUP_MODEL"
         assert r.level == 1
         assert r.data["action"] == "switch_model"
-        assert r.data["model"] == "qwen/qwen-plus"
+        assert r.data["model"] == "openai/glm-4.7-flash"
 
     def test_l2_rule_engine(self) -> None:
         dp = DegradationPath()

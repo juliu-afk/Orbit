@@ -1,244 +1,143 @@
 """LLMClient（Step 2.1）：统一 LLM 网关。
 
 WHY 统一网关：调度器只认 LLMClient.generate()，不直接接触 litellm。
-好处：① 密钥/路由/成本追踪集中管理；② 熔断器透明；③ 切模型不改调度器。
+好处：密钥/路由/成本追踪集中管理；熔断器透明；切模型不改调度器。
 
-主备降级（PRD SC5）：主力连续失败 2 次 → 自动切备选模型。
+模型体系（2026-06-26 修订）：
+- DeepSeek V4 Pro  → 主力推理（architect/developer）
+- DeepSeek V4 Flash → 轻量任务（config_manager/clarifier）
+- GLM-5.2          → 代码审查+测试设计（reviewer/qa），走 Coding Plan 订阅
+- GLM-4.7 Flash    → 统一降级兜底（免费），走 Coding Plan 订阅
+
+降级策略：主力失败 → 自动切 GLM-4.7 Flash（免费）→ 失败挂起人工。
 熔断（PRD SC2/SC3）：单模型连续 5 次失败 → 熔断 60s → 半开探测。
 """
 
 from __future__ import annotations
-
 from typing import Any
-
 import structlog
-
+from orbit.core.config import settings
 from orbit.gateway.circuit_breaker import CircuitBreaker, CircuitOpenError
 from orbit.gateway.schemas import LLMRequest, LLMResponse, LLMUsage
 
 logger = structlog.get_logger()
 
-# 模型定价（USD / 1K tokens）。来源：DeepSeek/Qwen 官方定价。
-# WHY 集中定价：成本追踪的基础，调价只改这里。
 PRICES: dict[str, dict[str, float]] = {
-    "deepseek/deepseek-chat": {
-        "prompt": 0.001,  # DeepSeek 输入约 $0.001/1K（缓存命中更便宜）
-        "completion": 0.002,
-    },
-    "qwen/qwen-plus": {
-        "prompt": 0.002,
-        "completion": 0.006,
-    },
+    "deepseek/deepseek-v4-pro": {"prompt": 0.000435, "completion": 0.00087},
+    "deepseek/deepseek-v4-flash": {"prompt": 0.00014, "completion": 0.00028},
+    "openai/glm-5.2": {"prompt": 0.0, "completion": 0.0},
+    "openai/glm-4.7-flash": {"prompt": 0.0, "completion": 0.0},
 }
 
-DEFAULT_MODEL = "deepseek/deepseek-chat"
-FALLBACK_MODEL = "qwen/qwen-plus"
-# 主力连续失败次数达到此阈值则切备选（PRD SC5：2 次失败切换）
-FALLBACK_FAILURE_THRESHOLD = 2
-
+MODEL_PRO = "deepseek/deepseek-v4-pro"
+MODEL_FLASH = "deepseek/deepseek-v4-flash"
+MODEL_GLM5 = "openai/glm-5.2"
+MODEL_GLM_FALLBACK = "openai/glm-4.7-flash"
+GLM_API_BASE = "https://open.bigmodel.cn/api/coding/paas/v4"
 
 class LLMClient:
-    """统一 LLM 调用入口。
-
-    被调度器调用（src/orbit/scheduler/）。
-    内部依赖 CircuitBreaker（按模型粒度）+ litellm.acompletion。
-    """
-
-    def __init__(
-        self,
-        circuit_breaker: CircuitBreaker | None = None,
-        default_model: str = DEFAULT_MODEL,
-        fallback_model: str = FALLBACK_MODEL,
-    ):
+    def __init__(self, circuit_breaker=None, default_model=MODEL_PRO, fallback_model=MODEL_GLM_FALLBACK):
         self.cb = circuit_breaker or CircuitBreaker()
         self.default_model = default_model
         self.fallback_model = fallback_model
-        # 调用记录（task_id -> [usage]）供 get_usage_stats
         self._usage_log: dict[str, list[LLMUsage]] = {}
 
     async def generate(self, req: LLMRequest, task_id: str) -> LLMResponse:
-        """调用 LLM，自动主备降级 + 熔断保护。
-
-        Raises:
-            CircuitOpenError: 主备模型均熔断时抛出（调用方应快速失败）。
-        """
-        # 主力模型尝试
         try:
             return await self._call_with_circuit(self.default_model, req, task_id)
         except CircuitOpenError:
-            # 主力熔断 → 尝试备选
-            logger.warning("primary_circuit_open_fallback", model=self.default_model)
-            return await self._call_with_circuit(self.fallback_model, req, task_id)
+            logger.warning("primary_circuit_open", model=self.default_model)
         except Exception as e:
-            # 主力失败但未熔断 → 记录后试备选
-            logger.warning(
-                "primary_failed_trying_fallback",
-                model=self.default_model,
-                error=str(e),
-            )
+            logger.warning("primary_failed", model=self.default_model, error=str(e))
+        try:
+            logger.info("fallback_to_glm47flash", original=self.default_model)
             return await self._call_with_circuit(self.fallback_model, req, task_id)
+        except CircuitOpenError:
+            logger.error("fallback_circuit_open", model=self.fallback_model)
+            raise
+        except Exception as e:
+            logger.error("fallback_failed", model=self.fallback_model, error=str(e))
+            raise
 
     async def _call_with_circuit(self, model: str, req: LLMRequest, task_id: str) -> LLMResponse:
-        """单模型调用 + 熔断器保护。"""
         await self.cb.before_call(model)
         try:
             resp = await self._do_completion(model, req)
             await self.cb.record_success(model)
             self._log_usage(task_id, resp.usage)
-            logger.info(
-                "llm_call_ok",
-                model=model,
-                task_id=task_id,
-                tokens=resp.usage.total_tokens,
-                cost=resp.usage.cost_usd,
-            )
+            logger.info("llm_call_ok", model=model, task_id=task_id, tokens=resp.usage.total_tokens, cost=resp.usage.cost_usd)
             return resp
         except Exception as e:
             await self.cb.record_failure(model)
-            logger.warning(
-                "llm_call_failed",
-                model=model,
-                task_id=task_id,
-                error=str(e),
-            )
+            logger.warning("llm_call_failed", model=model, task_id=task_id, error=str(e))
             raise
 
     async def _do_completion(self, model: str, req: LLMRequest) -> LLMResponse:
-        """调用 litellm.acompletion（真实 LLM）。
-
-        WHY 用 acompletion 异步：与调度器异步模型一致（ADR 技术约束）。
-        Mock 时由测试 patch 此方法。
-        """
-        # 延迟导入 litellm，避免未装包时 import 失败影响测试
         try:
             import litellm  # noqa: F401
         except ImportError as e:
-            raise RuntimeError(
-                "litellm 未安装。生产环境需 poetry install，测试请 mock _do_completion"
-            ) from e
-
-        result = await litellm.acompletion(
-            model=model,
-            messages=[
-                {"role": "system", "content": req.system_prompt},
-                {"role": "user", "content": req.prompt},
-            ],
-            temperature=req.temperature,
-            max_tokens=req.max_tokens,
-        )
+            raise RuntimeError("litellm 未安装") from e
+        if model.startswith("openai/glm"):
+            result = await litellm.acompletion(
+                model=model,
+                messages=[{"role": "system", "content": req.system_prompt}, {"role": "user", "content": req.prompt}],
+                temperature=req.temperature, max_tokens=req.max_tokens,
+                api_base=GLM_API_BASE, api_key=settings.ZAI_API_KEY,
+            )
+        else:
+            result = await litellm.acompletion(
+                model=model,
+                messages=[{"role": "system", "content": req.system_prompt}, {"role": "user", "content": req.prompt}],
+                temperature=req.temperature, max_tokens=req.max_tokens,
+            )
         content = result.choices[0].message.content or ""
-        usage_raw = result.usage
-        usage = self._build_usage(model, usage_raw)
+        usage = self._build_usage(model, result.usage)
         return LLMResponse(content=content, model=model, usage=usage)
 
-    async def generate_stream(
-        self,
-        req: LLMRequest,
-        task_id: str,
-        entropy_monitor=None,
-    ) -> LLMResponse:
-        """流式生成 + V4 熵监控接入。
-
-        WHY 流式：实时喂给 L3EntropyMonitor 检测 LLM 不确定性。
-        熵超阈值→ HighEntropyError（调用方捕获后可打回重问）。
-        无 monitor 时退化为普通流式（仅拼接内容，不检熵）。
-        """
-        import litellm  # 延迟导入，避免未装包时 import 失败
-
+    async def generate_stream(self, req, task_id, entropy_monitor=None):
+        import litellm
         from orbit.hallucination.schemas import HighEntropyError
-
+        model = self.default_model
         try:
-            stream = await litellm.acompletion(
-                model=self.default_model,
-                messages=[
-                    {"role": "system", "content": req.system_prompt},
-                    {"role": "user", "content": req.prompt},
-                ],
-                temperature=req.temperature,
-                max_tokens=req.max_tokens,
-                stream=True,
-                logprobs=bool(entropy_monitor),
-            )
+            stream = await self._stream_completion(model, req, entropy_monitor)
         except Exception as e:
-            # 主力失败 → 尝试备选（与 generate 一致的降级策略）
-            logger.warning("stream_primary_failed", model=self.default_model, error=str(e))
-            stream = await litellm.acompletion(
-                model=self.fallback_model,
-                messages=[
-                    {"role": "system", "content": req.system_prompt},
-                    {"role": "user", "content": req.prompt},
-                ],
-                temperature=req.temperature,
-                max_tokens=req.max_tokens,
-                stream=True,
-            )
-
-        # 拼接流式响应，逐 token 喂给熵监控
-        content_parts: list[str] = []
-        model_used = self.default_model
+            logger.warning("stream_primary_failed", model=model, error=str(e))
+            model = self.fallback_model
+            stream = await self._stream_completion(model, req, entropy_monitor)
+        content_parts = []
         async for chunk in stream:
-            if not chunk.choices:
-                continue
+            if not chunk.choices: continue
             delta = chunk.choices[0].delta
             token_text = delta.content or ""
-            if token_text:
-                content_parts.append(token_text)
-            # V4：有 monitor 且有 logprobs 时检熵
+            if token_text: content_parts.append(token_text)
             if entropy_monitor and hasattr(delta, "logprobs") and delta.logprobs:
-                for lp in delta.logprobs.content if delta.logprobs.content else []:
-                    logprob_list = (
-                        [t.logprob for t in lp.top_logprobs]
-                        if hasattr(lp, "top_logprobs") and lp.top_logprobs
-                        else [lp.logprob]
-                    )
+                for lp in (delta.logprobs.content if delta.logprobs.content else []):
+                    logprob_list = [t.logprob for t in lp.top_logprobs] if hasattr(lp, "top_logprobs") and lp.top_logprobs else [lp.logprob]
                     entropy = entropy_monitor.on_token(lp.token, logprob_list)
                     if entropy is not None:
-                        raise HighEntropyError(
-                            entropy=entropy, threshold=entropy_monitor.config.threshold
-                        )
-            # 记录模型名（备选降级时变化）
-            if hasattr(chunk, "model") and chunk.model:
-                model_used = chunk.model
-
+                        raise HighEntropyError(entropy=entropy, threshold=entropy_monitor.config.threshold)
         content = "".join(content_parts)
-        # 流式下 usage 可能为 None，构造零值 usage
-        usage = LLMUsage()  # type: ignore[call-arg]
-        logger.info(
-            "llm_stream_ok",
-            model=model_used,
-            task_id=task_id,
-            chars=len(content),
-            entropy_checked=entropy_monitor is not None,
-        )
-        return LLMResponse(content=content, model=model_used, usage=usage)
+        return LLMResponse(content=content, model=model, usage=LLMUsage())  # type: ignore[call-arg]
 
-    def _build_usage(self, model: str, usage_raw: Any) -> LLMUsage:
-        """从 litellm usage 对象构造 LLMUsage（含成本计算）。"""
+    async def _stream_completion(self, model, req, entropy_monitor=None):
+        import litellm
+        kwargs = dict(model=model, messages=[{"role": "system", "content": req.system_prompt}, {"role": "user", "content": req.prompt}], temperature=req.temperature, max_tokens=req.max_tokens, stream=True)
+        if model.startswith("openai/glm"): kwargs["api_base"] = GLM_API_BASE; kwargs["api_key"] = settings.ZAI_API_KEY
+        if entropy_monitor: kwargs["logprobs"] = True
+        return await litellm.acompletion(**kwargs)
+
+    def _build_usage(self, model, usage_raw):
         prompt_t = getattr(usage_raw, "prompt_tokens", 0) or 0
         completion_t = getattr(usage_raw, "completion_tokens", 0) or 0
-        total_t = getattr(usage_raw, "total_tokens", prompt_t + completion_t) or (
-            prompt_t + completion_t
-        )
+        total_t = getattr(usage_raw, "total_tokens", prompt_t + completion_t) or (prompt_t + completion_t)
         price = PRICES.get(model, {"prompt": 0.0, "completion": 0.0})
         cost = (prompt_t / 1000.0 * price["prompt"]) + (completion_t / 1000.0 * price["completion"])
-        return LLMUsage(
-            prompt_tokens=prompt_t,
-            completion_tokens=completion_t,
-            total_tokens=total_t,
-            cost_usd=round(cost, 6),
-        )
+        return LLMUsage(prompt_tokens=prompt_t, completion_tokens=completion_t, total_tokens=total_t, cost_usd=round(cost, 6))
 
-    def _log_usage(self, task_id: str, usage: LLMUsage) -> None:
+    def _log_usage(self, task_id, usage):
         self._usage_log.setdefault(task_id, []).append(usage)
 
-    def get_usage_stats(self, task_id: str) -> LLMUsage:
-        """查询任务累计 Token 消耗与成本（PRD 需求⑥）。"""
+    def get_usage_stats(self, task_id):
         records = self._usage_log.get(task_id, [])
-        if not records:
-            return LLMUsage()  # type: ignore[call-arg]
-        return LLMUsage(
-            prompt_tokens=sum(r.prompt_tokens for r in records),
-            completion_tokens=sum(r.completion_tokens for r in records),
-            total_tokens=sum(r.total_tokens for r in records),
-            cost_usd=round(sum(r.cost_usd for r in records), 6),
-        )
+        if not records: return LLMUsage()  # type: ignore[call-arg]
+        return LLMUsage(prompt_tokens=sum(r.prompt_tokens for r in records), completion_tokens=sum(r.completion_tokens for r in records), total_tokens=sum(r.total_tokens for r in records), cost_usd=round(sum(r.cost_usd for r in records), 6))

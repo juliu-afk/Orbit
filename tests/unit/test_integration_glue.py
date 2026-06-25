@@ -1,4 +1,4 @@
-"""Step I1——集成胶水单元测试。"""
+"""Step I1 集成胶水测试——适配 agent_llms 参数（PR2 修订）。"""
 
 import asyncio
 
@@ -41,12 +41,11 @@ class TestRunAgent:
     """
 
     @pytest.mark.asyncio
-    async def test_run_agent_fallback_to_llm(self) -> None:
-        """无 AgentFactory → 降级为直接 LLM 调用。"""
+    async def test_run_agent_no_factory_raises(self) -> None:
+        """无 AgentFactory → 抛 RuntimeError（不再降级到直接 LLM）。"""
         sched = Scheduler()
-        output = await sched._run_agent("developer", "t1", {"prd": "test"})
-        assert isinstance(output, str)
-        assert len(output) > 0
+        with pytest.raises(RuntimeError, match="AgentFactory"):
+            await sched._run_agent("developer", "t1", {"prd": "test"})
 
     @pytest.mark.asyncio
     async def test_run_agent_with_mock_factory(self) -> None:
@@ -112,8 +111,8 @@ class TestRunAgent:
                 return agent
 
         sched = Scheduler(
+            agent_llms={"developer": "fake-llm"},
             agent_factory=CheckFactory,
-            llm_client="fake-llm",
         )
         await sched._run_agent("developer", "t1", {"prd": "test"})
         assert injected["llm"] == "fake-llm"

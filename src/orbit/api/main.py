@@ -32,7 +32,7 @@ from orbit.api.routes import (
 from orbit.checkpoint.manager import CheckpointManager
 from orbit.core.config import settings
 from orbit.events.bus import EventBus
-from orbit.gateway.client import LLMClient
+from orbit.gateway.client import LLMClient, MODEL_FLASH, MODEL_GLM5, MODEL_PRO
 from orbit.scheduler.orchestrator import Scheduler
 from orbit.ws.router import router as ws_router
 from orbit.ws.router import start_broadcaster
@@ -108,7 +108,9 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
             asyncio.create_task(start_broadcaster(event_bus))
             logger.info("ws_broadcaster_started")
 
-    chat.set_clarifier_llm(LLMClient())
+    # ClarifierAgent 用 Flash 轻量模型
+    from orbit.gateway.client import LLMClient as _LLMClient
+    chat.set_clarifier_llm(_LLMClient(default_model=MODEL_FLASH))
 
     return app
 
@@ -126,9 +128,23 @@ except Exception:
     logger.warning("redis_init_failed_fallback_memory")
     _redis_client = None
 
+# ── 按角色创建 LLMClient，每个 Agent 用其配置的模型 ──
+_llm_pro = LLMClient(default_model=MODEL_PRO)
+_llm_flash = LLMClient(default_model=MODEL_FLASH)
+_llm_glm5 = LLMClient(default_model=MODEL_GLM5)
+
+_agent_llms: dict[str, LLMClient] = {
+    "architect": _llm_pro,
+    "developer": _llm_pro,
+    "reviewer": _llm_glm5,
+    "qa": _llm_glm5,
+    "config_manager": _llm_flash,
+    "clarifier": _llm_flash,
+}
+
 _checkpoint_manager = CheckpointManager(redis_client=_redis_client)
 _scheduler = Scheduler(
-    llm_client=LLMClient(),
+    agent_llms=_agent_llms,
     event_bus=_event_bus,
     agent_factory=AgentFactory,
     checkpoint_manager=_checkpoint_manager,

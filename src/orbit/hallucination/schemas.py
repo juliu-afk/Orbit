@@ -36,7 +36,7 @@ class ValidationResult(BaseModel):
 
 
 class L3EntropyConfig(BaseModel):
-    """L3 熵监控配置（PRD Q1 决议：DeepSeek 0.75，Qwen 0.70）。"""
+    """L3 熵监控配置（PRD Q1 决议：DeepSeek 0.75，GLM 0.73）。"""
 
     window_size: int = Field(10, ge=1, description="滑动窗口大小")
     threshold: float = Field(0.75, ge=0.0, le=1.0, description="熵阈值")

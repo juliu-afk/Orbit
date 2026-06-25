@@ -1,7 +1,7 @@
 """多级降级路径 (Step 7.3 ResourceGuard).
 
 WHY 4 级降级而非二元 pass/fail:
-- L1 备用模型: 自动切换, 用户无感知, 成功率最高
+- L1 备用模型: 自动切 GLM-4.7 Flash（免费），用户无感知
 - L2 规则引擎: 预定义模板响应, 不需要 LLM
 - L3 缓存数据: 返回上次成功结果 (标记 stale), 有数据可用
 - L4 人工挂起: 前 3 级全失败时安全兜底, 不丢任务
@@ -66,7 +66,7 @@ class DegradationPath:
             level=1,
             data={
                 "action": "switch_model",
-                "model": "qwen/qwen-plus",
+                "model": "openai/glm-4.7-flash",
                 "original_model": ctx.get("model", "unknown"),
             },
         )

@@ -1,6 +1,5 @@
 /** Knowledge Store??????????
  *
- * ??? /api/v1/knowledge ? /api/v1/compliance ???
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -33,7 +32,6 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  /** ?????? */
   async function queryConcept(domain: string, concept: string) {
     loading.value = true
     error.value = null
@@ -53,7 +51,6 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
-  /** ???? */
   async function search(query: string) {
     loading.value = true
     try {
@@ -69,7 +66,6 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
-  /** ?????? */
   async function listConcepts(domain: string) {
     loading.value = true
     try {
@@ -85,7 +81,6 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
-  /** ????? */
   async function validateCompliance(domain: string, concept: string) {
     loading.value = true
     error.value = null

@@ -55,7 +55,6 @@ class TestOrchestratorRunAgent:
         from orbit.scheduler.orchestrator import Scheduler
 
         sched = Scheduler(llm_client=None, agent_factory=FakeFactory)
-        # ? _run_agent ??
         output = await sched._run_agent("developer", "test-task", {"prd": "???"})
         assert "add" in output or "code" in output.lower() or "ok" in output.lower()
 
@@ -72,11 +71,9 @@ class TestSchedulerRunTaskProgress:
         bus = EventBus()
         sched = Scheduler(llm_client=None, event_bus=bus)
 
-        # ??? run_task?mock ???llm=None?
         task = asyncio.create_task(sched.run_task("test-123", "?????????????"))
-        await asyncio.sleep(0.3)  # ??????
+        await asyncio.sleep(0.3)
 
-        # ????
         events = []
         try:
             while True:
@@ -89,7 +86,6 @@ class TestSchedulerRunTaskProgress:
         with contextlib.suppress(asyncio.CancelledError):
             await task
 
-        # ???????????
         assert len(events) > 0, "EventBus ?????????"
 
 
@@ -103,9 +99,7 @@ class TestRunAgentRealFactory:
         from orbit.scheduler.orchestrator import Scheduler
 
         sched = Scheduler(llm_client=None, agent_factory=AgentFactory)
-        # mock ???llm=None??Agent ?? mock ??
         output = await sched._run_agent("developer", "test-real", {"prd": "???"})
-        # mock DeveloperAgent ?? {"code": "# [mock] code for: ..."}
         assert "mock" in output.lower() or "code" in output.lower()
 
     @pytest.mark.asyncio

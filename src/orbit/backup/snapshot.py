@@ -99,7 +99,6 @@ class Snapshotter:
                 size = os.path.getsize(path)
                 integrity_hash = compute_hash(path)
                 created = os.path.getmtime(path)
-                # ? snap_id ?? db_type????{type}_{timestamp}?
                 parts = snap_id.split("_", 1)
                 dtype = parts[0] if len(parts) > 1 else ""
                 results.append(

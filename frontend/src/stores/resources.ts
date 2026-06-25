@@ -25,7 +25,6 @@ export const useResourcesStore = defineStore('resources', () => {
   const loading = ref(false)
 
   async function fetchQueue() {
-    // WHY ? observability metrics ? active_tasks?MVP ????????
     try {
       const r = await fetch(METRICS_URL)
       const j = await r.json()
@@ -36,12 +35,10 @@ export const useResourcesStore = defineStore('resources', () => {
         }
       }
     } catch {
-      // ??
     }
   }
 
   async function fetchTools() {
-    // WHY ? metrics ? sandbox_executions ???????MVP ????????
     try {
       const r = await fetch(METRICS_URL)
       const j = await r.json()
@@ -57,7 +54,6 @@ export const useResourcesStore = defineStore('resources', () => {
         ]
       }
     } catch {
-      // ??
     }
   }
 

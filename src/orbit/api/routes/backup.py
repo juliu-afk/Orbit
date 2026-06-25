@@ -1,9 +1,8 @@
 """???? API?Step 7.4/7.5??
 
-??:
-  GET  /api/v1/backup/snapshots        ????
-  POST /api/v1/backup/snapshots        ?????SQLite/???
-  POST /api/v1/backup/restore          ????
+GET  /api/v1/backup/snapshots        ????
+POST /api/v1/backup/snapshots        ?????SQLite/???
+POST /api/v1/backup/restore          ????
 """
 
 from __future__ import annotations
@@ -25,14 +24,12 @@ _restorer = Restorer()
 
 
 class SnapshotCreateRequest(BaseModel):
-    """???????"""
 
     source_path: str
     db_type: str = "sqlite"  # sqlite | knowledge | checkpoint | file
 
 
 class RestoreRequest(BaseModel):
-    """???????"""
 
     snapshot_id: str
     target_path: str
@@ -40,7 +37,6 @@ class RestoreRequest(BaseModel):
 
 @router.get("/snapshots", summary="??????")
 async def list_snapshots(db_type: str = Query("", description="?????")) -> dict[str, Any]:
-    """????????????????"""
     snapshots = _snapshotter.list_snapshots(db_type=db_type)
     return {
         "code": 0,
@@ -66,7 +62,6 @@ async def create_snapshot(req: SnapshotCreateRequest) -> dict[str, Any]:
 
 @router.post("/restore", summary="????")
 async def restore_snapshot(req: RestoreRequest) -> dict[str, Any]:
-    """???????????"""
     snapshots = _snapshotter.list_snapshots()
     target = next((s for s in snapshots if s.snapshot_id == req.snapshot_id), None)
     if target is None:

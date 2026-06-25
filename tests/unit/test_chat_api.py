@@ -47,7 +47,6 @@ class TestChatWebSocket:
             assert data["data"]["type"] == "clarify"
 
     def test_empty_text_error(self) -> None:
-        """??? ? ?????"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(json.dumps({"type": "chat", "text": ""}))
             raw = ws.receive_text()
@@ -65,7 +64,6 @@ class TestChatWebSocket:
             assert len(data["data"]["reply"]) > 0
 
     def test_multiple_messages(self) -> None:
-        """???????????"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             for _ in range(3):
                 ws.send_text(json.dumps({"type": "chat", "text": "test message"}))
@@ -74,7 +72,6 @@ class TestChatWebSocket:
                 assert data["code"] == 0
 
     def test_unknown_type_error(self) -> None:
-        """?????? ? ?????"""
         with self.client.websocket_connect("/api/v1/chat") as ws:
             ws.send_text(json.dumps({"type": "unknown_type", "text": "test"}))
             raw = ws.receive_text()

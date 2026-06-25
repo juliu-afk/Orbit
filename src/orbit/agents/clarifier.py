@@ -140,7 +140,6 @@ _PLACEHOLDER_WORDS: tuple[str, ...] = (
     "todo",
     "...",
     "？？？",
-    "??",
     "暂无",
     "未知",
 )

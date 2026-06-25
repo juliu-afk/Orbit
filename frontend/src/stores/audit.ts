@@ -1,6 +1,5 @@
 /** Audit Store??????/??????
  *
- * ??? /api/v1/observability/audit ? /lessons ???
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -46,7 +45,6 @@ export const useAuditStore = defineStore('audit', () => {
     }
   }
 
-  /** ????? */
   async function fetchLessons() {
     loading.value = true
     try {
@@ -62,7 +60,6 @@ export const useAuditStore = defineStore('audit', () => {
     }
   }
 
-  /** ???? */
   async function recordLesson(data: {
     task_id: string
     domain: string

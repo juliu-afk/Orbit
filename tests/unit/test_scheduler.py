@@ -144,7 +144,7 @@ async def test_agent_error_handled():
 
     sched = Scheduler(agent_llms={}, agent_factory=AgentFactory)
     final = await sched.run_task("task-fail", "x")
-    assert final == TaskState.DONE  # error caught, continues
+    assert final == TaskState.FAILED  # agent 异常向上传播
 
 
 # ── 检查点 ──

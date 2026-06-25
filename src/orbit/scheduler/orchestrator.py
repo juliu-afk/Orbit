@@ -274,21 +274,21 @@ class Scheduler:
                 r = output_obj.result
                 output = r.get("design") or r.get("code") or r.get("review") or str(r)
             else:
-                output = f"[error] {output_obj.error}"
+                raise RuntimeError(f"Agent {role} 返回错误: {output_obj.error}")
         except TimeoutError:
             logger.warning("agent_timeout", role=role, task_id=task_id)
-            output = f"[timeout] {role} 超时 (300s)"
             if self._audit_logger:
                 self._audit_logger.log(
                     "orchestrator", "agent_timeout", task_id=task_id, component=role
                 )
+            raise
         except Exception as e:
             logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
-            output = f"[error] {role}: {e}"
             if self._audit_logger:
                 self._audit_logger.log(
                     "orchestrator", "agent_run_error", task_id=task_id, component=role, error=str(e)
                 )
+            raise
 
         return str(output)
 

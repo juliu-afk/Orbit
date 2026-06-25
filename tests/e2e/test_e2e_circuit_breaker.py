@@ -43,8 +43,18 @@ async def test_e2e_normal_llm_recovers(e2e_app: Any) -> None:
     scheduler: Scheduler = getattr(e2e_app, "_scheduler", None)
     assert scheduler is not None
 
+    # ClarifierAgent 需要 JSON——单独给 mock response
+    clarify_mock = MockLLMClient(
+        fail_count=0,
+        fixed_response='{"reply":"ok","clarification_status":"ready","structured_prd":{"goal":"test","scope":"test","acceptance_criteria":["ok"]}}',
+    )
     ok = MockLLMClient(fail_count=0)
-    scheduler._agent_llms = {"developer": ok, "clarifier": ok, "architect": ok, "reviewer": ok}
+    scheduler._agent_llms = {
+        "developer": ok,
+        "clarifier": clarify_mock,
+        "architect": ok,
+        "reviewer": ok,
+    }
 
     task_id = "recovery-test-id-00000000000000"
     state = await asyncio.wait_for(

@@ -32,7 +32,7 @@ from orbit.api.routes import (
 from orbit.checkpoint.manager import CheckpointManager
 from orbit.core.config import settings
 from orbit.events.bus import EventBus
-from orbit.gateway.client import LLMClient, MODEL_FLASH, MODEL_GLM5, MODEL_PRO
+from orbit.gateway.client import MODEL_FLASH, MODEL_GLM5, MODEL_PRO, LLMClient
 from orbit.scheduler.orchestrator import Scheduler
 from orbit.ws.router import router as ws_router
 from orbit.ws.router import start_broadcaster

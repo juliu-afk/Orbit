@@ -62,9 +62,9 @@ class TestSchedulerRunTaskProgress:
     @pytest.mark.asyncio
     async def test_run_task_publishes_to_event_bus(self) -> None:
         """run_task publishes state transitions to EventBus."""
+        from orbit.agents.factory import AgentFactory
         from orbit.events.bus import EventBus
         from orbit.scheduler.orchestrator import Scheduler
-        from orbit.agents.factory import AgentFactory
 
         bus = EventBus()
         sched = Scheduler(agent_llms={}, event_bus=bus, agent_factory=AgentFactory)

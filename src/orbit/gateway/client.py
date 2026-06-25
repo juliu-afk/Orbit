@@ -14,8 +14,9 @@ WHY 统一网关：调度器只认 LLMClient.generate()，不直接接触 litell
 """
 
 from __future__ import annotations
-from typing import Any
+
 import structlog
+
 from orbit.core.config import settings
 from orbit.gateway.circuit_breaker import CircuitBreaker, CircuitOpenError
 from orbit.gateway.schemas import LLMRequest, LLMResponse, LLMUsage
@@ -113,7 +114,6 @@ class LLMClient:
         return LLMResponse(content=content, model=model, usage=usage)
 
     async def generate_stream(self, req, task_id, entropy_monitor=None):
-        import litellm
         from orbit.hallucination.schemas import HighEntropyError
 
         model = self.default_model

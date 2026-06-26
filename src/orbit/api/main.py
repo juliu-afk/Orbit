@@ -137,13 +137,15 @@ _llm_pro = LLMClient(default_model=MODEL_PRO)
 _llm_flash = LLMClient(default_model=MODEL_FLASH)
 _llm_glm5 = LLMClient(default_model=MODEL_GLM5)
 
+# Tier 分配: Flash(T1)=轻量, Pro(T2)=中档, GLM-5.2(T3)=最强
+# developer 默认 T2, 失败时升级链: T1→T2→T3
 _agent_llms: dict[str, LLMClient] = {
-    "architect": _llm_pro,
-    "developer": _llm_pro,
-    "reviewer": _llm_glm5,
-    "qa": _llm_glm5,
-    "config_manager": _llm_flash,
-    "clarifier": _llm_flash,
+    "architect": _llm_glm5,  # T3 GLM-5.2——架构需要最强推理
+    "developer": _llm_pro,  # T2 DS V4 Pro——编码中档起步, 失败升T3
+    "reviewer": _llm_pro,  # T2 DS V4 Pro——审查中档够用
+    "qa": _llm_pro,  # T2 DS V4 Pro——测试中档够用
+    "config_manager": _llm_flash,  # T1 DS Flash——配置轻量即可
+    "clarifier": _llm_flash,  # T1 DS Flash——对话轻量即可
 }
 
 _checkpoint_manager = CheckpointManager(redis_client=_redis_client)

@@ -24,9 +24,9 @@ logger = structlog.get_logger("orbit.router.agent")
 # LiteLLM 模型 ID 映射
 TIER_MODEL_MAP: dict[str, str] = {
     "tier_0": "",  # 本地规则引擎，无 LLM 调用
-    "tier_1": "deepseek/deepseek-v4-flash",  # DS Flash——轻量
-    "tier_2": "openai/glm-5.2",  # GLM-5.2——中档
-    "tier_3": "deepseek/deepseek-v4-pro",  # DS V4 Pro——全量
+    "tier_1": "deepseek/deepseek-v4-flash",  # DS Flash——轻量·省钱
+    "tier_2": "deepseek/deepseek-v4-pro",  # DS V4 Pro——中档·标准
+    "tier_3": "openai/glm-5.2",  # GLM-5.2——最强·Coding Plan
 }
 
 FALLBACK_MODEL = "openai/glm-4.7-flash"  # 统一降级兜底（免费）
@@ -35,8 +35,8 @@ FALLBACK_MODEL = "openai/glm-4.7-flash"  # 统一降级兜底（免费）
 class ModelTier(StrEnum):
     TIER_0 = "tier_0"  # 本地规则引擎——零 LLM 调用
     TIER_1 = "tier_1"  # DS Flash——轻量任务
-    TIER_2 = "tier_2"  # GLM-5.2——中等任务
-    TIER_3 = "tier_3"  # DS V4 Pro——复杂任务
+    TIER_2 = "tier_2"  # DS V4 Pro——中等任务
+    TIER_3 = "tier_3"  # GLM-5.2——最强任务
 
 
 # Tier 判定阈值

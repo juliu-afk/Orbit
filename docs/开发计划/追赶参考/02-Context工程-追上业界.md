@@ -226,3 +226,127 @@ MiMo 的 checkpoint 算法保留 `[10K, 20K]` token 的尾部上下文：
 - TAIL_MIN_TEXT_BLOCK_MESSAGES = 5
 - 压缩可压缩工具（read, bash, grep 等）的结果
 - checkpoint-writer 子Agent 写入 `checkpoint.md`
+
+---
+
+## 附录 A：Hermes 上下文压缩原始研究
+
+> 来源：`NousResearch/hermes-agent` `agent/context_compressor.py` (2683行) + `hermes_state.py` (5351行)
+
+### 压缩触发阈值（精确到行号）
+
+| 参数 | 值 | 位置 |
+|------|-----|------|
+| `threshold_percent` | **0.50** (50%) | `__init__` 行783 |
+| `_MIN_CTX_TRIGGER_RATIO` | **0.85** (85%) | 退化阈值 |
+| `MINIMUM_CONTEXT_LENGTH` | **64000** tokens | 最小上下文 |
+| `protect_first_n` | **3** | 保护前N条消息 |
+| `protect_last_n` | **20** | 保护最后N条消息 |
+| `summary_target_ratio` | **0.20** (20%) | 摘要预算占比 |
+| `_MIN_SUMMARY_TOKENS` | **2000** | 摘要下限 |
+| `_SUMMARY_TOKENS_CEILING` | **12000** | 摘要上限 |
+
+### 压缩 8 步骤（`compress()` 行号 2372）
+
+1. **工具输出修剪** (`_prune_old_tool_results`, 行990) — 去重+摘要替换旧结果
+2. **找 head 边界** — 保护前3条消息（system prompt + 初始交换）
+3. **token 预算向后遍历找 tail** (`_find_tail_cut_by_tokens`, 行2094) — 20%预算
+4. **LLM 摘要** (`_generate_summary`, 行1453) — 辅助模型，结构化模板
+5. **组装 head + summary + tail**
+6. **边界对齐** — `_align_boundary_forward()` / `_align_boundary_backward()` 确保不拆 tool_call/result 对
+7. **用户消息锚定** — `_ensure_last_user_message_in_tail()` 防止活跃任务丢失
+8. **会话分叉** — 创建子会话，记录 parent-child lineage
+
+### 防抖动机制
+
+- `_ineffective_compression_count >= 2` → 退避，不再压缩
+- 摘要前缀：`[CONTEXT COMPACTION — REFERENCE ONLY] ... latest message WINS`
+
+### 会话管理 (`hermes_state.py`)
+
+- **双 FTS5 索引**：
+  ```sql
+  CREATE VIRTUAL TABLE messages_fts USING fts5(content);
+  CREATE VIRTUAL TABLE messages_fts_trigram USING fts5(content, tokenize='trigram');
+  ```
+- **WAL 模式 + NFS 回退** (`apply_wal_with_fallback`, 行244)
+- **损坏 DB 修复** (`repair_state_db_schema`, 行457) — FTS 索引原地重建，失败则 drop+rebuild
+- **Schema version 16**，54 个 session 列
+- **FTS 搜索** (`search_messages`, 行3691) — BM25 排序 + 片段生成 + source/role 过滤
+
+---
+
+## 附录 B：MiMo Code 记忆系统原始研究
+
+> 来源：`XiaomiMiMo/MiMo-Code` `packages/opencode/src/memory/` (6文件)
+
+### 文件与行数
+
+| 文件 | 行数 | 职责 |
+|------|:--:|------|
+| `memory/service.ts` | 115 | FTS5 search + BM25 ranking + score floor filtering |
+| `memory/reconcile.ts` | 120 | 双向同步（disk→FTS 索引 + prune 已删除） |
+| `memory/fts.sql.ts` | 25 | FTS5 DDL schema |
+| `memory/fts-query.ts` | 45 | CJK token builder（Unicode `\p{L}\p{N}_` 正则） |
+| `memory/paths.ts` | 110 | 路径解析器 + scope/type 提取 + CC frontmatter 类型 |
+| `memory/index.ts` | — | 模块导出 |
+
+### 记忆文件布局（6 种类型）
+
+```
+memory/global/MEMORY.md              ← 跨项目用户偏好
+memory/projects/<pid>/MEMORY.md      ← 每项目持久知识
+memory/sessions/<sid>/checkpoint.md  ← 会话检查点
+memory/sessions/<sid>/notes.md       ← 自由格式笔记
+memory/sessions/<sid>/tasks/<TID>/progress.md ← 每任务进度
+~/.claude/projects/<slug>/memory/**/*.md ← CC 互操作
+```
+
+### 双向同步算法 (`reconcile.ts`)
+
+```
+Direction A: 遍历磁盘 *.md → 读 body → 算 fingerprint(size+mtime) → FTS upsert
+Direction B: 遍历 FTS rows → 检查磁盘 path 是否存在 → 不存在则 DELETE
+```
+
+### BM25 搜索 (`service.ts`)
+
+- **Token 级 FTS5 查询**：标点剥离 → 每 token 双引号包裹 → OR 连接
+- **Score floor**: 相对比例（top hit 的 0.15），过滤常见词噪声
+- **Over-fetch**: 3x 请求量（上限 50），供 score floor 削峰
+
+### CJK 分词 (`fts-query.ts`)
+
+```python
+# 正则: [\p{L}\p{N}_]+ 匹配 Unicode 字母/数字/下划线（含中文）
+tokens = re.findall(r'[\w]+', query, re.UNICODE)
+fts_query = " OR ".join(f'"{t}"' for t in tokens)
+```
+
+### 检查点边界算法 (`session/checkpoint.ts` ~500行)
+
+| 参数 | 值 |
+|------|-----|
+| TAIL_MIN_TOKENS | 10000 |
+| TAIL_MAX_TOKENS | 20000 |
+| TAIL_MIN_TEXT_BLOCK_MESSAGES | 5 |
+| 压缩目标 | 可压缩工具结果（read, bash, grep 等） |
+| 输出 | checkpoint.md（checkpoint-writer 子Agent 维护） |
+
+### 上下文压缩 (`session/compaction.ts` ~300行)
+
+- `select()` — token 预算尾部选择
+- `prune()` — 旧工具输出擦除
+- `process()` — LLM 摘要（模板：Goal + Instructions + Discoveries + Accomplished + Relevant files）
+
+### /dream 命令——记忆自进化
+
+5 阶段 LLM 驱动的合并流程：
+1. Phase 0 - Locate Data: 搜索记忆文件，定位 SQLite DB
+2. Phase 1 - Orient: 读 MEMORY.md + notes.md + checkpoints
+3. Phase 2 - Gather: 从检查点/进度/笔记提取候选事实
+4. Phase 3 - Verify: 只读 SQLite 查询交叉验证
+5. Phase 4 - Consolidate: 编辑 MEMORY.md（预定义章节）
+6. Phase 5 - Prune: 保持 <200 行/10KB，验证路径/命名
+
+**自动触发**: 每 7 天（dream）/ 30 天（distill），`session/auto-dream.ts` ~120行

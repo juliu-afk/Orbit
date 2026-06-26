@@ -23,10 +23,10 @@ logger = structlog.get_logger("orbit.router.agent")
 
 # LiteLLM 模型 ID 映射
 TIER_MODEL_MAP: dict[str, str] = {
-    "tier_0": "",                             # 本地规则引擎，无 LLM 调用
-    "tier_1": "deepseek/deepseek-v4-flash",   # DS Flash——轻量·省钱
-    "tier_2": "deepseek/deepseek-v4-pro",     # DS V4 Pro——中档·标准
-    "tier_3": "openai/glm-5.2",               # GLM-5.2——最强·Coding Plan
+    "tier_0": "",  # 本地规则引擎，无 LLM 调用
+    "tier_1": "deepseek/deepseek-v4-flash",  # DS Flash——轻量·省钱
+    "tier_2": "deepseek/deepseek-v4-pro",  # DS V4 Pro——中档·标准
+    "tier_3": "openai/glm-5.2",  # GLM-5.2——最强·Coding Plan
 }
 
 FALLBACK_MODEL = "openai/glm-4.7-flash"  # 统一降级兜底（免费）

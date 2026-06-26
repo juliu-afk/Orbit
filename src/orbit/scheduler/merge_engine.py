@@ -17,6 +17,7 @@ from typing import Any
 
 import structlog
 
+from orbit.gateway.schemas import LLMRequest
 from orbit.scheduler.escalation import TierAttempt, EscalationResult
 
 logger = structlog.get_logger("orbit.scheduler.merge_engine")
@@ -135,10 +136,7 @@ class MergeEngine:
             )
 
         # Phase 1: 确定性验证
-        det_scores = {
-            a.tier_label: self._deterministic_check(a.output or {}, task)
-            for a in valid
-        }
+        det_scores = {a.tier_label: self._deterministic_check(a.output or {}, task) for a in valid}
 
         # Phase 2: LLM 逐维评分
         try:
@@ -153,7 +151,12 @@ class MergeEngine:
 
         total_scores = {}
         for label, scores in llm_scores.items():
-            weighted = sum(s.score * next((d["weight"] for d in EVALUATION_DIMENSIONS if d["key"] == s.key), 0) / 100 for s in scores)
+            weighted = sum(
+                s.score
+                * next((d["weight"] for d in EVALUATION_DIMENSIONS if d["key"] == s.key), 0)
+                / 100
+                for s in scores
+            )
             total_scores[label] = weighted
 
         scorecard = {}
@@ -171,9 +174,7 @@ class MergeEngine:
 
     # ── Phase 1: 确定性验证 ──────────────────────
 
-    def _deterministic_check(
-        self, output: dict[str, Any], task: str
-    ) -> dict[str, float]:
+    def _deterministic_check(self, output: dict[str, Any], task: str) -> dict[str, float]:
         """不调 LLM 的自动检查——快、零成本、可复现。"""
         scores: dict[str, float] = {}
 
@@ -194,15 +195,11 @@ class MergeEngine:
 
         # 无硬编码密钥
         secret_patterns = ["sk-", "api_key=", "password=", "secret="]
-        scores["no_hardcoded_secret"] = (
-            0.0 if any(p in content for p in secret_patterns) else 10.0
-        )
+        scores["no_hardcoded_secret"] = 0.0 if any(p in content for p in secret_patterns) else 10.0
 
         # 错误处理
         error_indicators = ["try", "except", "catch", "error", "raise", "throw"]
-        scores["has_error_handling"] = (
-            10.0 if any(e in content for e in error_indicators) else 5.0
-        )
+        scores["has_error_handling"] = 10.0 if any(e in content for e in error_indicators) else 5.0
 
         return scores
 
@@ -216,8 +213,6 @@ class MergeEngine:
     ) -> dict[str, list[DimensionScore]]:
         """调用 GLM-5.2，按 6 个维度逐项评分。"""
         prompt = self._build_evaluation_prompt(attempts, task, det_scores)
-
-        from orbit.gateway.schemas import LLMRequest
 
         resp = await self.llm.generate(
             LLMRequest(
@@ -246,9 +241,7 @@ class MergeEngine:
         ]
 
         for d in EVALUATION_DIMENSIONS:
-            parts.append(
-                f"- **{d['name']}**({d['key']}, 权重{d['weight']}%): {d['description']}"
-            )
+            parts.append(f"- **{d['name']}**({d['key']}, 权重{d['weight']}%): {d['description']}")
 
         parts.append("")
         parts.append("## 确定性检查结果（自动验证，不调LLM）")
@@ -271,7 +264,7 @@ class MergeEngine:
         parts.append("2. 每个分数必须附具体理由（引用方案中的代码/文字作为证据）")
         parts.append("3. 标注每个维度哪个方案最好（best_of: 'tier_1'/'tier_2'/'tier_3'）")
         parts.append("4. 输出 JSON:")
-        parts.append('''{
+        parts.append("""{
   "evaluations": {
     "tier_1": {
       "correctness": {"score": 8, "reason": "逻辑正确，但缺少空值检查", "best_of": null},
@@ -287,7 +280,7 @@ class MergeEngine:
     "tier_3": ["核心算法", "安全防护"]
   },
   "gaps": ["缺少并发处理", "未考虑超时"]
-}''')
+}""")
         parts.append("只输出 JSON，不要其他内容。")
 
         return "\n".join(parts)
@@ -301,11 +294,10 @@ class MergeEngine:
         result = _json.loads(raw)
         evals = result.get("evaluations", {})
 
-        tier_map = {0: "tier_1", 1: "tier_2", 2: "tier_3"}
         scored: dict[str, list[DimensionScore]] = {}
 
-        for i, a in enumerate(attempts):
-            label = tier_map.get(i, a.tier.value)
+        for a in attempts:
+            label = a.tier_label  # 直接用 TierAttempt.tier_label
             tier_eval = evals.get(label, {})
             scores = []
             for dim in EVALUATION_DIMENSIONS:
@@ -332,7 +324,7 @@ class MergeEngine:
         task: str,
     ) -> str:
         """构建代码融合 prompt——评分卡驱动，各取所长。"""
-        tier_labels = {0: "tier_1", 1: "tier_2", 2: "tier_3"}
+        tier_labels = [a.tier_label for a in attempts]
 
         parts = [
             "## 任务\n" + task,
@@ -348,23 +340,22 @@ class MergeEngine:
             best_label = None
             best_s = -1.0
             for i, a in enumerate(attempts):
-                label = tier_labels.get(i, a.tier.value)
+                label = tier_labels[i]
                 tier_scores = all_scores.get(label, [])
                 sc = next((s.score for s in tier_scores if s.key == dk), 5)
                 scores.append(str(sc))
                 if sc > best_s:
                     best_s = sc
                     best_label = label
-            parts.append(
-                f"| {dim['name']}({dim['weight']}%) | {scores[0]} | {scores[1]} | {scores[2]} | {best_label} |"
-            )
+            score_cols = " | ".join(scores)
+            parts.append(f"| {dim['name']}({dim['weight']}%) | {score_cols} | {best_label} |")
 
         parts.append("")
         parts.append("## 各方案代码")
         for i, a in enumerate(attempts):
-            label = tier_labels.get(i, a.tier.value)
+            label = tier_labels[i]
             parts.append(f"### {label} ({a.model})")
-            parts.append(f"```\n{str(a.output)}\n```")
+            parts.append(f"```\n{_json.dumps(a.output, indent=2, ensure_ascii=False)}\n```")
             parts.append("")
 
         parts.append("## 融合要求")
@@ -372,7 +363,9 @@ class MergeEngine:
         parts.append("2. 从其他方案中吸收评分更高的维度的具体写法")
         parts.append("3. 冲突时以评分卡为准——哪个方案在该维度分高就用哪个的写法")
         parts.append("4. 补充评分卡暴露的遗漏点")
-        parts.append('5. 输出纯代码，不要解释。格式: {"code": "融合后的完整代码", "taken_from": {"tier_1": [...], "tier_2": [...], "tier_3": [...]}, "changes": "简述融合做了哪些改动"}')
+        parts.append(
+            '5. 输出纯代码，不要解释。格式: {"code": "融合后的完整代码", "taken_from": {"tier_1": [...], "tier_2": [...], "tier_3": [...]}, "changes": "简述融合做了哪些改动"}'
+        )
         parts.append("只输出 JSON。")
 
         return "\n".join(parts)
@@ -389,15 +382,14 @@ class MergeEngine:
         从每个方案中提取真正优秀的部分，生成融合代码。
         """
         # 先做确定性最佳维度统计（用作评分卡）
-        tier_labels = {0: "tier_1", 1: "tier_2", 2: "tier_3"}
         taken_from: dict[str, list[str]] = {}
 
         for dim in EVALUATION_DIMENSIONS:
             dk = dim["key"]
             best_label = None
             best_score = -1.0
-            for i, a in enumerate(attempts):
-                label = tier_labels.get(i, a.tier.value)
+            for a in attempts:
+                label = a.tier_label
                 scores = all_scores.get(label, [])
                 for s in scores:
                     if s.key == dk and s.score > best_score:
@@ -409,8 +401,6 @@ class MergeEngine:
         # 调 LLM 融合代码
         try:
             prompt = self._build_synthesis_prompt(attempts, all_scores, task)
-            from orbit.gateway.schemas import LLMRequest
-
             resp = await self.llm.generate(
                 LLMRequest(
                     prompt=prompt,
@@ -418,8 +408,6 @@ class MergeEngine:
                 ),
                 task_id="merge-synth",
             )
-            import json as _json
-
             result = _json.loads(resp.content)
             merged_code = result.get("code", str(result))
             llm_taken = result.get("taken_from", {})
@@ -437,9 +425,7 @@ class MergeEngine:
                     return a.output, taken_from, []
             return {}, taken_from, []
 
-    def _fallback_merge(
-        self, attempts: list[TierAttempt]
-    ) -> MergeResult:
+    def _fallback_merge(self, attempts: list[TierAttempt]) -> MergeResult:
         """评分失败时的降级合并——Tier 3 直接胜出。"""
         t3 = None
         for a in reversed(attempts):

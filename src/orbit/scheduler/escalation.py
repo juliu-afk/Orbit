@@ -86,7 +86,9 @@ def build_merge_prompt(attempts: list[TierAttempt], task: str) -> str:
     parts.append("1. 从三个方案中提取各自最好的部分")
     parts.append("2. 冲突时以 Tier3-GLM-5.2 为准")
     parts.append("3. 补充任一方案遗漏的关键点")
-    parts.append("4. 输出 JSON: {\"merged\": {...}, \"taken_from\": {\"tier1\": [...], \"tier2\": [...], \"tier3\": [...]}, \"gaps_filled\": [...]}")
+    parts.append(
+        '4. 输出 JSON: {"merged": {...}, "taken_from": {"tier1": [...], "tier2": [...], "tier3": [...]}, "gaps_filled": [...]}'
+    )
     parts.append("")
     parts.append("只输出 JSON，不要其他内容。")
 

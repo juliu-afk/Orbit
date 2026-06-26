@@ -18,7 +18,7 @@ from typing import Any
 
 import structlog
 
-from orbit.router.agent import ModelTier, RouterDecision
+from orbit.router.agent import ModelTier
 
 logger = structlog.get_logger("orbit.scheduler.escalation")
 
@@ -140,9 +140,7 @@ def needs_escalation(output: dict[str, Any] | None, error: str | None) -> bool:
         return True
     # 输出中有明确失败标记
     status = output.get("status", "ok")
-    if status in ("error", "failed", "invalid"):
-        return True
-    return False
+    return status in ("error", "failed", "invalid")
 
 
 def next_tier(current: ModelTier) -> ModelTier | None:

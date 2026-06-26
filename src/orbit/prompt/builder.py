@@ -173,6 +173,19 @@ class PromptBuilder:
             if safe_env:
                 parts.append(f"\n环境信息：{safe_env}")
 
+        # Phase 2: 记忆注入——Agent 工作记忆 + 记忆检索结果
+        working_memory = ctx.get("working_memory")
+        if working_memory and hasattr(working_memory, "body") and working_memory.body:
+            parts.append(f"\n## Agent 工作记忆\n```\n{working_memory.body[:2000]}\n```")
+
+        memory_search_results = ctx.get("memory_search_results", [])
+        if memory_search_results:
+            mem_text = "\n".join(
+                f"- [{r.path}] (score={r.score:.2f}) {r.snippet[:150]}"
+                for r in memory_search_results[:5]
+            )
+            parts.append(f"\n## 记忆检索结果\n{mem_text}")
+
         if len(parts) == 1:
             return "## 项目上下文\n无特定项目上下文。通用开发环境。"
 

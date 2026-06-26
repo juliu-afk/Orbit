@@ -73,6 +73,9 @@ class ReActAgent(BaseAgent):
         self.tools = tools or ToolRegistry.get_instance()
         self._event_bus = event_bus
         self._budget = IterationBudget(self.ITERATION_BUDGET)
+        # Phase 2: 压缩管线——子类或外部可注入
+        self._compressor: Any = None
+        self._budget_tracker: Any = None
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——每步实时推送到事件总线（非黑盒）。
@@ -117,6 +120,51 @@ class ReActAgent(BaseAgent):
                     "remaining_turns": self.MAX_TURNS - turn,
                 },
             )
+
+            # 3a+. Phase 2: 上下文压缩——每轮 LLM 调用前检查 token 用量
+            if self._compressor and self._budget_tracker:
+                try:
+                    from orbit.compression.models import CompressionAction
+
+                    result = await self._compressor.compress(
+                        messages,
+                        task_id=task_id,
+                        turn=turn,
+                    )
+                    if result.action == CompressionAction.FORK:
+                        await self._emit(
+                            task_id,
+                            "agent.context_fork",
+                            {
+                                "turn": turn,
+                                "child_session_id": result.child_session_id,
+                            },
+                        )
+                        return AgentOutput(
+                            status="ok",
+                            result={
+                                "output": "上下文过大，已在子 Session 中继续。",
+                                "child_session_id": result.child_session_id,
+                                "reasoning_chain": reasoning_chain,
+                                "turns": turn + 1,
+                                "tool_calls": tool_call_count,
+                            },
+                        )
+                    if result.action != CompressionAction.SKIP:
+                        await self._emit(
+                            task_id,
+                            "agent.compression",
+                            {
+                                "turn": turn,
+                                "action": result.action,
+                                "original_tokens": result.original_tokens,
+                                "compressed_tokens": result.compressed_tokens,
+                                "ratio": result.ratio,
+                                "layers": result.layers_applied,
+                            },
+                        )
+                except Exception as e:
+                    logger.warning("compression_hook_failed", error=str(e))
 
             # 3b. LLM 思考
             if self.llm is None:

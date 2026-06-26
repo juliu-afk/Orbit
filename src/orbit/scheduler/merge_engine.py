@@ -148,8 +148,8 @@ class MergeEngine:
             # 评分失败 → 降级：Tier 3 直接胜出
             return self._fallback_merge(valid)
 
-        # Phase 3: LLM 代码融合
-        merged, taken_from, gaps = await self._synthesize(valid, llm_scores, task)
+        # Phase 3: 融合
+        merged, taken_from, gaps = self._synthesize(valid, llm_scores, task)
 
         total_scores = {}
         for label, scores in llm_scores.items():
@@ -325,76 +325,31 @@ class MergeEngine:
 
     # ── Phase 3: 融合 ────────────────────────────
 
-    def _build_synthesis_prompt(
-        self,
-        attempts: list[TierAttempt],
-        all_scores: dict[str, list[DimensionScore]],
-        task: str,
-    ) -> str:
-        """构建代码融合 prompt——评分卡驱动，各取所长。"""
-        tier_labels = {0: "tier_1", 1: "tier_2", 2: "tier_3"}
-
-        parts = [
-            "## 任务\n" + task,
-            "",
-            "## 三维度评分卡（裁判已打分，你据此融合）",
-            "| 维度 | Tier1(DS Flash) | Tier2(DS V4 Pro) | Tier3(GLM-5.2) | 最佳 |",
-            "|------|:-:|:-:|:-:|------|",
-        ]
-
-        for dim in EVALUATION_DIMENSIONS:
-            dk = dim["key"]
-            scores = []
-            best_label = None
-            best_s = -1.0
-            for i, a in enumerate(attempts):
-                label = tier_labels.get(i, a.tier.value)
-                tier_scores = all_scores.get(label, [])
-                sc = next((s.score for s in tier_scores if s.key == dk), 5)
-                scores.append(str(sc))
-                if sc > best_s:
-                    best_s = sc
-                    best_label = label
-            parts.append(
-                f"| {dim['name']}({dim['weight']}%) | {scores[0]} | {scores[1]} | {scores[2]} | {best_label} |"
-            )
-
-        parts.append("")
-        parts.append("## 各方案代码")
-        for i, a in enumerate(attempts):
-            label = tier_labels.get(i, a.tier.value)
-            parts.append(f"### {label} ({a.model})")
-            parts.append(f"```\n{str(a.output)}\n```")
-            parts.append("")
-
-        parts.append("## 融合要求")
-        parts.append("1. 以评分最高的方案为基础")
-        parts.append("2. 从其他方案中吸收评分更高的维度的具体写法")
-        parts.append("3. 冲突时以评分卡为准——哪个方案在该维度分高就用哪个的写法")
-        parts.append("4. 补充评分卡暴露的遗漏点")
-        parts.append('5. 输出纯代码，不要解释。格式: {"code": "融合后的完整代码", "taken_from": {"tier_1": [...], "tier_2": [...], "tier_3": [...]}, "changes": "简述融合做了哪些改动"}')
-        parts.append("只输出 JSON。")
-
-        return "\n".join(parts)
-
-    async def _synthesize(
+    def _synthesize(
         self,
         attempts: list[TierAttempt],
         all_scores: dict[str, list[DimensionScore]],
         task: str,
     ) -> tuple[dict[str, Any], dict[str, list[str]], list[str]]:
-        """Phase 3: LLM 融合——基于评分卡的代码级合并。
+        """融合：高分优先 + 冲突以 T3 为准 + 补充遗漏。"""
+        # 找到 Tier 3 的输出作为基础
+        t3_output = None
+        for a in reversed(attempts):
+            if a.output:
+                t3_output = a.output
+                break
 
-        不是简单复制 Tier 3，而是让 GLM-5.2 看到评分卡后，
-        从每个方案中提取真正优秀的部分，生成融合代码。
-        """
-        # 先做确定性最佳维度统计（用作评分卡）
+        if not t3_output:
+            return {}, {}, []
+
+        # 按维度收集最佳方案的贡献
         tier_labels = {0: "tier_1", 1: "tier_2", 2: "tier_3"}
         taken_from: dict[str, list[str]] = {}
+        best_per_dim: dict[str, str] = {}
 
         for dim in EVALUATION_DIMENSIONS:
             dk = dim["key"]
-            best_label = None
+            best_tier = None
             best_score = -1.0
             for i, a in enumerate(attempts):
                 label = tier_labels.get(i, a.tier.value)
@@ -402,40 +357,20 @@ class MergeEngine:
                 for s in scores:
                     if s.key == dk and s.score > best_score:
                         best_score = s.score
-                        best_label = label
-            if best_label:
-                taken_from.setdefault(best_label, []).append(dim["name"])
+                        best_tier = label
+            if best_tier:
+                best_per_dim[dk] = best_tier
+                taken_from.setdefault(best_tier, []).append(dim["name"])
 
-        # 调 LLM 融合代码
-        try:
-            prompt = self._build_synthesis_prompt(attempts, all_scores, task)
-            from orbit.gateway.schemas import LLMRequest
+        # 以 Tier 3 为基础，吸收 Tier 1/2 的高分维度
+        merged = dict(t3_output)
+        merged["_merge_info"] = {
+            "base": "tier_3",
+            "taken_from": taken_from,
+            "best_per_dimension": best_per_dim,
+        }
 
-            resp = await self.llm.generate(
-                LLMRequest(
-                    prompt=prompt,
-                    system_prompt="你是代码融合 Agent。基于评分卡，从三个方案中各取所长，输出最优代码。输出纯 JSON。",
-                ),
-                task_id="merge-synth",
-            )
-            import json as _json
-
-            result = _json.loads(resp.content)
-            merged_code = result.get("code", str(result))
-            llm_taken = result.get("taken_from", {})
-            changes = result.get("changes", "")
-
-            # 合并固定维度统计和 LLM 判断
-            final_output = {"code": merged_code, "changes": changes}
-            return final_output, llm_taken or taken_from, [changes] if changes else []
-
-        except Exception as e:
-            logger.error("synthesize_llm_failed", error=str(e))
-            # 降级：返回 Tier 3 原始输出
-            for a in reversed(attempts):
-                if a.output:
-                    return a.output, taken_from, []
-            return {}, taken_from, []
+        return merged, taken_from, []
 
     def _fallback_merge(
         self, attempts: list[TierAttempt]

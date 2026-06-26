@@ -12,8 +12,8 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from orbit.router.agent import ModelTier, RouterDecision
 from orbit.router.resolver import AgentModelResolver
-from orbit.router.agent import RouterDecision, ModelTier
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 

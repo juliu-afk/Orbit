@@ -5,9 +5,9 @@ AgentModelResolver: 5 级优先级解析 Agent 实际使用的模型。
 CC_SWITCH: 运维强制覆盖——解析 CC_SWITCH 环境变量。
 """
 
-from orbit.router.agent import ModelTier, RouterAgent, RouterDecision, ComplexityScore
-from orbit.router.resolver import AgentModelResolver, ResolvedModel
+from orbit.router.agent import ComplexityScore, ModelTier, RouterAgent, RouterDecision
 from orbit.router.cc_switch import CCSwitchConfig, CCSwitchEntry, parse_cc_switch
+from orbit.router.resolver import AgentModelResolver, ResolvedModel
 from orbit.router.weights import ScoreWeights
 
 __all__ = [

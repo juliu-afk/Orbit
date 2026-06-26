@@ -18,6 +18,17 @@ class LLMRequest(BaseModel):
     )
     temperature: float = Field(0.2, ge=0.0, le=2.0)
     max_tokens: int = Field(2048, ge=1, le=8192)
+    # Phase 1: 工具调用支持（对标 OpenAI function calling）
+    tools: list[dict] | None = Field(
+        None, description="工具 JSON Schema 列表（OpenAI function calling 格式）"
+    )
+    tool_choice: str = Field(
+        "auto", description="工具选择策略: auto/none/required"
+    )
+    # Phase 1: 消息历史（ReAct 循环用——支持多轮对话）
+    messages: list[dict] | None = Field(
+        None, description="完整消息历史（含 system/user/assistant/tool 角色）"
+    )
 
 
 class LLMUsage(BaseModel):
@@ -40,6 +51,13 @@ class LLMResponse(BaseModel):
     model_source: str = "default"
     # 熔断器触发时该字段为 True，表示本次是降级返回（非真实 LLM 输出）
     degraded: bool = False
+    # Phase 1: 工具调用结果（ReAct 循环——LLM 请求调用工具）
+    tool_calls: list[dict] | None = Field(
+        None, description="LLM 返回的 tool_calls 列表（OpenAI 格式）"
+    )
+    stop_reason: str = Field(
+        "end_turn", description="停止原因: end_turn | tool_calls | max_tokens | error"
+    )
 
 
 class CircuitBreakerState(BaseModel):

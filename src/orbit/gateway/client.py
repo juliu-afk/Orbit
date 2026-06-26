@@ -122,31 +122,68 @@ class LLMClient:
             import litellm  # noqa: F401
         except ImportError as e:
             raise RuntimeError("litellm 未安装") from e
-        if model.startswith("openai/glm"):
-            result = await litellm.acompletion(
-                model=model,
-                messages=[
-                    {"role": "system", "content": req.system_prompt},
-                    {"role": "user", "content": req.prompt},
-                ],
-                temperature=req.temperature,
-                max_tokens=req.max_tokens,
-                api_base=GLM_API_BASE,
-                api_key=settings.ZAI_API_KEY,
-            )
+
+        # Phase 1: 支持多轮消息历史（ReAct 循环）
+        if req.messages:
+            messages = req.messages
         else:
-            result = await litellm.acompletion(
-                model=model,
-                messages=[
-                    {"role": "system", "content": req.system_prompt},
-                    {"role": "user", "content": req.prompt},
-                ],
-                temperature=req.temperature,
-                max_tokens=req.max_tokens,
-            )
-        content = result.choices[0].message.content or ""
+            messages = [
+                {"role": "system", "content": req.system_prompt},
+                {"role": "user", "content": req.prompt},
+            ]
+
+        # 构建 litellm 参数
+        kwargs: dict = dict(
+            model=model,
+            messages=messages,
+            temperature=req.temperature,
+            max_tokens=req.max_tokens,
+        )
+
+        # GLM 模型特殊配置
+        if model.startswith("openai/glm"):
+            kwargs["api_base"] = GLM_API_BASE
+            kwargs["api_key"] = settings.ZAI_API_KEY
+
+        # Phase 1: 工具调用支持——传递 tools schema 给 LLM
+        if req.tools:
+            kwargs["tools"] = req.tools
+            kwargs["tool_choice"] = req.tool_choice
+
+        result = await litellm.acompletion(**kwargs)
+
+        # 解析响应
+        choice = result.choices[0]
+        content = choice.message.content or ""
         usage = self._build_usage(model, result.usage)
-        return LLMResponse(content=content, model=model, usage=usage)
+
+        # Phase 1: 解析 tool_calls
+        tool_calls = None
+        stop_reason = "end_turn"
+        if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
+            tool_calls = []
+            for tc in choice.message.tool_calls:
+                tool_calls.append({
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                })
+            stop_reason = "tool_calls"
+        elif choice.finish_reason == "length":
+            stop_reason = "max_tokens"
+        elif choice.finish_reason == "stop":
+            stop_reason = "end_turn"
+
+        return LLMResponse(
+            content=content,
+            model=model,
+            usage=usage,
+            tool_calls=tool_calls,
+            stop_reason=stop_reason,
+        )
 
     async def generate_stream(self, req, task_id, entropy_monitor=None):
         from orbit.hallucination.schemas import HighEntropyError

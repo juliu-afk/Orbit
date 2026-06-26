@@ -39,7 +39,10 @@ GLM_API_BASE = "https://open.bigmodel.cn/api/coding/paas/v4"
 
 class LLMClient:
     def __init__(
-        self, circuit_breaker=None, default_model=MODEL_PRO, fallback_model=MODEL_GLM_FALLBACK,
+        self,
+        circuit_breaker=None,
+        default_model=MODEL_PRO,
+        fallback_model=MODEL_GLM_FALLBACK,
         resolver=None,  # AgentModelResolver（Step 2.3）
     ):
         self.cb = circuit_breaker or CircuitBreaker()
@@ -49,9 +52,11 @@ class LLMClient:
         self._usage_log: dict[str, list[LLMUsage]] = {}
 
     async def generate(
-        self, req: LLMRequest, task_id: str,
-        agent_name: str = "",            # Step 2.3: Agent 名称
-        router_decision = None,          # Step 2.3: RouterDecision
+        self,
+        req: LLMRequest,
+        task_id: str,
+        agent_name: str = "",  # Step 2.3: Agent 名称
+        router_decision=None,  # Step 2.3: RouterDecision
     ) -> LLMResponse:
         # Step 2.3: 通过 Resolver 获取实际模型（而非硬编码 default_model）
         model = self.default_model
@@ -59,13 +64,16 @@ class LLMClient:
         if self.resolver and agent_name:
             try:
                 from orbit.router.resolver import AgentModelResolver
+
                 if isinstance(self.resolver, AgentModelResolver):
                     resolved = await self.resolver.resolve(agent_name, router_decision)
                     model = resolved.model or self.default_model
                     model_source = resolved.source
                     logger.info(
                         "router_model_selected",
-                        agent=agent_name, model=model, source=model_source,
+                        agent=agent_name,
+                        model=model,
+                        source=model_source,
                     )
             except Exception as e:
                 logger.warning("router_resolve_failed", error=str(e))
@@ -86,7 +94,9 @@ class LLMClient:
             logger.error("fallback_failed", model=self.fallback_model, error=str(e))
             raise
 
-    async def _call_with_circuit(self, model: str, req: LLMRequest, task_id: str, model_source: str = "default") -> LLMResponse:
+    async def _call_with_circuit(
+        self, model: str, req: LLMRequest, task_id: str, model_source: str = "default"
+    ) -> LLMResponse:
         await self.cb.before_call(model)
         try:
             resp = await self._do_completion(model, req)

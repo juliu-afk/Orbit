@@ -47,7 +47,9 @@ class TestRouterAgentChaos:
     async def test_zero_file_count(self):
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=0, change_type="single_file", risk="low",
+            file_count=0,
+            change_type="single_file",
+            risk="low",
             agent_role="developer",
         )
         assert decision.tier in ModelTier
@@ -56,7 +58,9 @@ class TestRouterAgentChaos:
     async def test_negative_file_count(self):
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=-5, change_type="config", risk="low",
+            file_count=-5,
+            change_type="config",
+            risk="low",
             agent_role="config_manager",
         )
         assert decision.tier in ModelTier
@@ -65,8 +69,10 @@ class TestRouterAgentChaos:
     async def test_unknown_change_type(self):
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=1, change_type="this_type_does_not_exist",
-            risk="low", agent_role="developer",
+            file_count=1,
+            change_type="this_type_does_not_exist",
+            risk="low",
+            agent_role="developer",
         )
         assert decision.tier in ModelTier
 
@@ -74,8 +80,10 @@ class TestRouterAgentChaos:
     async def test_unknown_risk_level(self):
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=3, change_type="multi_file",
-            risk="unknown_risk", agent_role="developer",
+            file_count=3,
+            change_type="multi_file",
+            risk="unknown_risk",
+            agent_role="developer",
         )
         assert decision.tier in ModelTier
 
@@ -83,7 +91,9 @@ class TestRouterAgentChaos:
     async def test_unknown_agent_role(self):
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=1, change_type="single_file", risk="low",
+            file_count=1,
+            change_type="single_file",
+            risk="low",
             agent_role="super_ai_overlord",
         )
         assert decision.tier in ModelTier
@@ -92,7 +102,9 @@ class TestRouterAgentChaos:
     async def test_very_large_file_count(self):
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=99999, change_type="multi_module", risk="high",
+            file_count=99999,
+            change_type="multi_module",
+            risk="high",
             agent_role="architect",
         )
         assert decision.tier == ModelTier.TIER_3

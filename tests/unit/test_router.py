@@ -20,10 +20,10 @@ from orbit.router.cc_switch import CCSwitchEntry, parse_cc_switch
 from orbit.router.resolver import AgentModelResolver, ResolvedModel
 from orbit.router.weights import ScoreWeights
 
-
 # ============================================================
 # RouterAgent 测试 (AC1)
 # ============================================================
+
 
 class TestRouterAgent:
     """AC1: RouterAgent 根据任务复杂度输出 ModelTier。"""
@@ -33,7 +33,9 @@ class TestRouterAgent:
         """简单任务 → Tier 1（DS Flash）。"""
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=1, change_type="single_function", risk="low",
+            file_count=1,
+            change_type="single_function",
+            risk="low",
             agent_role="developer",
         )
         assert decision.tier == ModelTier.TIER_1
@@ -44,7 +46,9 @@ class TestRouterAgent:
         """复杂任务（多文件+架构）→ Tier 3（DS V4 Pro）。"""
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=10, change_type="multi_module", risk="medium",
+            file_count=10,
+            change_type="multi_module",
+            risk="medium",
             agent_role="architect",
         )
         assert decision.tier == ModelTier.TIER_3
@@ -55,7 +59,9 @@ class TestRouterAgent:
         """纯配置修改 → Tier 0（本地规则引擎）。"""
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=1, change_type="config", risk="low",
+            file_count=1,
+            change_type="config",
+            risk="low",
             agent_role="config_manager",
         )
         assert decision.tier == ModelTier.TIER_0
@@ -66,7 +72,9 @@ class TestRouterAgent:
         agent = RouterAgent()
         # 中等复杂度但高风险 → 至少 Tier 2+
         decision = await agent.evaluate(
-            file_count=3, change_type="multi_file", risk="high",
+            file_count=3,
+            change_type="multi_file",
+            risk="high",
             agent_role="developer",
         )
         assert decision.tier in (ModelTier.TIER_2, ModelTier.TIER_3)
@@ -76,16 +84,24 @@ class TestRouterAgent:
         """有历史成功先例 → 降级（更低的 Tier）。"""
         agent = RouterAgent()
         without_history = await agent.evaluate(
-            file_count=3, change_type="multi_file", risk="low",
-            agent_role="developer", has_similar_history=False,
+            file_count=3,
+            change_type="multi_file",
+            risk="low",
+            agent_role="developer",
+            has_similar_history=False,
         )
         with_history = await agent.evaluate(
-            file_count=3, change_type="multi_file", risk="low",
-            agent_role="developer", has_similar_history=True,
+            file_count=3,
+            change_type="multi_file",
+            risk="low",
+            agent_role="developer",
+            has_similar_history=True,
         )
         # 有历史先例应该不高于无历史的 Tier
         tier_order = ["tier_0", "tier_1", "tier_2", "tier_3"]
-        assert tier_order.index(with_history.tier.value) <= tier_order.index(without_history.tier.value)
+        assert tier_order.index(with_history.tier.value) <= tier_order.index(
+            without_history.tier.value
+        )
 
     @pytest.mark.asyncio
     async def test_score_clamped_to_0_100(self):
@@ -93,15 +109,21 @@ class TestRouterAgent:
         agent = RouterAgent()
         # 极端低分场景
         low = await agent.evaluate(
-            file_count=1, change_type="config", risk="low",
-            agent_role="config_manager", has_similar_history=True,
+            file_count=1,
+            change_type="config",
+            risk="low",
+            agent_role="config_manager",
+            has_similar_history=True,
         )
         assert 0 <= low.confidence <= 1.0
 
         # 极端高分场景
         high = await agent.evaluate(
-            file_count=20, change_type="multi_module", risk="high",
-            agent_role="architect", has_similar_history=False,
+            file_count=20,
+            change_type="multi_module",
+            risk="high",
+            agent_role="architect",
+            has_similar_history=False,
         )
         assert high.tier == ModelTier.TIER_3
 
@@ -120,7 +142,9 @@ class TestRouterAgent:
         """降级 Tier 比当前 Tier 低一级。"""
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=3, change_type="multi_file", risk="medium",
+            file_count=3,
+            change_type="multi_file",
+            risk="medium",
             agent_role="developer",
         )
         # Tier 2 的 fallback 应该是 Tier 1
@@ -134,7 +158,9 @@ class TestRouterAgent:
         """Tier 0 没有降级 Tier。"""
         agent = RouterAgent()
         decision = await agent.evaluate(
-            file_count=1, change_type="config", risk="low",
+            file_count=1,
+            change_type="config",
+            risk="low",
             agent_role="config_manager",
         )
         if decision.tier == ModelTier.TIER_0:
@@ -144,6 +170,7 @@ class TestRouterAgent:
 # ============================================================
 # AgentModelResolver 测试 (AC2)
 # ============================================================
+
 
 class TestAgentModelResolver:
     """AC2: AgentModelResolver 按优先级正确解析模型。"""
@@ -251,6 +278,7 @@ class TestAgentModelResolver:
 # ============================================================
 # CC_SWITCH 解析器测试 (AC3)
 # ============================================================
+
 
 class TestCCSwitchParser:
     """AC3: CC_SWITCH 格式解析。"""

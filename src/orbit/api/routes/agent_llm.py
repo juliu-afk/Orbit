@@ -22,6 +22,7 @@ KNOWN_AGENTS = {"clarifier", "architect", "developer", "reviewer", "qa", "config
 
 # ── Response Models ──────────────────────────────
 
+
 class LLMConfigCurrent(BaseModel):
     model: str
     source: str
@@ -29,12 +30,19 @@ class LLMConfigCurrent(BaseModel):
     effective_since: str | None = None
     is_forced: bool = False
 
+
 class LLMConfigResponse(BaseModel):
     agent: str
     current: LLMConfigCurrent | None = None
-    available_sources: list[str] = Field(default_factory=lambda: [
-        "cc_switch_force", "environment", "cc_switch", "router", "default",
-    ])
+    available_sources: list[str] = Field(
+        default_factory=lambda: [
+            "cc_switch_force",
+            "environment",
+            "cc_switch",
+            "router",
+            "default",
+        ]
+    )
     cc_switch_active: bool = False
     cc_switch_config: str = ""
 
@@ -55,6 +63,7 @@ class SwitchResponse(BaseModel):
 
 
 # ── Routes ─────────────────────────────────────
+
 
 @router.get("/{agent_name}/llm", response_model=LLMConfigResponse)
 async def get_agent_llm_config(agent_name: str) -> LLMConfigResponse:
@@ -127,6 +136,7 @@ async def switch_agent_llm(agent_name: str, body: SwitchRequest) -> SwitchRespon
     # 记录到审计（如果有审计 logger）
     try:
         from orbit.core.config import settings
+
         if hasattr(settings, "audit_logger") and settings.audit_logger:
             settings.audit_logger.info(
                 "agent_llm_switched",

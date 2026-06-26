@@ -22,8 +22,8 @@ logger = structlog.get_logger("orbit.router.cc_switch")
 
 @dataclass
 class CCSwitchEntry:
-    agent_name: str     # "all" 表示全部
-    model: str          # LiteLLM 模型 ID
+    agent_name: str  # "all" 表示全部
+    model: str  # LiteLLM 模型 ID
     mode: str = "no-force"  # "force" | "no-force"
 
     @property

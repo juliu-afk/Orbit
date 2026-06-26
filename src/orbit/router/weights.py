@@ -14,11 +14,11 @@ from dataclasses import dataclass
 class ScoreWeights:
     """RouterAgent 评分维度权重。所有值应为 0-100，总和不需要等于 100。"""
 
-    files: int = 30       # 涉及文件数
-    change: int = 25      # 修改类型
-    risk: int = 25        # 风险等级
-    role: int = 15        # Agent 角色
-    history: int = 5      # 历史相似任务
+    files: int = 30  # 涉及文件数
+    change: int = 25  # 修改类型
+    risk: int = 25  # 风险等级
+    role: int = 15  # Agent 角色
+    history: int = 5  # 历史相似任务
 
     @classmethod
     def from_env(cls) -> ScoreWeights:

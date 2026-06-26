@@ -308,8 +308,8 @@ class Scheduler:
 
         return TaskContext(
             task_id=task_id,
-            agent_name=context.get("agent_name", ""),        # Step 2.3
-            model_tier=context.get("model_tier", ""),        # Step 2.3
+            agent_name=context.get("agent_name", ""),  # Step 2.3
+            model_tier=context.get("model_tier", ""),  # Step 2.3
             l1="遵循小企业会计准则; 禁止直接操作总账; 金额使用 Decimal",
             l2=context.get("l2", {}),  # 图谱查询结果由调用方注入
             l3={
@@ -354,8 +354,10 @@ class Scheduler:
                     context["router_decision"] = decision
                     logger.info(
                         "router_tier_selected",
-                        task_id=task_id, role=role,
-                        tier=decision.tier.value, confidence=round(decision.confidence, 2),
+                        task_id=task_id,
+                        role=role,
+                        tier=decision.tier.value,
+                        confidence=round(decision.confidence, 2),
                     )
                 except Exception as e:
                     logger.warning("router_evaluate_failed", error=str(e))

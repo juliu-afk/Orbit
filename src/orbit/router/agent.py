@@ -23,10 +23,10 @@ logger = structlog.get_logger("orbit.router.agent")
 
 # LiteLLM 模型 ID 映射
 TIER_MODEL_MAP: dict[str, str] = {
-    "tier_0": "",                             # 本地规则引擎，无 LLM 调用
-    "tier_1": "deepseek/deepseek-v4-flash",   # DS Flash——轻量
-    "tier_2": "openai/glm-5.2",               # GLM-5.2——中档
-    "tier_3": "deepseek/deepseek-v4-pro",     # DS V4 Pro——全量
+    "tier_0": "",  # 本地规则引擎，无 LLM 调用
+    "tier_1": "deepseek/deepseek-v4-flash",  # DS Flash——轻量
+    "tier_2": "openai/glm-5.2",  # GLM-5.2——中档
+    "tier_3": "deepseek/deepseek-v4-pro",  # DS V4 Pro——全量
 }
 
 FALLBACK_MODEL = "openai/glm-4.7-flash"  # 统一降级兜底（免费）
@@ -44,14 +44,23 @@ TIER_THRESHOLDS: list[tuple[int, ModelTier]] = [
     (71, ModelTier.TIER_3),
     (40, ModelTier.TIER_2),
     (15, ModelTier.TIER_1),
-    (0,  ModelTier.TIER_0),
+    (0, ModelTier.TIER_0),
 ]
 
 # 核心模块关键词——高风险
 CORE_MODULES: list[str] = [
-    "scheduler", "orchestrator", "checkpoint", "gateway",
-    "hallucination", "compliance", "resource_guard", "sandbox",
-    "payment", "security", "auth", "encryption",
+    "scheduler",
+    "orchestrator",
+    "checkpoint",
+    "gateway",
+    "hallucination",
+    "compliance",
+    "resource_guard",
+    "sandbox",
+    "payment",
+    "security",
+    "auth",
+    "encryption",
 ]
 
 # Agent 角色基础分
@@ -68,6 +77,7 @@ ROLE_BASE_SCORES: dict[str, int] = {
 @dataclass
 class ComplexityScore:
     """任务复杂度评分——0-100。"""
+
     total: float = 0.0
     file_count_score: float = 0.0
     change_type_score: float = 0.0
@@ -122,9 +132,14 @@ class RouterAgent:
 
         # 2. 修改类型评分
         ct_map = {
-            "config": 0.0, "comment": 0.0, "format": 10.0,
-            "single_line": 10.0, "single_function": 35.0,
-            "single_file": 45.0, "multi_file": 70.0, "multi_module": 100.0,
+            "config": 0.0,
+            "comment": 0.0,
+            "format": 10.0,
+            "single_line": 10.0,
+            "single_function": 35.0,
+            "single_file": 45.0,
+            "multi_file": 70.0,
+            "multi_module": 100.0,
         }
         c_score = ct_map.get(change_type, 50.0)
         reasons.append(f"修改类型: {change_type}")

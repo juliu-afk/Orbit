@@ -1,447 +1,170 @@
-# Orbit
+# Orbit — 核心规则
 
 > 轻量级多 Agent 软件开发自循环系统。
-> 自研调度框架，替代 CrewAI 等黑盒框架。三图谱（代码/数据库/配置）+ 8 层防幻觉体系 + 毫秒级熔断。
-> 当前阶段：**设计文档定稿（V14.1），无实现代码**。`docs/` 下 16 个 Step 的 PRD+ADR 已全部交付，待搭骨架进入编码。
+> 自研调度框架，替代 CrewAI 等黑盒框架。六图谱（代码/数据库/配置/知识/元图谱/文档）+ 9 层防幻觉体系 + 毫秒级熔断。
+> 当前阶段：**编码阶段**。24 个源码模块已落地，持续迭代中。
 
 ## 文档索引
 
-| 文档 | 内容 |
-|---|---|
-| `@docs/开发计划_V14.1.md` | 总体设计方案：三图谱架构 / 8层防幻觉 / 10周迭代 / 技术栈矩阵（26章，142K） |
-| `@docs/PRD+ADR_0+1阶段.md` | Step 0.1/0.2/1.1/1.2 — 章程 / 环境 / API契约 / 三图谱Schema |
-| `@docs/PRD+ADR_2阶段.md` | Step 2.1/2.2 — LiteLLM 网关 / 检查点管理 |
-| `@docs/PRD+ADR_3阶段.md` | Step 3.1-3.3 — 代码 / 数据库 / 配置图谱实现 |
-| `@docs/PRD+ADR_4阶段.md` | Step 4.1/4.2 — 防幻觉 L1-L4 / L5-L8 |
-| `@docs/PRD+ADR_5阶段.md` | Step 5.1-5.7 — 调度器状态机 / Agent 角色 |
-| `@docs/PRD+ADR_6阶段.md` | Step 5.8/5.9/6.1-6.3 — 前端驾驶舱 / E2E |
-| `@docs/PRD+ADR_7阶段.md` | Step 7.1 — 灰度发布 + 可观测性 |
-| `@docs/PRD+ADR_MVP阶段.md` | 生产部署总结表（16 Step 交付确认） |
-| `@docs/PRD+ADR_工程化流程简版.md` | 全 16 Step 合并版（147K，权威实现依据） |
-| `@docs/PRD+ADR_模块归类版.md` | 按模块归类版（317K，交叉参考用） |
+**收到新需求/新任务时，必须在回复用户之前先读取 `@docs/WORKFLOW.md`**——所有改动走阶段 1-4 流程。
 
-> 三个大文件（模块归类版 / 阶段合并版 / 工程化简版）内容高度重叠。**实现以"工程化流程简版" + 分阶段文件为准**，其余仅作交叉参考。
+| 文档 | 何时读 |
+|------|--------|
+| `@docs/WORKFLOW.md` | **收到新需求时必读**——阶段 1-4 完整流程 |
+| `@docs/开发计划_V14.1.md` | 总体设计索引——指向 `docs/开发计划/` 下 4 个子文档（不要全量加载） |
+| `@docs/PRD+ADR_0+1阶段.md` | Step 0.1-1.2 实现时读 |
+| `@docs/PRD+ADR_2阶段.md` | Step 2.1-2.2 实现时读 |
+| `@docs/PRD+ADR_3阶段.md` | Step 3.1-3.3 实现时读 |
+| `@docs/PRD+ADR_4阶段.md` | Step 4.1-4.2 实现时读 |
+| `@docs/PRD+ADR_5阶段.md` | Step 5.1-5.7 实现时读 |
+| `@docs/PRD+ADR_6阶段.md` | Step 5.8-6.3 实现时读 |
+| `@docs/PRD+ADR_7阶段.md` | Step 7.1 实现时读 |
+| `@docs/PRD+ADR_MVP阶段.md` | 部署总结查询时读 |
+| `@docs/PRD+ADR_工程化流程简版.md` | 全 Step 交叉参考时读（147K） |
 
 ## 术语定义
 
-**核心模块**（尚未实现，路径预定）：
-- `src/orbit/scheduler/` — 调度器状态机、Agent 角色编排
-- `src/orbit/graph/` — 三图谱统一存储与查询（CodeGraph SQLite）
-- `src/orbit/hallucination/` — L1-L8 八层防幻觉（熵监控 / 双向合约 / 配置漂移检测等）
-- `src/orbit/sandbox/` — Docker 代码片段隔离执行
-- `src/orbit/audit/` — `task_audit_trail` 审计链 + 成本记录
+**核心模块**（`src/orbit/` 下已实现的 24 个模块）：
+- `scheduler/` — 调度器状态机、Agent 角色编排
+- `graph/` — 六图谱统一存储与查询（CodeGraph SQLite）
+- `hallucination/` — L1-L8 八层防幻觉（熵监控/双向合约/配置漂移检测等）
+- `sandbox/` — Docker 代码片段隔离执行
+- `checkpoint/` — 检查点管理（保存/回滚）
+- `agents/` — Agent 工厂 + 角色定义（base, clarifier, context, factory）
+- `gateway/` — LiteLLM 网关
+- `knowledge/` — 知识库管理
+- `communication/` — 消息总线 + 协议
+- `compliance/` — 合规规则引擎
+- `observability/` — OpenTelemetry + structlog
+- `api/` — FastAPI 路由 + Pydantic 模型
+- 以及 `backup/`, `context/`, `core/`, `events/`, `infrastructure/`, `projects/`, `resource_guard/`, `sessions/`, `sharding/`, `tools/`, `versioning/`, `ws/`
 
 **核心模型**：`Task`、`AgentRole`、`Checkpoint`、`GraphSnapshot`、`AuditEntry`、`CostRecord`。
 
 **核心概念**：
-- **三图谱**：代码图谱（Tree-sitter）+ 数据库图谱（DDL/MVCC 快照）+ 配置图谱（.env/Nginx/docker-compose），统一存 CodeGraph SQLite。
-- **8 层防幻觉**：L1 静态校验 / L2 动态追踪 / L3 熵监控 / L4 沙箱执行 / L5 合约验证 / L6 双向合约定向 / L7 形式化验证（Z3，<10% 关键路径）/ L8 配置漂移检测。
-- **熔断**：Token 计数器 + 延迟阈值，超限即熔断回滚到上一检查点。
+- **六图谱**：代码图谱（Tree-sitter）+ 数据库图谱（DDL/MVCC）+ 配置图谱（.env/Nginx/docker-compose）+ 知识图谱（外挂领域知识）+ 元图谱（跨图谱关系）+ 文档图谱，统一存 CodeGraph SQLite
+- **9 层防幻觉**：L1 静态校验 / L2 动态追踪 / L3 熵监控 / L4 沙箱执行 / L5 合约验证 / L6 双向合约定向 / L7 形式化验证（Z3）/ L8 配置漂移检测 / L9 动态合规验证
+- **熔断**：Token 计数器 + 延迟阈值，超限即熔断回滚到上一检查点
 
-**核心指标**（设计目标，非硬性 CI 门禁）：
-- 调度层延迟 ≤1.5s（不含验证层）
-- 幻觉率 <3%
-- 单任务 Token ≤35 —— ⚠️ **本指标暂缓**，先跑通闭环再优化，不作为当前阶段阻断条件
+## 技术栈
 
-## 技术栈（预定）
+| 层级 | 组件 |
+|------|------|
+| 主语言 | Python 3.14 |
+| 包管理 | Poetry 1.8.2 |
+| LLM 网关 | LiteLLM >=1.40 |
+| API | FastAPI + Pydantic v2 + Uvicorn |
+| ORM | SQLAlchemy 2.0.25 + Alembic |
+| 沙箱 | Docker Engine >=24 |
+| 前端 | Vue3 + Pinia + AG-UI |
+| 桌面壳 | Tauri (Rust WebView) |
+| 测试 | pytest + pytest-asyncio + Playwright |
 
-| 层级 | 组件 | 版本 |
-|---|---|---|
-| 主语言 | Python | 3.11+（实测 3.14） |
-| 包管理 | Poetry | 1.8.2（开发计划 Step 0.2 指定） |
-| LLM 网关 | LiteLLM | >=1.40 |
-| LLM 模型 | DeepSeek V4 Pro / Flash / GLM-5.2 | 主力/轻量/审查测试，降级 GLM-4.7 Flash（免费） |
-| 代码图谱 | CodeGraph（Tree-sitter） | latest |
-| 数据库图谱 | SQLLineage | latest |
-| 配置漂移 | Driftctl | latest |
-| 审计存储 | PostgreSQL + Redis | >=15 / >=7 |
-| API | FastAPI + Pydantic v2 + Uvicorn | >=0.110 |
-| ORM | SQLAlchemy 2.0.25 + Alembic 1.13.0 | 2.0 风格 Mapped/mapped_column |
-| 沙箱 | Docker Engine | >=24 |
-| 前端 | Vue3 + Pinia + AG-UI | >=3.4 |
-| 编排 | K8s + Istio + ArgoCD | 生产 |
-| 测试 | pytest / pytest-asyncio / mutmut / Playwright | >=8.0 |
-| 日志/监控 | structlog + OpenTelemetry | - |
-
-完整矩阵见 `@docs/开发计划_V14.1.md` 第 3.4 节。
-
-## 全局强制规则
-
-- **禁止自动 commit**，必须等用户审查确认
-- **禁止直接 push master**，必须走 feature 分支 + PR
-- 新依赖必须先问再装（Python: `poetry add`；Node: `pnpm add`）。优先用标准库，不为单个函数引入整包
-- **必须写注释**：调度器状态机、防幻觉判定逻辑、图谱查询语义必须注释 WHY。注释用中文，面向非编程专业人士审计。类型签名自解释的不写冗余 docstring
-- 禁止命令注入、XSS、SQL 注入、`eval()`、动态代码执行
-- 密钥/Token/API key 一律从环境变量读取，禁止硬编码
-- 不读/写 `.env`、credentials、`.pem`、`.key` 文件
-## ⚠️ 构建 exe 桌面版（强制两段式，禁止直接用 PyInstaller 产物）
-
-> **Deliverables/Orbit.exe 是 Tauri 桌面壳，不是裸 PyInstaller 产物。**
-> 裸 PyInstaller 产物是 39MB 后端-only，无 UI 窗口（`console=False`），用户双击看不到任何东西。
-> 桌面壳 = Tauri (Rust WebView) 内嵌 orbit-backend.exe，42MB，双击弹出原生窗口。
-
-**每次改完后端（任何 Python 文件变更）必须完整跑构建链，禁止跳过步骤：**
-
-```bash
-bash scripts/build-desktop.sh
-```
-
-**手工分步（调试时用）：**
-
-| 步骤 | 命令 | 产物 |
-|------|------|------|
-| 1. 杀旧进程 | `taskkill //F //IM Orbit.exe` | — |
-| 2. 前端构建 | `cd frontend && CI=true pnpm build` | `frontend/dist/` |
-| 3. 复制前端 | `cp -r frontend/dist/* backend/static/` | `backend/static/` |
-| 4. PyInstaller | `cd backend && python -m PyInstaller orbit.spec --distpath ../Deliverables --workpath build --noconfirm` | `Deliverables/Orbit.exe` (39MB 后端) |
-| 5. 替换 Tauri 内嵌 | `cp Deliverables/Orbit.exe src-tauri/orbit-backend.exe` | Tauri 壳用的后端 |
-| 6. Tauri 编译 | `cd src-tauri && cargo build --release` | `src-tauri/target/release/orbit.exe` (42MB 桌面壳) |
-| 7. 输出 | `cp src-tauri/target/release/orbit.exe Deliverables/Orbit.exe` | **最终产物** |
-
-**关键关系**：
-- `Deliverables/Orbit.exe` ← 覆盖自 Tauri 构建输出（步骤 7），不是 PyInstaller 产物
-- 步骤 4 生成的 `Deliverables/Orbit.exe` 会被步骤 7 覆盖——这是正确的
-- `src-tauri/orbit-backend.exe` 在 `.gitignore` 中，每次 `cargo build` 编译进 Tauri 壳
-- 仅改前端（未动 backend/）→ 跳步骤 4-5，跑步骤 2-3 + 6-7 即可
-- 改了 `orbit.spec` 的 `hiddenimports` → 必须加新模块路径后再跑完整链
-- `console=False` 是正确的——Tauri 提供窗口，后端不需要自己的控制台
-- 新增 backend 模块 → 必须加到 `orbit.spec` 的 `hiddenimports` 列表，否则 PyInstaller 漏打包
-- 永远不生成包含真实个人或企业信息的测试数据
-- API 响应统一：`{ code: 0, data: ..., message: "ok" }`；错误 `{ code: 错误码, data: null, message: "具体原因" }`
-- 路由层只做参数校验 + 响应格式化，不写业务逻辑
-- LLM 调用必须经 LiteLLM 网关，禁止直连 provider API
-- 沙箱执行的代码片段必须 Docker 隔离，禁止宿主机直接跑 LLM 生成代码
-- 路径：正斜杠 `/`
-
-## 开发工作流（每次需求强制执行）
-
-收到新需求时，**禁止直接写代码**。按以下流程推进，每阶段等待用户确认后再进入下一阶段。
-慢没关系，重点是**不返工**——宁可在阶段1-2花时间对齐需求，不要写完再改。
-
-### 文档管理约定
-- 同批次需求文档保存到 `docs/requirements/YYYY-MM-DD-需求简称/`
-- 文件命名：
-  - `阶段1-PRD-需求简称.md`
-  - `阶段2-技术方案-需求简称.md`
-  - `阶段3-实现记录-需求简称.md`
-  - `阶段3b-代码审查-需求简称.md`
-  - `阶段4-测试报告-需求简称.md`
-- **阶段2 技术方案必填边界 case 清单**：逐类填「场景-预期行为」，不适用标 N/A + 理由，禁止留空。阶段4 测试据此验收
-- 文档一旦保存即视为当前阶段基线，后续阶段必须引用和对照
-- 实现阶段必须对照对应 Step 的 PRD+ADR（`docs/PRD+ADR_*.md`），偏离必须主动标记并说明理由
-
-### 阶段切换与对齐规则
-
-文档产出不是目的——用文档来对齐才是。以下规则确保跨阶段信息不丢失，不依赖人的记忆。
-
-**进入新阶段前（AI 自主执行，不等待用户指令）**：
-1. **重读前面所有阶段文档**：进入阶段 2 前重读 PRD；进入阶段 3 前重读 PRD + 技术方案；进入阶段 4 前重读 PRD + 技术方案 + 实现记录
-2. **在新阶段产出开头显式引用前一阶段基线**：如"基于阶段1 PRD（验收标准共 5 条），本次技术方案覆盖 5 条，无偏离"
-3. **将前一阶段的成功标准/验收标准作为本阶段输入约束**——不能静默偏离，偏离必须主动标记并说明理由
-4. **阶段门禁（硬性规则，禁止跳过）**：当前阶段产出完成后，AI **必须**显式请求用户确认，等待用户回复"确认"或"进入阶段 N"后，方可进入下一阶段。**禁止**在用户未确认当前阶段时输出下一阶段产出。禁止默认"用户应该会同意"
-
-**用户质疑时必须启动「回溯链」（AI 自主执行，核心操作纪律）**：
-当用户在任何阶段对你的输出提出质疑（"为什么这么做"/"这个不对"/"换个方式"等），禁止直接跳到新方案。必须：
-
-1. **回溯**：从 PRD → 技术方案 → 当前代码/输出，展示完整逻辑链
-   ```
-   需求A（PRD 第X条验收标准）→ 方案B（技术方案第Y节）→ 实现C（文件:行号）
-   ```
-2. **定位断点**：用户质疑落在哪一环？
-   - 需求变了？→ 回阶段 1 更新 PRD，重新走阶段 1→2→3
-   - 需求没变但方案不对？→ 回阶段 2 更新技术方案，重新走阶段 2→3
-   - 需求和方案都对但代码有问题？→ 在阶段 3 修正代码即可
-3. **展示选项**：根据断点位置给出修改方案，等用户确认后再动手
-4. **更新基线**：断点修好后更新对应的阶段文档，保持文档链一致
-
-**核心原则**：不假设用户记得前面所有文档内容。每次质疑都是一次对齐检查——用文档说话，不用记忆说话。
-
-**问题定位原则（AI 自主执行，核心操作纪律）**：
-收到任何问题报告时，必须从问题本身出发，由外向内逐层排查。禁止一上来就猜测是代码问题。
+## 项目结构
 
 ```
-问题类型            → 定位入口
-驾驶舱 UI 呈现问题  → 打开 dev 服务器/Vite 亲自操作确认 → 检查 AG-UI 通信链路 → 最后看源码
-调度/Agent 行为异常 → 检查调度器状态机日志 → 检查检查点回滚路径 → 定位 Agent 角色逻辑
-LLM 输出错误        → 检查 LiteLLM 网关日志 → 检查防幻觉层 L1-L8 判定 → 定位 Prompt/Context
-图谱查询错误        → 检查 CodeGraph SQLite 数据 → 检查查询接口 → 定位 Tree-sitter/SQLLineage 解析
+Orbit/
+├── src/orbit/                     # 主源码（24 个模块）
+│   ├── scheduler/                 # 调度器状态机
+│   ├── graph/                     # 六图谱（code/database/config/knowledge/meta/document）
+│   ├── hallucination/             # L1-L8 防幻觉
+│   ├── sandbox/                   # Docker 隔离执行
+│   ├── checkpoint/                # 检查点管理
+│   ├── agents/                    # Agent 工厂
+│   ├── gateway/                   # LiteLLM 网关
+│   ├── knowledge/                 # 知识库
+│   ├── api/                       # FastAPI 路由
+│   ├── communication/             # 消息总线
+│   ├── compliance/                # 合规引擎
+│   ├── observability/             # 遥测
+│   └── (backup/ context/ core/ events/ infrastructure/ projects/
+│        resource_guard/ sessions/ sharding/ tools/ versioning/ ws/)
+├── backend/                       # PyInstaller 打包配置 + static/
+├── frontend/src/                  # Vue3 驾驶舱
+│   ├── views/                     # 页面
+│   ├── components/                # 通用组件（alerts/ audit/ charts/ chat/ dag/ ops/）
+│   ├── composables/               # 组合式函数
+│   ├── stores/                    # Pinia 状态
+│   └── router/                    # Vue Router
+├── src-tauri/                     # Tauri 桌面壳（Rust）
+├── alembic/versions/              # 数据库迁移
+├── configs/                       # k8s/otel/alertmanager/grafana
+├── chart/orbit/                   # Helm Chart
+├── scripts/                       # build_codex_context.py, build-desktop.sh
+├── docs/                          # PRD+ADR + requirements/
+├── .automations/pr-review/        # PR 审核 Token 节省工具
+└── Deliverables/                  # Tauri 桌面壳产物（Orbit.exe）
 ```
 
-每一层确认无误后才进入下一层。最外层（用户看到的）永远是第一入口。
+## 实现约束
 
-### 阶段 1：需求澄清 (brainstorm)
-
-**输出**：`阶段1-PRD-需求简称.md`
-
-**执行流程**：
-
-1. **生成 PRD 草稿**：收到需求后，先输出结构化 PRD，包含：
-   - 背景和用户问题
-   - 用户故事（P0/P1/P2 优先级，`作为[角色]，我希望[功能]，以便[价值]`）
-   - 验收标准和成功指标
-   - 待确认问题清单
-   - Non-Goals（防止范围蔓延）
-
-2. **补充领域特定内容**：在 PRD 基础上，AI 必须补充：
-   - **调度器影响**：涉及调度器状态机时，标注对状态转换/检查点/回滚/并发的影响
-   - **防幻觉影响**：涉及 L1-L8 任一层时，标注对全链路判定逻辑的影响
-   - **图谱影响**：涉及三图谱时，标注对查询接口/存储格式/跨图谱协作的影响
-   - **边缘情况**：LLM 超时/熔断触发、沙箱执行失败、图谱查询空结果、并发 Agent 竞态、检查点回滚冲突
-
-3. **对抗性验证（调度器/防幻觉/图谱变更强制，其他可选）**：对 PRD 进行压力测试，暴露最危险的假设（如"LLM 一定返回结构化输出""检查点一定可回滚""图谱查询一定命中"）
-
-4. **保存为 `阶段1-PRD-需求简称.md`**
-
-**反馈循环**：
-1. 输出 PRD → 等待用户反馈
-2. 收到反馈 → 更新 PRD → 再次确认
-3. 循环直到用户确认 → 保存文档 → 进入阶段 2
-4. 用户超过 2 天未回复 → 主动提醒一次
-
-**复杂需求可选**：`/ce-brainstorm`（多模块交叉/跨图谱协作/防幻觉层重构时使用，简单 CRUD 跳过）
-
-**Bug 修复/用户验收问题 → 先复现再动代码（强制）**：
-收到 bug 报告或验收问题时，禁止直接猜代码。必须：
-1. **复现**：按报告场景跑一遍，确认问题存在（调度器问题用日志复现，UI 问题用 dev 服务器复现，LLM 问题用相同 prompt 复现）
-2. **定位**：用「问题定位原则」由外向内排查
-3. **记录**：复现步骤写进阶段1 PRD 的"问题背景"
-4. 复现不了 → 回用户确认场景细节，禁止编造复现路径
-
-### 阶段 2：技术方案 (spec)
-
-**输出**：`阶段2-技术方案-需求简称.md`
-
-**必填要素**（缺一不通过）：
-
-1. **PRD 对照表**：逐条列出阶段1 PRD 的验收标准 → 对应技术方案如何覆盖。偏离必须标红说明理由
-2. **API 设计**（涉及 API 时）：端点路径、请求/响应 Pydantic 模型、错误码、OpenAPI schema 草稿
-3. **数据模型**（涉及持久化时）：SQLAlchemy 2.0 模型定义、Alembic 迁移方向、索引设计、对现有表的影响
-4. **数据流**：从入口到出口的完整链路（如 `API → 调度器 → Agent → 图谱查询 → 防幻觉层 → 沙箱 → 审计`）
-5. **调度器状态变更**（涉及调度时）：新增/修改的状态、转换条件、检查点策略、回滚路径
-6. **防幻觉层影响**（涉及 L1-L8 时）：哪些层受影响、判定逻辑变化、误报/漏报风险评估
-7. **图谱 Schema 变更**（涉及图谱时）：CodeGraph SQLite 表结构变化、查询接口变化、对现有索引的影响
-8. **边界 case 清单**（必填）：复制模板逐类填「场景-预期行为」，不适用标 N/A + 理由，禁止留空。阶段4 据此验收
-9. **风险与缓解**：至少列 3 条（性能/正确性/可维护性各一条）
-10. **依赖链**：新增/变更的内部模块依赖、外部依赖（需先问用户才能装）
-
-**门禁**：要素 1、8、9 为硬性，缺失即退回重写。
-
-### 阶段 3：编码 + 审查
-
-#### 3a. 编码
-
-- feature 分支开发：`feat/<需求简称>` 或 `fix/<bug简称>`
-- 对照阶段2 技术方案逐项实现，每完成一个模块跑一次单元测试
-- 命名遵守「编码约定」章节
-- 提交粒度：一个逻辑变更一个 commit，Conventional Commits 格式，subject ≤50 字符
-- commit message 注明对应 Step（如 `feat(scheduler): 实现状态机 Step 5.1`）
-- **禁止 `git add -A`**，精确指定文件
-
-#### 3b. 代码审查
-
-**触发条件（满足任一即强制审查）**：
-- 触及核心模块（调度器/防幻觉层/三图谱/沙箱）
-- 触及核心模型（Task/AgentRole/Checkpoint/GraphSnapshot）
-- 新增 API 端点或数据库 Schema 变更
-- 改动行数 >200 行
-
-**审查方式**：
-- 核心模块强制 `/ce-code-review`（12 Agent 并行审查 + 影响分析）
-- 非核心模块可选 `/code-review`（轻量审查）
-- 审查发现问题 → 修复 → 重新审查，循环最多 3 轮
-
-**审查产出**：`阶段3b-代码审查-需求简称.md`，记录问题清单、修复情况、遗留风险。
-
-### 阶段 4：测试门禁 + 合并
-
-#### 4a. 测试（第一道门禁）
-
-**第一步：确定测试范围**
-
-```
-改动类型            → 测试范围
-纯前端（驾驶舱）    → frontend vitest + Playwright 冒烟
-纯后端（非核心）    → pytest unit + integration
-触及核心模块        → + 全量回归
-触及防幻觉层 L1-L8 ⚠️ → + 每层独立验证用例
-触及调度器状态机 ⚠️ → + 状态转换/检查点/回滚全路径回归
-触及三图谱 ⚠️       → + 跨图谱协作查询回归
-```
-
-**第二步：执行命令**
-
-| 级别 | 命令 | 时长 |
-|------|------|------|
-| 单元测试 | `pytest tests/unit/ -q` | 秒级 |
-| 集成测试 | `pytest tests/integration/ -q` | ≤1 分钟 |
-| 冒烟测试 | `pytest tests/e2e/ -q -k "smoke"` | ≤2 分钟 |
-| 回归测试 | `pytest tests/e2e/ -q` | ≤10 分钟 |
-| 变异测试（核心算法） | `mutmut run` | 按需 |
-| 混沌测试（故障注入） | `tox -e chaos` | 按需 |
-
-**冒烟场景（5 个核心，必须全绿）**：
-
-| 场景 | 覆盖链路 |
-|------|---------|
-| smoke_schedule | 任务提交 → 调度器状态机 → Agent 角色分发 → 完成 → 审计记录 |
-| smoke_graph | 代码改动 → 代码图谱更新 → 跨图谱影响分析（代码→数据库→配置） |
-| smoke_hallucination | LLM 输出 → L1-L8 链路判定 → 熔断触发 → 回滚 |
-| smoke_sandbox | 代码片段 → Docker 隔离执行 → 结果回收 → 清理 |
-| smoke_checkpoint | 检查点保存 → 故障注入 → 回滚到上一检查点 → 继续 |
-
-**新功能追加测试（强制）**：
-- 新增 API 端点 → 至少 1 个集成测试
-- 新增调度器状态 → 单元测试覆盖所有转换路径
-- 新增防幻觉层规则 → 正向 + 异常用例（误报/漏报各一）
-- 新增图谱查询 → 空结果 + 命中 + 跨图谱协作用例
-- **Bug 修复** → 1 条 `test_regression_` 用例：先写复现 → 确认失败 → 修代码 → 确认通过
-
-#### 4b. 创建 PR
-
-- PR 标题 Conventional Commits：`feat(module): 描述`，subject ≤50 字符
-- CI 自动触发（GitHub Actions）。AI 负责监控 CI 结果
-- 禁止 force-push
-
-#### 4c. 门禁检查
-
-**门禁清单（9 项，全绿才能合并）**：
-1. 安全扫描通过（无致命漏洞）
-2. 所有测试命令 exit code = 0
-3. 覆盖率 ≥80% 且未下降（调度器/防幻觉纯函数 100%）
-4. 触及核心模块时回归已跑且通过
-5. 新功能有对应测试
-6. Bug 修复有 `test_regression_` 用例
-7. 前端改动有 Playwright 回归测试且通过
-8. 测试报告已保存（`阶段4-测试报告-需求简称.md`）
-9. PR CI 绿灯（lint + test 全部通过）
-
-**门禁不通过时**：分析根因 → 自动修复 → 从 4a 重新执行 → 循环最多 3 轮
-
-#### 4d. 用户验收 + 合并
-
-- 用户对照阶段1 PRD 验收标准逐条验证
-- 验收通过后用户确认"可以合并"
-- GitHub PR merge → master
-
-#### 4e. 版本号 + CHANGELOG
-- 语义化版本：修订号+1（bug修复）、次版本+1（新功能）、主版本+1（破坏性变更）
-- `git tag -a vX.Y.Z -m "版本说明"` + 更新 CHANGELOG.md
-- tag push：`git push origin vX.Y.Z`
-
-#### 4f. 数据库迁移（涉及 schema 变更时）
-- Alembic：`alembic revision --autogenerate -m "description"`，迁移文件在 `alembic/versions/`
-- 迁移脚本必须可重复执行（含 downgrade）
-- commit message 注明：`db: 新增/修改 xxx 表/字段`
-- **禁止直接修改数据库不写迁移脚本**
-
-#### 4g. 收尾
-
-**强制——每次 merge 到 master 后执行**：
-1. 更新 `docs/已实现功能清单.md`：对应模块加一行（功能/PR链接/版本号/Step 对照）。新增模块则新增表格
-2. 更新 `docs/产品路线图.md`：版本号变更时更新"版本历史"表；模块状态 ⏳ → ✅ 时更新"状态"列
-3. 更新 SESSION.md：当日完成、PR、关键决策、待处理
-4. 本轮发现新的错误模式 → 追加到「行为拦截清单」表中。加一行不费劲，不加下次再犯
-
-### 例外
-
-无例外。所有改动——包括 bug 修复、单行文案修正、CSS 调整——必须走完整四阶段流程。阶段 1 PRD → 阶段 2 技术方案 → 阶段 3 编码+3b 审查 → 阶段 4 测试门禁，一个不能少。
-
-改动越小，文档可以越短（bug 修复的 PRD 可能只需要 5 行），但不能跳过。理由：文档链（PRD→方案→实现→测试）是唯一可追溯的记录，跳过任何一环都会留下空白。
-
-> 涉及核心模块/核心模型 → 阶段 3b 强制 `/ce-code-review`；新增 API 端点/数据库变更 → 阶段 2 方案必须包含 API 设计/迁移脚本；触及防幻觉层/调度器状态机 → 阶段 4 强制全路径回归。
-
-## 项目结构（预定，尚未创建）
-
-```
-orbit/
-├── pyproject.toml                  # uv 管理
-├── Makefile                        # init / test / lint / run
-├── docker-compose.yml              # PostgreSQL / Redis / LiteLLM
-├── .env.example
-├── src/orbit/
-│   ├── scheduler/                  # 调度器状态机（Step 5.x）
-│   ├── graph/                      # 三图谱：code / database / config（Step 3.x）
-│   ├── hallucination/              # L1-L8 防幻觉（Step 4.x）
-│   ├── sandbox/                    # Docker 隔离执行（Step 1.x）
-│   ├── gateway/                    # LiteLLM 网关（Step 2.1）
-│   ├── checkpoint/                 # 检查点管理（Step 2.2）
-│   ├── audit/                      # task_audit_trail + 成本记录（Step 6.4）
-│   └── api/                        # FastAPI 路由 + Pydantic 模型
-├── frontend/                       # Vue3 + Pinia + AG-UI 驾驶舱（Step 6.1）
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   ├── e2e/                        # Playwright
-│   └── chaos/                      # tox 故障注入
-├── helm/                           # K8s Chart（Step 7.1）
-└── docs/
-    ├── 开发计划_V14.1.md
-    ├── PRD+ADR_*.md                # 16 Step 设计文档
-    └── requirements/               # 需求文档
-```
+| # | 约束 | 理由 |
+|---|------|------|
+| 1 | **新模块 → 必须在 `orbit.spec` 的 `hiddenimports` 注册** | 否则 PyInstaller 漏打包 |
+| 2 | **构建 exe 前 `rm -rf backend/build`** | 清除旧缓存 |
+| 3 | **改后端后必须跑完整 `scripts/build-desktop.sh`** | Tauri 壳 ≠ 裸 PyInstaller 产物 |
+| 4 | **LLM 调用必须经 LiteLLM 网关，禁止直连 provider** | 统一追踪 + 降级 |
+| 5 | **沙箱执行代码 → Docker 隔离，禁止宿主机直接跑** | 安全基线 |
+| 6 | **防幻觉层改动 → 审查 L1-L8 全链路，不能只改一层** | 单层改动影响上下游判定 |
+| 7 | **调度器状态机改动 → 全路径回归（转换/检查点/回滚）** | 状态不一致 → 任务卡死 |
+| 8 | **新依赖必须先问** | poetry add / pnpm add 前确认 |
+| 9 | **API key / Token → 环境变量，禁止硬编码** | 安全基线 |
 
 ## 编码约定
 
 ### Python
 - 类型标注：所有 public 函数写完整类型签名
-- 命名：模块/类 PascalCase，函数/变量 snake_case，布尔 `is_` / `has_` 前缀
-- 异步：调度器/网关/沙箱一律 `async def`，用 `asyncio`
-- Pydantic v2 模型做 LLM 输出结构化与 API 契约
+- 异步：调度器/网关/沙箱一律 `async def`
+- Pydantic v2 做 LLM 输出结构化与 API 契约
 - ORM 用 SQLAlchemy 2.0 风格（`Mapped` / `mapped_column`）
-- 配置用 `python-dotenv`（开发计划 3.4.1 指定，非 pydantic-settings）
 
 ### Vue3 / TypeScript
 - `<script setup lang="ts">` 组合式 API
 - strict 模式，禁止 `any`
-- 组件 PascalCase， composables `useXxx`
 - 状态进 Pinia store，不散落组件内
-- 与后端通信用 AG-UI 协议（SSE + polling）
 
-## 测试（尚未落地，待 Step 落地后执行）
+## 测试框架
 
-| 级别 | 范围 | 命令 | 时长 |
-|------|------|------|------|
-| 单元测试 | 调度器/验证器纯函数 | `pytest tests/unit/ -q` | 秒级 |
-| 集成测试 | API 端点 / 图谱查询 / DB | `pytest tests/integration/ -q` | ≤1 分钟 |
-| 冒烟测试 | 5 核心场景 | `pytest tests/e2e/ -q -k "smoke"` | ≤2 分钟 |
-| 回归测试 | 全量 E2E | `pytest tests/e2e/ -q` | ≤10 分钟 |
-| 变异测试 | 核心算法 | `mutmut run` | 按需 |
-| 混沌测试 | 故障注入 | `tox -e chaos` | 按需 |
+| 级别 | 命令 | 时长 |
+|------|------|------|
+| 单元测试 | `pytest tests/unit/ -q --tb=short` | 秒级 |
+| 集成测试 | `pytest tests/integration/ -q --tb=short` | ≤1min |
+| 冒烟测试 | `pytest tests/e2e/ -q --tb=short -k "smoke"` | ≤2min |
+| 回归测试 | `pytest tests/e2e/ -q --tb=short` | ≤10min |
 
 覆盖率目标：调度器/防幻觉纯函数 100%，Service 模块 ≥80%，CI 门禁 ≥80%。
 
-Bug 修复 → 先写 `test_regression_` 复现用例 → 确认失败 → 修代码 → 确认通过。回归用例永久保留。
-
 ## 行为拦截清单
 
-| 操作 | 必须先确认 |
-|------|-----------|
-| 说"合并"或执行 `git merge` | 逐条确认：用户验收？CI？审查？缺一即阻止 |
+| 操作 | 规则 |
+|------|------|
+| 说"合并" | 逐条确认：用户验收？CI？审查？ |
 | `git add -A` | ⛔ 禁止——精确指定文件 |
-| 说"完成"/"修好了" | 输出测试通过证据 |
 | 展示 diff 后 | 等用户说"commit"，不自动 commit |
-| 4g 收尾（功能清单/路线图/SESSION） | ⛔ 必须在 merge 到 master 后才做，禁止 merge 前写收尾产物 |
 | 新增 dep | 先问用户 |
 | `git push --force` / `--no-verify` | ⛔ 禁止 |
 | LLM 生成代码直接执行 | ⛔ 禁止——必须经沙箱 Docker 隔离 |
-| 调度器状态机改动 | 审查全生命周期，检查检查点回滚路径 |
-| 防幻觉层判定逻辑改动 | 审查 L1-L8 全链路影响，不能只改一层 |
-| LLM API key | ⛔ 禁止硬编码，从环境变量读取 |
+| 调度器状态机改动 | 审查全生命周期 + 检查点回滚路径 |
+| 防幻觉层判定逻辑改动 | 审查 L1-L8 全链路影响 |
+| LLM API key | ⛔ 禁止硬编码 |
+
+## Token 节省规则
+
+1. **按需加载文档**：WORKFLOW.md 收到新需求时读；其他文档仅相关时读
+2. **Grep/Glob 优先**：避免整文件读取
+3. **Subagent 用 cavecrew**：输出压缩 ~60%
+4. **Memory 系统**：重复问题写入 memory，自动注入后续会话
 
 ## 插件环境
 
-ECC (`affaan-m/ECC`) + Compound Engineering (`EveryInc/compound-engineering-plugin`) 双插件部署，自动读取本文件。
-
-| 命令 | 触发 | 条件 |
-|------|------|------|
-| `ECC /security-scan` | 阶段 4a 强制 | 每次先于 pytest |
-| `/ce-code-review` | 阶段 3b 可选 | 核心模块（调度器/防幻觉/图谱）改动时 |
-| `/ce-*` 系列 | 按需 | 复杂需求多模块交叉时启用 |
-
-push 前必须经用户确认。
+ECC + Compound 双插件部署。`ECC /security-scan` 阶段 4a 强制。
+`/ce-code-review` 核心模块改动时启用。
 
 ## 通信模式
 
 - 默认 caveman **full** 模式回复。丢冠词/填充词，保留技术准确
-- 安全警告、不可逆操作确认、多步序列、或压缩造成歧义时：自动降级回正常模式
-- 说 "stop caveman" 或 "normal mode" 关闭；`/caveman lite|full|ultra` 切换等级
+- 安全警告、不可逆操作确认、多步序列：自动降级回正常模式
+
+## 例外
+
+无例外。所有改动走完整四阶段流程。**收到需求时先读 `@docs/WORKFLOW.md`。**

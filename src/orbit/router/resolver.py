@@ -25,9 +25,9 @@ logger = structlog.get_logger("orbit.router.resolver")
 
 @dataclass
 class ResolvedModel:
-    model: str          # LiteLLM 模型 ID（空字符串 = 本地规则引擎，不调 LLM）
+    model: str  # LiteLLM 模型 ID（空字符串 = 本地规则引擎，不调 LLM）
     tier: ModelTier | None
-    source: str         # "cc_switch_force" | "environment" | "cc_switch" | "router" | "default"
+    source: str  # "cc_switch_force" | "environment" | "cc_switch" | "router" | "default"
     reason: str
     is_forced: bool = False
 
@@ -56,7 +56,9 @@ class AgentModelResolver:
         # 1. CC_SWITCH force 模式——最高优先级
         cc_config = parse_cc_switch()
         for entry in cc_config.entries:
-            if entry.is_force and (entry.agent_name == "all" or entry.agent_name.lower() == agent_name.lower()):
+            if entry.is_force and (
+                entry.agent_name == "all" or entry.agent_name.lower() == agent_name.lower()
+            ):
                 result = ResolvedModel(
                     model=entry.model,
                     tier=None,
@@ -83,7 +85,9 @@ class AgentModelResolver:
 
         # 3. CC_SWITCH no-force 模式
         for entry in cc_config.entries:
-            if not entry.is_force and (entry.agent_name == "all" or entry.agent_name.lower() == agent_name.lower()):
+            if not entry.is_force and (
+                entry.agent_name == "all" or entry.agent_name.lower() == agent_name.lower()
+            ):
                 result = ResolvedModel(
                     model=entry.model,
                     tier=None,
@@ -128,7 +132,10 @@ class AgentModelResolver:
             model=default_model,
             tier=None,
             source="default",
-            reason=f"系统默认模型" + (f" ({os.getenv('DEFAULT_LLM_MODEL', '')})" if os.getenv("DEFAULT_LLM_MODEL") else ""),
+            reason=f"系统默认模型"
+            + (
+                f" ({os.getenv('DEFAULT_LLM_MODEL', '')})" if os.getenv("DEFAULT_LLM_MODEL") else ""
+            ),
             is_forced=False,
         )
         self._cache[agent_name] = result

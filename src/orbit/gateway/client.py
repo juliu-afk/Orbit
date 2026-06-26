@@ -3,10 +3,10 @@
 WHY 统一网关：调度器只认 LLMClient.generate()，不直接接触 litellm。
 好处：密钥/路由/成本追踪集中管理；熔断器透明；切模型不改调度器。
 
-模型体系（2026-06-26 修订）：
-- DeepSeek V4 Pro  → 主力推理（architect/developer）
-- DeepSeek V4 Flash → 轻量任务（config_manager/clarifier）
-- GLM-5.2          → 代码审查+测试设计（reviewer/qa），走 Coding Plan 订阅
+模型体系（2026-06-26 修订，Tier 换位）：
+- GLM-5.2          → Tier 3 最强推理（architect），走 Coding Plan 订阅
+- DeepSeek V4 Pro  → Tier 2 中档推理（developer/reviewer/qa）
+- DeepSeek V4 Flash → Tier 1 轻量任务（config_manager/clarifier）
 - GLM-4.7 Flash    → 统一降级兜底（免费），走 Coding Plan 订阅
 
 降级策略：主力失败 → 自动切 GLM-4.7 Flash（免费）→ 失败挂起人工。

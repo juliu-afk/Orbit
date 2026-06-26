@@ -5,19 +5,16 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from orbit.router.agent import (
-    FALLBACK_MODEL,
     TIER_MODEL_MAP,
     ModelTier,
     RouterAgent,
     RouterDecision,
 )
-from orbit.router.cc_switch import CCSwitchEntry, parse_cc_switch
-from orbit.router.resolver import AgentModelResolver, ResolvedModel
+from orbit.router.cc_switch import parse_cc_switch
+from orbit.router.resolver import AgentModelResolver
 from orbit.router.weights import ScoreWeights
 
 # ============================================================

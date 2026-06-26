@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """RouterAgent chaos tests: fault injection and degradation verification."""
 
 from __future__ import annotations

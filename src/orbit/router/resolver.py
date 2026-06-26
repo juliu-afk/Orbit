@@ -132,7 +132,7 @@ class AgentModelResolver:
             model=default_model,
             tier=None,
             source="default",
-            reason=f"系统默认模型"
+            reason="系统默认模型"
             + (
                 f" ({os.getenv('DEFAULT_LLM_MODEL', '')})" if os.getenv("DEFAULT_LLM_MODEL") else ""
             ),

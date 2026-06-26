@@ -212,3 +212,60 @@ class ToolRegistry:
 | Claude Code | `tools/` dir (leaked, 43 tools) | ~2000 |
 | OpenCode | `session/prompt.ts:resolveTools()` | ~100 |
 | OpenCode | `session/processor.ts:350-376` (Doom Loop) | ~25 |
+| OpenClaw | `src/agents/pi-tools.abort.ts` wrapToolWithAbortSignal | ~30 |
+| OpenClaw | `src/agents/pi-tools.schema.ts` normalizeToolParameters | ~100 |
+| OpenClaw | `src/agents/pi-tools.*.ts` 9-layer policy merge | ~200 |
+
+---
+
+## 五、OpenClaw 补充：工作区隔离 + 子进程 Agent 启动
+
+### Worktree 隔离（对标 Git 沙箱）
+
+```python
+# src/orbit/sandbox/worktree.py
+class WorktreeManager:
+    """每个任务独立 git worktree，避免文件冲突。"""
+
+    async def create(self, task_id: str) -> str:
+        branch = f"agent/{task_id}"
+        path = f"../.worktrees/{task_id}"
+        await exec(f"git worktree add {path} {branch}")
+        return path
+
+    async def resolve(self, task_id: str, action: str):
+        """merge | pr | discard"""
+        states = {
+            "merge": self._merge_and_cleanup,
+            "pr": self._create_pr,
+            "discard": self._remove_worktree,
+        }
+        return await states[action](task_id)
+```
+
+### 子进程 Agent 启动（对标 OpenClaw code-agent 插件）
+
+```python
+# src/orbit/runner/subprocess_agent.py
+class SubprocessAgentRunner:
+    async def launch_claude_code(self, task_id: str, prompt: str, cwd: str):
+        # 1. 写 prompt 到临时文件（避免 shell 转义 bug）
+        tmp = Path(f"/tmp/orbit-task-{task_id}.txt")
+        tmp.write_text(prompt)
+
+        # 2. 启动 Claude Code 子进程
+        proc = await asyncio.create_subprocess_exec(
+            "claude", "--permission-mode", "bypassPermissions", "--print",
+            stdin=open(tmp),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+        )
+
+        # 3. 流式读取输出
+        async for line in proc.stdout:
+            yield self._parse_output(line)
+
+        # 4. 持久化结果
+        self._save_result(task_id, proc.returncode)
+```

@@ -89,43 +89,6 @@ def build_merge_prompt(attempts: list[TierAttempt], task: str) -> str:
     return "\n".join(parts)
 
 
-async def merge_outputs(
-    llm_client: Any,
-    attempts: list[TierAttempt],
-    task: str,
-) -> dict[str, Any] | None:
-    """由 GLM-5.2（Tier 3 裁判）对比三个方案，各取所长融合。
-
-    裁判逻辑:
-        - 同一模型既当选手(Tier 3)又当裁判——它是最强的，有能力判断优劣
-        - 冲突时以 Tier 3 输出为准（最强模型），但吸收 Tier 1/2 的亮点
-        - 输出包含 taken_from 字段，标注每部分来自哪个 Tier，可审计
-    """
-    if len(attempts) < 2:
-        return attempts[0].output if attempts else None
-
-    prompt = build_merge_prompt(attempts, task)
-
-    try:
-        from orbit.gateway.schemas import LLMRequest
-
-        resp = await llm_client.generate(
-            LLMRequest(prompt=prompt, system_prompt="你是方案合并 Agent。输出纯 JSON。"),
-            task_id="merge",
-        )
-        import json as _json
-
-        return _json.loads(resp.content)
-    except Exception as e:
-        logger.error("merge_failed", error=str(e))
-        # 合并失败 → 降级返回 Tier 3 的输出（最强模型）
-        for a in reversed(attempts):
-            if a.success and a.output:
-                logger.info("merge_fallback_to_tier", tier=a.tier.value)
-                return a.output
-        return None
-
-
 def needs_escalation(output: dict[str, Any] | None, error: str | None) -> bool:
     """判断是否需要升级。"""
     if error:

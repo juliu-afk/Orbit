@@ -18,7 +18,7 @@ from typing import Any
 import structlog
 
 from orbit.gateway.schemas import LLMRequest
-from orbit.scheduler.escalation import TierAttempt, EscalationResult
+from orbit.scheduler.escalation import EscalationResult, TierAttempt
 
 logger = structlog.get_logger("orbit.scheduler.merge_engine")
 

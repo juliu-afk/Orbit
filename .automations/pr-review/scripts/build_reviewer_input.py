@@ -1,0 +1,216 @@
+"""build_reviewer_input.py — 生成精简 Reviewer 输入文件。
+
+输入: pr-meta.json, repo-map.md, rule-scan.md (由前面脚本生成)
+输出: reviewer-input.md — 可直接交给 Reviewer Agent 的精简审核输入
+
+⚠️ 关键原则: reviewer-input.md 不包含完整 pr.diff。
+    Reviewer Agent 应先读此文件，仅在需要时读取具体源文件片段。
+"""
+
+import json
+import sys
+from pathlib import Path
+
+if sys.stdout.encoding != "utf-8":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+AUTOMATIONS_DIR = PROJECT_ROOT / ".automations" / "pr-review"
+
+
+def build_reviewer_input(pr_number: int) -> str:
+    """构建 reviewer-input.md。"""
+    pr_dir = AUTOMATIONS_DIR / str(pr_number)
+
+    # 读取输入
+    meta = json.loads((pr_dir / "pr-meta.json").read_text(encoding="utf-8"))
+
+    repo_map = ""
+    repo_map_path = pr_dir / "repo-map.md"
+    if repo_map_path.exists():
+        repo_map = repo_map_path.read_text(encoding="utf-8")
+
+    rule_scan = ""
+    rule_scan_path = pr_dir / "rule-scan.md"
+    if rule_scan_path.exists():
+        rule_scan = rule_scan_path.read_text(encoding="utf-8")
+
+    # 从 meta 提取结构化信息（不含完整 body）
+    title = meta.get("title", "N/A")
+    body = meta.get("body", "")
+    # 截断 body 到 500 字符 —— Reviewer 需要知道 PR 意图但不需读完整描述
+    body_summary = body[:500] + ("..." if len(body) > 500 else "")
+    files = meta.get("files", [])
+    comments = meta.get("comments", [])
+
+    # 提取变更文件摘要
+    additions = sum(f.get("additions", 0) for f in files)
+    deletions = sum(f.get("deletions", 0) for f in files)
+    changed_paths = [f["path"] for f in files]
+
+    lines = [
+        f"# Reviewer Input — PR #{pr_number}",
+        "",
+        "> ⚠️ 本文档是精简审核上下文。完整 diff 在 `pr.diff`，仅在需要时读取具体片段。",
+        "",
+        "## Task",
+        "",
+        f"请基于以下上下文审核 PR #{pr_number}，输出 P0/P1/P2 和 RR-1~RR-5 覆盖情况。",
+        "",
+        "## PR Metadata",
+        "",
+        f"- **PR**: #{pr_number}",
+        f"- **Title**: {title}",
+        f"- **Files**: {len(files)} changed (+{additions}/-{deletions})",
+        f"- **Reviews**: {len(meta.get('reviews', []))} | **Comments**: {len(comments)}",
+        "",
+    ]
+
+    # PR 描述摘要
+    if body_summary.strip():
+        lines.append("### PR Description (摘要)")
+        lines.append("")
+        lines.append("```text")
+        lines.append(body_summary)
+        lines.append("```")
+        lines.append("")
+
+    # 变更文件列表（仅路径，不含 diff）
+    lines.append("### Changed Files")
+    lines.append("")
+    for f in changed_paths:
+        lines.append(f"- {f}")
+    lines.append("")
+
+    # 已有的 Review Comments 摘要
+    if comments:
+        lines.append("### Existing Review Comments")
+        lines.append("")
+        for c in comments:
+            author = c.get("author", {}).get("login", "unknown")
+            body_text = c.get("body", "")
+            # 截断每条评论到 300 字符
+            body_short = body_text[:300] + ("..." if len(body_text) > 300 else "")
+            lines.append(f"- **{author}**: {body_short}")
+        lines.append("")
+
+    # 嵌入 Repo Map
+    if repo_map:
+        lines.append("---")
+        lines.append("")
+        lines.append(repo_map)
+        lines.append("")
+
+    # 嵌入 Rule Scan
+    if rule_scan:
+        lines.append("---")
+        lines.append("")
+        lines.append(rule_scan)
+        lines.append("")
+
+    # 历史 Gotcha 提醒（硬编码——确保 Reviewer 不会错过）
+    lines.append("---")
+    lines.append("")
+    lines.append("## ⚠️ Historical Gotcha — require_permission")
+    lines.append("")
+    lines.append("**权限字符串问题已反复出现 5 次**: PR#73 → #75 → #78 → #83 → #84。")
+    lines.append("")
+    lines.append("Reviewer 必须逐项检查：")
+    lines.append("")
+    lines.append("1. 权限字符串拼写是否正确（`module:action` 格式）？")
+    lines.append("2. 权限是否在 `backend/app/core/rbac.py` 中注册？")
+    lines.append("3. 权限是否在 seed 数据中授予了正确的角色？")
+    lines.append("4. 新增 API 端点是否都有 `require_permission` 保护？")
+    lines.append("5. 测试是否覆盖未授权/无权限场景（期望 403）？")
+    lines.append("")
+
+    # 输出格式要求
+    lines.append("---")
+    lines.append("")
+    lines.append("## Required Review Output")
+    lines.append("")
+    lines.append("请按以下格式输出审核结论：")
+    lines.append("")
+    lines.append("```markdown")
+    lines.append("## 结论")
+    lines.append("是否建议合并：是/否")
+    lines.append("")
+    lines.append("## P0 — 阻断合并")
+    lines.append("...")
+    lines.append("")
+    lines.append("## P1 — 应修复")
+    lines.append("...")
+    lines.append("")
+    lines.append("## P2 — 建议优化")
+    lines.append("...")
+    lines.append("")
+    lines.append("## RR 覆盖")
+    lines.append("- RR-1: 需求/AC 对齐 — [通过/部分失败/不通过]")
+    lines.append("- RR-2: 实现正确性 — [通过/部分失败/不通过]")
+    lines.append("- RR-3: 权限/RBAC/数据隔离 — [通过/部分失败/不通过]")
+    lines.append("- RR-4: 测试覆盖 — [通过/部分失败/不通过]")
+    lines.append("- RR-5: 回归风险 — [通过/部分失败/不通过]")
+    lines.append("")
+    lines.append("## 建议修复指令")
+    lines.append("...")
+    lines.append("```")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append(f"*Generated by build_reviewer_input.py for PR #{pr_number}*")
+
+    return "\n".join(lines)
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        print("用法: python build_reviewer_input.py <PR_NUMBER>")
+        print("示例: python build_reviewer_input.py 85")
+        sys.exit(1)
+
+    try:
+        pr_number = int(sys.argv[1])
+    except ValueError:
+        print(f"错误: PR 号必须是数字，收到: {sys.argv[1]}")
+        sys.exit(1)
+
+    pr_dir = AUTOMATIONS_DIR / str(pr_number)
+
+    # 检查前置产物
+    required = ["pr-meta.json", "changed-files.txt"]
+    missing = [f for f in required if not (pr_dir / f).exists()]
+    if missing:
+        print(f"错误: 缺少前置产物: {missing}")
+        print(f"请先运行 fetch_pr_context.py {pr_number}")
+        sys.exit(1)
+
+    print(f"正在生成 PR #{pr_number} reviewer input...")
+    reviewer_input = build_reviewer_input(pr_number)
+    output_path = pr_dir / "reviewer-input.md"
+    output_path.write_text(reviewer_input, encoding="utf-8")
+
+    # 验收自检：确保不含完整 diff
+    diff_path = pr_dir / "pr.diff"
+    if diff_path.exists():
+        diff_content = diff_path.read_text(encoding="utf-8")
+        # 检查 reviewer-input 是否包含大段 diff（判断标准：是否包含超过 50 行 diff 内容）
+        if len(diff_content) > 500 and diff_content[:200] in reviewer_input:
+            print("❌ 错误: reviewer-input.md 包含完整 pr.diff！Token 会爆炸。")
+            sys.exit(1)
+
+    # 检查 reviewer-input.md 大小是否合理（应 < 50KB，典型值 ~10-30KB）
+    size_kb = len(reviewer_input) / 1024
+    print(f"✓ reviewer-input.md 已生成 → {output_path} ({size_kb:.1f} KB)")
+
+    if size_kb > 100:
+        print("⚠️  警告: reviewer-input.md 超过 100KB，可能包含过多上下文。")
+        print("   请检查是否嵌入了大段文件内容。")
+
+    # 确认不含完整 diff
+    print("✓ 已确认: 不含完整 pr.diff")
+    print("✓ Reviewer Agent 可直接使用此文件开始审核")
+
+
+if __name__ == "__main__":
+    main()

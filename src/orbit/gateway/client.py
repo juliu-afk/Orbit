@@ -15,6 +15,8 @@ WHY 统一网关：调度器只认 LLMClient.generate()，不直接接触 litell
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 
 from orbit.core.config import settings
@@ -133,7 +135,7 @@ class LLMClient:
             ]
 
         # 构建 litellm 参数
-        kwargs: dict = dict(
+        kwargs: dict[str, Any] = dict(
             model=model,
             messages=messages,
             temperature=req.temperature,
@@ -163,14 +165,16 @@ class LLMClient:
         if hasattr(choice.message, "tool_calls") and choice.message.tool_calls:
             tool_calls = []
             for tc in choice.message.tool_calls:
-                tool_calls.append({
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {
-                        "name": tc.function.name,
-                        "arguments": tc.function.arguments,
-                    },
-                })
+                tool_calls.append(
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                )
             stop_reason = "tool_calls"
         elif choice.finish_reason == "length":
             stop_reason = "max_tokens"

@@ -8,6 +8,8 @@ ConfigManagerAgent/ClarifierAgent → 保持 BaseAgent（不需要文件工具�
 
 from __future__ import annotations
 
+from typing import Any
+
 import structlog
 
 from orbit.agents.base import AgentRole, BaseAgent
@@ -70,7 +72,7 @@ class ConfigManagerAgent(BaseAgent):
     role = AgentRole.CONFIG_MANAGER
 
     async def execute(self, input_data):
-        from orbit.agents.base import AgentInput, AgentOutput
+        from orbit.agents.base import AgentOutput
 
         if self.llm is None:
             return AgentOutput(result={"config": f"# [mock] config for: {input_data.task}"})
@@ -113,8 +115,12 @@ class AgentFactory:
     ) -> BaseAgent:
         """create = get_agent alias for orchestrator."""
         return cls.get_agent(
-            role, llm=llm, graph=graph, sandbox=sandbox,
-            tools=tools, event_bus=event_bus,
+            role,
+            llm=llm,
+            graph=graph,
+            sandbox=sandbox,
+            tools=tools,
+            event_bus=event_bus,
         )
 
     @classmethod
@@ -152,8 +158,11 @@ class AgentFactory:
         # Phase 1: ReActAgent 子类需要 tools + event_bus
         if issubclass(agent_cls, ReActAgent):
             return agent_cls(
-                llm=llm, graph=graph, sandbox=sandbox,
-                tools=tools, event_bus=event_bus,
+                llm=llm,
+                graph=graph,
+                sandbox=sandbox,
+                tools=tools,
+                event_bus=event_bus,
             )
         return agent_cls(llm=llm, graph=graph, sandbox=sandbox)
 

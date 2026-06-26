@@ -15,7 +15,6 @@ from typing import Any
 
 from orbit.agents.base import AgentRole
 
-
 # ── Agent 角色描述（stable 层）─────────────────────────────
 # WHY 在这里集中定义: 不在 agent 各自文件中散落，统一管理+
 
@@ -166,8 +165,11 @@ class PromptBuilder:
             parts.append(f"\n已有代码上下文：\n```\n{truncated}\n```")
 
         if env_info:
-            safe_env = {k: v for k, v in env_info.items()
-                       if not any(s in k.lower() for s in ("key", "secret", "token", "password"))}
+            safe_env = {
+                k: v
+                for k, v in env_info.items()
+                if not any(s in k.lower() for s in ("key", "secret", "token", "password"))
+            }
             if safe_env:
                 parts.append(f"\n环境信息：{safe_env}")
 

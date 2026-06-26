@@ -42,6 +42,7 @@ def test_factory_unknown_role() -> None:
 # Phase 1: Developer/Architect/Reviewer/QA 继承 ReActAgent
 # mock 模式 (无 LLM) 返回 ReAct 循环跳过标记
 
+
 @pytest.mark.asyncio
 async def test_developer_mock_output() -> None:
     """DeveloperAgent (ReActAgent)——无 LLM 时返回 mock 跳过标记."""
@@ -146,7 +147,9 @@ def test_factory_passes_tools_to_react_agent() -> None:
     mock_tools = object()
     mock_bus = object()
     agent = AgentFactory.get_agent(
-        AgentRole.DEVELOPER, tools=mock_tools, event_bus=mock_bus,
+        AgentRole.DEVELOPER,
+        tools=mock_tools,
+        event_bus=mock_bus,
     )
     assert agent.tools is mock_tools
     assert agent._event_bus is mock_bus

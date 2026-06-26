@@ -10,7 +10,7 @@ import fnmatch
 import os
 from pathlib import Path
 
-from orbit.tools.registry import get_registry, WorkspaceViolationError
+from orbit.tools.registry import WorkspaceViolationError, get_registry
 
 # workspace 根目录
 _WORKSPACE_ROOT = Path.cwd().resolve()
@@ -30,7 +30,7 @@ def _resolve_path(path: str) -> Path:
     except ValueError:
         raise WorkspaceViolationError(
             f"路径 '{path}' 在工作区外 (workspace: {_WORKSPACE_ROOT})"
-        )
+        ) from None
     return p
 
 
@@ -68,7 +68,12 @@ async def grep(
 
     for root, dirs, files in os.walk(str(search_root)):
         # 跳过隐藏目录和 venv/node_modules
-        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "__pycache__", ".git", ".venv", "venv")]
+        dirs[:] = [
+            d
+            for d in dirs
+            if not d.startswith(".")
+            and d not in ("node_modules", "__pycache__", ".git", ".venv", "venv")
+        ]
 
         for fname in files:
             if fname.startswith("."):
@@ -94,7 +99,11 @@ async def grep(
             if output_mode == "files_with_matches":
                 matches.append(str(fpath.relative_to(search_root)))
             elif output_mode == "count":
-                count = content_lower.count(search_pattern) if case_insensitive else content.count(search_pattern)
+                count = (
+                    content_lower.count(search_pattern)
+                    if case_insensitive
+                    else content.count(search_pattern)
+                )
                 matches.append(f"{fpath.relative_to(search_root)}: {count}")
             else:  # content
                 lines = content.splitlines()

@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from orbit.tools.registry import WorkspaceViolationError, get_registry
@@ -33,7 +32,7 @@ def _guard_path(path: str) -> Path:
     except ValueError:
         raise WorkspaceViolationError(
             f"路径 '{path}' 在工作区外 (workspace: {_WORKSPACE_ROOT})"
-        )
+        ) from None
     return p
 
 
@@ -59,9 +58,7 @@ async def read_file(path: str, offset: int = 0, limit: int = 200) -> str:
     end = min(offset + limit, total)
     selected = lines[offset:end]
 
-    result = "\n".join(
-        f"{i + 1:>6}\t{line}" for i, line in enumerate(selected, start=offset)
-    )
+    result = "\n".join(f"{i + 1:>6}\t{line}" for i, line in enumerate(selected, start=offset))
     header = f"# {path} (行 {offset + 1}-{end} / 共 {total} 行)\n"
     return header + result
 
@@ -86,9 +83,7 @@ async def write_file(path: str, content: str) -> str:
 # ── edit_file ────────────────────────────────────────────
 
 
-async def edit_file(
-    path: str, old_string: str, new_string: str, replace_all: bool = False
-) -> str:
+async def edit_file(path: str, old_string: str, new_string: str, replace_all: bool = False) -> str:
     """精确字符串替换——对标 Claude Code Edit tool.
 
     Args:
@@ -116,7 +111,11 @@ async def edit_file(
             "请扩大匹配范围使其唯一，或传 replace_all=true 替换全部。"
         )
 
-    new_content = content.replace(old_string, new_string) if replace_all else content.replace(old_string, new_string, 1)
+    new_content = (
+        content.replace(old_string, new_string)
+        if replace_all
+        else content.replace(old_string, new_string, 1)
+    )
     p.write_text(new_content, encoding="utf-8")
 
     replaced = count if replace_all else 1
@@ -172,8 +171,7 @@ registry.register_tool(
         "function": {
             "name": "write_file",
             "description": (
-                "创建或覆盖文件。父目录不存在时自动创建。"
-                "用于生成代码、配置文件、测试用例等。"
+                "创建或覆盖文件。父目录不存在时自动创建。" "用于生成代码、配置文件、测试用例等。"
             ),
             "parameters": {
                 "type": "object",

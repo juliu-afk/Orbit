@@ -5,22 +5,20 @@ Phase 1 AC1-AC5 验收测试.
 
 from __future__ import annotations
 
-import os
 import tempfile
 from pathlib import Path
 
 import pytest
 
+from orbit.tools.models import ToolSchema
 from orbit.tools.registry import (
-    DoomLoopError,
+    PermissionError,
+    RateLimitError,
     ToolCall,
-    ToolEntry,
+    ToolNotFoundError,
     ToolRegistry,
     WorkspaceViolationError,
-    get_registry,
 )
-from orbit.tools.models import ToolSchema
-
 
 # ── Fixtures ──────────────────────────────────────────
 
@@ -38,6 +36,7 @@ def tmp_workspace():
     with tempfile.TemporaryDirectory() as d:
         # 设置 workspace 根目录
         from orbit.tools import filesystem
+
         orig = filesystem._WORKSPACE_ROOT
         filesystem._WORKSPACE_ROOT = Path(d).resolve()
         yield Path(d)
@@ -65,11 +64,9 @@ class TestToolRegistryLegacy:
 
     def test_invoke_permission_denied(self, registry):
         """旧 API——白名单限制."""
-        schema = ToolSchema(
-            name="admin_tool", version="1.0.0", allowed_agents=["admin"]
-        )
+        schema = ToolSchema(name="admin_tool", version="1.0.0", allowed_agents=["admin"])
         registry.register(schema, lambda p: p)
-        with pytest.raises(Exception):
+        with pytest.raises(PermissionError):
             registry.invoke("admin_tool", {}, agent_name="guest")
 
     def test_invoke_rate_limit(self, registry):
@@ -78,7 +75,7 @@ class TestToolRegistryLegacy:
         registry.register(schema, lambda p: p)
         registry.invoke("limited", {}, agent_name="test")
         registry.invoke("limited", {}, agent_name="test")
-        with pytest.raises(Exception):
+        with pytest.raises(RateLimitError):
             registry.invoke("limited", {}, agent_name="test")
 
     def test_list_tools(self, registry):
@@ -105,6 +102,7 @@ class TestToolRegistryNew:
 
     def test_register_tool(self, registry):
         """register_tool——扁平参数注册."""
+
         async def handler(x: int) -> str:
             return f"result:{x}"
 
@@ -121,6 +119,7 @@ class TestToolRegistryNew:
     @pytest.mark.asyncio
     async def test_dispatch(self, registry):
         """dispatch——执行工具并返回字符串."""
+
         async def handler(text: str) -> str:
             return f"echo: {text}"
 
@@ -136,15 +135,15 @@ class TestToolRegistryNew:
     @pytest.mark.asyncio
     async def test_dispatch_not_found(self, registry):
         """dispatch——工具不存在."""
-        with pytest.raises(Exception):
+        with pytest.raises(ToolNotFoundError):
             await registry.dispatch("nonexistent", {})
 
     def test_discover(self, tmp_path):
         """AST 自发现——扫描目录找 register_tool 调用."""
         tool_file = tmp_path / "test_discovery.py"
         tool_file.write_text(
-            'from orbit.tools.registry import get_registry\n'
-            'r = get_registry()\n'
+            "from orbit.tools.registry import get_registry\n"
+            "r = get_registry()\n"
             'async def test_fn(): return "ok"\n'
             'r.register_tool("discovered", "test", {}, test_fn, concurrency="safe")\n'
         )
@@ -153,10 +152,13 @@ class TestToolRegistryNew:
 
     def test_get_schemas(self, registry):
         """get_schemas——返回 LLM 函数调用格式."""
-        async def h(): return ""
+
+        async def h():
+            return ""
 
         registry.register_tool(
-            name="tool1", toolset="t",
+            name="tool1",
+            toolset="t",
             schema={"type": "function", "function": {"name": "tool1", "description": "desc1"}},
             handler=h,
         )
@@ -425,6 +427,7 @@ class TestSearchTools:
 
         # 设置 workspace
         from orbit.tools import search
+
         orig = search._WORKSPACE_ROOT
         search._WORKSPACE_ROOT = tmp_workspace
         try:
@@ -436,8 +439,8 @@ class TestSearchTools:
 
     def test_glob_subdirectory(self, tmp_workspace):
         """glob——递归匹配子目录."""
-        from orbit.tools.search import glob_files
         from orbit.tools import search
+        from orbit.tools.search import glob_files
 
         d = tmp_workspace / "src"
         d.mkdir()
@@ -455,8 +458,8 @@ class TestSearchTools:
 
     def test_grep_finds_pattern(self, tmp_workspace):
         """grep——找到匹配行."""
-        from orbit.tools.search import grep
         from orbit.tools import search
+        from orbit.tools.search import grep
 
         (tmp_workspace / "test.py").write_text("def foo():\n    pass\nclass Bar:\n    pass\n")
 
@@ -471,8 +474,8 @@ class TestSearchTools:
 
     def test_grep_files_with_matches(self, tmp_workspace):
         """grep——files_with_matches 模式."""
-        from orbit.tools.search import grep
         from orbit.tools import search
+        from orbit.tools.search import grep
 
         (tmp_workspace / "a.py").write_text("TODO: fix")
         (tmp_workspace / "b.py").write_text("nothing here")
@@ -488,8 +491,8 @@ class TestSearchTools:
 
     def test_grep_case_insensitive(self, tmp_workspace):
         """grep——忽略大小写."""
-        from orbit.tools.search import grep
         from orbit.tools import search
+        from orbit.tools.search import grep
 
         (tmp_workspace / "x.py").write_text("HelloWorld")
 
@@ -508,12 +511,14 @@ class TestSearchTools:
 def asyncio_run(coro):
     """同步运行 async 函数——测试用."""
     import asyncio
+
     try:
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
     except RuntimeError:
         return asyncio.run(coro)
     # 已有事件循环时用 nest_asyncio 或其他方式
     import concurrent.futures
+
     with concurrent.futures.ThreadPoolExecutor() as pool:
         future = pool.submit(asyncio.run, coro)
         return future.result()

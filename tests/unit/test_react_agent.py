@@ -5,13 +5,12 @@ Phase 1 AC6-AC8 验收测试.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from orbit.agents.base import AgentInput, AgentOutput, AgentRole
+from orbit.agents.base import AgentInput, AgentRole
 from orbit.agents.react_agent import IterationBudget, ReActAgent, _truncate_output
-
 
 # ── Fixtures ──────────────────────────────────────────
 
@@ -65,6 +64,7 @@ def mock_tools():
 @pytest.fixture
 def react_agent(mock_llm, mock_tools):
     """创建用于测试的 ReActAgent 子类."""
+
     class TestAgent(ReActAgent):
         role = AgentRole.DEVELOPER
 
@@ -153,31 +153,59 @@ class TestReActAgentCore:
         mock_tools.dispatch = AsyncMock(return_value="result")
 
         llm = AsyncMock()
-        llm.generate = AsyncMock(side_effect=[
-            # Turn 0: tool_call——通过 doom check，执行
-            LLMResponse(
-                content="", model="mock", usage=LLMUsage(),
-                tool_calls=[{"id": "c1", "type": "function", "function": {"name": "read_file", "arguments": '{"path":"a.py"}'}}],
-                stop_reason="tool_calls",
-            ),
-            # Turn 1: tool_call again——通过 doom check（不同args），执行
-            LLMResponse(
-                content="", model="mock", usage=LLMUsage(),
-                tool_calls=[{"id": "c2", "type": "function", "function": {"name": "read_file", "arguments": '{"path":"b.py"}'}}],
-                stop_reason="tool_calls",
-            ),
-            # Turn 2: tool_call——doom loop! → 跳过，注入警告，继续到 LLM
-            LLMResponse(
-                content="", model="mock", usage=LLMUsage(),
-                tool_calls=[{"id": "c3", "type": "function", "function": {"name": "read_file", "arguments": '{"path":"a.py"}'}}],
-                stop_reason="tool_calls",
-            ),
-            # Turn 3: end_turn (LLM 收到死循环警告后决定完成)
-            LLMResponse(
-                content="无法继续——系统检测到死循环。", model="mock", usage=LLMUsage(),
-                stop_reason="end_turn",
-            ),
-        ])
+        llm.generate = AsyncMock(
+            side_effect=[
+                # Turn 0: tool_call——通过 doom check，执行
+                LLMResponse(
+                    content="",
+                    model="mock",
+                    usage=LLMUsage(),
+                    tool_calls=[
+                        {
+                            "id": "c1",
+                            "type": "function",
+                            "function": {"name": "read_file", "arguments": '{"path":"a.py"}'},
+                        }
+                    ],
+                    stop_reason="tool_calls",
+                ),
+                # Turn 1: tool_call again——通过 doom check（不同args），执行
+                LLMResponse(
+                    content="",
+                    model="mock",
+                    usage=LLMUsage(),
+                    tool_calls=[
+                        {
+                            "id": "c2",
+                            "type": "function",
+                            "function": {"name": "read_file", "arguments": '{"path":"b.py"}'},
+                        }
+                    ],
+                    stop_reason="tool_calls",
+                ),
+                # Turn 2: tool_call——doom loop! → 跳过，注入警告，继续到 LLM
+                LLMResponse(
+                    content="",
+                    model="mock",
+                    usage=LLMUsage(),
+                    tool_calls=[
+                        {
+                            "id": "c3",
+                            "type": "function",
+                            "function": {"name": "read_file", "arguments": '{"path":"a.py"}'},
+                        }
+                    ],
+                    stop_reason="tool_calls",
+                ),
+                # Turn 3: end_turn (LLM 收到死循环警告后决定完成)
+                LLMResponse(
+                    content="无法继续——系统检测到死循环。",
+                    model="mock",
+                    usage=LLMUsage(),
+                    stop_reason="end_turn",
+                ),
+            ]
+        )
 
         class TestAgent(ReActAgent):
             role = AgentRole.DEVELOPER
@@ -225,9 +253,14 @@ class TestExitConditions:
         from orbit.gateway.schemas import LLMResponse, LLMUsage
 
         llm = AsyncMock()
-        llm.generate = AsyncMock(return_value=LLMResponse(
-            content="任务完成", model="mock", usage=LLMUsage(), stop_reason="end_turn",
-        ))
+        llm.generate = AsyncMock(
+            return_value=LLMResponse(
+                content="任务完成",
+                model="mock",
+                usage=LLMUsage(),
+                stop_reason="end_turn",
+            )
+        )
 
         class TestAgent(ReActAgent):
             role = AgentRole.DEVELOPER
@@ -243,10 +276,14 @@ class TestExitConditions:
         from orbit.gateway.schemas import LLMResponse, LLMUsage
 
         llm = AsyncMock()
-        llm.generate = AsyncMock(return_value=LLMResponse(
-            content="输出被截断前的内容...", model="mock", usage=LLMUsage(),
-            stop_reason="max_tokens",
-        ))
+        llm.generate = AsyncMock(
+            return_value=LLMResponse(
+                content="输出被截断前的内容...",
+                model="mock",
+                usage=LLMUsage(),
+                stop_reason="max_tokens",
+            )
+        )
 
         class TestAgent(ReActAgent):
             role = AgentRole.DEVELOPER
@@ -262,9 +299,14 @@ class TestExitConditions:
         from orbit.gateway.schemas import LLMResponse, LLMUsage
 
         llm = AsyncMock()
-        llm.generate = AsyncMock(return_value=LLMResponse(
-            content="服务不可用", model="mock", usage=LLMUsage(), stop_reason="error",
-        ))
+        llm.generate = AsyncMock(
+            return_value=LLMResponse(
+                content="服务不可用",
+                model="mock",
+                usage=LLMUsage(),
+                stop_reason="error",
+            )
+        )
 
         class TestAgent(ReActAgent):
             role = AgentRole.DEVELOPER
@@ -283,10 +325,12 @@ class TestAgentConfig:
     def test_default_max_turns(self):
         class DefaultAgent(ReActAgent):
             role = AgentRole.DEVELOPER
+
         assert DefaultAgent.MAX_TURNS == 20
 
     def test_custom_max_turns(self):
         class FastAgent(ReActAgent):
             role = AgentRole.REVIEWER
             MAX_TURNS = 5
+
         assert FastAgent.MAX_TURNS == 5

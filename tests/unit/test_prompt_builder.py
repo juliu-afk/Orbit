@@ -3,10 +3,8 @@
 Phase 1 AC9-AC10 验收测试.
 """
 
-import pytest
-
 from orbit.agents.base import AgentRole
-from orbit.prompt.builder import PromptBuilder, ROLE_DESCRIPTIONS, RULES_BLOCK, TOOLS_GUIDE_BLOCK
+from orbit.prompt.builder import ROLE_DESCRIPTIONS, PromptBuilder
 
 
 class TestPromptBuilder:
@@ -67,10 +65,12 @@ class TestPromptBuilder:
     def test_context_layer_project_info(self):
         """context 层——包含项目信息."""
         builder = PromptBuilder()
-        ctx = builder._build_context({
-            "project": "TestProject",
-            "tech_stack": "Python 3.14 + FastAPI",
-        })
+        ctx = builder._build_context(
+            {
+                "project": "TestProject",
+                "tech_stack": "Python 3.14 + FastAPI",
+            }
+        )
         assert "TestProject" in ctx
         assert "Python" in ctx
 
@@ -90,10 +90,12 @@ class TestPromptBuilder:
     def test_volatile_layer_constraints(self):
         """volatile 层——约束条件."""
         builder = PromptBuilder()
-        vol = builder._build_volatile({
-            "task": "实现登录",
-            "constraints": ["不能使用 OAuth", "JWT 过期时间 24h"],
-        })
+        vol = builder._build_volatile(
+            {
+                "task": "实现登录",
+                "constraints": ["不能使用 OAuth", "JWT 过期时间 24h"],
+            }
+        )
         assert "OAuth" in vol
         assert "JWT" in vol
 

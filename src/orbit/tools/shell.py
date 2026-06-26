@@ -7,26 +7,59 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from orbit.tools.registry import get_registry
 
-
 # ── 白名单定义 ───────────────────────────────────────────
 # 对标 Claude Code 23 Bash validators——只允许安全的开发命令
 
 SHELL_WHITELIST: dict[str, list[str]] = {
-    "git": ["status", "diff", "add", "commit", "log", "branch", "checkout",
-            "push", "pull", "fetch", "merge", "rebase", "stash", "tag", "remote",
-            "clone", "init", "restore", "switch", "cherry-pick", "bisect",
-            "blame", "show", "describe", "rev-parse", "config"],
+    "git": [
+        "status",
+        "diff",
+        "add",
+        "commit",
+        "log",
+        "branch",
+        "checkout",
+        "push",
+        "pull",
+        "fetch",
+        "merge",
+        "rebase",
+        "stash",
+        "tag",
+        "remote",
+        "clone",
+        "init",
+        "restore",
+        "switch",
+        "cherry-pick",
+        "bisect",
+        "blame",
+        "show",
+        "describe",
+        "rev-parse",
+        "config",
+    ],
     "pytest": ["*"],
     "python": ["-m", "-c", "--version"],
-    "pnpm": ["install", "build", "test", "lint", "add", "remove", "run",
-             "dev", "start", "format", "typecheck"],
+    "pnpm": [
+        "install",
+        "build",
+        "test",
+        "lint",
+        "add",
+        "remove",
+        "run",
+        "dev",
+        "start",
+        "format",
+        "typecheck",
+    ],
     "npm": ["install", "build", "test", "run", "start", "ci"],
     "uv": ["add", "run", "lock", "sync", "pip", "python"],
     "ls": ["*"],
@@ -137,9 +170,7 @@ def validate_command(cmd: str) -> ExecResult | None:
     # 检查危险组合 (管道到 shell)
     if "|" in cmd:
         after_pipe = cmd.split("|")[-1].strip()
-        if any(
-            after_pipe.startswith(s) for s in ("sh", "bash", "zsh", "cmd", "powershell")
-        ):
+        if any(after_pipe.startswith(s) for s in ("sh", "bash", "zsh", "cmd", "powershell")):
             return ExecResult(
                 stderr="安全阻止: 禁止管道输出到 shell 解释器",
                 exit_code=1,
@@ -205,13 +236,9 @@ async def exec_command(
             timeout=timeout,
         )
         duration = (_time.time() - start) * 1000
-    except asyncio.TimeoutError:
+    except TimeoutError:
         duration = (_time.time() - start) * 1000
-        return (
-            f"⏱ 命令超时 ({timeout}s)\n"
-            f"cmd: {cmd}\n"
-            f"cwd: {work_dir}"
-        )
+        return f"⏱ 命令超时 ({timeout}s)\n" f"cmd: {cmd}\n" f"cwd: {work_dir}"
 
     stdout = stdout_bytes.decode("utf-8", errors="replace").strip()
     stderr = stderr_bytes.decode("utf-8", errors="replace").strip()

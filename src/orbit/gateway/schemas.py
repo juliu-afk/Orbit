@@ -22,9 +22,7 @@ class LLMRequest(BaseModel):
     tools: list[dict] | None = Field(
         None, description="工具 JSON Schema 列表（OpenAI function calling 格式）"
     )
-    tool_choice: str = Field(
-        "auto", description="工具选择策略: auto/none/required"
-    )
+    tool_choice: str = Field("auto", description="工具选择策略: auto/none/required")
     # Phase 1: 消息历史（ReAct 循环用——支持多轮对话）
     messages: list[dict] | None = Field(
         None, description="完整消息历史（含 system/user/assistant/tool 角色）"

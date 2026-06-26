@@ -16,7 +16,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -187,9 +187,7 @@ class ToolRegistry:
 
         同一 name 可注册多版本。
         """
-        self._tools.setdefault(schema.name, []).append(
-            (schema.version, schema, handler)
-        )
+        self._tools.setdefault(schema.name, []).append((schema.version, schema, handler))
         logger.info("tool_registered", name=schema.name, version=schema.version)
 
     # ── AST 自发现 ────────────────────────────────────
@@ -203,7 +201,7 @@ class ToolRegistry:
 
         WHY AST 而非 import 全部: 只导入含注册调用的模块，避免副作用。
         """
-        instance = cls.get_instance()
+        _ = cls.get_instance()  # 确保单例已初始化
         for path in paths:
             p = Path(path)
             if not p.exists():
@@ -264,7 +262,9 @@ class ToolRegistry:
 
     # ── 工具分发 (ReAct 循环核心) ──────────────────────────
 
-    async def dispatch(self, name: str, args: dict[str, Any], agent_name: str = "react_agent") -> str:
+    async def dispatch(
+        self, name: str, args: dict[str, Any], agent_name: str = "react_agent"
+    ) -> str:
         """执行工具并返回字符串结果——ReAct 循环调用入口.
 
         Args:
@@ -310,9 +310,7 @@ class ToolRegistry:
 
     # ── 并发安全判定 ─────────────────────────────────────
 
-    def _should_parallelize(
-        self, calls: list[ToolCall]
-    ) -> tuple[list[ToolCall], list[ToolCall]]:
+    def _should_parallelize(self, calls: list[ToolCall]) -> tuple[list[ToolCall], list[ToolCall]]:
         """将工具调用分为 safe(可并发) 和 serial(必须串行) 两组.
 
         对标 Hermes _should_parallelize_tool_batch():
@@ -387,9 +385,7 @@ class ToolRegistry:
         WHY 嵌套结构: agent → tool → history，防止跨工具污染。
         """
         agent_history = self._tool_history.setdefault(agent_name, {})
-        agent_history.setdefault(name, []).append(
-            ToolCall(name=name, args=args)
-        )
+        agent_history.setdefault(name, []).append(ToolCall(name=name, args=args))
 
     def clear_tool_history(self, agent_name: str) -> None:
         """清除指定 Agent 的所有工具调用历史."""
@@ -443,13 +439,14 @@ class ToolRegistry:
             try:
                 # 安全执行 async handler——兼容同步和异步调用上下文
                 try:
-                    loop = asyncio.get_running_loop()
+                    asyncio.get_running_loop()
                 except RuntimeError:
                     # 无运行中事件循环——直接用 asyncio.run()
                     result = asyncio.run(self._dispatch_entry(entry, params))
                 else:
                     # 在已有事件循环中——用线程池避免冲突
                     import concurrent.futures
+
                     with concurrent.futures.ThreadPoolExecutor() as pool:
                         future = pool.submit(asyncio.run, self._dispatch_entry(entry, params))
                         result = future.result(timeout=30)
@@ -482,9 +479,7 @@ class ToolRegistry:
         # 旧 API 路径 (保持不变)
         schema = self.get_schema(name, version)
         if schema.deprecated:
-            raise ToolDeprecatedError(
-                f"工具 {name} 已废弃: {schema.deprecated_message}"
-            )
+            raise ToolDeprecatedError(f"工具 {name} 已废弃: {schema.deprecated_message}")
         if schema.allowed_agents and agent_name not in schema.allowed_agents:
             inv = ToolInvocation(
                 tool_name=name,
@@ -626,7 +621,7 @@ def _path_to_module(file_path: str) -> str:
     except ValueError:
         try:
             idx = parts.index("src")
-            parts = parts[idx + 1:]  # 跳过 src
+            parts = parts[idx + 1 :]  # 跳过 src
         except ValueError:
             # 无法定位——用文件名推导（回退策略）
             stem = p.stem

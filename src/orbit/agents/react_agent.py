@@ -16,7 +16,7 @@ from typing import Any
 
 import structlog
 
-from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
+from orbit.agents.base import AgentInput, AgentOutput, BaseAgent
 from orbit.events.schemas import DashboardEvent
 from orbit.gateway.schemas import LLMRequest
 from orbit.tools.registry import DoomLoopError, ToolRegistry
@@ -108,11 +108,15 @@ class ReActAgent(BaseAgent):
         # 3. ReAct 循环
         for turn in range(self.MAX_TURNS):
             # 3a. 推送 turn_start 事件
-            await self._emit(task_id, "agent.turn_start", {
-                "turn": turn,
-                "agent": self.role.value,
-                "remaining_turns": self.MAX_TURNS - turn,
-            })
+            await self._emit(
+                task_id,
+                "agent.turn_start",
+                {
+                    "turn": turn,
+                    "agent": self.role.value,
+                    "remaining_turns": self.MAX_TURNS - turn,
+                },
+            )
 
             # 3b. LLM 思考
             if self.llm is None:
@@ -120,7 +124,7 @@ class ReActAgent(BaseAgent):
                 return AgentOutput(
                     status="ok",
                     result={
-                        "note": f"[mock] ReAct 循环跳过——无 LLM 连接",
+                        "note": "[mock] ReAct 循环跳过——无 LLM 连接",
                         "task": input_data.task[:200],
                         "turns": 1,
                         "tool_calls": 0,
@@ -140,15 +144,21 @@ class ReActAgent(BaseAgent):
 
             # AC8: 正常完成
             if stop_reason == "end_turn":
-                reasoning_chain.append({
-                    "turn": turn,
-                    "action": "finish",
-                    "reasoning": response.content[:500] if response.content else "",
-                })
-                await self._emit(task_id, "agent.turn_end", {
-                    "turn": turn,
-                    "action": "complete",
-                })
+                reasoning_chain.append(
+                    {
+                        "turn": turn,
+                        "action": "finish",
+                        "reasoning": response.content[:500] if response.content else "",
+                    }
+                )
+                await self._emit(
+                    task_id,
+                    "agent.turn_end",
+                    {
+                        "turn": turn,
+                        "action": "complete",
+                    },
+                )
                 return AgentOutput(
                     status="ok",
                     result={
@@ -161,11 +171,13 @@ class ReActAgent(BaseAgent):
 
             # AC8: token 截断
             if stop_reason == "max_tokens":
-                reasoning_chain.append({
-                    "turn": turn,
-                    "action": "truncated",
-                    "reasoning": response.content[:500] if response.content else "",
-                })
+                reasoning_chain.append(
+                    {
+                        "turn": turn,
+                        "action": "truncated",
+                        "reasoning": response.content[:500] if response.content else "",
+                    }
+                )
                 logger.warning("react_max_tokens", turn=turn, task_id=task_id)
                 # 附加截断前的内容并返回
                 return AgentOutput(
@@ -208,39 +220,51 @@ class ReActAgent(BaseAgent):
                             agent=self.role.value,
                             tool=tool_name,
                         )
-                        await self._emit(task_id, "agent.doom_loop_warn", {
-                            "tool": tool_name,
-                            "args": tool_args,
-                            "turn": turn,
-                        })
+                        await self._emit(
+                            task_id,
+                            "agent.doom_loop_warn",
+                            {
+                                "tool": tool_name,
+                                "args": tool_args,
+                                "turn": turn,
+                            },
+                        )
                         # 推送到消息历史——让 LLM 知道被阻止了
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tc.get("id", ""),
-                            "content": (
-                                f"⚠ 死循环检测——连续 3 次调用 {tool_name} 相同参数。"
-                                "请换一种方式完成任务或报告无法继续。"
-                            ),
-                        })
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tc.get("id", ""),
+                                "content": (
+                                    f"⚠ 死循环检测——连续 3 次调用 {tool_name} 相同参数。"
+                                    "请换一种方式完成任务或报告无法继续。"
+                                ),
+                            }
+                        )
                         continue
 
                     # 3f. 记录工具调用（检测通过后才记录）
                     self.tools.record_tool_call(agent_key, tool_name, tool_args)
 
                     # 3g. 推送 tool_call_start 事件
-                    await self._emit(task_id, "agent.tool_call_start", {
-                        "tool": tool_name,
-                        "args": {
-                            k: (str(v)[:100] if isinstance(v, str) else v)
-                            for k, v in tool_args.items()
+                    await self._emit(
+                        task_id,
+                        "agent.tool_call_start",
+                        {
+                            "tool": tool_name,
+                            "args": {
+                                k: (str(v)[:100] if isinstance(v, str) else v)
+                                for k, v in tool_args.items()
+                            },
+                            "turn": turn,
                         },
-                        "turn": turn,
-                    })
+                    )
 
                     # 3h. 执行工具——传递 agent_name 供审计
                     try:
                         result_str = await self.tools.dispatch(
-                            tool_name, tool_args, agent_name=self.role.value,
+                            tool_name,
+                            tool_args,
+                            agent_name=self.role.value,
                         )
                     except DoomLoopError:
                         result_str = "检测到工具调用死循环，请换一种方式。"
@@ -256,34 +280,44 @@ class ReActAgent(BaseAgent):
                     truncated = _truncate_output(result_str, MAX_RESULT_CHARS)
 
                     # 3j. 记录推理链
-                    reasoning_chain.append({
-                        "turn": turn,
-                        "action": tool_name,
-                        "args": {
-                            k: (str(v)[:100] if isinstance(v, str) else v)
-                            for k, v in tool_args.items()
-                        },
-                        "result_preview": truncated[:200],
-                    })
+                    reasoning_chain.append(
+                        {
+                            "turn": turn,
+                            "action": tool_name,
+                            "args": {
+                                k: (str(v)[:100] if isinstance(v, str) else v)
+                                for k, v in tool_args.items()
+                            },
+                            "result_preview": truncated[:200],
+                        }
+                    )
 
                     # 3k. 反馈结果到消息历史
-                    messages.append({
-                        "role": "assistant",
-                        "content": None,
-                        "tool_calls": [tc],
-                    })
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc.get("id", ""),
-                        "content": truncated,
-                    })
+                    messages.append(
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [tc],
+                        }
+                    )
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc.get("id", ""),
+                            "content": truncated,
+                        }
+                    )
 
                     # 3l. 推送 tool_call_end 事件
-                    await self._emit(task_id, "agent.tool_call_end", {
-                        "tool": tool_name,
-                        "result_size": len(result_str),
-                        "truncated": len(result_str) > MAX_RESULT_CHARS,
-                    })
+                    await self._emit(
+                        task_id,
+                        "agent.tool_call_end",
+                        {
+                            "tool": tool_name,
+                            "result_size": len(result_str),
+                            "truncated": len(result_str) > MAX_RESULT_CHARS,
+                        },
+                    )
 
                     tool_call_count += 1
                     self._budget.consume()
@@ -331,8 +365,4 @@ def _truncate_output(text: str, max_chars: int = MAX_RESULT_CHARS) -> str:
         return text
     half = max_chars // 2
     cut = len(text) - max_chars
-    return (
-        text[:half]
-        + f"\n\n... [截断 {cut} 字符] ...\n\n"
-        + text[-half:]
-    )
+    return text[:half] + f"\n\n... [截断 {cut} 字符] ...\n\n" + text[-half:]

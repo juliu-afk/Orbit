@@ -156,7 +156,73 @@ class DreamAgent:
 
 | 项目 | 关键文件 | 行数 |
 |------|---------|------|
-| MiMo Code | `memory/` dir (MEMORY.md + checkpoint + tasks + SQLite) | ~800 |
+| MiMo Code | `packages/opencode/src/memory/service.ts` (FTS5 search+BM25) | ~115 |
+| MiMo Code | `packages/opencode/src/memory/reconcile.ts` (双向同步) | ~120 |
+| MiMo Code | `packages/opencode/src/memory/fts.sql.ts` (FTS schema) | ~25 |
+| MiMo Code | `packages/opencode/src/memory/fts-query.ts` (CJK token builder) | ~45 |
+| MiMo Code | `session/compaction.ts` (token-budgeted tail selection) | ~300 |
+| MiMo Code | `session/checkpoint.ts` (checkpoint boundary algorithm) | ~500 |
 | Hermes | `session/compressor.py` (lineage-based compression) | ~300 |
 | Claude Code | `context/compression.ts` (leaked, 5-layer pipeline) | ~600 |
 | OpenClaw | `memory/` dir (dual MD files + vector + BM25) | ~200 |
+
+---
+
+## 五、MiMo Code 源码补充：FTS5 记忆引擎 + 检查点边界算法
+
+### FTS5 Schema（可直接复用）
+
+```sql
+-- MiMo Code memory_fts 表结构
+CREATE TABLE memory_fts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL UNIQUE,       -- 文件路径
+    scope TEXT NOT NULL,             -- global | projects | sessions
+    scope_id TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL,              -- memory | checkpoint | progress | notes
+    body TEXT NOT NULL,              -- 全文内容
+    fingerprint TEXT NOT NULL,       -- stat.size + "-" + stat.mtimeMs
+    last_indexed_at INTEGER NOT NULL
+);
+CREATE INDEX idx_memory_scope ON memory_fts(scope, scope_id);
+CREATE INDEX idx_memory_type ON memory_fts(type);
+```
+
+### 双向同步（reconcile.ts）
+
+```python
+# Orbit 适配版
+class MemoryReconciler:
+    async def reconcile(self, root: Path) -> None:
+        # Direction A: 新文件/变更文件 → 索引
+        for md_file in root.rglob("*.md"):
+            fingerprint = f"{md_file.stat().st_size}-{md_file.stat().st_mtime_ns}"
+            existing = await self.db.get_fingerprint(md_file)
+            if existing != fingerprint:
+                body = md_file.read_text()
+                await self.db.upsert(md_file, body, fingerprint)
+
+        # Direction B: 已删除文件 → 清理索引
+        for row in await self.db.all_rows():
+            if not Path(row.path).exists():
+                await self.db.delete(row.path)
+```
+
+### CJK 分词查询（fts-query.ts）
+
+MiMo 的 FTS 查询构建器处理中英文混合：
+```python
+# 正则: [\p{L}\p{N}_]+ 匹配 Unicode 字母/数字/下划线（含中文）
+tokens = re.findall(r'[\w]+', query, re.UNICODE)
+# 每个 token 用双引号包裹 + OR 连接
+fts_query = " OR ".join(f'"{t}"' for t in tokens)
+```
+
+### 检查点边界算法（checkpoint.ts）
+
+MiMo 的 checkpoint 算法保留 `[10K, 20K]` token 的尾部上下文：
+- TAIL_MIN_TOKENS = 10K
+- TAIL_MAX_TOKENS = 20K
+- TAIL_MIN_TEXT_BLOCK_MESSAGES = 5
+- 压缩可压缩工具（read, bash, grep 等）的结果
+- checkpoint-writer 子Agent 写入 `checkpoint.md`

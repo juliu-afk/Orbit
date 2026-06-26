@@ -208,4 +208,66 @@ class GoalChecker:
 | OpenCode | `session/prompt.ts:1400` runLoop() | ~200 |
 | OpenCode | `session/processor.ts:350` Doom Loop | ~25 |
 | Hermes | `ai_agent.py` _interruptible_api_call + concurrent tools | ~150 |
-| MiMo Code | Fork from OpenCode + goal checker | ~100 |
+| MiMo Code | `session/goal.ts` goal gate + judge verdict schema | ~150 |
+| MiMo Code | `session/prompt.ts:2050-2160` goalGate interceptor | ~110 |
+| MiMo Code | `actor/spawn.ts` allocate→register→fork→Deferred | ~400 |
+| MiMo Code | `actor/registry.ts` SQLite actor state machine | ~300 |
+
+---
+
+## 五、MiMo Code 源码补充：Goal Gate + Actor 生命周期
+
+### Judge 模型——独立裁决（goal.ts）
+
+```python
+# MiMo 的 goal 系统核心——独立 judge 模型验证停止条件
+class GoalGate:
+    JUDGE_SYSTEM = """你是停止条件评估裁判。
+    返回 JSON:
+    - {"ok": true, "reason": "&lt;已完成的证据&gt;"}
+    - {"ok": false, "reason": "&lt;还缺什么&gt;"}
+    - {"ok": false, "impossible": true, "reason": "&lt;为什么无法完成&gt;"}
+    """
+
+    MAX_GOAL_REACT = 12  # 硬上限，防死循环
+
+    async def evaluate(self, condition: str, transcript: list[Message]) -> Verdict:
+        """独立 judge 模型，temperature=0 确保确定性。"""
+        # 1. 先跑 Task Gate（更便宜——只检查是否有未完成任务）
+        if self._has_pending_tasks():
+            return Verdict(ok=False, reason="还有未完成的任务")
+
+        # 2. Goal Gate——完整 transcript 送 judge
+        resp = await self.judge_llm.generate(
+            prompt=condition,
+            system=self.JUDGE_SYSTEM,
+            messages=transcript,  # 完整对话历史
+            temperature=0,
+        )
+        return Verdict.parse(resp)
+```
+
+**安全设计**：judge 错误时 `fail-open`（当作已完成），不会困住用户。
+
+### Actor 生命周期（actor/registry.ts）
+
+MiMo 的子Agent 用 SQLite 做状态机：
+```
+pending → running → idle
+outcome: success | failure | cancelled
+```
+- 5 分钟 stale 阈值，60 秒扫描间隔
+- `Effect.uninterruptible` 包裹 turn 确保 cleanup 总是执行
+- 实际 work 重新标记 `interruptible` 使其可取消
+
+### 检查点子Agent（checkpoint.ts）
+
+MiMo 的 checkpoint 用独立的 checkpoint-writer 子Agent：
+```python
+# 代币预算尾部选择
+TAIL_MIN_TOKENS = 10000  # 保留至少 10K tokens
+TAIL_MAX_TOKENS = 20000  # 最多保留 20K tokens
+TAIL_MIN_TEXT_BLOCK_MESSAGES = 5  # 至少 5 条文本消息
+# 压缩可压缩工具的结果（read, bash, grep 等）
+# 输出到 checkpoint.md
+```

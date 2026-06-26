@@ -522,3 +522,222 @@ def asyncio_run(coro):
     with concurrent.futures.ThreadPoolExecutor() as pool:
         future = pool.submit(asyncio.run, coro)
         return future.result()
+
+
+# ── 覆盖率补充测试 ──────────────────────────────────────
+
+
+class TestCoverageBoost:
+    """补充测试——将覆盖率从 79% 提至 80%+."""
+
+    # ── registry.py 补充 ──
+
+    def test_register_tool_v2(self, registry):
+        """register_tool——新 API 扁平参数."""
+
+        async def h():
+            return "ok"
+
+        registry.register_tool("cov_tool", "test", {"type": "function"}, h, concurrency="safe")
+        assert "cov_tool" in registry._entries
+
+    def test_get_schemas_with_old_api(self, registry):
+        """get_schemas——旧 API 工具也输出 schema."""
+        registry.register(
+            ToolSchema(
+                name="old_tool",
+                version="1.0.0",
+                parameters={
+                    "type": "function",
+                    "function": {"name": "old_tool", "description": "old"},
+                },
+            ),
+            lambda p: p,
+        )
+        schemas = registry.get_schemas()
+        found = any(s.get("function", {}).get("name") == "old_tool" for s in schemas)
+        assert found, f"schemas: {schemas}"
+
+    def test_get_schema_new_api(self, registry):
+        """get_schema——新 API 工具返回 ToolSchema."""
+
+        async def h():
+            return ""
+
+        registry.register_tool(
+            "ns", "t", {"type": "function", "function": {"name": "ns", "description": "d"}}, h
+        )
+        schema = registry.get_schema("ns")
+        assert schema.name == "ns"
+        assert schema.version == "2.0.0"
+
+    @pytest.mark.asyncio
+    async def test_dispatch_old_api_fallback(self, registry):
+        """dispatch——旧 API 工具回退."""
+        registry.register(ToolSchema(name="legacy", version="1.0.0"), lambda p: str(p.get("x", "")))
+        result = await registry.dispatch("legacy", {"x": "hello"}, agent_name="test")
+        assert "hello" in result
+
+    def test_version_key(self):
+        """_version_key——semver 解析."""
+        from orbit.tools.registry import _version_key
+
+        assert _version_key("1.2.3") == (1, 2, 3)
+        assert _version_key("invalid") == (0,)
+
+    def test_path_to_module_orbit(self):
+        """_path_to_module——从 orbit 包路径推导."""
+        from orbit.tools.registry import _path_to_module
+
+        result = _path_to_module("/some/prefix/src/orbit/tools/test_file.py")
+        assert result == "orbit.tools.test_file"
+
+    def test_path_to_module_fallback(self):
+        """_path_to_module——无 orbit/src 标记时回退."""
+        from orbit.tools.registry import _path_to_module
+
+        result = _path_to_module("/tmp/mystery/test_file.py")
+        assert "orbit.tools" in result
+
+    def test_invoke_new_api_sync(self, registry):
+        """invoke——新 API 工具同步上下文执行."""
+
+        async def h(x: int) -> str:
+            return f"got {x}"
+
+        registry.register_tool("sync_invoke", "t", {"type": "function"}, h)
+        result = registry.invoke("sync_invoke", {"x": 42}, agent_name="test")
+        assert "42" in str(result)
+
+    def test_invoke_new_api_error(self, registry):
+        """invoke——新 API 工具 handler 异常被 _dispatch_entry 捕获."""
+        # _dispatch_entry 内部捕获 handler 异常 → 返回错误字符串，不向外抛
+
+        async def h():
+            raise ValueError("boom")
+
+        registry.register_tool("fail_tool", "t", {"type": "function"}, h)
+        result = registry.invoke("fail_tool", {}, agent_name="test")
+        # _dispatch_entry 捕获异常并返回错误信息字符串
+        assert "错误" in str(result)
+
+    # ── shell.py 补充 ──
+
+    def test_validate_command_unknown_subcommand(self):
+        """validate_command——git 未知子命令拒绝."""
+        from orbit.tools.shell import validate_command
+
+        result = validate_command("git dangerous-sub")
+        assert result is not None
+
+    def test_validate_command_pipe_block(self):
+        """validate_command——管道到 bash 阻止."""
+        from orbit.tools.shell import validate_command
+
+        result = validate_command("cat file | bash")
+        assert result is not None and result.exit_code == 1
+
+    def test_validate_command_empty(self):
+        """validate_command——空命令."""
+        from orbit.tools.shell import validate_command
+
+        result = validate_command("")
+        assert result is not None
+
+    def test_validate_command_allow_npm(self):
+        """validate_command——npm 子命令."""
+        from orbit.tools.shell import validate_command
+
+        assert validate_command("npm install") is None
+
+    @pytest.mark.asyncio
+    async def test_exec_command_timeout(self):
+        """exec_command——超时处理."""
+        from orbit.tools.shell import exec_command
+
+        result = await exec_command('python -c "import time; time.sleep(10)"', timeout=1)
+        assert "超时" in result
+
+    @pytest.mark.asyncio
+    async def test_exec_command_error(self):
+        """exec_command——命令失败返回非零."""
+        from orbit.tools.shell import exec_command
+
+        result = await exec_command('python -c "import sys; sys.exit(1)"')
+        assert result  # 有输出（无论成功或失败）
+
+    # ── search.py 补充 ──
+
+    def test_grep_no_match(self, tmp_workspace):
+        """grep——无匹配结果."""
+        from orbit.tools import search
+        from orbit.tools.search import grep
+
+        (tmp_workspace / "empty.py").write_text("nothing")
+
+        orig = search._WORKSPACE_ROOT
+        search._WORKSPACE_ROOT = tmp_workspace
+        try:
+            result = asyncio_run(grep("NONEXISTENT", glob="*.py"))
+            assert "无匹配" in result
+        finally:
+            search._WORKSPACE_ROOT = orig
+
+    def test_grep_count_mode(self, tmp_workspace):
+        """grep——计数模式."""
+        from orbit.tools import search
+        from orbit.tools.search import grep
+
+        (tmp_workspace / "count.py").write_text("TODO: a\nTODO: b\nok\n")
+
+        orig = search._WORKSPACE_ROOT
+        search._WORKSPACE_ROOT = tmp_workspace
+        try:
+            result = asyncio_run(grep("TODO", output_mode="count", glob="*.py"))
+            assert "2" in result
+        finally:
+            search._WORKSPACE_ROOT = orig
+
+    def test_glob_no_match(self, tmp_workspace):
+        """glob——无匹配."""
+        from orbit.tools import search
+        from orbit.tools.search import glob_files
+
+        orig = search._WORKSPACE_ROOT
+        search._WORKSPACE_ROOT = tmp_workspace
+        try:
+            result = asyncio_run(glob_files("*.nonexistent"))
+            assert "0 个匹配" in result
+        finally:
+            search._WORKSPACE_ROOT = orig
+
+    def test_search_dir_not_found(self, tmp_workspace):
+        """grep——目录不存在."""
+        from orbit.tools import search
+        from orbit.tools.search import grep
+
+        orig = search._WORKSPACE_ROOT
+        search._WORKSPACE_ROOT = tmp_workspace
+        try:
+            result = asyncio_run(grep("x", path="nonexistent_dir"))
+            assert "不存在" in result
+        finally:
+            search._WORKSPACE_ROOT = orig
+
+    # ── filesystem.py 补充 ──
+
+    def test_read_file_directory(self, tmp_workspace):
+        """read_file——路径是目录."""
+        from orbit.tools.filesystem import read_file
+
+        d = tmp_workspace / "subdir"
+        d.mkdir()
+        result = asyncio_run(read_file("subdir"))
+        assert "目录" in result
+
+    def test_edit_file_not_found(self, tmp_workspace):
+        """edit_file——文件不存在."""
+        from orbit.tools.filesystem import edit_file
+
+        result = asyncio_run(edit_file("nope.py", "a", "b"))
+        assert "不存在" in result

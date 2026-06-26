@@ -151,19 +151,19 @@ class MergeEngine:
         # Phase 3: 融合
         merged, taken_from, gaps = self._synthesize(valid, llm_scores, task)
 
-        total_scores = {}
-        for label, scores in llm_scores.items():
-            weighted = sum(s.score * next((d["weight"] for d in EVALUATION_DIMENSIONS if d["key"] == s.key), 0) / 100 for s in scores)
-            total_scores[label] = weighted
-
-        scorecard = {}
-        for label, sc in llm_scores.items():
-            scorecard[label] = {s.key: s.score for s in sc}
+        total_scores = {
+            a.tier_label: sum(s.score * d["weight"] / 100 for s in scores)
+            for a, scores in llm_scores.items()
+            if a in valid
+        }
 
         return MergeResult(
             merged=merged,
             scorer="GLM-5.2",
-            scorecard=scorecard,
+            scorecard={
+                a.tier_label: {s.key: s.score for s in sc}
+                for a, sc in llm_scores.items()
+            },
             taken_from=taken_from,
             gaps_filled=gaps,
             total_scores=total_scores,
@@ -213,7 +213,7 @@ class MergeEngine:
         attempts: list[TierAttempt],
         task: str,
         det_scores: dict[str, dict[str, float]],
-    ) -> dict[str, list[DimensionScore]]:
+    ) -> dict[TierAttempt, list[DimensionScore]]:
         """调用 GLM-5.2，按 6 个维度逐项评分。"""
         prompt = self._build_evaluation_prompt(attempts, task, det_scores)
 
@@ -296,13 +296,13 @@ class MergeEngine:
         self,
         raw: str,
         attempts: list[TierAttempt],
-    ) -> dict[str, list[DimensionScore]]:
+    ) -> dict[TierAttempt, list[DimensionScore]]:
         """解析 LLM 返回的评分 JSON。"""
         result = _json.loads(raw)
         evals = result.get("evaluations", {})
 
         tier_map = {0: "tier_1", 1: "tier_2", 2: "tier_3"}
-        scored: dict[str, list[DimensionScore]] = {}
+        scored: dict[TierAttempt, list[DimensionScore]] = {}
 
         for i, a in enumerate(attempts):
             label = tier_map.get(i, a.tier.value)
@@ -319,7 +319,7 @@ class MergeEngine:
                         best_of=dim_eval.get("best_of"),
                     )
                 )
-            scored[label] = scores
+            scored[a] = scores
 
         return scored
 
@@ -328,7 +328,7 @@ class MergeEngine:
     def _synthesize(
         self,
         attempts: list[TierAttempt],
-        all_scores: dict[str, list[DimensionScore]],
+        all_scores: dict[TierAttempt, list[DimensionScore]],
         task: str,
     ) -> tuple[dict[str, Any], dict[str, list[str]], list[str]]:
         """融合：高分优先 + 冲突以 T3 为准 + 补充遗漏。"""
@@ -352,12 +352,11 @@ class MergeEngine:
             best_tier = None
             best_score = -1.0
             for i, a in enumerate(attempts):
-                label = tier_labels.get(i, a.tier.value)
-                scores = all_scores.get(label, [])
+                scores = all_scores.get(a, [])
                 for s in scores:
                     if s.key == dk and s.score > best_score:
                         best_score = s.score
-                        best_tier = label
+                        best_tier = tier_labels.get(i, a.tier.value)
             if best_tier:
                 best_per_dim[dk] = best_tier
                 taken_from.setdefault(best_tier, []).append(dim["name"])

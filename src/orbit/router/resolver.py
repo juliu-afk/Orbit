@@ -43,8 +43,23 @@ class AgentModelResolver:
         )
     """
 
-    def __init__(self):
+    def __init__(self, max_cache_size: int = 64):
         self._cache: dict[str, ResolvedModel] = {}
+        self._cache_order: list[str] = []  # FIFO eviction
+        self._max_cache_size = max_cache_size
+
+    def _cache_put(self, key: str, value: ResolvedModel) -> None:
+        """Write to cache, evict oldest if over limit."""
+        if len(self._cache_order) >= self._max_cache_size:
+            old_key = self._cache_order.pop(0)
+            self._cache.pop(old_key, None)
+        self._cache[key] = value
+        self._cache_order.append(key)
+
+    def clear_cache(self) -> None:
+        """Clear all cached resolutions (call after CC_SWITCH/env changes)."""
+        self._cache.clear()
+        self._cache_order.clear()
 
     async def resolve(
         self,
@@ -66,7 +81,7 @@ class AgentModelResolver:
                     reason=f"CC_SWITCH force: {entry.agent_name}:{entry.model}",
                     is_forced=True,
                 )
-                self._cache[agent_name] = result
+                self._cache_put(agent_name, result)
                 return result
 
         # 2. 环境变量 AGENT_{ROLE}_MODEL
@@ -80,7 +95,7 @@ class AgentModelResolver:
                 reason=f"环境变量 {env_key}={env_model}",
                 is_forced=False,
             )
-            self._cache[agent_name] = result
+            self._cache_put(agent_name, result)
             return result
 
         # 3. CC_SWITCH no-force 模式
@@ -95,7 +110,7 @@ class AgentModelResolver:
                     reason=f"CC_SWITCH: {entry.agent_name}:{entry.model}",
                     is_forced=False,
                 )
-                self._cache[agent_name] = result
+                self._cache_put(agent_name, result)
                 return result
 
         # 4. RouterAgent 推荐
@@ -108,7 +123,7 @@ class AgentModelResolver:
                 reason=f"RouterAgent: {router_decision.reason}",
                 is_forced=False,
             )
-            self._cache[agent_name] = result
+            self._cache_put(agent_name, result)
             return result
 
         # Tier 0: 本地规则引擎，不调 LLM
@@ -120,7 +135,7 @@ class AgentModelResolver:
                 reason="本地规则引擎，无需 LLM 调用",
                 is_forced=False,
             )
-            self._cache[agent_name] = result
+            self._cache_put(agent_name, result)
             return result
 
         # 5. 系统默认
@@ -138,7 +153,7 @@ class AgentModelResolver:
             ),
             is_forced=False,
         )
-        self._cache[agent_name] = result
+        self._cache_put(agent_name, result)
         return result
 
     def get_cached(self, agent_name: str) -> ResolvedModel | None:

@@ -271,6 +271,30 @@ class TestAgentModelResolver:
         assert cached is not None
         assert cached.source == "router"
 
+    @pytest.mark.asyncio
+    async def test_cache_eviction(self):
+        """缓存超限时驱逐最旧条目。"""
+        resolver = AgentModelResolver(max_cache_size=2)
+        decision = RouterDecision(tier=ModelTier.TIER_1, reason="t", confidence=0.5)
+
+        await resolver.resolve("Agent1", decision)
+        await resolver.resolve("Agent2", decision)
+        await resolver.resolve("Agent3", decision)  # evicts Agent1
+
+        assert resolver.get_cached("Agent1") is None
+        assert resolver.get_cached("Agent3") is not None
+
+    @pytest.mark.asyncio
+    async def test_clear_cache(self):
+        """clear_cache() 清空所有缓存。"""
+        resolver = AgentModelResolver()
+        decision = RouterDecision(tier=ModelTier.TIER_1, reason="t", confidence=0.5)
+        await resolver.resolve("Agent1", decision)
+
+        resolver.clear_cache()
+        assert resolver.get_cached("Agent1") is None
+        assert len(resolver._cache) == 0
+
 
 # ============================================================
 # CC_SWITCH 解析器测试 (AC3)

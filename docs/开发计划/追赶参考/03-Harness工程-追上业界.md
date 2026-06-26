@@ -269,3 +269,65 @@ class SubprocessAgentRunner:
         # 4. 持久化结果
         self._save_result(task_id, proc.returncode)
 ```
+
+---
+
+## 六、Hermes 源码补充：AST 自注册 + 并行调度 + 压缩算法
+
+### AST 自注册（`tools/registry.py:44` discover_builtin_tools）
+
+```python
+# 精确到行号的实现模式
+def discover_builtin_tools():
+    tools_dir = Path(__file__).parent
+    for py_file in tools_dir.glob("*.py"):
+        if py_file.name.startswith("_"):
+            continue
+        tree = ast.parse(py_file.read_text())
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Call) and
+                isinstance(node.func, ast.Attribute) and
+                node.func.attr == "register" and
+                isinstance(node.func.value, ast.Name) and
+                node.func.value.id == "registry"):
+                # 文件包含 registry.register() → 导入触发注册
+                importlib.import_module(f"tools.{py_file.stem}")
+                break
+```
+
+### 并行调度决策（`agent/tool_dispatch_helpers.py:104` _should_parallelize_tool_batch）
+
+三类工具：
+- `_NEVER_PARALLEL_TOOLS = {"clarify"}` — 交互式，必须串行
+- `_PARALLEL_SAFE_TOOLS = {"web_search","read_file","session_search",...}` — 只读，总是安全
+- `_PATH_SCOPED_TOOLS = {"read_file","write_file","patch"}` — 路径不重叠时可并行
+
+### 压缩算法核心（`agent/context_compressor.py` 行 742-2372）
+
+关键常数：
+- `threshold_percent = 0.50` — 50% 触发
+- `_MIN_CTX_TRIGGER_RATIO = 0.85` — 退化为 85% 时
+- `MINIMUM_CONTEXT_LENGTH = 64000` — 最小上下文
+- `protect_first_n = 3` — 保护前 3 条消息
+- `protect_last_n = 20` — 保护最后 20 条
+- `summary_target_ratio = 0.20` — 摘要预算 20%
+- `_MIN_SUMMARY_TOKENS = 2000` — 摘要下限
+- `_SUMMARY_TOKENS_CEILING = 12000` — 摘要上限
+
+压缩 8 步骤：工具输出修剪 → 找 head 边界 → token 预算向后遍历找 tail → LLM 摘要 → 组装 head+summary+tail → 边界对齐（不拆 tool_call/result 对）→ 用户消息锚定 → 会话分叉（创建子会话，记录 parent-child lineage）
+
+### FTS5 会话搜索（`hermes_state.py:692-745`）
+
+双 FTS5 索引：
+```sql
+-- 标准分词（英文+数字）
+CREATE VIRTUAL TABLE messages_fts USING fts5(content);
+-- trigram 分词（CJK/Thai 子串查询）
+CREATE VIRTUAL TABLE messages_fts_trigram USING fts5(content, tokenize='trigram');
+```
+
+### 迭代预算（`agent/iteration_budget.py` 62行）
+
+- 主Agent: `max_iterations=90`，子Agent: `delegation.max_iterations=50`
+- `execute_code` 调用退还预算（不消耗 iteration）
+- 线程安全的 `consume()`/`refund()`

@@ -18,7 +18,7 @@ from typing import Any
 import structlog
 
 from orbit.gateway.schemas import LLMRequest
-from orbit.scheduler.escalation import EscalationResult, TierAttempt
+from orbit.scheduler.escalation import TierAttempt
 
 logger = structlog.get_logger("orbit.scheduler.merge_engine")
 
@@ -339,7 +339,7 @@ class MergeEngine:
             scores = []
             best_label = None
             best_s = -1.0
-            for i, a in enumerate(attempts):
+            for i, _a in enumerate(attempts):
                 label = tier_labels[i]
                 tier_scores = all_scores.get(label, [])
                 sc = next((s.score for s in tier_scores if s.key == dk), 5)

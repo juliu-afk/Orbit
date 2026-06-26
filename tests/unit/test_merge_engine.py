@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json as _json
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -125,7 +126,7 @@ class TestTierAttempt:
 
     def test_frozen(self):
         a = TierAttempt(tier=ModelTier.TIER_1, model="m")
-        with pytest.raises(Exception):
+        with pytest.raises(FrozenInstanceError):
             a.tier = ModelTier.TIER_3  # type: ignore[misc]
 
 

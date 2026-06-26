@@ -18,6 +18,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.agents.factory import AgentFactory
 from orbit.api.routes import (
+    agent_llm,
     backup,
     chat,
     compliance,
@@ -78,6 +79,8 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     # Session + Project API（Session PR #1）
     app.include_router(sessions.router, prefix=settings.API_V1_STR)
     app.include_router(projects.router, prefix=settings.API_V1_STR)
+    # Agent LLM 配置 API（Step 2.3 智能路由）
+    app.include_router(agent_llm.router, prefix=settings.API_V1_STR)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
     # WebSocket 路由（Step 6.1 驾驶舱）

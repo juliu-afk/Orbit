@@ -36,6 +36,8 @@ class LLMResponse(BaseModel):
     content: str
     model: str
     usage: LLMUsage
+    # Step 2.3: 模型选择来源（"cc_switch_force" | "environment" | "cc_switch" | "router" | "default" | "fallback"）
+    model_source: str = "default"
     # 熔断器触发时该字段为 True，表示本次是降级返回（非真实 LLM 输出）
     degraded: bool = False
 

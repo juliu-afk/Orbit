@@ -27,6 +27,9 @@ class TaskContext:
     """
 
     task_id: str
+    # Step 2.3: Agent 名称 + 模型 Tier
+    agent_name: str = ""
+    model_tier: str = ""
     # L1: 协作宪法——高层约束 (str)
     l1: str = ""
     # L2: 四图谱事实 (代码/DB/配置/知识)

@@ -164,7 +164,7 @@ class ReActAgent(BaseAgent):
         self._budget = IterationBudget(self.ITERATION_BUDGET)  # 对标 Hermes
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
-        """ReAct 循环主入口。"""
+        """ReAct 循环主入口——每步实时推送到事件总线（非黑盒）。"""
         # 1. 构建 system prompt（AC6）
         system = PromptBuilder().build(self.role, input_data.context)
 
@@ -173,16 +173,31 @@ class ReActAgent(BaseAgent):
             {"role": "system", "content": system},
             {"role": "user", "content": input_data.task},
         ]
-        tools_schema = self.tools.get_schemas()  # JSON Schema for LLM
+        tools_schema = self.tools.get_schemas()
+        reasoning_chain: list[dict] = []  # L0 推理链——用户可见
 
         # 3. ReAct 循环（对标 OpenCode runLoop）
         for turn in range(self.MAX_TURNS):
             # 3a. LLM 思考
             response = await self.llm.generate(messages, tools_schema)
 
+            # 3a+. 推送推理步骤到驾驶舱（用户实时可见）
+            await self._emit("turn_start", {"turn": turn, "agent": self.role.value})
+
             # 3b. 判断退出
             if response.stop_reason == "end_turn":
-                return AgentOutput(status="ok", result=self._parse_result(response))
+                reasoning_chain.append({
+                    "turn": turn, "action": "finish",
+                    "reasoning": response.reasoning or response.content[:500],
+                })
+                await self._emit("turn_end", {"turn": turn, "action": "complete"})
+                return AgentOutput(
+                    status="ok",
+                    result={**self._parse_result(response),
+                            "reasoning_chain": reasoning_chain,  # L0 推理链
+                            "turns": turn + 1,
+                            "tool_calls": len(self._tool_history)},
+                )
 
             # 3c. 执行工具
             if response.stop_reason == "tool_calls":
@@ -191,22 +206,37 @@ class ReActAgent(BaseAgent):
                     if self.tools.detect_doom_loop(self._tool_history + [tc]):
                         raise DoomLoopError(f"检测到死循环: {tc.name} × 3")
 
-                    # 3e. 执行工具 + 截断输出（AC6b）
+                    # 3e. 推送工具调用事件（用户实时可见）
+                    await self._emit("tool_call_start", {
+                        "tool": tc.name, "args": tc.args, "turn": turn,
+                    })
+
+                    # 3f. 执行工具 + 截断输出（AC6b）
                     result = await self.tools.dispatch(tc.name, tc.args)
                     truncated = self._truncate_output(result)
+                    reasoning_chain.append({
+                        "turn": turn, "action": tc.name,
+                        "args": tc.args, "result_preview": truncated[:200],
+                    })
                     messages.append({"role": "tool", "content": truncated})
+
+                    # 3g. 推送工具结果
+                    await self._emit("tool_call_end", {
+                        "tool": tc.name, "result_size": len(result),
+                        "truncated": len(result) > 10000,
+                    })
 
                     self._tool_history.append(tc)
                     self._budget.consume()
 
                 continue  # ← 回到 3a
 
-            # 3f. 预算耗尽（AC5）
-            if self._budget.remaining <= 0:
-                return AgentOutput(status="error", error="迭代预算耗尽")
-
-        # 4. 超过最大轮数
         return AgentOutput(status="error", error=f"超过 {self.MAX_TURNS} 轮")
+
+    async def _emit(self, event_type: str, data: dict) -> None:
+        """推送事件到 EventBus——对标 OpenCode fullStream events。"""
+        if hasattr(self, '_event_bus') and self._event_bus:
+            await self._event_bus.publish(f"agent.{event_type}", data)
 ```
 
 ### 4.4 PromptBuilder——三层拼接（AC6）
@@ -295,17 +325,30 @@ class QAAgent(ReActAgent):
 用户提交 PRD
   → Scheduler._agent_cycle(CODING)
     → DeveloperAgent.execute(input_data)
-      → PromptBuilder.build("developer", context)
-        → stable: 角色 + 6工具 + 规则
-        → context: 项目 + 技术栈
-        → volatile: 任务 + 预算
-      → ReAct 循环:
-        Round 1: LLM→"需要 read_file('src/main.py')"→执行→结果反馈
-        Round 2: LLM→"需要 edit_file(...)"→执行→结果反馈
-        Round 3: LLM→"需要 exec_command('pytest')"→执行→结果反馈
-        Round 4: LLM→"完成"→返回 AgentOutput
-      → Scheduler → VERIFYING → DONE
+      ├─ PromptBuilder.build("developer", context)
+      │   ├─ stable: 角色 + 6工具 + 规则
+      │   ├─ context: 项目 + 技术栈
+      │   └─ volatile: 任务 + 预算
+      │
+      └─ ReAct 循环（每步推送到驾驶舱——用户实时可见）:
+          Round 1: LLM→"需要读main.py" → [emit: turn_start+tool_call_start]
+                   → read_file("src/main.py") → [emit: tool_call_end]
+                   → 内容反馈给 LLM → [emit: turn_end]
+          Round 2: LLM→"需要改第42行" → [emit: tool_call_start]
+                   → edit_file("src/main.py", ...) → [emit: tool_call_end]
+          Round 3: LLM→"跑测试验证" → [emit: tool_call_start]
+                   → exec_command("pytest -q") → [emit: tool_call_end]
+          Round 4: LLM→"完成" → [emit: turn_end(complete)]
+                   → AgentOutput {result, reasoning_chain, turns:4, tool_calls:3}
+      │
+      └─ 驾驶舱实时显示:
+           Agent 思考中... → 调用 read_file → ✓ 384行
+           → 调用 edit_file → ✓ 已修改
+           → 调用 exec_command → ✓ 28 passed
+           → 任务完成 (4 轮, 3 次工具调用)
 ```
+
+**用户看到的不是黑盒**——每一步工具调用、每次 LLM 思考、推理链，都通过 EventBus 实时推送到驾驶舱。对标 OpenCode fullStream events。
 
 ---
 

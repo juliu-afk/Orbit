@@ -25,7 +25,7 @@ logger = structlog.get_logger("orbit.scheduler.escalation")
 MAX_ESCALATION = 3  # 最多三级
 
 
-@dataclass
+@dataclass(frozen=True)
 class TierAttempt:
     """单次 Tier 尝试的结果。"""
 
@@ -35,6 +35,10 @@ class TierAttempt:
     error: str | None = None
     success: bool = False
     duration_ms: float = 0.0
+
+    @property
+    def tier_label(self) -> str:
+        return self.tier.value
 
 
 @dataclass

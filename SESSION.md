@@ -152,3 +152,8 @@
 - GLM 必须走 Coding Plan 端点，不能用标准端点（扣余额）
 - 本地部署不考虑——单卡 5090 也跑不动 GLM-5.2 (750B)
 - API 直接调最划算
+
+## 2026-06-26（续）
+
+### 完成
+- PR #51 关闭——内容已通过 PR #50 合并，test isolation 修复 cherry-pick 到 master (d8da444)

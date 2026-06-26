@@ -39,23 +39,54 @@ GLM_API_BASE = "https://open.bigmodel.cn/api/coding/paas/v4"
 
 class LLMClient:
     def __init__(
-        self, circuit_breaker=None, default_model=MODEL_PRO, fallback_model=MODEL_GLM_FALLBACK
+        self,
+        circuit_breaker=None,
+        default_model=MODEL_PRO,
+        fallback_model=MODEL_GLM_FALLBACK,
+        resolver=None,  # AgentModelResolver（Step 2.3）
     ):
         self.cb = circuit_breaker or CircuitBreaker()
         self.default_model = default_model
         self.fallback_model = fallback_model
+        self.resolver = resolver  # Step 2.3: 智能路由
         self._usage_log: dict[str, list[LLMUsage]] = {}
 
-    async def generate(self, req: LLMRequest, task_id: str) -> LLMResponse:
+    async def generate(
+        self,
+        req: LLMRequest,
+        task_id: str,
+        agent_name: str = "",  # Step 2.3: Agent 名称
+        router_decision=None,  # Step 2.3: RouterDecision
+    ) -> LLMResponse:
+        # Step 2.3: 通过 Resolver 获取实际模型（而非硬编码 default_model）
+        model = self.default_model
+        model_source = "default"
+        if self.resolver and agent_name:
+            try:
+                from orbit.router.resolver import AgentModelResolver
+
+                if isinstance(self.resolver, AgentModelResolver):
+                    resolved = await self.resolver.resolve(agent_name, router_decision)
+                    model = resolved.model or self.default_model
+                    model_source = resolved.source
+                    logger.info(
+                        "router_model_selected",
+                        agent=agent_name,
+                        model=model,
+                        source=model_source,
+                    )
+            except Exception as e:
+                logger.warning("router_resolve_failed", error=str(e))
+
         try:
-            return await self._call_with_circuit(self.default_model, req, task_id)
+            return await self._call_with_circuit(model, req, task_id, model_source)
         except CircuitOpenError:
-            logger.warning("primary_circuit_open", model=self.default_model)
+            logger.warning("primary_circuit_open", model=model)
         except Exception as e:
-            logger.warning("primary_failed", model=self.default_model, error=str(e))
+            logger.warning("primary_failed", model=model, error=str(e))
         try:
-            logger.info("fallback_to_glm47flash", original=self.default_model)
-            return await self._call_with_circuit(self.fallback_model, req, task_id)
+            logger.info("fallback_to_glm47flash", original=model)
+            return await self._call_with_circuit(self.fallback_model, req, task_id, "fallback")
         except CircuitOpenError:
             logger.error("fallback_circuit_open", model=self.fallback_model)
             raise
@@ -63,16 +94,20 @@ class LLMClient:
             logger.error("fallback_failed", model=self.fallback_model, error=str(e))
             raise
 
-    async def _call_with_circuit(self, model: str, req: LLMRequest, task_id: str) -> LLMResponse:
+    async def _call_with_circuit(
+        self, model: str, req: LLMRequest, task_id: str, model_source: str = "default"
+    ) -> LLMResponse:
         await self.cb.before_call(model)
         try:
             resp = await self._do_completion(model, req)
             await self.cb.record_success(model)
+            resp.model_source = model_source  # Step 2.3: 记录模型来源供审计
             self._log_usage(task_id, resp.usage)
             logger.info(
                 "llm_call_ok",
                 model=model,
                 task_id=task_id,
+                source=model_source,
                 tokens=resp.usage.total_tokens,
                 cost=resp.usage.cost_usd,
             )

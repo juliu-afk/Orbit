@@ -76,6 +76,8 @@ class Scheduler:
         agent_factory: Any = None,  # AgentFactory (延迟导入避免循环)
         message_bus: Any = None,  # AgentMessageBus
         tool_registry: Any = None,  # ToolRegistry
+        # ── Step 2.3 智能路由 ─────────────────────
+        router: Any = None,  # RouterAgent（延迟导入）
         audit_logger: Any = None,  # AuditLogger
     ):
         self._agent_llms = agent_llms or {}
@@ -91,6 +93,7 @@ class Scheduler:
         self._message_bus = message_bus
         self._tool_registry = tool_registry
         self._audit_logger = audit_logger
+        self.router = router  # Step 2.3: RouterAgent（可选）
         # Step O1: 快车道模式
         self._fast_lane = False
 
@@ -305,6 +308,8 @@ class Scheduler:
 
         return TaskContext(
             task_id=task_id,
+            agent_name=context.get("agent_name", ""),  # Step 2.3
+            model_tier=context.get("model_tier", ""),  # Step 2.3
             l1="遵循小企业会计准则; 禁止直接操作总账; 金额使用 Decimal",
             l2=context.get("l2", {}),  # 图谱查询结果由调用方注入
             l3={
@@ -332,6 +337,31 @@ class Scheduler:
         role = role_map.get(state)
         if role and self._agent_factory is not None:
             context["state"] = state.value
+            context["agent_name"] = role  # Step 2.3: 记录当前 Agent 名称
+
+            # Step 2.3: PLANNING 阶段调用 RouterAgent 评估模型级别
+            if state == TaskState.PLANNING and self.router is not None:
+                try:
+                    complexity = context.get("complexity", {})
+                    decision = await self.router.evaluate(
+                        file_count=complexity.get("file_count", 1),
+                        change_type=complexity.get("scope", "single_file"),
+                        risk=complexity.get("risk", "low"),
+                        agent_role=role,
+                        has_similar_history=False,
+                    )
+                    context["model_tier"] = decision.tier.value
+                    context["router_decision"] = decision
+                    logger.info(
+                        "router_tier_selected",
+                        task_id=task_id,
+                        role=role,
+                        tier=decision.tier.value,
+                        confidence=round(decision.confidence, 2),
+                    )
+                except Exception as e:
+                    logger.warning("router_evaluate_failed", error=str(e))
+
             return await self._run_agent(role, task_id, context)
 
         raise RuntimeError(

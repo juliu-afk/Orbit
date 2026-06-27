@@ -6,6 +6,7 @@ FTS5 虚拟表管理 + BM25 查询 + snippet 高亮.
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 
 import structlog
@@ -86,7 +87,7 @@ def search_messages(
         """
         params.append(limit)
         rows = conn.execute(sql, params).fetchall()
-    except Exception as e:
+    except (sqlite3.OperationalError, sqlite3.DatabaseError) as e:
         logger.warning("fts_search_failed", error=str(e))
         return _fallback_like_search(conn, query, session_filter, role_filter, limit)
 

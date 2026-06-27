@@ -97,5 +97,15 @@ class Settings:
     RESOURCE_GUARD_TOKEN_RATE: int = _get_int("RESOURCE_GUARD_TOKEN_RATE", 5000)
     RESOURCE_GUARD_BUDGET_MULTIPLIER: float = float(_get("RESOURCE_GUARD_BUDGET_MULTIPLIER", "1.5"))
 
+    # ---- Phase 2: 上下文压缩 + /dream ----
+    COMPRESSION_SUMMARY_MODEL: str = _get(
+        "COMPRESSION_SUMMARY_MODEL", "openai/glm-4.7-flash"
+    )  # WHY 免费模型: 压缩摘要不消耗主力 token
+    COMPRESSION_SOFT_THRESHOLD: float = float(_get("COMPRESSION_SOFT_THRESHOLD", "0.50"))
+    COMPRESSION_HARD_THRESHOLD: float = float(_get("COMPRESSION_HARD_THRESHOLD", "0.85"))
+    DREAM_MODEL: str = _get("DREAM_MODEL", "openai/glm-4.7-flash")
+    DREAM_AUTO_TRIGGER_DAYS: int = _get_int("DREAM_AUTO_TRIGGER_DAYS", 7)
+    MEMORY_MAX_FILE_SIZE: int = _get_int("MEMORY_MAX_FILE_SIZE", 50_000)
+
 
 settings = Settings()

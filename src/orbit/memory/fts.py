@@ -75,8 +75,8 @@ def enable_fts(conn: sqlite3.Connection) -> bool:
         if not has_fts5:
             logger.warning("fts5_not_available", fallback="LIKE search")
             return False
-    except Exception:
-        pass  # 假设可用，尝试创建
+    except sqlite3.OperationalError:
+        pass  # PRAGMA 失败——假设 FTS5 可用，尝试直接创建
 
     try:
         conn.executescript(FTS5_CREATE_SQL)

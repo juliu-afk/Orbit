@@ -88,7 +88,7 @@ class DreamEngine:
                 )
                 logger.info("dream_cycle_complete", lines=result.lines, bytes=result.bytes)
 
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             logger.error("dream_cycle_failed", error=str(e))
             return DreamResult(
                 status=DreamStatus.FAILED,
@@ -138,7 +138,7 @@ class DreamEngine:
             )
             resp = await self._llm.generate(req, task_id="dream_merge")
             return resp.content or content
-        except Exception as e:
+        except (ConnectionError, TimeoutError, ValueError) as e:
             logger.warning("dream_merge_failed", error=str(e))
             return content
 

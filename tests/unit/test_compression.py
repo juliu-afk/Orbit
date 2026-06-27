@@ -147,17 +147,18 @@ class TestContextCompressor:
 
     @pytest.mark.asyncio
     async def test_compress_force_action(self):
-        """超85%——强制压缩."""
+        """超85%——压缩被触发（非skip）."""
         from orbit.compression.budget import TokenBudgetTracker
         from orbit.compression.compressor import ContextCompressor
 
-        tracker = TokenBudgetTracker(max_context_window=1000)
-        # 填充大量消息使超过85%
-        msgs = [{"role": "user", "content": "x" * 400} for _ in range(5)]
+        # max_window极小 → usage_ratio=1.0 → 必然触发压缩
+        tracker = TokenBudgetTracker(max_context_window=500, reserved_output=0)
+        msgs = [{"role": "user", "content": "x" * 2000} for _ in range(3)]
         comp = ContextCompressor(budget_tracker=tracker)
         result = await comp.compress(msgs, task_id="t2")
-        # 阈值判定依赖 exact token估算，接受 force/warn/fork
-        assert result.action in ("force", "warn", "fork")
+        # usage_ratio=1.0 → FORCE → 压缩后可能fork，但绝不是skip
+        assert result.action != "skip"
+        assert result.layers_applied  # 至少应用了一层压缩
 
     @pytest.mark.asyncio
     async def test_compress_with_fork(self):
@@ -165,15 +166,14 @@ class TestContextCompressor:
         from orbit.compression.budget import TokenBudgetTracker
         from orbit.compression.compressor import ContextCompressor
 
-        # 极小窗口 + 大量内容 = fork
+        # 极小窗口 + 大量不可压缩内容 → 压缩后仍高 → fork
         tracker = TokenBudgetTracker(max_context_window=100, reserved_output=0)
-        msgs = [{"role": "user", "content": "x" * 500} for _ in range(3)]
+        msgs = [{"role": "user", "content": "unique_data_" + str(i) + "x" * 2000} for i in range(10)]
         comp = ContextCompressor(budget_tracker=tracker)
         result = await comp.compress(msgs, task_id="t3", turn=0)
-        # 可能fork或force——取决于压缩效果
-        assert result.action in ("force", "fork", "warn")
-        if result.action == "fork":
-            assert result.child_session_id is not None
+        # usage_ratio=1.0+ → FORCE → 压缩后仍超85% → FORK
+        assert result.action == "fork", f"Expected fork, got {result.action}"
+        assert result.child_session_id is not None
 
     def test_budget_tracker_estimate(self):
         """Token估算."""

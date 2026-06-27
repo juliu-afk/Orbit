@@ -25,8 +25,16 @@ from orbit.compression.pipeline import CompressionPipeline
 
 logger = structlog.get_logger("orbit.compressor")
 
-# 摘要 LLM 模型——廉价模型，不消耗主力 token
-SUMMARY_MODEL = "openai/glm-4.7-flash"
+
+# 摘要 LLM 模型——从配置读取（默认 GLM-4.7 Flash 免费模型）
+def _get_summary_model() -> str:
+    try:
+        from orbit.core.config import settings
+
+        return settings.COMPRESSION_SUMMARY_MODEL
+    except Exception:
+        return "openai/glm-4.7-flash"
+
 
 # 摘要 prompt——保留关键信息
 SUMMARY_PROMPT = (
@@ -208,10 +216,25 @@ class ContextCompressor:
         """创建子 Session 分叉——当压缩后仍超 85% 窗口。
 
         WHY 分叉而非崩溃: 给 Agent 一个干净的上下文继续工作。
+
+        TODO(Phase 3): 当前只生成 UUID，未写入 sessions 表。
+        Phase 3 应调用 SessionRegistry.create_fork() 持久化子 session，
+        并将压缩后的 messages 序列化到 cold storage。
         """
         import uuid
 
         child_id = str(uuid.uuid4())[:8]
+        # Phase 3: 尝试写入 SessionRegistry（如果可用）
+        try:
+            from orbit.sessions.registry import SessionRegistry
+
+            registry = SessionRegistry()
+            registry.create_fork(task_id, reason=f"context_overflow_turn_{turn}")
+            # 使用 registry 返回的真实 session_id
+            # child_id = registry.create_fork(...)
+        except Exception:
+            pass  # SessionRegistry 不可用时回退 UUID
+
         logger.info(
             "session_fork",
             task_id=task_id,

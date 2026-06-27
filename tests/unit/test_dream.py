@@ -56,8 +56,8 @@ class TestDreamEngine:
 
         engine = DreamEngine(llm_client=None, memory_store=MemoryStore(), config=DreamConfig())
         result = await engine.run()
-        # 无LLM时merge返回原文，dedup+verify正常执行
-        assert result.status in ("complete", "failed")
+        # 无LLM时merge返回原文 → dedup → verify (空内容应通过验证) → complete
+        assert result.status == "complete"
 
     def test_stage_gather_empty(self):
         """空记忆——gather返回空字符串."""

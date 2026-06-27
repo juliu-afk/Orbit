@@ -30,6 +30,7 @@ _TOKENS: dict[str, CancellationToken] = {}
 
 class AgentRunRequest(BaseModel):
     """启动 Agent 流式执行请求。"""
+
     task: str = Field(..., min_length=1, description="任务描述")
     role: str = Field("developer", description="Agent 角色")
     context: dict[str, Any] = Field(default_factory=dict, description="上下文")
@@ -37,6 +38,7 @@ class AgentRunRequest(BaseModel):
 
 class AgentCancelRequest(BaseModel):
     """取消 Agent 执行请求。"""
+
     task_id: str = Field(..., min_length=1, description="任务 ID")
 
 
@@ -81,7 +83,11 @@ async def agent_stream(
     async def event_generator():
         try:
             # 创建 Agent
-            role = AgentRole(agent_id) if agent_id in AgentRole._value2member_map_ else AgentRole.DEVELOPER
+            role = (
+                AgentRole(agent_id)
+                if agent_id in AgentRole._value2member_map_
+                else AgentRole.DEVELOPER
+            )
             agent = AgentFactory.create(
                 role=role,
                 llm=llm,
@@ -107,11 +113,13 @@ async def agent_stream(
 
         except Exception as e:
             logger.error("sse_stream_error", error=str(e), task_id=task_id)
-            error_data = json.dumps({
-                "type": "error",
-                "task_id": task_id,
-                "data": {"message": str(e), "code": "SSE_ERROR"},
-            })
+            error_data = json.dumps(
+                {
+                    "type": "error",
+                    "task_id": task_id,
+                    "data": {"message": str(e), "code": "SSE_ERROR"},
+                }
+            )
             yield f"event: error\ndata: {error_data}\n\n"
 
         finally:

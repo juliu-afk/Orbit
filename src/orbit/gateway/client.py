@@ -365,11 +365,13 @@ class LLMClient:
                     tool_calls_list = []
                     for idx in sorted(tool_calls_acc.keys()):
                         tc = tool_calls_acc[idx]
-                        tool_calls_list.append({
-                            "id": tc["id"],
-                            "type": "function",
-                            "function": tc["function"],
-                        })
+                        tool_calls_list.append(
+                            {
+                                "id": tc["id"],
+                                "type": "function",
+                                "function": tc["function"],
+                            }
+                        )
                     yield (StreamEventType.TOOL_CALL, {"tool_calls": tool_calls_list})
                 break
 

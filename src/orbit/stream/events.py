@@ -15,14 +15,14 @@ from pydantic import BaseModel, Field
 class StreamEventType(StrEnum):
     """流式事件类型——对标 OpenCode prompt.ts:1400 fullStream events."""
 
-    TEXT_DELTA = "text_delta"       # LLM 逐 token 输出
-    THINKING = "thinking"           # LLM 思考过程（非工具推理）
-    TOOL_CALL = "tool_call"         # Agent 决定调用工具
-    TOOL_RESULT = "tool_result"     # 工具执行结果
-    TURN_START = "turn_start"       # 新一轮 think→act→observe 开始
-    FINISH_STEP = "finish_step"     # Agent 完成一步
-    ERROR = "error"                 # 错误
-    CANCELLED = "cancelled"         # 用户取消
+    TEXT_DELTA = "text_delta"  # LLM 逐 token 输出
+    THINKING = "thinking"  # LLM 思考过程（非工具推理）
+    TOOL_CALL = "tool_call"  # Agent 决定调用工具
+    TOOL_RESULT = "tool_result"  # 工具执行结果
+    TURN_START = "turn_start"  # 新一轮 think→act→observe 开始
+    FINISH_STEP = "finish_step"  # Agent 完成一步
+    ERROR = "error"  # 错误
+    CANCELLED = "cancelled"  # 用户取消
 
 
 class StreamEvent(BaseModel):

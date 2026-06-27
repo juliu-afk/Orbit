@@ -14,10 +14,10 @@ from pydantic import BaseModel
 class RoutingStrategy(StrEnum):
     """路由策略枚举。"""
 
-    CHEAPEST = "cheapest"       # 成本最低（GLM-4.7 Flash 免费）
-    FASTEST = "fastest"         # 延迟最低（Flash 类模型）
-    BEST_QUALITY = "best"       # 最强推理（GLM-5.2 / DS V4 Pro）
-    AGENT_DEFAULT = "agent"     # 按 Agent 角色默认（现有行为——走 Resolver）
+    CHEAPEST = "cheapest"  # 成本最低（GLM-4.7 Flash 免费）
+    FASTEST = "fastest"  # 延迟最低（Flash 类模型）
+    BEST_QUALITY = "best"  # 最强推理（GLM-5.2 / DS V4 Pro）
+    AGENT_DEFAULT = "agent"  # 按 Agent 角色默认（现有行为——走 Resolver）
 
 
 class RoutingDecision(BaseModel):
@@ -32,8 +32,8 @@ class RoutingDecision(BaseModel):
 _MODEL_COSTS: dict[str, float] = {
     "deepseek/deepseek-v4-pro": 0.001305,
     "deepseek/deepseek-v4-flash": 0.00042,
-    "openai/glm-5.2": 0.0,         # 免费（Coding Plan）
-    "openai/glm-4.7-flash": 0.0,   # 免费（Coding Plan）
+    "openai/glm-5.2": 0.0,  # 免费（Coding Plan）
+    "openai/glm-4.7-flash": 0.0,  # 免费（Coding Plan）
 }
 
 # 模型→延迟排名（越低越快）

@@ -206,7 +206,9 @@ class ReActAgent(BaseAgent):
                     from orbit.compression.models import CompressionAction
 
                     result = await self._compressor.compress(
-                        messages, task_id=task_id, turn=turn,
+                        messages,
+                        task_id=task_id,
+                        turn=turn,
                     )
                     if result.action == CompressionAction.FORK:
                         yield StreamEvent(
@@ -254,7 +256,9 @@ class ReActAgent(BaseAgent):
             content_parts: list[str] = []
             try:
                 async for event_type, event_data in self.llm.generate_stream_with_tools(
-                    req, task_id=task_id, agent_name=agent_id,
+                    req,
+                    task_id=task_id,
+                    agent_name=agent_id,
                 ):
                     if event_type == StreamEventType.TEXT_DELTA:
                         content_parts.append(event_data["delta"])
@@ -304,8 +308,11 @@ class ReActAgent(BaseAgent):
                                     {"role": "assistant", "content": None, "tool_calls": [tc]}
                                 )
                                 messages.append(
-                                    {"role": "tool", "tool_call_id": tc.get("id", ""),
-                                     "content": f"死循环检测——连续3次调用 {tool_name} 相同参数。请换一种方式完成任务或报告无法继续。"}
+                                    {
+                                        "role": "tool",
+                                        "tool_call_id": tc.get("id", ""),
+                                        "content": f"死循环检测——连续3次调用 {tool_name} 相同参数。请换一种方式完成任务或报告无法继续。",
+                                    }
                                 )
                                 continue
 
@@ -313,7 +320,9 @@ class ReActAgent(BaseAgent):
 
                             try:
                                 result_str = await self.tools.dispatch(
-                                    tool_name, tool_args, agent_name=self.role.value,
+                                    tool_name,
+                                    tool_args,
+                                    agent_name=self.role.value,
                                 )
                             except DoomLoopError:
                                 result_str = "检测到工具调用死循环，请换一种方式。"
@@ -341,17 +350,25 @@ class ReActAgent(BaseAgent):
                                 {"role": "assistant", "content": None, "tool_calls": [tc]}
                             )
                             messages.append(
-                                {"role": "tool", "tool_call_id": tc.get("id", ""), "content": truncated}
+                                {
+                                    "role": "tool",
+                                    "tool_call_id": tc.get("id", ""),
+                                    "content": truncated,
+                                }
                             )
 
                             # 推理链记录
-                            reasoning_chain.append({
-                                "turn": turn,
-                                "action": tool_name,
-                                "args": {k: (str(v)[:100] if isinstance(v, str) else v)
-                                         for k, v in tool_args.items()},
-                                "result_preview": truncated[:200],
-                            })
+                            reasoning_chain.append(
+                                {
+                                    "turn": turn,
+                                    "action": tool_name,
+                                    "args": {
+                                        k: (str(v)[:100] if isinstance(v, str) else v)
+                                        for k, v in tool_args.items()
+                                    },
+                                    "result_preview": truncated[:200],
+                                }
+                            )
 
                             tool_call_count += 1
                             self._budget.consume()
@@ -379,11 +396,13 @@ class ReActAgent(BaseAgent):
 
             # 3f. 无 tool_calls → 正常完成
             if not has_tool_calls:
-                reasoning_chain.append({
-                    "turn": turn,
-                    "action": "finish",
-                    "reasoning": "".join(content_parts)[:500],
-                })
+                reasoning_chain.append(
+                    {
+                        "turn": turn,
+                        "action": "finish",
+                        "reasoning": "".join(content_parts)[:500],
+                    }
+                )
                 yield StreamEvent(
                     type=StreamEventType.FINISH_STEP,
                     agent_id=agent_id,

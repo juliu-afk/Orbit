@@ -82,14 +82,19 @@ class MockLLMClient:
         self.stream_call_count += 1
 
         if self.stream_call_count <= self.fail_count:
-            yield (StreamEventType.ERROR, {
-                "message": f"Mock LLM internal error (stream call #{self.stream_call_count})",
-                "code": "MOCK_ERROR",
-            })
+            yield (
+                StreamEventType.ERROR,
+                {
+                    "message": f"Mock LLM internal error (stream call #{self.stream_call_count})",
+                    "code": "MOCK_ERROR",
+                },
+            )
             return
 
         # 模拟逐 token 推送文本
         words = self.fixed_response.split()
         for i, word in enumerate(words):
-            yield (StreamEventType.TEXT_DELTA, {"delta": word + (" " if i < len(words) - 1 else "")})
-
+            yield (
+                StreamEventType.TEXT_DELTA,
+                {"delta": word + (" " if i < len(words) - 1 else "")},
+            )

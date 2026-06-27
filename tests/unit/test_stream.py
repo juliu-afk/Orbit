@@ -153,8 +153,14 @@ class TestSSEEventFormat:
         from orbit.stream.events import StreamEventType
 
         valid_types = {
-            "text_delta", "thinking", "tool_call", "tool_result",
-            "turn_start", "finish_step", "error", "cancelled",
+            "text_delta",
+            "thinking",
+            "tool_call",
+            "tool_result",
+            "turn_start",
+            "finish_step",
+            "error",
+            "cancelled",
         }
         for t in StreamEventType:
             assert t.value in valid_types, f"Missing valid type: {t.value}"

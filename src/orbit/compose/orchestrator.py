@@ -34,12 +34,14 @@ class ComposeOrchestrator:
         actor_spawn: Any = None,  # ActorSpawn
         parser: ComposeParser | None = None,
         scheduler: Scheduler | None = None,
-        max_retries: int = 2,  # P2-2: 重试次数从模型移到编排器配置
+        max_retries: int = 2,
+        worktree_manager: Any = None,  # Phase 4 AC-B4: WorktreeManager
     ) -> None:
         self.actor_spawn = actor_spawn
         self.parser = parser or ComposeParser()
         self.scheduler = scheduler
         self.MAX_RETRIES = max_retries
+        self._worktree = worktree_manager
 
     async def run_spec(
         self,
@@ -67,6 +69,21 @@ class ComposeOrchestrator:
             title=spec.title,
             task_count=len(spec.tasks),
         )
+
+        # Phase 4 AC-B4: 创建 Worktree 隔离工作区
+        wt_record = None
+        if self._worktree:
+            try:
+                from orbit.worktree.models import WorktreeStrategy
+
+                wt_record = await self._worktree.create(strategy=WorktreeStrategy.DELEGATE)
+                logger.info(
+                    "compose_worktree_created",
+                    id=wt_record.worktree_id,
+                    branch=wt_record.branch_name,
+                )
+            except Exception as e:
+                logger.warning("compose_worktree_failed_fallback_off", error=str(e))
 
         # 2. Spec review（对标 MiMo spec review）
         spec_review = await self._spec_review(spec)

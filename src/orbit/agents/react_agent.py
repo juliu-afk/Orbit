@@ -74,11 +74,15 @@ class ReActAgent(BaseAgent):
         sandbox: Any = None,
         tools: ToolRegistry | None = None,
         event_bus: Any = None,
+        goal: Any = None,  # Phase 4 AC-B1: Goal 模型
+        goal_judge: Any = None,  # Phase 4 AC-B1: GoalJudge 实例
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
         self._event_bus = event_bus
         self._budget = IterationBudget(self.ITERATION_BUDGET)
+        self._goal = goal  # Phase 4
+        self._goal_judge = goal_judge  # Phase 4
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——向后兼容 wrapper。
@@ -393,6 +397,32 @@ class ReActAgent(BaseAgent):
                     data={"message": str(e), "code": "LLM_ERROR"},
                 )
                 return
+
+            # Phase 4 AC-B1: GoalJudge 自检——每轮 LLM 返回后判定
+            if not has_tool_calls and self._goal_judge and self._goal:
+                transcript = "".join(content_parts)
+                verdict = await self._goal_judge.evaluate(
+                    self._goal, transcript=transcript, task_id=task_id
+                )
+                if not verdict.ok:
+                    # 目标未完成——注入合成 user turn，强制继续
+                    logger.info(
+                        "goal_judge_not_ok",
+                        turn=turn,
+                        reason=verdict.reason,
+                    )
+                    yield StreamEvent(
+                        type=StreamEventType.THINKING,
+                        agent_id=agent_id,
+                        task_id=task_id,
+                        turn=turn,
+                        data={"content": f"判定: {verdict.reason}"},
+                    )
+                    messages.append(
+                        {"role": "user", "content": f"任务尚未完成——{verdict.reason}。请继续。"}
+                    )
+                    continue  # 回到下一轮 turn
+                # verdict.ok → 正常完成，继续走 finish_step 逻辑
 
             # 3f. 无 tool_calls → 正常完成
             if not has_tool_calls:

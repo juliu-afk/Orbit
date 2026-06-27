@@ -259,10 +259,9 @@ class TestGatewayStreaming:
         """流式调用——纯文本输出，无工具调用。"""
         from unittest.mock import patch
 
+        from orbit.gateway.client import LLMClient
         from orbit.gateway.schemas import LLMRequest
         from orbit.stream.events import StreamEventType
-
-        from orbit.gateway.client import LLMClient
 
         client = LLMClient()
 
@@ -286,10 +285,9 @@ class TestGatewayStreaming:
         """流式调用——primary 失败后 fallback 成功。"""
         from unittest.mock import patch
 
+        from orbit.gateway.client import LLMClient
         from orbit.gateway.schemas import LLMRequest
         from orbit.stream.events import StreamEventType
-
-        from orbit.gateway.client import LLMClient
 
         client = LLMClient()
 

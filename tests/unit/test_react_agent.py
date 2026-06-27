@@ -379,7 +379,6 @@ class TestCancellation:
         token2 = CancellationToken()
         token2.cancel()
 
-
         tools = MagicMock()
         tools.get_schemas.return_value = []
         tools.would_form_loop.return_value = False

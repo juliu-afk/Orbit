@@ -25,11 +25,25 @@ def mock_llm():
 
     # Old API——backward compatibility
     responses = [
-        LLMResponse(content="", model="mock", usage=LLMUsage(),
-                     tool_calls=[{"id":"call_1","type":"function","function":{"name":"read_file","arguments":'{"path":"test.py"}'}}],
-                     stop_reason="tool_calls"),
-        LLMResponse(content="code review done, 2 issues found.", model="mock", usage=LLMUsage(),
-                     stop_reason="end_turn"),
+        LLMResponse(
+            content="",
+            model="mock",
+            usage=LLMUsage(),
+            tool_calls=[
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "read_file", "arguments": '{"path":"test.py"}'},
+                }
+            ],
+            stop_reason="tool_calls",
+        ),
+        LLMResponse(
+            content="code review done, 2 issues found.",
+            model="mock",
+            usage=LLMUsage(),
+            stop_reason="end_turn",
+        ),
     ]
     llm.generate = AsyncMock(side_effect=responses)
 
@@ -41,7 +55,18 @@ def mock_llm():
         _call_count[0] += 1
         if _call_count[0] == 1:
             yield (StreamEventType.TEXT_DELTA, {"delta": "Let me read the file."})
-            yield (StreamEventType.TOOL_CALL, {"tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "read_file", "arguments": '{"path": "test.py"}'}}]})
+            yield (
+                StreamEventType.TOOL_CALL,
+                {
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {"name": "read_file", "arguments": '{"path": "test.py"}'},
+                        }
+                    ]
+                },
+            )
         else:
             yield (StreamEventType.TEXT_DELTA, {"delta": "code review complete, 2 issues found."})
 
@@ -153,13 +178,49 @@ class TestReActAgentCore:
         async def mock_stream(req, task_id="", agent_name=""):
             call_count[0] += 1
             if call_count[0] == 1:
-                yield (StreamEventType.TOOL_CALL, {"tool_calls": [{"id": "c1", "type": "function", "function": {"name": "read_file", "arguments": '{"path":"a.py"}'}}]})
+                yield (
+                    StreamEventType.TOOL_CALL,
+                    {
+                        "tool_calls": [
+                            {
+                                "id": "c1",
+                                "type": "function",
+                                "function": {"name": "read_file", "arguments": '{"path":"a.py"}'},
+                            }
+                        ]
+                    },
+                )
             elif call_count[0] == 2:
-                yield (StreamEventType.TOOL_CALL, {"tool_calls": [{"id": "c2", "type": "function", "function": {"name": "read_file", "arguments": '{"path":"b.py"}'}}]})
+                yield (
+                    StreamEventType.TOOL_CALL,
+                    {
+                        "tool_calls": [
+                            {
+                                "id": "c2",
+                                "type": "function",
+                                "function": {"name": "read_file", "arguments": '{"path":"b.py"}'},
+                            }
+                        ]
+                    },
+                )
             elif call_count[0] == 3:
-                yield (StreamEventType.TOOL_CALL, {"tool_calls": [{"id": "c3", "type": "function", "function": {"name": "read_file", "arguments": '{"path":"a.py"}'}}]})
+                yield (
+                    StreamEventType.TOOL_CALL,
+                    {
+                        "tool_calls": [
+                            {
+                                "id": "c3",
+                                "type": "function",
+                                "function": {"name": "read_file", "arguments": '{"path":"a.py"}'},
+                            }
+                        ]
+                    },
+                )
             else:
-                yield (StreamEventType.TEXT_DELTA, {"delta": "cannot continue——doom loop detected."})
+                yield (
+                    StreamEventType.TEXT_DELTA,
+                    {"delta": "cannot continue——doom loop detected."},
+                )
 
         llm = AsyncMock()
         llm.generate_stream_with_tools = mock_stream
@@ -223,7 +284,10 @@ class TestExitConditions:
         from orbit.stream.events import StreamEventType
 
         async def mock_stream_err(req, task_id="", agent_name=""):
-            yield (StreamEventType.ERROR, {"message": "service unavailable", "code": "SERVICE_UNAVAILABLE"})
+            yield (
+                StreamEventType.ERROR,
+                {"message": "service unavailable", "code": "SERVICE_UNAVAILABLE"},
+            )
 
         llm = AsyncMock()
         llm.generate_stream_with_tools = mock_stream_err
@@ -295,7 +359,18 @@ class TestCancellation:
             call_count[0] += 1
             if call_count[0] == 1:
                 # First call: tool call → execute tool → next turn
-                yield (StreamEventType.TOOL_CALL, {"tool_calls": [{"id": "c1", "type": "function", "function": {"name": "read_file", "arguments": '{"path":"x.py"}'}}]})
+                yield (
+                    StreamEventType.TOOL_CALL,
+                    {
+                        "tool_calls": [
+                            {
+                                "id": "c1",
+                                "type": "function",
+                                "function": {"name": "read_file", "arguments": '{"path":"x.py"}'},
+                            }
+                        ]
+                    },
+                )
             else:
                 # Second call: token already cancelled → should not be reached
                 yield (StreamEventType.TEXT_DELTA, {"delta": "should not reach"})
@@ -303,7 +378,6 @@ class TestCancellation:
         # Simpler approach: test cancellation via token set BEFORE execute_stream
         token2 = CancellationToken()
         token2.cancel()
-
 
         tools = MagicMock()
         tools.get_schemas.return_value = []
@@ -339,8 +413,10 @@ class TestCancellation:
 
         class SimpleAgent(BaseAgent):
             role = AgentRole.CONFIG_MANAGER
+
             async def execute(self, input_data):
                 from orbit.agents.base import AgentOutput
+
                 return AgentOutput(result={"output": "done"})
 
         agent = SimpleAgent()
@@ -364,10 +440,12 @@ class TestAgentConfig:
     def test_default_max_turns(self):
         class DefaultAgent(ReActAgent):
             role = AgentRole.DEVELOPER
+
         assert DefaultAgent.MAX_TURNS == 20
 
     def test_custom_max_turns(self):
         class FastAgent(ReActAgent):
             role = AgentRole.REVIEWER
             MAX_TURNS = 5
+
         assert FastAgent.MAX_TURNS == 5

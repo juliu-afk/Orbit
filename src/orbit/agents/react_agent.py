@@ -12,7 +12,11 @@ WHY ReAct 而非单次 LLM 调用:
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from orbit.goal_judge.judge import GoalJudge
+    from orbit.goal_judge.models import Goal
 
 import structlog
 
@@ -74,11 +78,15 @@ class ReActAgent(BaseAgent):
         sandbox: Any = None,
         tools: ToolRegistry | None = None,
         event_bus: Any = None,
+        goal: Goal | None = None,  # Phase 4 AC-B1: Goal 模型
+        goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge 实例
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
         self._event_bus = event_bus
         self._budget = IterationBudget(self.ITERATION_BUDGET)
+        self._goal = goal  # Phase 4
+        self._goal_judge = goal_judge  # Phase 4
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——向后兼容 wrapper。
@@ -393,6 +401,37 @@ class ReActAgent(BaseAgent):
                     data={"message": str(e), "code": "LLM_ERROR"},
                 )
                 return
+
+            # Phase 4 AC-B1: GoalJudge 自检——每轮 LLM 返回后判定
+            if not has_tool_calls and self._goal_judge and self._goal:
+                transcript = "".join(content_parts)
+                try:
+                    verdict = await self._goal_judge.evaluate(
+                        self._goal, transcript=transcript, task_id=task_id
+                    )
+                except Exception as e:
+                    # P2-1: GoalJudge 异常→fail-open，不困住 Agent
+                    logger.warning("goal_judge_exception_fail_open", error=str(e))
+                    verdict = None  # 跳过判定，正常完成
+                if verdict is not None and not verdict.ok:
+                    # 目标未完成——注入合成 user turn，强制继续
+                    logger.info(
+                        "goal_judge_not_ok",
+                        turn=turn,
+                        reason=verdict.reason,
+                    )
+                    yield StreamEvent(
+                        type=StreamEventType.THINKING,
+                        agent_id=agent_id,
+                        task_id=task_id,
+                        turn=turn,
+                        data={"content": f"判定: {verdict.reason}"},
+                    )
+                    messages.append(
+                        {"role": "user", "content": f"任务尚未完成——{verdict.reason}。请继续。"}
+                    )
+                    continue  # 回到下一轮 turn
+                # verdict.ok → 正常完成，继续走 finish_step 逻辑
 
             # 3f. 无 tool_calls → 正常完成
             if not has_tool_calls:

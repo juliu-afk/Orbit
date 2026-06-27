@@ -14,6 +14,7 @@ import structlog
 
 from orbit.agents.base import AgentRole, BaseAgent
 from orbit.agents.clarifier import ClarifierAgent
+from orbit.agents.dream_agent import DreamAgent
 from orbit.agents.react_agent import ReActAgent
 
 logger = structlog.get_logger()
@@ -101,6 +102,7 @@ class AgentFactory:
         AgentRole.QA: QAAgent,
         AgentRole.CONFIG_MANAGER: ConfigManagerAgent,
         AgentRole.CLARIFIER: ClarifierAgent,
+        AgentRole.DREAM: DreamAgent,  # Phase 2: /dream 自进化
     }
 
     @classmethod

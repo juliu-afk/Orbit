@@ -6,6 +6,7 @@ SQLite 持久化——与 ProjectRegistry 共用 `data/orbit.db`。
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sqlite3
@@ -62,6 +63,14 @@ class SessionRegistry:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_name)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at DESC)")
+        # Phase 2: parent-child fork tracking
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE sessions ADD COLUMN parent_session_id TEXT DEFAULT NULL")
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE sessions ADD COLUMN lineage_reason TEXT DEFAULT NULL")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id)"
+        )
         # chat_messages 表
         conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_messages (
@@ -249,6 +258,60 @@ class SessionRegistry:
         )
         # 按时间正序返回（最旧 → 最新）
         return [self._row_to_message(r) for r in reversed(rows)]
+
+    # ── Phase 2: FTS5 + Fork ──────────────────────────
+
+    def enable_fts(self) -> bool:
+        """启用 FTS5 全文搜索（幂等）."""
+        from orbit.sessions.fts import setup_session_fts
+
+        conn = self._get_conn()
+        return setup_session_fts(conn)
+
+    def fts_search(
+        self,
+        query: str,
+        session_filter: str | None = None,
+        role_filter: str | None = None,
+        limit: int = 20,
+    ) -> list:
+        """FTS5 全文搜索聊天消息."""
+        from orbit.sessions.fts import search_messages
+
+        conn = self._get_conn()
+        return search_messages(conn, query, session_filter, role_filter, limit)
+
+    def create_fork(self, parent_session_id: str, reason: str = "") -> str:
+        """创建子 Session 分叉——记录 parent-child lineage."""
+        parent = self.get(parent_session_id)
+        project = parent.project_name if parent else "unknown"
+        title = f"Fork of {parent_session_id[:8]}"
+        child = self.create(project, title=title)
+
+        conn = self._get_conn()
+        conn.execute(
+            "UPDATE sessions SET parent_session_id=?, lineage_reason=? WHERE id=?",
+            (parent_session_id, reason, child.session_id),
+        )
+        conn.commit()
+        logger.info(
+            "session_forked",
+            parent=parent_session_id[:8],
+            child=child.session_id[:8],
+            reason=reason,
+        )
+        return child.session_id
+
+    def get_child_sessions(self, session_id: str) -> list[SessionRecord]:
+        """获取指定 Session 的所有子 Session."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT s.*, p.local_path "
+            "FROM sessions s LEFT JOIN projects p ON s.project_name = p.name "
+            "WHERE s.parent_session_id=? ORDER BY s.created_at",
+            (session_id,),
+        ).fetchall()
+        return [self._row_to_session(r) for r in rows]
 
     def close(self) -> None:
         if self._conn:

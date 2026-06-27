@@ -49,6 +49,11 @@ ROLE_DESCRIPTIONS: dict[AgentRole, str] = {
         "职责：理解用户自然语言需求，拆解为结构化任务。\n"
         "不写代码——输出结构化的需求文档供其他 Agent 消费。"
     ),
+    AgentRole.DREAM: (  # Phase 2
+        "你是 Orbit 多智能体协作网络中的 **自进化 Agent**。\n"
+        "职责：定期扫描会话历史和记忆文件，合并去重经验教训。\n"
+        "通过 /dream 命令触发，输出精简的 MEMORY.md。"
+    ),
 }
 
 
@@ -172,6 +177,19 @@ class PromptBuilder:
             }
             if safe_env:
                 parts.append(f"\n环境信息：{safe_env}")
+
+        # Phase 2: 记忆注入——Agent 工作记忆 + 记忆检索结果
+        working_memory = ctx.get("working_memory")
+        if working_memory and hasattr(working_memory, "body") and working_memory.body:
+            parts.append(f"\n## Agent 工作记忆\n```\n{working_memory.body[:2000]}\n```")
+
+        memory_search_results = ctx.get("memory_search_results", [])
+        if memory_search_results:
+            mem_text = "\n".join(
+                f"- [{r.path}] (score={r.score:.2f}) {r.snippet[:150]}"
+                for r in memory_search_results[:5]
+            )
+            parts.append(f"\n## 记忆检索结果\n{mem_text}")
 
         if len(parts) == 1:
             return "## 项目上下文\n无特定项目上下文。通用开发环境。"

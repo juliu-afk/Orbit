@@ -306,6 +306,24 @@ class Scheduler:
         """
         from orbit.agents.context import TaskContext
 
+        # Phase 2: L4——从文件记忆系统加载 Agent 工作记忆
+        l4: dict[str, Any] = {}
+        try:
+            from orbit.memory.models import MemoryFileType
+            from orbit.memory.store import MemoryStore
+
+            project_path = context.get("project_path", "")
+            store = MemoryStore(project_path=project_path)
+            mem = store.read_file(MemoryFileType.EPISODIC)
+            if mem.body:
+                l4["working_memory"] = mem.body[:2000]
+            # 也检查 progress
+            progress = store.read_file(MemoryFileType.PROGRESS)
+            if progress.body:
+                l4["progress"] = progress.body[:1000]
+        except Exception:
+            pass  # 记忆加载失败不阻塞任务
+
         return TaskContext(
             task_id=task_id,
             agent_name=context.get("agent_name", ""),  # Step 2.3
@@ -317,7 +335,7 @@ class Scheduler:
                 "prd": context.get("prd", ""),
                 "artifacts": context.get("artifacts", {}),
             },
-            l4={},  # 私有记忆——Agent 间通过 MessageBus 传递
+            l4=l4,  # Phase 2: 私有工作记忆——从 MEMORY.md 加载
             l5=context.get("l5", []),  # 教训库检索结果
         )
 

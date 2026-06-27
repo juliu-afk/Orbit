@@ -33,11 +33,9 @@ def _guard_path(path: str, allow_outside: bool = False) -> Path:
         from orbit.security.guard import WorkspaceGuard
 
         guard = WorkspaceGuard(str(_WORKSPACE_ROOT))
-        # 传入已解析的绝对路径，而非相对 path
         guard.validate(str(p), allow_outside=allow_outside)
     except ValueError as e:
         raise WorkspaceViolationError(str(e)) from None
-
     try:
         p.relative_to(_WORKSPACE_ROOT)
     except ValueError:

@@ -47,6 +47,8 @@ class BashValidators:
         "cargo",
         "make",
         "curl",
+        "docker",
+        "kubectl",
     }
 
     # 危险模式——始终拒绝

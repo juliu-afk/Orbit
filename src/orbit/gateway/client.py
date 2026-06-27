@@ -152,7 +152,10 @@ class LLMClient:
                 cost=resp.usage.cost_usd,
             )
             return resp
-        except Exception as e:
+        except (RuntimeError, OSError, ImportError) as e:
+            # RuntimeError: litellm 未安装或调用失败
+            # OSError: 网络错误
+            # ImportError: litellm 模块缺失
             await self.cb.record_failure(model)
             logger.warning("llm_call_failed", model=model, task_id=task_id, error=str(e))
             raise
@@ -242,25 +245,29 @@ class LLMClient:
         from orbit.stream.events import StreamEventType
 
         model = self.default_model
+        model_source = "default"
         # Phase 3: 流式调用也经过熔断器
         try:
             await self.cb.before_call(model)
             async for event in self._stream_completion_with_tools(model, req):
                 yield event
             await self.cb.record_success(model)
+            logger.info("stream_call_ok", model=model, source=model_source, task_id=task_id)
             return
-        except Exception as e:
+        except (RuntimeError, OSError, ImportError) as e:
             await self.cb.record_failure(model)
             logger.warning("stream_primary_failed", model=model, error=str(e))
 
         # 降级
         model = self.fallback_model
+        model_source = "fallback"
         try:
             await self.cb.before_call(model)
             async for event in self._stream_completion_with_tools(model, req):
                 yield event
             await self.cb.record_success(model)
-        except Exception as e:
+            logger.info("stream_call_ok", model=model, source=model_source, task_id=task_id)
+        except (RuntimeError, OSError, ImportError) as e:
             await self.cb.record_failure(model)
             logger.error("stream_fallback_failed", model=model, error=str(e))
             yield (StreamEventType.ERROR, {"message": str(e), "code": "STREAM_FAILED"})

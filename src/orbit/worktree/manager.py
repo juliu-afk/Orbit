@@ -106,8 +106,13 @@ class WorktreeManager:
         elif strategy == WorktreeStrategy.OFF:
             pass  # 无需清理
 
-        # ASK——由外部交互决定
-        record.state = target_state
+        # P1-6: 策略分支内已设置 state 的策略不覆盖
+        if strategy not in (
+            WorktreeStrategy.AUTO_PR,
+            WorktreeStrategy.MANUAL,
+            WorktreeStrategy.OFF,
+        ):
+            record.state = target_state
         record.resolved_at = datetime.now(UTC)
 
     async def list_active(self) -> list[WorktreeRecord]:

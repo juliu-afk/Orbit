@@ -129,9 +129,7 @@ class ComposeOrchestrator:
             except Exception as e:
                 logger.error("task_failed", task_id=task.id, error=str(e))
                 # 重试（最多 MAX_RETRIES 次）
-                results[task.id] = await self._retry_task(
-                    task, parent_task_id, error=str(e)
-                )
+                results[task.id] = await self._retry_task(task, parent_task_id, error=str(e))
 
             done.add(task.id)
 
@@ -139,10 +137,7 @@ class ComposeOrchestrator:
         code_review = await self._code_review(spec, results)
 
         # 5. 汇总
-        all_ok = all(
-            r.get("status") in ("ok", "dispatched")
-            for r in results.values()
-        )
+        all_ok = all(r.get("status") in ("ok", "dispatched") for r in results.values())
 
         return {
             "status": "ok" if all_ok else "partial",

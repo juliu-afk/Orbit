@@ -142,13 +142,17 @@ class ComposeParser:
         if not isinstance(frontmatter, dict):
             return None
 
-        body = content[match.end():].strip()
+        body = content[match.end() :].strip()
         phase_raw = frontmatter.get("phase", "implement")
 
         return Skill(
             name=frontmatter.get("name", md_file.stem),
             description=frontmatter.get("description", ""),
-            phase=SkillPhase(phase_raw) if phase_raw in SkillPhase._value2member_map_ else SkillPhase.IMPLEMENT,
+            phase=(
+                SkillPhase(phase_raw)
+                if phase_raw in SkillPhase._value2member_map_
+                else SkillPhase.IMPLEMENT
+            ),
             tools=frontmatter.get("tools", []),
             agent_role=frontmatter.get("agent_role", "developer"),
             body=body,

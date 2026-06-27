@@ -14,11 +14,12 @@ from pydantic import BaseModel, Field
 
 class SkillPhase(StrEnum):
     """技能执行阶段。"""
-    PLAN = "plan"         # 方案设计
+
+    PLAN = "plan"  # 方案设计
     IMPLEMENT = "implement"  # 代码实现
-    REVIEW = "review"     # 代码审查
-    VERIFY = "verify"     # 验证测试
-    MERGE = "merge"       # 合并工作流
+    REVIEW = "review"  # 代码审查
+    VERIFY = "verify"  # 验证测试
+    MERGE = "merge"  # 合并工作流
 
 
 class Skill(BaseModel):

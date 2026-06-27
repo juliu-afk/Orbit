@@ -263,6 +263,8 @@ class ComposeOrchestrator:
                 # TimeoutError: Actor 执行超时
                 # RuntimeError: ActorSpawn 创建/执行失败
                 # OSError: 数据库访问异常
-                logger.warning("retry_failed", task_id=task.id, attempt=attempt, error=str(e), exc_info=True)
+                logger.warning(
+                    "retry_failed", task_id=task.id, attempt=attempt, error=str(e), exc_info=True
+                )
 
         return {"status": "error", "error": f"重试 {Task.MAX_RETRIES} 次后仍失败: {error}"}

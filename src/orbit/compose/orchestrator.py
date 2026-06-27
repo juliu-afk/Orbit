@@ -5,12 +5,11 @@
 2. Per task: dispatch implementer subagent via ActorSpawn
 3. Two-stage review gate: spec review → code quality review
 4. Finish: final review → merge
-
-WHY 继承 Orchestrator: 复用 DAG + checkpoint + event_bus。
 """
 
 from __future__ import annotations
 
+from collections import deque
 from typing import Any
 
 import structlog
@@ -35,10 +34,12 @@ class ComposeOrchestrator:
         actor_spawn: Any = None,  # ActorSpawn
         parser: ComposeParser | None = None,
         scheduler: Scheduler | None = None,
+        max_retries: int = 2,  # P2-2: 重试次数从模型移到编排器配置
     ) -> None:
         self.actor_spawn = actor_spawn
         self.parser = parser or ComposeParser()
-        self.scheduler = scheduler  # 可复用现有 Scheduler（含 DAG + checkpoint）
+        self.scheduler = scheduler
+        self.MAX_RETRIES = max_retries
 
     async def run_spec(
         self,
@@ -54,22 +55,11 @@ class ComposeOrchestrator:
         3. 按依赖顺序执行 tasks（通过 ActorSpawn）
         4. code quality review（代码审查门禁）
         5. 汇总结果
-
-        Args:
-            spec_text: spec YAML 文本
-            parent_task_id: 父任务 ID
-            background: True = 任务后台执行（不等待完成）
-
-        Returns:
-            {"status": "ok"/"error", "tasks": [...], "review": {...}}
         """
         # 1. 解析 spec
         try:
             spec = self.parser.parse_spec(spec_text)
         except (ValueError, KeyError) as e:
-            # ValueError: spec 格式错误（非 dict）
-            # KeyError: spec 缺少必要字段
-            # yaml.YAMLError: parse_spec 内部的 yaml 解析异常
             return {"status": "error", "error": f"spec 解析失败: {str(e)}"}
 
         logger.info(
@@ -78,7 +68,7 @@ class ComposeOrchestrator:
             task_count=len(spec.tasks),
         )
 
-        # 2. Spec review——方案审查门禁（对标 MiMo spec review）
+        # 2. Spec review（对标 MiMo spec review）
         spec_review = await self._spec_review(spec)
         if not spec_review.get("ok", True):
             return {
@@ -87,15 +77,16 @@ class ComposeOrchestrator:
                 "spec_review": spec_review,
             }
 
-        # 3. 按依赖顺序执行 tasks——拓扑排序 + ActorSpawn
-        task_order = self._topological_sort(spec.tasks)
-        results: dict[str, dict] = {}
+        # 3. 按依赖顺序执行 tasks
+        try:
+            task_order = self._topological_sort(spec.tasks)
+        except ValueError as e:
+            return {"status": "error", "error": str(e)}
 
-        # 已完成的 task IDs
+        results: dict[str, dict] = {}
         done: set[str] = set()
 
         for task in task_order:
-            # 等待依赖完成
             for dep_id in task.depends_on:
                 if dep_id not in done:
                     logger.warning(
@@ -103,7 +94,6 @@ class ComposeOrchestrator:
                         task_id=task.id,
                         dependency=dep_id,
                     )
-                    # 继续执行（依赖可能已在上一批完成）
 
             logger.info("compose_dispatch_task", task_id=task.id, role=task.agent_role)
 
@@ -124,22 +114,17 @@ class ComposeOrchestrator:
                             "actor_id": deferred.actor_id,
                         }
                 else:
-                    # 无 ActorSpawn——模拟执行
                     results[task.id] = {
                         "status": "ok",
-                        "output": f"[mock] {task.agent_role} 完成: {task.description[:100]}",
+                        "output": f"[mock] {task.agent_role}: {task.description[:100]}",
                     }
             except (TimeoutError, RuntimeError, OSError, ValueError) as e:
-                # TimeoutError: Actor 执行超时
-                # RuntimeError: ActorSpawn 并发上限/执行失败
-                # OSError: DB 访问异常
-                # ValueError: 参数校验失败
                 logger.error("task_failed", task_id=task.id, error=str(e), exc_info=True)
                 results[task.id] = await self._retry_task(task, parent_task_id, error=str(e))
 
             done.add(task.id)
 
-        # 4. Code quality review——代码审查门禁
+        # 4. Code quality review
         code_review = await self._code_review(spec, results)
 
         # 5. 汇总
@@ -156,21 +141,20 @@ class ComposeOrchestrator:
     # ── 内部门禁 ──────────────────────────────────
 
     async def _spec_review(self, spec: Spec) -> dict[str, Any]:
-        """方案审查门禁——检查 spec 完整性。
-
-        对标 MiMo compose 的 spec review 阶段。
-        """
+        """方案审查门禁——检查 spec 完整性。"""
         issues = []
 
         if not spec.title:
             issues.append("缺少 title")
         if not spec.tasks:
-            issues.append("tasks 列表为空——至少需要一个任务")
+            issues.append("tasks 列表为空")
         for task in spec.tasks:
             if not task.description:
                 issues.append(f"任务 {task.id} 缺少 description")
+            # P2-1: 自依赖检查
+            if task.id in task.depends_on:
+                issues.append(f"任务 {task.id} 依赖自身——不允许")
             if task.depends_on:
-                # 检查依赖是否存在
                 known_ids = {t.id for t in spec.tasks}
                 unknown = set(task.depends_on) - known_ids
                 if unknown:
@@ -178,32 +162,37 @@ class ComposeOrchestrator:
 
         if issues:
             return {"ok": False, "reason": "; ".join(issues)}
-
         return {"ok": True, "reason": "spec 审查通过"}
 
     async def _code_review(self, spec: Spec, results: dict) -> dict[str, Any]:
-        """代码审查门禁——检查所有任务完成质量。
-
-        对标 MiMo compose 的 code quality review 阶段。
-        """
+        """代码审查门禁——P1-2: 增强检查产物+错误残留。"""
         failed = []
+        warnings = []
         for task_id, result in results.items():
             status = result.get("status", "unknown")
             if status == "error":
                 failed.append({"task_id": task_id, "error": result.get("error", "未知错误")})
+                continue
+            output = result.get("output", "")
+            if not output or len(str(output)) < 10:
+                warnings.append({"task_id": task_id, "warning": "输出过短，可能无实质产物"})
+            if "Traceback" in str(output) or "Error:" in str(output):
+                warnings.append({"task_id": task_id, "warning": "输出包含错误堆栈残留"})
 
+        review: dict[str, Any] = {
+            "ok": len(failed) == 0,
+            "reason": f"全部 {len(results)} 个任务通过",
+        }
         if failed:
-            return {"ok": False, "failed_tasks": failed}
-
-        return {"ok": True, "reason": f"全部 {len(results)} 个任务通过"}
+            review["failed_tasks"] = failed
+        if warnings:
+            review["warnings"] = warnings
+        return review
 
     # ── 拓扑排序 ──────────────────────────────────
 
     def _topological_sort(self, tasks: list[Task]) -> list[Task]:
-        """按依赖关系拓扑排序 tasks。
-
-        Kahn 算法——无依赖的先执行。
-        """
+        """Kahn 算法——O(V+E)。P1-1: deque 保证 O(1) 出队。"""
         task_map = {t.id: t for t in tasks}
         in_degree = {t.id: len(t.depends_on) for t in tasks}
         adj: dict[str, list[str]] = {t.id: [] for t in tasks}
@@ -213,26 +202,21 @@ class ComposeOrchestrator:
                 if dep in adj:
                     adj[dep].append(t.id)
 
-        # 入度为 0 的节点
-        queue = [tid for tid, deg in in_degree.items() if deg == 0]
+        queue: deque[str] = deque(tid for tid, deg in in_degree.items() if deg == 0)
         result: list[Task] = []
 
         while queue:
-            tid = queue.pop(0)
+            tid = queue.popleft()
             result.append(task_map[tid])
             for neighbor in adj.get(tid, []):
                 in_degree[neighbor] -= 1
                 if in_degree[neighbor] == 0:
                     queue.append(neighbor)
 
-        # 环形依赖检测
+        # P1-4: 环形依赖→抛异常
         if len(result) != len(tasks):
             remaining = set(t.id for t in tasks) - {t.id for t in result}
-            logger.warning("circular_dependency_detected", remaining=remaining)
-            # 强制追加剩余任务（打破循环）
-            for t in tasks:
-                if t.id in remaining:
-                    result.append(t)
+            raise ValueError(f"环形依赖——以下任务形成循环: {remaining}")
 
         return result
 
@@ -244,8 +228,12 @@ class ComposeOrchestrator:
         parent_task_id: str,
         error: str,
     ) -> dict[str, Any]:
-        """任务失败重试——最多 MAX_RETRIES 次。"""
-        for attempt in range(1, Task.MAX_RETRIES + 1):
+        """任务失败重试——最多 self.MAX_RETRIES 次。
+
+        P1-3: 非 error 状态视为成功（ok/dispatched/partial 均非失败）。
+        P2-2: 重试次数从实例配置 self.MAX_RETRIES 读取。
+        """
+        for attempt in range(1, self.MAX_RETRIES + 1):
             logger.info("task_retry", task_id=task.id, attempt=attempt)
             try:
                 if self.actor_spawn:
@@ -255,16 +243,24 @@ class ComposeOrchestrator:
                         parent_task_id=parent_task_id,
                     )
                     result = await deferred.result(timeout=600)
-                    if result.get("status") == "ok":
+                    # P1-3: 非 error 即视为成功
+                    if result.get("status") != "error":
                         return result
                 else:
-                    return {"status": "ok", "output": f"[mock retry {attempt}] 完成"}
+                    return {
+                        "status": "ok",
+                        "output": f"[mock retry {attempt}] 完成",
+                    }
             except (TimeoutError, RuntimeError, OSError) as e:
-                # TimeoutError: Actor 执行超时
-                # RuntimeError: ActorSpawn 创建/执行失败
-                # OSError: 数据库访问异常
                 logger.warning(
-                    "retry_failed", task_id=task.id, attempt=attempt, error=str(e), exc_info=True
+                    "retry_failed",
+                    task_id=task.id,
+                    attempt=attempt,
+                    error=str(e),
+                    exc_info=True,
                 )
 
-        return {"status": "error", "error": f"重试 {Task.MAX_RETRIES} 次后仍失败: {error}"}
+        return {
+            "status": "error",
+            "error": f"重试 {self.MAX_RETRIES} 次后仍失败: {error}",
+        }

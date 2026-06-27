@@ -7,7 +7,6 @@ WHY YAML frontmatter: 技能元数据与 markdown body 分离——
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -63,6 +62,3 @@ class Task(BaseModel):
     agent_role: str = Field("developer", description="执行 Agent 角色")
     skill: str = Field("", description="使用的技能名称")
     depends_on: list[str] = Field(default_factory=list, description="依赖的任务 ID 列表")
-
-    # 执行状态（运行时填充）
-    MAX_RETRIES: ClassVar[int] = 2

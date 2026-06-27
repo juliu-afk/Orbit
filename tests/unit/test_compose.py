@@ -264,7 +264,7 @@ tasks:
         assert set(ids[1:3]) == {"t2", "t3"}
 
     def test_topological_sort_circular_dependency(self):
-        """环形依赖——检测并打破。"""
+        """环形依赖——P1-4: 抛 ValueError 而非静默打破。"""
         from orbit.compose.models import Task
         from orbit.compose.orchestrator import ComposeOrchestrator
 
@@ -273,9 +273,54 @@ tasks:
             Task(id="t1", description="a", depends_on=["t2"]),
             Task(id="t2", description="b", depends_on=["t1"]),
         ]
-        sorted_tasks = orch._topological_sort(tasks)
-        # 环形依赖被打破——所有任务都会在结果中
-        assert len(sorted_tasks) == 2
+        with pytest.raises(ValueError, match="环形依赖"):
+            orch._topological_sort(tasks)
+
+    @pytest.mark.asyncio
+    async def test_spec_review_self_dependency(self):
+        """P2-1: 自依赖检查——task 依赖自身被拒绝。"""
+        from orbit.compose.orchestrator import ComposeOrchestrator
+
+        spec = """title: "test"
+tasks:
+  - id: "t1"
+    description: "do"
+    depends_on: ["t1"]
+"""
+        orch = ComposeOrchestrator()
+        result = await orch.run_spec(spec)
+        assert result["status"] == "error"
+        assert "自身" in str(result.get("error", ""))
+
+    @pytest.mark.asyncio
+    async def test_code_review_detects_short_output(self):
+        """P1-2: _code_review 检测过短输出。"""
+        from orbit.compose.models import Spec
+        from orbit.compose.orchestrator import ComposeOrchestrator
+
+        orch = ComposeOrchestrator()
+        spec = Spec(title="test")
+        results = {"t1": {"status": "ok", "output": "ab"}}
+        review = await orch._code_review(spec, results)
+        assert review["ok"] is True
+        assert len(review.get("warnings", [])) > 0
+
+    @pytest.mark.asyncio
+    async def test_code_review_detects_traceback(self):
+        """P1-2: _code_review 检测错误堆栈残留。"""
+        from orbit.compose.models import Spec
+        from orbit.compose.orchestrator import ComposeOrchestrator
+
+        orch = ComposeOrchestrator()
+        spec = Spec(title="test")
+        results = {
+            "t1": {
+                "status": "ok",
+                "output": "Traceback (most recent call last):\n  Error: boom",
+            }
+        }
+        review = await orch._code_review(spec, results)
+        assert len(review.get("warnings", [])) > 0
 
 
 class TestSkillModels:
@@ -306,7 +351,16 @@ class TestSkillModels:
         assert spec.title == "test project"
         assert len(spec.tasks) == 1
 
-    def test_task_max_retries_default(self):
-        from orbit.compose.models import Task
+    def test_orchestrator_max_retries_default(self):
+        """P2-2: MAX_RETRIES 已从 Task 移到 ComposeOrchestrator。"""
+        from orbit.compose.orchestrator import ComposeOrchestrator
 
-        assert Task.MAX_RETRIES == 2
+        orch = ComposeOrchestrator()
+        assert orch.MAX_RETRIES == 2
+
+    def test_orchestrator_max_retries_custom(self):
+        """自定义 max_retries。"""
+        from orbit.compose.orchestrator import ComposeOrchestrator
+
+        orch = ComposeOrchestrator(max_retries=5)
+        assert orch.MAX_RETRIES == 5

@@ -3,6 +3,8 @@
 WHY Mock 而非真实 LLM：E2E 需要稳定可重复的结果，
 外部 API 波动/费用/延迟会破坏测试的确定性。
 PRD+ADR Q1 决议：默认 Mock，夜间构建用真实 LLM。
+
+Phase 3 更新: 新增 generate_stream_with_tools() 以支持 ReActAgent.execute_stream().
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ class LLMError(Exception):
 
 
 class MockLLMClient:
-    """Mock LLM 客户端——实现 generate 接口，与 LLMClient 同签名。
+    """Mock LLM 客户端——实现 generate + generate_stream_with_tools 接口。
 
     可配置：
     - fail_count: 前 N 次调用抛 LLMError（模拟 5xx）
@@ -38,11 +40,12 @@ class MockLLMClient:
         self.fixed_response = fixed_response
         self.entropy = entropy
         self.call_count = 0
+        self.stream_call_count = 0
         # 记录调用历史，供测试断言
         self.calls: list[LLMRequest] = []
 
     async def generate(self, req: LLMRequest, task_id: str) -> LLMResponse:
-        """Mock LLM 调用。
+        """Mock LLM 调用——同步版本（向后兼容）。
 
         Raises:
             LLMError: 前 fail_count 次调用时抛出（模拟 5xx）
@@ -64,3 +67,34 @@ class MockLLMClient:
             ),
             degraded=False,
         )
+
+    async def generate_stream_with_tools(
+        self, req: LLMRequest, task_id: str = "", agent_name: str = ""
+    ):
+        """Mock 流式调用——Phase 3 兼容。
+
+        模拟流式: 推送 TEXT_DELTA 文本 → 无工具调用 → Agent 正常完成。
+        WHY 无工具调用: E2E 测试的 Mock 场景不需要真实工具执行，
+        直接返回文本即可让 Agent 进入 FINISH_STEP 状态。
+        """
+        from orbit.stream.events import StreamEventType
+
+        self.stream_call_count += 1
+
+        if self.stream_call_count <= self.fail_count:
+            yield (
+                StreamEventType.ERROR,
+                {
+                    "message": f"Mock LLM internal error (stream call #{self.stream_call_count})",
+                    "code": "MOCK_ERROR",
+                },
+            )
+            return
+
+        # 模拟逐 token 推送文本
+        words = self.fixed_response.split()
+        for i, word in enumerate(words):
+            yield (
+                StreamEventType.TEXT_DELTA,
+                {"delta": word + (" " if i < len(words) - 1 else "")},
+            )

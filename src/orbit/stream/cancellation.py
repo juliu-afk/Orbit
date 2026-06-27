@@ -52,6 +52,6 @@ class CancellationToken:
         if timeout > 0:
             try:
                 await asyncio.wait_for(self._event.wait(), timeout=timeout)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return False
         return self._cancelled

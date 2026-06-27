@@ -24,7 +24,7 @@ from orbit.gateway.adapters import ProviderAdapter
 from orbit.gateway.adapters.anthropic import AnthropicAdapter
 from orbit.gateway.adapters.openai import OpenAIAdapter
 from orbit.gateway.circuit_breaker import CircuitBreaker, CircuitOpenError
-from orbit.gateway.routing import RoutingDecision, RoutingStrategy, select_model
+from orbit.gateway.routing import RoutingStrategy, select_model
 from orbit.gateway.schemas import LLMRequest, LLMResponse, LLMUsage
 
 logger = structlog.get_logger()
@@ -292,6 +292,7 @@ class LLMClient:
         流式下 tool_calls 在最终 chunk 聚合，需要累积所有 chunk。
         """
         import litellm
+
         from orbit.stream.events import StreamEventType
 
         # 构建消息

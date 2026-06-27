@@ -8,11 +8,10 @@ WHY ABC: 新 provider 只需写一个子类，不改 gateway 核心逻辑。
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from typing import Any
 
 
-class ProviderAdapter(ABC):
+class ProviderAdapter:  # noqa: B024 (有意——基类提供默认 no-op，子类按需覆盖)
     """LLM provider schema 适配器基类。
 
     默认 no-op——子类只覆盖差异部分。

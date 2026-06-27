@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field
 
 from orbit.agents.factory import AgentFactory
 from orbit.stream.cancellation import CancellationToken
-from orbit.stream.events import StreamEventType
 
 logger = structlog.get_logger()
 

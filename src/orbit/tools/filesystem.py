@@ -26,16 +26,18 @@ def _guard_path(path: str, allow_outside: bool = False) -> Path:
     对标 OpenClaw wrapToolWorkspaceRootGuard():
     拒绝绝对路径越界、../ 穿透、符号链接逃逸。
     """
+    p = (_WORKSPACE_ROOT / path).resolve()
+
     # Phase 4 AC-A6: WorkspaceGuard——敏感文件 + 路径遍历
     try:
         from orbit.security.guard import WorkspaceGuard
 
         guard = WorkspaceGuard(str(_WORKSPACE_ROOT))
-        guard.validate(path, allow_outside=allow_outside)
+        # 传入已解析的绝对路径，而非相对 path
+        guard.validate(str(p), allow_outside=allow_outside)
     except ValueError as e:
         raise WorkspaceViolationError(str(e)) from None
 
-    p = (_WORKSPACE_ROOT / path).resolve()
     try:
         p.relative_to(_WORKSPACE_ROOT)
     except ValueError:

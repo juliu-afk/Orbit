@@ -10,9 +10,12 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
+
+if TYPE_CHECKING:
+    from orbit.worktree.manager import WorktreeManager
 
 from orbit.compose.models import Spec, Task
 from orbit.compose.parser import ComposeParser

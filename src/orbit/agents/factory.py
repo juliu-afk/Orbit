@@ -137,7 +137,24 @@ class AgentFactory:
         goal: Any = None,  # Phase 4 AC-B1: Goal
         goal_judge: Any = None,  # Phase 4 AC-B1: GoalJudge
     ) -> BaseAgent:
-        """按角色创建 Agent 实例。"""
+        """按角色创建 Agent 实例。
+
+        Args:
+            role: AgentRole 枚举或字符串
+            llm: LLMClient 实例（可选，mock 模式不传）
+            graph: CodeGraphEngine 实例（可选）
+            sandbox: Sandbox 实例（可选）
+            tools: ToolRegistry 实例（供 ReActAgent 使用）
+            event_bus: EventBus 实例（供实时事件推送）
+            goal: Goal 模型（Phase 4——GoalJudge 判定用）
+            goal_judge: GoalJudge 实例（Phase 4——每轮 turn 后自检）
+
+        Returns:
+            对应角色的 BaseAgent 实例
+
+        Raises:
+            ValueError: 未知角色
+        """
         if isinstance(role, str):
             role = AgentRole(role)
         agent_cls = cls._registry.get(role)

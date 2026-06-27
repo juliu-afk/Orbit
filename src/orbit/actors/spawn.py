@@ -39,7 +39,7 @@ class DeferredActor:
         """等待 Actor 完成，返回 result dict。"""
         try:
             return await asyncio.wait_for(self._task, timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._token.cancel()
             return {"status": "timeout", "error": f"超时 ({timeout}s)"}
 

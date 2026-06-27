@@ -27,6 +27,10 @@ class LLMRequest(BaseModel):
     messages: list[dict] | None = Field(
         None, description="完整消息历史（含 system/user/assistant/tool 角色）"
     )
+    # Phase 3: 显式指定 provider 以选择 adapter（None = 自动从 model 推断）
+    provider: str | None = Field(
+        None, description="LLM provider: anthropic | openai | None(自动检测)"
+    )
 
 
 class LLMUsage(BaseModel):
@@ -56,6 +60,8 @@ class LLMResponse(BaseModel):
     stop_reason: str = Field(
         "end_turn", description="停止原因: end_turn | tool_calls | max_tokens | error"
     )
+    # Phase 3: 记录应用的 adapter 名称（审计用）
+    provider_adapter: str | None = Field(None, description="应用的 ProviderAdapter 名称")
 
 
 class CircuitBreakerState(BaseModel):

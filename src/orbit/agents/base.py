@@ -66,6 +66,38 @@ class BaseAgent(ABC):
         """执行 Agent 逻辑。"""
         ...
 
+    async def execute_stream(self, input_data: AgentInput, cancel_token: Any = None):
+        """流式执行 Agent——async generator（Phase 3）。
+
+        默认实现：调用 execute() 收集结果，包装为单个 FINISH_STEP 事件。
+        子类可覆盖为真正的流式实现。
+
+        WHY 检查 cancel_token: 确保非 ReActAgent 子类也能响应取消。
+        """
+        from orbit.stream.events import StreamEvent, StreamEventType
+
+        # 检查是否在执行前已被取消
+        if cancel_token is not None and cancel_token.is_cancelled:
+            yield StreamEvent(
+                type=StreamEventType.CANCELLED,
+                agent_id=self.role.value,
+                task_id=input_data.context.get("task_id", ""),
+                data={"message": "用户取消"},
+            )
+            return
+
+        result = await self.execute(input_data)
+        yield StreamEvent(
+            type=StreamEventType.FINISH_STEP,
+            agent_id=self.role.value,
+            task_id=input_data.context.get("task_id", ""),
+            data={
+                "output": result.result.get("output", ""),
+                "turns": result.result.get("turns", 1),
+                "tool_calls": result.result.get("tool_calls", 0),
+            },
+        )
+
     def system_prompt(self) -> str:
         """编排层风格 System Prompt（Step 0.4 架构锚定声明）。"""
         return (

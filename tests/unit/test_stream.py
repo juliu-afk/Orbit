@@ -144,7 +144,7 @@ class TestSSEEventFormat:
         assert sse_frame.endswith("\n\n")
         # 验证 JSON 可解析
         lines = sse_frame.strip().split("\n")
-        data_line = [l for l in lines if l.startswith("data: ")][0]
+        data_line = [ln for ln in lines if ln.startswith("data: ")][0]
         data_json = data_line[6:]  # strip "data: "
         parsed = json.loads(data_json)
         assert parsed["type"] == "text_delta"

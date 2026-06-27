@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 
 class TestProviderAdapterBase:
     """ProviderAdapter ABC 默认行为。"""
@@ -170,3 +172,105 @@ class TestOpenAIAdapter:
         adapter = OpenAIAdapter()
         tools = [{"type": "function", "function": {"name": "test"}}]
         assert adapter.normalize_tool_schema(tools) == tools
+
+
+# ── LLMClient adapter 管线集成测试 ──────────────────
+
+
+class TestClientAdapterPipeline:
+    """LLMClient._do_completion 中的 adapter 管线。"""
+
+    @pytest.mark.asyncio
+    async def test_do_completion_uses_adapter(self):
+        """_do_completion 调用 adapter.normalize_messages 和 normalize_response。"""
+        from unittest.mock import MagicMock, patch
+
+        from orbit.gateway.client import LLMClient
+        from orbit.gateway.schemas import LLMRequest
+
+        client = LLMClient()
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "adapted response"
+        mock_choice.message.tool_calls = None
+        mock_choice.finish_reason = "stop"
+        mock_result = MagicMock()
+        mock_result.choices = [mock_choice]
+        mock_result.usage = MagicMock()
+        mock_result.usage.prompt_tokens = 10
+        mock_result.usage.completion_tokens = 20
+        mock_result.usage.total_tokens = 30
+
+        async def mock_acompletion(**kwargs):
+            return mock_result
+
+        with patch("litellm.acompletion", new=mock_acompletion):
+            resp = await client._do_completion(
+                "deepseek/deepseek-v4-pro",
+                LLMRequest(prompt="test", tools=None),
+            )
+
+        assert resp.content == "adapted response"
+        assert resp.provider_adapter == "openai"
+        assert resp.stop_reason == "end_turn"
+
+    @pytest.mark.asyncio
+    async def test_do_completion_with_tools(self):
+        """带工具调用的请求——adapter 标准化 tool schema。"""
+        from unittest.mock import MagicMock, patch
+
+        from orbit.gateway.client import LLMClient
+        from orbit.gateway.schemas import LLMRequest
+
+        client = LLMClient()
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = ""
+        tc = MagicMock()
+        tc.id = "call_1"
+        tc.function.name = "read_file"
+        tc.function.arguments = '{"path":"x.py"}'
+        mock_choice.message.tool_calls = [tc]
+        mock_choice.finish_reason = "tool_calls"
+        mock_result = MagicMock()
+        mock_result.choices = [mock_choice]
+        mock_result.usage = MagicMock()
+        mock_result.usage.prompt_tokens = 5
+        mock_result.usage.completion_tokens = 10
+        mock_result.usage.total_tokens = 15
+
+        async def mock_acompletion(**kwargs):
+            assert "tools" in kwargs
+            return mock_result
+
+        with patch("litellm.acompletion", new=mock_acompletion):
+            resp = await client._do_completion(
+                "deepseek/deepseek-v4-pro",
+                LLMRequest(
+                    prompt="read file",
+                    tools=[{"type": "function", "function": {"name": "read_file"}}],
+                ),
+            )
+
+        assert resp.tool_calls is not None
+        assert len(resp.tool_calls) == 1
+        assert resp.tool_calls[0]["function"]["name"] == "read_file"
+
+    @pytest.mark.asyncio
+    async def test_get_adapter_auto_detect(self):
+        """_get_adapter 按 model 自动检测 provider。"""
+        from orbit.gateway.client import LLMClient
+
+        client = LLMClient()
+        assert client._get_adapter("deepseek/deepseek-v4-pro").provider_name == "openai"
+        assert client._get_adapter("anthropic/claude-4").provider_name == "anthropic"
+        assert client._get_adapter("openai/gpt-4").provider_name == "openai"
+
+    @pytest.mark.asyncio
+    async def test_get_adapter_explicit_provider(self):
+        """显式 provider 优先于 model 检测。"""
+        from orbit.gateway.client import LLMClient
+
+        client = LLMClient()
+        adapter = client._get_adapter("deepseek/v4", provider="anthropic")
+        assert adapter.provider_name == "anthropic"

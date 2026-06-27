@@ -49,6 +49,11 @@ ROLE_DESCRIPTIONS: dict[AgentRole, str] = {
         "职责：理解用户自然语言需求，拆解为结构化任务。\n"
         "不写代码——输出结构化的需求文档供其他 Agent 消费。"
     ),
+    AgentRole.DREAM: (  # Phase 2
+        "你是 Orbit 多智能体协作网络中的 **自进化 Agent**。\n"
+        "职责：定期扫描会话历史和记忆文件，合并去重经验教训。\n"
+        "通过 /dream 命令触发，输出精简的 MEMORY.md。"
+    ),
 }
 
 

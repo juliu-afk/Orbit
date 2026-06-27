@@ -61,6 +61,10 @@ class ReActAgent(BaseAgent):
     MAX_TURNS = 20
     ITERATION_BUDGET = 90  # 对标 Hermes max_iterations
 
+    # Phase 2: 压缩管线（类级默认——子类通过 __init__ 注入）
+    _compressor: Any = None
+    _budget_tracker: Any = None
+
     def __init__(
         self,
         llm: Any = None,
@@ -73,9 +77,6 @@ class ReActAgent(BaseAgent):
         self.tools = tools or ToolRegistry.get_instance()
         self._event_bus = event_bus
         self._budget = IterationBudget(self.ITERATION_BUDGET)
-        # Phase 2: 压缩管线——子类或外部可注入
-        self._compressor: Any = None
-        self._budget_tracker: Any = None
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——每步实时推送到事件总线（非黑盒）。

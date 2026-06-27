@@ -43,7 +43,7 @@ class AgentCancelRequest(BaseModel):
 
 
 @router.post("/api/v1/agent/{agent_id}/run")
-async def agent_run(agent_id: str, body: AgentRunRequest) -> dict:
+async def agent_run(agent_id: str, body: AgentRunRequest) -> dict[str, Any]:
     """启动 Agent 流式执行——返回 task_id。
 
     客户端收到 task_id 后连 GET /api/v1/agent/{agent_id}/stream?task_id=...
@@ -138,7 +138,7 @@ async def agent_stream(
 
 
 @router.post("/api/v1/agent/{agent_id}/cancel")
-async def agent_cancel(agent_id: str, body: AgentCancelRequest) -> dict:
+async def agent_cancel(agent_id: str, body: AgentCancelRequest) -> dict[str, Any]:
     """取消 Agent 执行。
 
     WHY POST 而非 SSE 反向通道: SSE 是单向协议，

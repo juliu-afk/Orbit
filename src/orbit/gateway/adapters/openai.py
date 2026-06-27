@@ -22,7 +22,7 @@ class OpenAIAdapter(ProviderAdapter):
 
     provider_name = "openai"
 
-    def normalize_response(self, raw_response: Any, model: str) -> dict:
+    def normalize_response(self, raw_response: Any, model: str) -> dict[str, Any]:
         """从 OpenAI litellm 响应提取统一字段。"""
         choice = raw_response.choices[0]
         content = choice.message.content or ""

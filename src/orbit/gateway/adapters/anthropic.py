@@ -22,7 +22,7 @@ class AnthropicAdapter(ProviderAdapter):
 
     provider_name = "anthropic"
 
-    def normalize_response(self, raw_response: Any, model: str) -> dict:
+    def normalize_response(self, raw_response: Any, model: str) -> dict[str, Any]:
         """从 Anthropic litellm 响应提取统一字段。
 
         litellm 已做大部分标准化——本方法处理残余差异。

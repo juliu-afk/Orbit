@@ -19,7 +19,7 @@ class ProviderAdapter:  # noqa: B024 (有意——基类提供默认 no-op，子
 
     provider_name: str = "base"
 
-    def normalize_tool_schema(self, tools: list[dict]) -> list[dict]:
+    def normalize_tool_schema(self, tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """将工具 JSON Schema 标准化为该 provider 可接受的格式。
 
         默认透传——OpenAI 格式即是行业标准。
@@ -28,14 +28,14 @@ class ProviderAdapter:  # noqa: B024 (有意——基类提供默认 no-op，子
         """
         return tools
 
-    def normalize_messages(self, messages: list[dict]) -> list[dict]:
+    def normalize_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """标准化消息历史格式。
 
         某些 provider 对 system/tool role 有特殊要求。
         """
         return messages
 
-    def normalize_response(self, raw_response: Any, model: str) -> dict:
+    def normalize_response(self, raw_response: Any, model: str) -> dict[str, Any]:
         """从 provider 原始响应中提取统一字段。
 
         Returns:

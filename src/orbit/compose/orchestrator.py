@@ -45,7 +45,7 @@ class ComposeOrchestrator:
         spec_text: str,
         parent_task_id: str = "",
         background: bool = False,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """执行 spec——完整的 spec-driven 开发流程。
 
         流程:
@@ -149,7 +149,7 @@ class ComposeOrchestrator:
 
     # ── 内部门禁 ──────────────────────────────────
 
-    async def _spec_review(self, spec: Spec) -> dict:
+    async def _spec_review(self, spec: Spec) -> dict[str, Any]:
         """方案审查门禁——检查 spec 完整性。
 
         对标 MiMo compose 的 spec review 阶段。
@@ -175,7 +175,7 @@ class ComposeOrchestrator:
 
         return {"ok": True, "reason": "spec 审查通过"}
 
-    async def _code_review(self, spec: Spec, results: dict) -> dict:
+    async def _code_review(self, spec: Spec, results: dict) -> dict[str, Any]:
         """代码审查门禁——检查所有任务完成质量。
 
         对标 MiMo compose 的 code quality review 阶段。
@@ -237,7 +237,7 @@ class ComposeOrchestrator:
         task: Task,
         parent_task_id: str,
         error: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """任务失败重试——最多 MAX_RETRIES 次。"""
         for attempt in range(1, Task.MAX_RETRIES + 1):
             logger.info("task_retry", task_id=task.id, attempt=attempt)

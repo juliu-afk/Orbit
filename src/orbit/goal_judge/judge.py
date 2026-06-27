@@ -57,7 +57,7 @@ class GoalJudge:
 
         # 2. 无活跃 goal → 跳过 goal gate
         if not goal.description:
-            return Verdict(ok=True, reason="no_active_goal")
+            return Verdict(ok=True, impossible=False, reason="no_active_goal")
 
         # 3. 检查硬上限
         if goal.react_count >= goal.MAX_REACT:
@@ -68,6 +68,7 @@ class GoalJudge:
             )
             return Verdict(
                 ok=True,
+                impossible=False,
                 reason=f"MAX_GOAL_REACT ({goal.MAX_REACT}) 已达硬上限——强制完成",
             )
 
@@ -77,14 +78,14 @@ class GoalJudge:
         if self.llm is None:
             # mock 模式——无 LLM → fail-open: 当作完成
             logger.info("goal_judge_mock_mode_fail_open")
-            return Verdict(ok=True, reason="mock mode fail-open")
+            return Verdict(ok=True, impossible=False, reason="mock mode fail-open")
 
         try:
             return await self._goal_gate(goal, transcript)
         except Exception as e:
             # fail-open: judge 失败 → 当作已完成
             logger.error("goal_judge_failed_fail_open", error=str(e))
-            return Verdict(ok=True, reason=f"judge 失败→fail-open: {str(e)}")
+            return Verdict(ok=True, impossible=False, reason=f"judge 失败→fail-open: {str(e)}")
 
     # ── 内部 ─────────────────────────────────────
 
@@ -107,6 +108,7 @@ class GoalJudge:
             if pending_or_running:
                 return Verdict(
                     ok=False,
+                    impossible=False,
                     reason=f"存在 {len(pending_or_running)} 个未完成的子任务",
                 )
         except Exception as e:
@@ -133,8 +135,12 @@ class GoalJudge:
         req = LLMRequest(
             prompt=prompt,
             system_prompt=JUDGE_SYSTEM_PROMPT,
-            temperature=0.0,  # 确定性评估
-            max_tokens=256,     # Verdict 只需 ~100 tokens
+            temperature=0.0,
+            max_tokens=256,
+            tools=None,
+            tool_choice="auto",
+            messages=None,
+            provider=None,
         )
 
         response = await self.llm.generate(req, task_id="goal_judge")
@@ -151,11 +157,11 @@ class GoalJudge:
                     content = content[4:]
             data = json.loads(content)
             return Verdict(
-                ok=data.get("ok", True),  # 默认 fail-open
+                ok=data.get("ok", True),
                 impossible=data.get("impossible", False),
                 reason=data.get("reason", ""),
             )
         except (json.JSONDecodeError, KeyError) as e:
             # JSON 解析失败 → fail-open
             logger.warning("verdict_parse_failed", content=response.content[:200])
-            return Verdict(ok=True, reason=f"verdict 解析失败→fail-open: {str(e)}")
+            return Verdict(ok=True, impossible=False, reason=f"verdict 解析失败→fail-open: {str(e)}")

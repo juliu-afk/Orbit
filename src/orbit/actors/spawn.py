@@ -35,7 +35,7 @@ class DeferredActor:
         self._task = task
         self._token = CancellationToken()
 
-    async def result(self, timeout: float | None = None) -> dict:
+    async def result(self, timeout: float | None = None) -> dict[str, Any]:
         """等待 Actor 完成，返回 result dict。"""
         try:
             return await asyncio.wait_for(self._task, timeout=timeout)
@@ -146,7 +146,7 @@ class ActorSpawn:
             role=agent_role,
         )
 
-        async def _run_actor() -> dict:
+        async def _run_actor() -> dict[str, Any]:
             """Actor 执行纤维——对标 MiMo runTurn Effect.uninterruptible."""
             self.registry.update_status(actor_id, ActorStatus.RUNNING)
             try:

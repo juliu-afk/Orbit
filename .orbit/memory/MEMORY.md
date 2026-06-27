@@ -40,8 +40,6 @@ dream_cycle: v1
 ## 现有记忆 (MEMORY.md)
 ## 现有记忆 (MEMORY.md)
 ## 现有记忆 (MEMORY.md)
-## 现有记忆 (MEMORY.md)
-## 现有记忆 (MEMORY.md)
 ## Session 2026-06-27 — Silent Turn 1
 
 - **时间**: 2026-06-27T09:48:44Z
@@ -193,26 +191,9 @@ dream_cycle: v1
 - **Agent**: dev
 - **Task**: t2
 
+## Session 2026-06-27 — Silent Turn 1
+
 - **时间**: 2026-06-27T14:55:53Z
-- **Agent**: dev
-- **Task**: t2
-
-- **时间**: 2026-06-27T15:06:05Z
-- **Agent**: dev
-- **Task**: t2
-
-## Session 2026-06-27 — Silent Turn 1
-
-- **时间**: 2026-06-27T15:07:48Z
-- **Agent**: dev
-- **Task**: t2
-
-**上下文快照**:
-无上下文
-
-## Session 2026-06-27 — Silent Turn 1
-
-- **时间**: 2026-06-27T15:10:51Z
 - **Agent**: dev
 - **Task**: t2
 

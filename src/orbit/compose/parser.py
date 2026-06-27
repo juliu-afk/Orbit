@@ -107,7 +107,10 @@ class ComposeParser:
         """
         from orbit.compose.models import Spec, Task
 
-        data = yaml.safe_load(spec_text)
+        try:
+            data = yaml.safe_load(spec_text)
+        except yaml.YAMLError as e:
+            raise ValueError(f"spec YAML 解析失败: {e}") from e
         if not isinstance(data, dict):
             raise ValueError("spec 必须是 YAML dict")
 

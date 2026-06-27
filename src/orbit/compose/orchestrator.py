@@ -67,8 +67,9 @@ class ComposeOrchestrator:
         try:
             spec = self.parser.parse_spec(spec_text)
         except (ValueError, KeyError) as e:
-            # ValueError: YAML 解析失败或 spec 格式错误
+            # ValueError: spec 格式错误（非 dict）
             # KeyError: spec 缺少必要字段
+            # yaml.YAMLError: parse_spec 内部的 yaml 解析异常
             return {"status": "error", "error": f"spec 解析失败: {str(e)}"}
 
         logger.info(

@@ -62,23 +62,20 @@ class TestGatewayClientStream:
 
     @pytest.mark.asyncio
     async def test_generate_stream_basic(self) -> None:
-        """generate_stream 代码路径——mock _stream_completion 避免真实 API。"""
-        from unittest.mock import AsyncMock
+        """generate_stream——Phase 4 后委托给 generate_stream_with_tools。"""
+        from orbit.stream.events import StreamEventType
 
         client = LLMClient()
         req = LLMRequest(prompt="test")
 
-        # 构造一个可 async-for 的空流
-        class _EmptyStream:
-            def __aiter__(self):
-                return self
+        # Phase 4: mock generate_stream_with_tools（generate_stream 内部委托方）
+        async def mock_stream(req, task_id="", agent_name=""):
+            yield (StreamEventType.TEXT_DELTA, {"delta": "hello world"})
 
-            async def __anext__(self):
-                raise StopAsyncIteration
-
-        client._stream_completion = AsyncMock(return_value=_EmptyStream())
+        client.generate_stream_with_tools = mock_stream
         resp = await client.generate_stream(req, "task-1")
         assert isinstance(resp.content, str)
+        assert "hello" in resp.content
 
     def test_build_usage_zero(self) -> None:
         """_build_usage 零值输入返回零成本。"""

@@ -211,7 +211,7 @@ class LLMClient:
         )
 
     async def generate_stream(self, req, task_id, entropy_monitor=None):
-        """旧流式方法——Phase 4 AC-A8: 委托给 generate_stream_with_tools（含 adapter）。"""
+        """旧流式方法——Phase 4 AC-A8: 委托给 generate_stream_with_tools。"""
         from orbit.stream.events import StreamEventType
 
         content_parts = []

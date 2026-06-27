@@ -75,8 +75,11 @@ class ComposeParser:
                 if skill:
                     skills.append(skill)
                     self._cache[skill.name] = skill
-            except Exception as e:
-                logger.warning("skill_load_failed", file=str(md_file), error=str(e))
+            except (OSError, UnicodeDecodeError, ValueError) as e:
+                # OSError: 文件读取失败
+                # UnicodeDecodeError: 编码错误
+                # ValueError: YAML frontmatter 解析失败
+                logger.warning("skill_load_failed", file=str(md_file), error=str(e), exc_info=True)
 
         logger.info("skills_discovered", count=len(skills))
         return skills

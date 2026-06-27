@@ -66,7 +66,9 @@ class ComposeOrchestrator:
         # 1. 解析 spec
         try:
             spec = self.parser.parse_spec(spec_text)
-        except Exception as e:
+        except (ValueError, KeyError) as e:
+            # ValueError: YAML 解析失败或 spec 格式错误
+            # KeyError: spec 缺少必要字段
             return {"status": "error", "error": f"spec 解析失败: {str(e)}"}
 
         logger.info(
@@ -126,9 +128,12 @@ class ComposeOrchestrator:
                         "status": "ok",
                         "output": f"[mock] {task.agent_role} 完成: {task.description[:100]}",
                     }
-            except Exception as e:
-                logger.error("task_failed", task_id=task.id, error=str(e))
-                # 重试（最多 MAX_RETRIES 次）
+            except (TimeoutError, RuntimeError, OSError, ValueError) as e:
+                # TimeoutError: Actor 执行超时
+                # RuntimeError: ActorSpawn 并发上限/执行失败
+                # OSError: DB 访问异常
+                # ValueError: 参数校验失败
+                logger.error("task_failed", task_id=task.id, error=str(e), exc_info=True)
                 results[task.id] = await self._retry_task(task, parent_task_id, error=str(e))
 
             done.add(task.id)
@@ -253,7 +258,10 @@ class ComposeOrchestrator:
                         return result
                 else:
                     return {"status": "ok", "output": f"[mock retry {attempt}] 完成"}
-            except Exception as e:
-                logger.warning("retry_failed", task_id=task.id, attempt=attempt, error=str(e))
+            except (TimeoutError, RuntimeError, OSError) as e:
+                # TimeoutError: Actor 执行超时
+                # RuntimeError: ActorSpawn 创建/执行失败
+                # OSError: 数据库访问异常
+                logger.warning("retry_failed", task_id=task.id, attempt=attempt, error=str(e), exc_info=True)
 
         return {"status": "error", "error": f"重试 {Task.MAX_RETRIES} 次后仍失败: {error}"}

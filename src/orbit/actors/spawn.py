@@ -89,6 +89,7 @@ class ActorSpawn:
         tools: Any = None,
         event_bus: Any = None,
         background: bool = False,
+        workspace_path: str = "",  # Phase 4 AC-B4: Worktree 隔离工作区路径
     ) -> DeferredActor:
         """创建并启动子Agent。
 
@@ -100,7 +101,8 @@ class ActorSpawn:
             llm: LLMClient（None = 继承父Agent）
             tools: ToolRegistry（None = 继承父Agent）
             event_bus: EventBus（None = 不推送事件）
-            background: True = 后台执行（不阻塞 spawn 调用）
+            background: True = 后台执行
+            workspace_path: Worktree 隔离工作区路径（Phase 4）
 
         Returns:
             DeferredActor——异步结果句柄
@@ -140,9 +142,14 @@ class ActorSpawn:
         token = CancellationToken()
 
         # 7. fork 执行 fiber
+        ctx = context or {"task_id": parent_task_id}
+        # Phase 4 AC-B4: 注入 worktree 路径到上下文
+        if workspace_path:
+            ctx["workspace_path"] = workspace_path
+
         input_data = AgentInput(
             task=task,
-            context=context or {"task_id": parent_task_id},
+            context=ctx,
             role=agent_role,
         )
 

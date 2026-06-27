@@ -211,38 +211,18 @@ class LLMClient:
         )
 
     async def generate_stream(self, req, task_id, entropy_monitor=None):
-        """旧流式方法——保留向后兼容。内部委托给 generate_stream_with_tools。"""
-        from orbit.hallucination.schemas import HighEntropyError
+        """旧流式方法——Phase 4 AC-A8: 委托给 generate_stream_with_tools（含 adapter）。"""
+        from orbit.stream.events import StreamEventType
 
-        model = self.default_model
-        try:
-            stream = await self._stream_completion(model, req, entropy_monitor)
-        except Exception as e:
-            logger.warning("stream_primary_failed", model=model, error=str(e))
-            model = self.fallback_model
-            stream = await self._stream_completion(model, req, entropy_monitor)
         content_parts = []
-        async for chunk in stream:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
-            token_text = delta.content or ""
-            if token_text:
-                content_parts.append(token_text)
-            if entropy_monitor and hasattr(delta, "logprobs") and delta.logprobs:
-                for lp in (delta.logprobs.content if delta.logprobs.content else []):
-                    logprob_list = (
-                        [t.logprob for t in lp.top_logprobs]
-                        if hasattr(lp, "top_logprobs") and lp.top_logprobs
-                        else [lp.logprob]
-                    )
-                    entropy = entropy_monitor.on_token(lp.token, logprob_list)
-                    if entropy is not None:
-                        raise HighEntropyError(
-                            entropy=entropy, threshold=entropy_monitor.config.threshold
-                        )
+        async for event_type, data in self.generate_stream_with_tools(req, task_id=task_id):
+            if event_type == StreamEventType.TEXT_DELTA:
+                content_parts.append(data["delta"])
+            elif event_type == StreamEventType.ERROR:
+                raise RuntimeError(data.get("message", "stream error"))
+
         content = "".join(content_parts)
-        return LLMResponse(content=content, model=model, usage=LLMUsage())  # type: ignore[call-arg]
+        return LLMResponse(content=content, model=self.default_model, usage=LLMUsage())  # type: ignore[call-arg]
 
     async def generate_stream_with_tools(
         self,

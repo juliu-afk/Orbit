@@ -22,6 +22,7 @@ from orbit.api.routes import (
     backup,
     chat,
     compliance,
+    compose,
     health,
     knowledge,
     observability,
@@ -35,6 +36,7 @@ from orbit.core.config import settings
 from orbit.events.bus import EventBus
 from orbit.gateway.client import MODEL_FLASH, MODEL_GLM5, MODEL_PRO, LLMClient
 from orbit.scheduler.orchestrator import Scheduler
+from orbit.stream.sse import router as sse_router
 from orbit.ws.router import router as ws_router
 from orbit.ws.router import start_broadcaster
 
@@ -81,8 +83,12 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(projects.router, prefix=settings.API_V1_STR)
     # Agent LLM 配置 API（Step 2.3 智能路由）
     app.include_router(agent_llm.router, prefix=settings.API_V1_STR)
+    # Phase 4 AC-A7: Compose 编排端点
+    app.include_router(compose.router, prefix=settings.API_V1_STR)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
+    # Phase 4 AC-A1: SSE 流式端点
+    app.include_router(sse_router)
     # WebSocket 路由（Step 6.1 驾驶舱）
     app.include_router(ws_router)
 
@@ -148,6 +154,24 @@ _agent_llms: dict[str, LLMClient] = {
     "clarifier": _llm_flash,  # T1 DS Flash——对话轻量即可
 }
 
+# ── Phase 4 AC-A2: Actor 子系统实例 ──
+from orbit.actors.registry import ActorRegistry  # noqa: E402
+from orbit.actors.spawn import ActorSpawn  # noqa: E402
+from orbit.actors.watchdog import ActorWatchdog  # noqa: E402
+from orbit.compose.orchestrator import ComposeOrchestrator  # noqa: E402
+from orbit.security.permission import PermissionEngine  # noqa: E402
+
+_actor_registry = ActorRegistry()
+_actor_spawn = ActorSpawn(registry=_actor_registry, agent_factory=AgentFactory)
+_compose_orchestrator = ComposeOrchestrator(actor_spawn=_actor_spawn)
+_permission_engine = PermissionEngine()
+_actor_watchdog = ActorWatchdog(_actor_registry)
+
+# Phase 4 AC-A4: PermissionEngine 挂载到 ToolRegistry
+from orbit.tools.registry import ToolRegistry  # noqa: E402
+
+ToolRegistry.get_instance().set_permission(_permission_engine)
+
 _checkpoint_manager = CheckpointManager(redis_client=_redis_client)
 _scheduler = Scheduler(
     agent_llms=_agent_llms,
@@ -155,4 +179,18 @@ _scheduler = Scheduler(
     agent_factory=AgentFactory,
     checkpoint_manager=_checkpoint_manager,
 )
+# Phase 4: 注入 Compose + ActorSpawn
+_scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-defined]
 app = create_app(_event_bus)
+
+# Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
+app.state.compose_orchestrator = _compose_orchestrator
+
+
+# Phase 4 AC-A3: Watchdog 在 startup 事件中启动
+@app.on_event("startup")
+async def _start_watchdog() -> None:
+    import asyncio
+
+    asyncio.create_task(_actor_watchdog.run())
+    logger.info("watchdog_started")

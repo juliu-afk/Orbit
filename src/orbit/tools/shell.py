@@ -195,7 +195,7 @@ async def exec_command(
     cwd: str = ".",
     timeout: int = 30,
 ) -> str:
-    """执行 Shell 命令——白名单验证后运行.
+    """执行 Shell 命令——白名单 + Phase 4 BashValidators 双重验证后运行.
 
     Args:
         cmd: 要执行的命令
@@ -205,7 +205,15 @@ async def exec_command(
     Returns:
         格式化输出: [exit_code] stdout
     """
-    # 白名单验证
+    # Phase 4 AC-A5: BashValidators 前置校验
+    try:
+        from orbit.security.validators import BashValidators
+
+        BashValidators.validate(cmd)
+    except ValueError as e:
+        return f"❌ 安全拒绝——{e}"
+
+    # 旧白名单验证
     validation = validate_command(cmd)
     if validation is not None:
         if validation.exit_code != 0:

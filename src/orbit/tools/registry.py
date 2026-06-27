@@ -262,6 +262,10 @@ class ToolRegistry:
 
     # ── 工具分发 (ReAct 循环核心) ──────────────────────────
 
+    def set_permission(self, engine: Any) -> None:
+        """Phase 4: 注入 PermissionEngine 实例。"""
+        self._permission = engine
+
     async def dispatch(
         self, name: str, args: dict[str, Any], agent_name: str = "react_agent"
     ) -> str:
@@ -270,8 +274,16 @@ class ToolRegistry:
         Args:
             name: 工具名
             args: 工具参数
-            agent_name: 调用方 Agent 名——用于审计 + 旧 API 权限检查
+            agent_name: 调用方 Agent 名——用于审计 + 权限检查
         """
+        # Phase 4 AC-A4: PermissionEngine 前置检查
+        perm = getattr(self, "_permission", None)
+        if perm is not None:
+            path = str(args.get("path", args.get("file_path", "")))
+            command = str(args.get("command", ""))
+            if not perm.check(agent_name, name, path=path, command=command):
+                return f"权限拒绝——{agent_name} 无权执行 {name}"
+
         # 新 API 优先
         entry = self._entries.get(name)
         if entry is not None:

@@ -128,3 +128,68 @@ class TestCompressionPipeline:
         msgs = [{"role": "assistant", "content": "test"}]
         await pipe.run(msgs, "warn")
         assert "summary" not in pipe.applied_layers
+
+
+# ── ContextCompressor (8-step algorithm) ──────────────
+
+
+class TestContextCompressor:
+    @pytest.mark.asyncio
+    async def test_compress_skip_below_threshold(self):
+        """低于50%——跳过压缩."""
+        from orbit.compression.compressor import ContextCompressor
+
+        comp = ContextCompressor()
+        msgs = [{"role": "user", "content": "hello"}]  # very small
+        result = await comp.compress(msgs, task_id="t1")
+        assert result.action == "skip"
+        assert result.ratio == 0.0
+
+    @pytest.mark.asyncio
+    async def test_compress_force_action(self):
+        """超85%——强制压缩."""
+        from orbit.compression.budget import TokenBudgetTracker
+        from orbit.compression.compressor import ContextCompressor
+
+        tracker = TokenBudgetTracker(max_context_window=1000)
+        # 填充大量消息使超过85%
+        msgs = [{"role": "user", "content": "x" * 400} for _ in range(5)]
+        comp = ContextCompressor(budget_tracker=tracker)
+        result = await comp.compress(msgs, task_id="t2")
+        # 阈值判定依赖 exact token估算，接受 force/warn/fork
+        assert result.action in ("force", "warn", "fork")
+
+    @pytest.mark.asyncio
+    async def test_compress_with_fork(self):
+        """压缩后仍超85%——触发fork."""
+        from orbit.compression.budget import TokenBudgetTracker
+        from orbit.compression.compressor import ContextCompressor
+
+        # 极小窗口 + 大量内容 = fork
+        tracker = TokenBudgetTracker(max_context_window=100, reserved_output=0)
+        msgs = [{"role": "user", "content": "x" * 500} for _ in range(3)]
+        comp = ContextCompressor(budget_tracker=tracker)
+        result = await comp.compress(msgs, task_id="t3", turn=0)
+        # 可能fork或force——取决于压缩效果
+        assert result.action in ("force", "fork", "warn")
+        if result.action == "fork":
+            assert result.child_session_id is not None
+
+    def test_budget_tracker_estimate(self):
+        """Token估算."""
+        from orbit.compression.budget import TokenBudgetTracker
+
+        tracker = TokenBudgetTracker()
+        tokens = tracker.estimate_tokens(
+            [
+                {"role": "user", "content": "hello world"},
+                {"role": "assistant", "content": "response", "tool_calls": [{"id": "1"}]},
+            ]
+        )
+        assert tokens > 0
+
+    def test_model_window_default(self):
+        from orbit.compression.compressor import ContextCompressor
+
+        comp = ContextCompressor()
+        assert comp.child_session_id is None

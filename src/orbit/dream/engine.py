@@ -163,7 +163,7 @@ class DreamEngine:
 
     def _stage_verify(self, content: str) -> DreamResult:
         """Stage 5: 验证输出."""
-        return self._verifier.verify(content, self._store._path_for(MemoryFileType.EPISODIC))
+        return self._verifier.verify(content, str(self._store._path_for(MemoryFileType.EPISODIC)))
 
 
 # ── Jaccard Similarity ─────────────────────────────────

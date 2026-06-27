@@ -82,7 +82,7 @@ async def write_file(path: str, content: str) -> str:
     - 父目录不存在则自动创建
     - 内容以 UTF-8 写入
     """
-    p = _guard_path(path, allow_outside=True)  # 只读工具允许工作区外
+    p = _guard_path(path, allow_outside=False)  # 写操作禁止工作区外
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
     lines = content.count("\n") + (0 if content.endswith("\n") else 1)
@@ -104,7 +104,7 @@ async def edit_file(path: str, old_string: str, new_string: str, replace_all: bo
     Raises:
         ValueError: old_string 不唯一或未找到
     """
-    p = _guard_path(path, allow_outside=True)  # 只读工具允许工作区外
+    p = _guard_path(path, allow_outside=False)
     if not p.exists():
         return f"文件不存在: {path}"
 

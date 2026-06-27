@@ -20,12 +20,21 @@ def set_workspace_root(path: str | Path) -> None:
     _WORKSPACE_ROOT = Path(path).resolve()
 
 
-def _guard_path(path: str) -> Path:
-    """路径安全守卫——resolve 后必须在 workspace 内.
+def _guard_path(path: str, allow_outside: bool = False) -> Path:
+    """路径安全守卫——Phase 4 升级: WorkspaceGuard + 已有边界检查.
 
     对标 OpenClaw wrapToolWorkspaceRootGuard():
     拒绝绝对路径越界、../ 穿透、符号链接逃逸。
     """
+    # Phase 4 AC-A6: WorkspaceGuard——敏感文件 + 路径遍历
+    try:
+        from orbit.security.guard import WorkspaceGuard
+
+        guard = WorkspaceGuard(str(_WORKSPACE_ROOT))
+        guard.validate(path, allow_outside=allow_outside)
+    except ValueError as e:
+        raise WorkspaceViolationError(str(e)) from None
+
     p = (_WORKSPACE_ROOT / path).resolve()
     try:
         p.relative_to(_WORKSPACE_ROOT)
@@ -47,7 +56,7 @@ async def read_file(path: str, offset: int = 0, limit: int = 200) -> str:
         offset: 起始行号 (0-indexed)
         limit: 最大行数
     """
-    p = _guard_path(path)
+    p = _guard_path(path, allow_outside=True)  # 只读工具允许工作区外
     if not p.exists():
         return f"文件不存在: {path}"
     if p.is_dir():
@@ -73,7 +82,7 @@ async def write_file(path: str, content: str) -> str:
     - 父目录不存在则自动创建
     - 内容以 UTF-8 写入
     """
-    p = _guard_path(path)
+    p = _guard_path(path, allow_outside=False)  # 写操作禁止工作区外
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
     lines = content.count("\n") + (0 if content.endswith("\n") else 1)
@@ -95,7 +104,7 @@ async def edit_file(path: str, old_string: str, new_string: str, replace_all: bo
     Raises:
         ValueError: old_string 不唯一或未找到
     """
-    p = _guard_path(path)
+    p = _guard_path(path, allow_outside=False)
     if not p.exists():
         return f"文件不存在: {path}"
 

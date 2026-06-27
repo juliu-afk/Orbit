@@ -134,30 +134,16 @@ class AgentFactory:
         sandbox: Any = None,
         tools: Any = None,
         event_bus: Any = None,
+        goal: Any = None,  # Phase 4 AC-B1: Goal
+        goal_judge: Any = None,  # Phase 4 AC-B1: GoalJudge
     ) -> BaseAgent:
-        """按角色创建 Agent 实例。
-
-        Args:
-            role: AgentRole 枚举或字符串
-            llm: LLMClient 实例（可选，mock 模式不传）
-            graph: CodeGraphEngine 实例（可选）
-            sandbox: Sandbox 实例（可选）
-            tools: ToolRegistry 实例（Phase 1——供 ReActAgent 使用）
-            event_bus: EventBus 实例（Phase 1——供实时事件推送）
-
-        Returns:
-            对应角色的 BaseAgent 实例
-
-        Raises:
-            ValueError: 未知角色
-        """
+        """按角色创建 Agent 实例。"""
         if isinstance(role, str):
             role = AgentRole(role)
         agent_cls = cls._registry.get(role)
         if agent_cls is None:
             raise ValueError(f"Unknown agent role: {role}")
 
-        # Phase 1: ReActAgent 子类需要 tools + event_bus
         if issubclass(agent_cls, ReActAgent):
             return agent_cls(
                 llm=llm,
@@ -165,6 +151,8 @@ class AgentFactory:
                 sandbox=sandbox,
                 tools=tools,
                 event_bus=event_bus,
+                goal=goal,
+                goal_judge=goal_judge,
             )
         return agent_cls(llm=llm, graph=graph, sandbox=sandbox)
 

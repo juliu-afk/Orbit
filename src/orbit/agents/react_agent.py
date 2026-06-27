@@ -12,7 +12,11 @@ WHY ReAct 而非单次 LLM 调用:
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from orbit.goal_judge.judge import GoalJudge
+    from orbit.goal_judge.models import Goal
 
 import structlog
 
@@ -74,8 +78,8 @@ class ReActAgent(BaseAgent):
         sandbox: Any = None,
         tools: ToolRegistry | None = None,
         event_bus: Any = None,
-        goal: Any = None,  # Phase 4 AC-B1: Goal 模型
-        goal_judge: Any = None,  # Phase 4 AC-B1: GoalJudge 实例
+        goal: Goal | None = None,  # Phase 4 AC-B1: Goal 模型
+        goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge 实例
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
@@ -401,10 +405,15 @@ class ReActAgent(BaseAgent):
             # Phase 4 AC-B1: GoalJudge 自检——每轮 LLM 返回后判定
             if not has_tool_calls and self._goal_judge and self._goal:
                 transcript = "".join(content_parts)
-                verdict = await self._goal_judge.evaluate(
-                    self._goal, transcript=transcript, task_id=task_id
-                )
-                if not verdict.ok:
+                try:
+                    verdict = await self._goal_judge.evaluate(
+                        self._goal, transcript=transcript, task_id=task_id
+                    )
+                except Exception as e:
+                    # P2-1: GoalJudge 异常→fail-open，不困住 Agent
+                    logger.warning("goal_judge_exception_fail_open", error=str(e))
+                    verdict = None  # 跳过判定，正常完成
+                if verdict is not None and not verdict.ok:
                     # 目标未完成——注入合成 user turn，强制继续
                     logger.info(
                         "goal_judge_not_ok",

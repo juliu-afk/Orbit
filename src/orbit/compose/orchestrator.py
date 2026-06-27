@@ -35,7 +35,7 @@ class ComposeOrchestrator:
         parser: ComposeParser | None = None,
         scheduler: Scheduler | None = None,
         max_retries: int = 2,
-        worktree_manager: Any = None,  # Phase 4 AC-B4: WorktreeManager
+        worktree_manager: WorktreeManager | None = None,  # Phase 4 AC-B4
     ) -> None:
         self.actor_spawn = actor_spawn
         self.parser = parser or ComposeParser()
@@ -121,6 +121,7 @@ class ComposeOrchestrator:
                         role=task.agent_role,
                         parent_task_id=parent_task_id,
                         background=background,
+                        workspace_path=wt_record.path if wt_record else "",
                     )
                     if not background:
                         result = await deferred.result(timeout=600)

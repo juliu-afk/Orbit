@@ -168,7 +168,9 @@ class TestContextCompressor:
 
         # 极小窗口 + 大量不可压缩内容 → 压缩后仍高 → fork
         tracker = TokenBudgetTracker(max_context_window=100, reserved_output=0)
-        msgs = [{"role": "user", "content": "unique_data_" + str(i) + "x" * 2000} for i in range(10)]
+        msgs = [
+            {"role": "user", "content": "unique_data_" + str(i) + "x" * 2000} for i in range(10)
+        ]
         comp = ContextCompressor(budget_tracker=tracker)
         result = await comp.compress(msgs, task_id="t3", turn=0)
         # usage_ratio=1.0+ → FORCE → 压缩后仍超85% → FORK

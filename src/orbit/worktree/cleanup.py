@@ -19,8 +19,11 @@ class WorktreeCleanup:
         self._manager = manager
 
     async def preview_safe(self) -> list[str]:
-        """预览可安全清理的 worktree（仅 DISMISSED 状态）。"""
-        return await self._manager.cleanup_safe("preview_safe")
+        """列出可安全清理的 worktree（仅 DISMISSED 状态，不执行删除）。
+
+        P0-2: 语义修正——preview 只列表，不删除。
+        """
+        return self._manager.list_safe_to_clean("preview_safe")
 
     async def clean_safe(self) -> list[str]:
         """安全清理已完成的 worktree（MERGED/RELEASED/NO_CHANGE）。"""

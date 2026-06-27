@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
@@ -104,11 +105,26 @@ class WorktreeManager:
 
         # ASK——由外部交互决定
         record.state = target_state
-        record.resolved_at = __import__("datetime").datetime.now(__import__("datetime").UTC)
+        record.resolved_at = datetime.now(UTC)
 
     async def list_active(self) -> list[WorktreeRecord]:
         """列出活跃 worktree。"""
         return [r for r in self._worktrees.values() if r.state == WorktreeState.ACTIVE]
+
+    def list_safe_to_clean(self, mode: str = "preview_safe") -> list[str]:
+        """列出可安全清理的 worktree ID（只读，不执行删除）。
+
+        P0-2: 与 cleanup_safe 分离——preview 只列表。
+        """
+        result = []
+        for wid, record in self._worktrees.items():
+            if mode == "preview_safe" and record.state == WorktreeState.DISMISSED or mode == "clean_safe" and record.state in (
+                WorktreeState.MERGED,
+                WorktreeState.RELEASED,
+                WorktreeState.NO_CHANGE,
+            ):
+                result.append(wid)
+        return result
 
     async def cleanup_safe(self, mode: str = "preview_safe") -> list[str]:
         """安全清理 worktree。

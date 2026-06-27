@@ -45,7 +45,7 @@ class BashValidators:
         "node",
         "cargo",
         "make",
-        "cURL",
+        "curl",
     }
 
     # 危险模式——始终拒绝

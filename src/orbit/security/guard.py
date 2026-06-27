@@ -53,17 +53,17 @@ class WorkspaceGuard:
         Raises:
             ValueError: 路径不安全
         """
+        # 1. 路径遍历检测——在 resolve() 前拒绝 ../（P1-2）
+        if ".." in Path(path).parts:
+            raise ValueError(f"安全拒绝——路径遍历攻击: {path}")
+
         resolved = Path(path).resolve()
 
-        # 1. 检查全局拒绝模式
+        # 2. 检查全局拒绝模式
         fname = resolved.name
         for pattern in self.ALWAYS_DENY_PATTERNS:
             if fnmatch.fnmatch(fname, pattern):
                 raise ValueError(f"安全拒绝——禁止访问敏感文件: {fname}")
-
-        # 2. 路径遍历检测——拒绝 ../ 模式
-        if ".." in Path(path).parts:
-            raise ValueError(f"安全拒绝——路径遍历攻击: {path}")
 
         # 3. 工作区边界检查
         if self._root and not allow_outside:

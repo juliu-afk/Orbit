@@ -24,6 +24,7 @@ class BashValidators:
         "git",
         "pytest",
         "python",
+        "python3",
         "pnpm",
         "uv",
         "poetry",

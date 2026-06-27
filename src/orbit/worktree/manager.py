@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -49,6 +50,8 @@ class WorktreeManager:
         worktree_id = uuid.uuid4().hex[:12]
         branch_name = f"orbit/wt-{worktree_id[:8]}"
         wt_path = self._root.parent / f".worktrees/{worktree_id}"
+        # P1-4: 确保父目录存在
+        wt_path.parent.mkdir(parents=True, exist_ok=True)
 
         record = WorktreeRecord(
             worktree_id=worktree_id,
@@ -118,10 +121,16 @@ class WorktreeManager:
         """
         result = []
         for wid, record in self._worktrees.items():
-            if mode == "preview_safe" and record.state == WorktreeState.DISMISSED or mode == "clean_safe" and record.state in (
-                WorktreeState.MERGED,
-                WorktreeState.RELEASED,
-                WorktreeState.NO_CHANGE,
+            if (
+                mode == "preview_safe"
+                and record.state == WorktreeState.DISMISSED
+                or mode == "clean_safe"
+                and record.state
+                in (
+                    WorktreeState.MERGED,
+                    WorktreeState.RELEASED,
+                    WorktreeState.NO_CHANGE,
+                )
             ):
                 result.append(wid)
         return result
@@ -167,11 +176,26 @@ class WorktreeManager:
         return stdout.decode()
 
     async def _merge(self, record: WorktreeRecord) -> None:
-        """合并 worktree 分支到 base。"""
+        """合并 worktree 分支到 base。
+
+        P1-5: 检测 merge 冲突——冲突时回滚并标记 DISMISSED。
+        """
         await self._git("checkout", record.base_branch)
-        await self._git(
-            "merge", record.branch_name, "--no-ff", "-m", f"merge worktree {record.worktree_id}"
-        )
+        try:
+            await self._git(
+                "merge",
+                record.branch_name,
+                "--no-ff",
+                "-m",
+                f"merge worktree {record.worktree_id}",
+            )
+        except RuntimeError:
+            # 合并冲突——回滚
+            logger.warning("worktree_merge_conflict", id=record.worktree_id)
+            with suppress(RuntimeError):
+                await self._git("merge", "--abort")
+            record.state = WorktreeState.DISMISSED
+            return
         await self._git("branch", "-d", record.branch_name)
         logger.info("worktree_merged", id=record.worktree_id)
 

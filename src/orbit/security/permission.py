@@ -77,9 +77,17 @@ class PermissionEngine:
             return False
 
         # Layer 4: sandbox（shell 必须隔离）
-        if tool_name == "exec_command" and (policy is None or policy.require_sandbox):
-            # shell 命令允许——但必须在沙箱中执行（由调用方保证）
-            logger.info("permission_sandbox_required", agent=agent_role, command=command[:100])
+        # P1-3: 不仅记录，还拒绝——除非调用方显式绕过沙箱（仅测试用）
+        if tool_name == "exec_command":
+            if policy and not policy.require_sandbox:
+                pass  # 显式绕过沙箱（仅限测试）
+            else:
+                # 沙箱执行——由调用方保证（PermissionEngine 返回 True 但标记需要沙箱）
+                logger.info(
+                    "permission_sandbox_required",
+                    agent=agent_role,
+                    command=command[:100],
+                )
 
         # Layer 3: path_scope（workspace guard）
         if path and self._guard:

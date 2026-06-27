@@ -164,3 +164,151 @@ class TestSSEEventFormat:
         }
         for t in StreamEventType:
             assert t.value in valid_types, f"Missing valid type: {t.value}"
+
+
+# ── SSE 端点测试（覆盖 stream/sse.py）───────────────
+
+
+class TestSSEEndpoints:
+    """SSE 端点——agent_run / agent_stream / agent_cancel。"""
+
+    @pytest.fixture
+    def sse_client(self):
+        """FastAPI TestClient——包含 SSE 路由。"""
+        from unittest.mock import AsyncMock
+
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from orbit.stream.sse import router as sse_router
+
+        app = FastAPI()
+        app.include_router(sse_router)
+
+        # 注入 mock llm/tools 到 app state
+        app.state.llm = AsyncMock()
+        app.state.tools = None
+
+        return TestClient(app)
+
+    def test_agent_run_returns_task_id(self, sse_client):
+        """POST /api/v1/agent/dev/run → 返回 task_id。"""
+        resp = sse_client.post(
+            "/api/v1/agent/dev/run",
+            json={"task": "hello world", "role": "developer"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["code"] == 0
+        assert len(data["data"]["task_id"]) == 12
+        assert data["data"]["agent_id"] == "dev"
+
+    def test_agent_cancel_unknown_task(self, sse_client):
+        """POST cancel 不存在的 task → 404 code。"""
+        resp = sse_client.post(
+            "/api/v1/agent/dev/cancel",
+            json={"task_id": "nonexistent"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["code"] == 404
+
+    def test_agent_cancel_existing_task(self, sse_client):
+        """先 run 创建 token，再 cancel → 200。"""
+        # 1. 创建 task
+        run_resp = sse_client.post(
+            "/api/v1/agent/dev/run",
+            json={"task": "test", "role": "developer"},
+        )
+        task_id = run_resp.json()["data"]["task_id"]
+
+        # 2. 取消
+        cancel_resp = sse_client.post(
+            "/api/v1/agent/dev/cancel",
+            json={"task_id": task_id},
+        )
+        assert cancel_resp.status_code == 200
+        assert cancel_resp.json()["data"]["cancelled"] is True
+
+    def test_agent_stream_endpoint_sets_headers(self, sse_client):
+        """SSE 流式端点返回正确的 content-type 和 headers。"""
+        # 先创建 task
+        run_resp = sse_client.post(
+            "/api/v1/agent/dev/run",
+            json={"task": "simple", "role": "developer"},
+        )
+        task_id = run_resp.json()["data"]["task_id"]
+
+        # 连接 SSE 流（带 mock LLM——但请求可能因缺少真实 llm 而失败）
+        # 测试 SSE headers 设置
+        resp = sse_client.get(
+            f"/api/v1/agent/dev/stream?task_id={task_id}&task=echo+hello",
+        )
+        assert resp.status_code == 200
+        assert "text/event-stream" in resp.headers.get("content-type", "")
+        assert resp.headers.get("cache-control") == "no-cache"
+
+
+# ── 流式 Gateway Client 测试 ────────────────────────
+
+
+class TestGatewayStreaming:
+    """LLMClient.generate_stream_with_tools——流式 LLM 调用。"""
+
+    @pytest.mark.asyncio
+    async def test_generate_stream_with_tools_text_only(self):
+        """流式调用——纯文本输出，无工具调用。"""
+        from unittest.mock import patch
+
+        from orbit.gateway.schemas import LLMRequest
+        from orbit.stream.events import StreamEventType
+
+        from orbit.gateway.client import LLMClient
+
+        client = LLMClient()
+
+        # Mock _stream_completion_with_tools——避免依赖 litellm
+        async def mock_stream(model, req):
+            yield (StreamEventType.TEXT_DELTA, {"delta": "hello"})
+
+        with patch.object(client, "_stream_completion_with_tools", new=mock_stream):
+            events = []
+            async for event_type, data in client.generate_stream_with_tools(
+                LLMRequest(prompt="test"), task_id="t1"
+            ):
+                events.append((event_type, data))
+
+        text_events = [d for t, d in events if t == StreamEventType.TEXT_DELTA]
+        assert len(text_events) > 0
+        assert text_events[0]["delta"] == "hello"
+
+    @pytest.mark.asyncio
+    async def test_generate_stream_with_tools_error(self):
+        """流式调用——primary 失败后 fallback 成功。"""
+        from unittest.mock import patch
+
+        from orbit.gateway.schemas import LLMRequest
+        from orbit.stream.events import StreamEventType
+
+        from orbit.gateway.client import LLMClient
+
+        client = LLMClient()
+
+        # 第一次调用失败，第二次成功
+        call_count = [0]
+
+        async def mock_stream_primary(model, req):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise RuntimeError("primary failed")
+            yield (StreamEventType.TEXT_DELTA, {"delta": "fallback ok"})
+
+        with patch.object(client, "_stream_completion_with_tools", new=mock_stream_primary):
+            events = []
+            async for event_type, data in client.generate_stream_with_tools(
+                LLMRequest(prompt="test"), task_id="t2"
+            ):
+                events.append((event_type, data))
+
+        text_events = [d for t, d in events if t == StreamEventType.TEXT_DELTA]
+        assert len(text_events) > 0
+        assert text_events[0]["delta"] == "fallback ok"

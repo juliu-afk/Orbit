@@ -50,8 +50,9 @@ class TestWorktreeManager:
     """WorktreeManager——状态管理（mock git，测试内部逻辑）。"""
 
     @pytest.fixture
-    def manager(self):
-        mgr = WorktreeManager("/fake/repo")
+    def manager(self, tmp_path):
+        repo = tmp_path / "repo"
+        mgr = WorktreeManager(str(repo))
         # Mock _git to avoid real git calls
         mgr._git = AsyncMock(return_value="ok")
         return mgr

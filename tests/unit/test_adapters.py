@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 
 class TestProviderAdapterBase:
     """ProviderAdapter ABC 默认行为。"""
@@ -40,7 +38,6 @@ class TestProviderAdapterBase:
         assert adapter.normalize_messages(msgs) == msgs
 
     def test_normalize_stop_reason_stop(self):
-        from orbit.gateway.adapters import ProviderAdapter
         from orbit.gateway.adapters.openai import OpenAIAdapter
 
         adapter = OpenAIAdapter()

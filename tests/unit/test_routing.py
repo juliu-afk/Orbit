@@ -5,8 +5,6 @@ Phase 3 组 1 (AC18.3): 覆盖 cheapest/fastest/best/agent 四种策略。
 
 from __future__ import annotations
 
-import pytest
-
 
 class TestRoutingCheapest:
     """cheapest 策略——选成本最低模型。"""

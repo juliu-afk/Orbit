@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orbit.agents.base import AgentInput, AgentRole
-from orbit.agents.react_agent import IterationBudget, ReActAgent, _truncate_output
+from orbit.agents.react_agent import IterationBudget, ReActAgent
 
 # ── Fixtures ──────────────────────────────────────────
 
@@ -379,7 +379,6 @@ class TestCancellation:
         token2 = CancellationToken()
         token2.cancel()
 
-        from orbit.tools.registry import ToolRegistry
 
         tools = MagicMock()
         tools.get_schemas.return_value = []

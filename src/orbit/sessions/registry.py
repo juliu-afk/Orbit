@@ -6,6 +6,7 @@ SQLite 持久化——与 ProjectRegistry 共用 `data/orbit.db`。
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import sqlite3
@@ -63,14 +64,10 @@ class SessionRegistry:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at DESC)")
         # Phase 2: parent-child fork tracking
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             conn.execute("ALTER TABLE sessions ADD COLUMN parent_session_id TEXT DEFAULT NULL")
-        except sqlite3.OperationalError:
-            pass  # 列已存在
-        try:
+        with contextlib.suppress(sqlite3.OperationalError):
             conn.execute("ALTER TABLE sessions ADD COLUMN lineage_reason TEXT DEFAULT NULL")
-        except sqlite3.OperationalError:
-            pass
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id)"
         )

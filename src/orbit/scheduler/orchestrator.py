@@ -309,11 +309,10 @@ class Scheduler:
         # Phase 2: L4——从文件记忆系统加载 Agent 工作记忆
         l4: dict[str, Any] = {}
         try:
-            from orbit.memory.store import MemoryStore
             from orbit.memory.models import MemoryFileType
+            from orbit.memory.store import MemoryStore
 
             project_path = context.get("project_path", "")
-            agent_name = context.get("agent_name", "")
             store = MemoryStore(project_path=project_path)
             mem = store.read_file(MemoryFileType.EPISODIC)
             if mem.body:

@@ -29,7 +29,8 @@ class TestBuildContext:
         sched = Scheduler()
         ctx = sched._build_context("t2", {})
         assert ctx.l2 == {}
-        assert ctx.l4 == {}
+        # Phase 2: L4 可能从文件记忆加载内容（非严格空）
+        assert isinstance(ctx.l4, dict)
         assert ctx.l5 == []
 
 

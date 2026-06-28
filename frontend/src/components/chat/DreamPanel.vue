@@ -9,7 +9,7 @@ import { apiPost, apiGet } from '@/services/api'
 
 interface DreamStatus { status: string }
 
-const status = ref<'idle' | 'running' | 'ready'>('idle')
+const status = ref<'idle' | 'running' | 'ready' | 'error'>('idle')
 const loading = ref(false)
 const dreamResult = ref<string | null>(null)
 const error = ref<string | null>(null)
@@ -17,8 +17,10 @@ const error = ref<string | null>(null)
 async function fetchStatus() {
   try {
     const data = await apiGet<DreamStatus>('/api/v1/dream/status')
-    if (data?.status === 'ready') status.value = 'ready'
-  } catch { /* mute on mount */ }
+    status.value = data?.status === 'ready' ? 'ready' : 'idle'
+  } catch {
+    status.value = 'error'
+  }
 }
 
 async function triggerDream() {

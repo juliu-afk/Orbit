@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
+    from orbit.compression.budget import TokenBudgetTracker
+    from orbit.compression.compressor import ContextCompressor
     from orbit.observability.audit import AuditLogger
     from orbit.tools.registry import ToolRegistry
 
@@ -79,8 +81,8 @@ class Scheduler:
         fail_fast: bool = True,
         # ── Step I1 集成胶水 ──────────────────────
         agent_factory: type[AgentFactory] | None = None,  # AgentFactory (延迟导入避免循环)
-        compressor: object | None = None,  # Phase 2 AC7: ContextCompressor
-        budget_tracker: object | None = None,  # Phase 2 AC7: TokenBudgetTracker
+        compressor: ContextCompressor | None = None,  # Phase 2 AC7
+        budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7
         message_bus: Any = None,  # AgentMessageBus (通信层未导出类型)
         tool_registry: ToolRegistry | None = None,  # ToolRegistry
         # ── Step 2.3 智能路由 ─────────────────────

@@ -153,3 +153,13 @@ def test_factory_passes_tools_to_react_agent() -> None:
     )
     assert agent.tools is mock_tools
     assert agent._event_bus is mock_bus
+
+
+def test_architect_multi_perspective_prompt() -> None:
+    """Phase 2: ArchitectAgent.system_prompt 含多视角指令."""
+    agent = ArchitectAgent()
+    prompt = agent.system_prompt()
+    assert "多方案生成" in prompt or "备选方案" in prompt
+    assert "可行性" in prompt
+    assert "可维护性" in prompt
+    assert "性能" in prompt

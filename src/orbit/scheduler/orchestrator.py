@@ -220,6 +220,30 @@ class Scheduler:
 
         return state
 
+    # Phase 2: 黄金圈 Why 路由表
+    GOLDEN_ROUTE: dict[str, list[str]] = {
+        "实现新功能": ["architect", "developer"],
+        "修复Bug": ["qa", "developer", "reviewer"],
+        "代码审查": ["reviewer"],
+        "重构": ["architect", "developer"],
+        "数据分析": ["developer"],
+    }
+
+    def _route_by_golden_why(self, context: dict[str, Any]) -> list[str]:
+        """按黄金圈 Why 分类选择初始 Agent 链。
+
+        WHY 独立方法: 路由逻辑与调度逻辑分离，方便测试和扩展。
+        默认回退 developer——向后兼容无标签的旧调用。
+        """
+        why = str(context.get("golden_why", ""))
+        route = self.GOLDEN_ROUTE.get(why)
+        if route:
+            logger.info("golden_route_match", why=why, route=route)
+            return route
+        # 默认回退——向后兼容
+        logger.debug("golden_route_default", why=why or "empty")
+        return ["developer"]
+
     def _transition(self, current: TaskState) -> TaskState:
         """执行状态转换。快车道模式走简化路径。"""
         if current in TERMINAL_STATES:

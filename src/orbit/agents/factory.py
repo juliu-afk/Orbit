@@ -34,10 +34,28 @@ class ArchitectAgent(ReActAgent):
 
     WHY ReActAgent: 架构师需要 read_file/grep/glob 了解现有代码结构，
     再输出设计方案。不再是纯 LLM 输出。
+
+    Phase 2: 多视角方案生成——强制输出 ≥2 个备选方案并评分。
     """
 
     role = AgentRole.ARCHITECT
     MAX_TURNS = 10  # 设计任务不需要太多轮
+
+    def system_prompt(self) -> str:
+        """多视角架构师提示——CARO 风格结构化思维。
+
+        WHY 覆盖基类: 标准 prompt 只要求输出 JSON，不要求多方案。
+        多视角降低单方案"隧道效应"风险。
+        """
+        base = super().system_prompt()
+        extra = """## 设计方法论
+作为架构师，对每个设计任务必须：
+1. **问题类型判断**：这是 CRUD / 算法 / 集成 / 重构 中的哪一类？
+2. **相似经验回忆**：项目中是否有类似问题的已有实现？如有，标注参考。
+3. **多方案生成**：生成至少 2 个互斥的备选方案（不同架构模式、不同技术栈、不同粒度）
+4. **三维评分**：对每个方案从 [可行性/可维护性/性能] 三个维度打分（0-10），选最优
+5. **最优方案详述**：对最高分方案详细说明接口设计、数据流、需改动的文件"""
+        return f"{base}\n\n{extra}"
 
 
 class DeveloperAgent(ReActAgent):

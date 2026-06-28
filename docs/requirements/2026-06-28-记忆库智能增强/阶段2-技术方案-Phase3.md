@@ -21,6 +21,6 @@
 
 ### 2. Graph-RAG 跨文件边
 - 新 SQLite 表 `code_edges(source_path, target_path, relation_type, source_name, target_name)`
-- `relation_type` 枚举: 'imports' | 'calls' | 'inherits'
-- 查询: `find_callers(target_name)` → 所有调用该函数的文件
-- Tree-sitter 解析时自动填充边（复用现有 AST 解析器）
+- `relation_type`: 'imports' | 'calls' | 'inherits'（内存字典存储，非 DB）
+- 查询 API: `find_definitions_cross_file(name)` | `find_imports_of(file)` | `find_importers_of(module)`
+- `_extract_imports` 在 AST 解析时自动填充边

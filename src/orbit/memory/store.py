@@ -128,7 +128,7 @@ class MemoryStore:
                 hyde = self._generate_hyde_questions(entry, llm_client)
                 if hyde:
                     new_body += "\n\n## HyDE 假设问答\n" + hyde + "\n"
-                    fm["has_hyde"] = "true"
+                    fm["has_hyde"] = True
             except (OSError, RuntimeError, ValueError) as e:
                 logger.debug("hyde_generation_skipped", error=str(e))
 

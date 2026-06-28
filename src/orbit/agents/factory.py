@@ -8,7 +8,16 @@ ConfigManagerAgent/ClarifierAgent → 保持 BaseAgent（不需要文件工具�
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from orbit.events.bus import EventBus
+    from orbit.gateway.client import LLMClient
+    from orbit.goal_judge.judge import GoalJudge
+    from orbit.goal_judge.models import Goal
+    from orbit.graph.engines.code_graph import CodeGraphEngine
+    from orbit.sandbox.executor import Sandbox
+    from orbit.tools.registry import ToolRegistry
 
 import structlog
 
@@ -109,11 +118,11 @@ class AgentFactory:
     def create(
         cls,
         role: AgentRole | str,
-        llm: Any = None,
-        graph: Any = None,
-        sandbox: Any = None,
-        tools: Any = None,
-        event_bus: Any = None,
+        llm: LLMClient | None = None,
+        graph: CodeGraphEngine | None = None,
+        sandbox: Sandbox | None = None,
+        tools: ToolRegistry | None = None,
+        event_bus: EventBus | None = None,
     ) -> BaseAgent:
         """create = get_agent alias for orchestrator."""
         return cls.get_agent(
@@ -129,13 +138,13 @@ class AgentFactory:
     def get_agent(
         cls,
         role: AgentRole | str,
-        llm: Any = None,
-        graph: Any = None,
-        sandbox: Any = None,
-        tools: Any = None,
-        event_bus: Any = None,
-        goal: Any = None,  # Phase 4 AC-B1: Goal
-        goal_judge: Any = None,  # Phase 4 AC-B1: GoalJudge
+        llm: LLMClient | None = None,
+        graph: CodeGraphEngine | None = None,
+        sandbox: Sandbox | None = None,
+        tools: ToolRegistry | None = None,
+        event_bus: EventBus | None = None,
+        goal: Goal | None = None,  # Phase 4 AC-B1: Goal
+        goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge
     ) -> BaseAgent:
         """按角色创建 Agent 实例。
 
@@ -170,6 +179,7 @@ class AgentFactory:
                 event_bus=event_bus,
                 goal=goal,
                 goal_judge=goal_judge,
+                role=role,  # Issue #3: 显式传递 role，消除 spawn.py type: ignore
             )
         return agent_cls(llm=llm, graph=graph, sandbox=sandbox)
 

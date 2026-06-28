@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
+    from orbit.actors.spawn import ActorSpawn
     from orbit.worktree.manager import WorktreeManager
 
 from orbit.compose.models import Spec, Task
@@ -34,7 +35,7 @@ class ComposeOrchestrator:
 
     def __init__(
         self,
-        actor_spawn: Any = None,  # ActorSpawn
+        actor_spawn: ActorSpawn | None = None,
         parser: ComposeParser | None = None,
         scheduler: Scheduler | None = None,
         max_retries: int = 2,

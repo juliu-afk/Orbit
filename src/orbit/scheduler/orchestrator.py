@@ -14,7 +14,12 @@ from __future__ import annotations
 import asyncio
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from orbit.agents.factory import AgentFactory
+    from orbit.observability.audit import AuditLogger
+    from orbit.tools.registry import ToolRegistry
 
 import structlog
 
@@ -73,12 +78,12 @@ class Scheduler:
         max_retries: int = 2,
         fail_fast: bool = True,
         # ── Step I1 集成胶水 ──────────────────────
-        agent_factory: Any = None,  # AgentFactory (延迟导入避免循环)
-        message_bus: Any = None,  # AgentMessageBus
-        tool_registry: Any = None,  # ToolRegistry
+        agent_factory: type[AgentFactory] | None = None,  # AgentFactory (延迟导入避免循环)
+        message_bus: Any = None,  # AgentMessageBus (通信层未导出类型)
+        tool_registry: ToolRegistry | None = None,  # ToolRegistry
         # ── Step 2.3 智能路由 ─────────────────────
-        router: Any = None,  # RouterAgent（延迟导入）
-        audit_logger: Any = None,  # AuditLogger
+        router: Any = None,  # RouterAgent（延迟导入，内部模块无公开类型）
+        audit_logger: AuditLogger | None = None,  # AuditLogger
     ):
         self._agent_llms = agent_llms or {}
         self.checkpoint = checkpoint_manager

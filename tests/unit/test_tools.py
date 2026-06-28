@@ -741,3 +741,84 @@ class TestCoverageBoost:
 
         result = asyncio_run(edit_file("nope.py", "a", "b"))
         assert "不存在" in result
+
+    # ── 额外覆盖率补丁（80%→80.2%）──
+
+    def test_get_latest_version(self, registry):
+        """get_latest_version——返回最新版本号."""
+        registry.register(ToolSchema(name="ver_tool", version="2.0.0"), lambda p: p)
+        v = registry.get_latest_version("ver_tool")
+        assert v == "2.0.0"
+
+    def test_get_invocations_with_limit(self, registry):
+        """get_invocations——limit 参数截断."""
+        schema = ToolSchema(name="multi", version="1.0.0")
+        registry.register(schema, lambda p: p)
+        for _ in range(5):
+            registry.invoke("multi", {}, agent_name="test")
+        assert len(registry.get_invocations(limit=2)) == 2
+
+    def test_discover_with_actual_path(self, tmp_path):
+        """discover——实际路径扫描不崩溃."""
+        from orbit.tools.registry import ToolRegistry
+
+        ToolRegistry.discover([str(tmp_path)])
+
+    def test_validate_command_find_asterisk(self):
+        """validate_command——带 * 子命令允许."""
+        from orbit.tools.shell import validate_command
+
+        assert validate_command("find . -name '*.py'") is None
+
+    @pytest.mark.asyncio
+    async def test_exec_command_with_cwd(self):
+        """exec_command——指定 cwd."""
+        from orbit.tools.shell import exec_command
+
+        result = await exec_command("echo cwd_test", cwd=".")
+        assert "cwd_test" in result
+
+    def test_grep_no_content_match(self, tmp_workspace):
+        """grep——匹配模式但无内容行."""
+        from orbit.tools import search
+        from orbit.tools.search import grep
+
+        (tmp_workspace / "z.py").write_text("nothing here\n")
+
+        orig = search._WORKSPACE_ROOT
+        search._WORKSPACE_ROOT = tmp_workspace
+        try:
+            result = asyncio_run(grep("NOTFOUND", glob="*.py"))
+            assert "无匹配" in result
+        finally:
+            search._WORKSPACE_ROOT = orig
+
+    def test_glob_skips_hidden_dirs(self, tmp_workspace):
+        """glob——跳过隐藏目录和 venv."""
+        from orbit.tools import search
+        from orbit.tools.search import glob_files
+
+        (tmp_workspace / "visible.py").write_text("")
+        hidden = tmp_workspace / ".hidden_dir"
+        hidden.mkdir()
+        (hidden / "secret.py").write_text("")
+
+        orig = search._WORKSPACE_ROOT
+        search._WORKSPACE_ROOT = tmp_workspace
+        try:
+            result = asyncio_run(glob_files("**/*.py"))
+            assert "visible.py" in result
+            assert ".hidden_dir" not in result
+        finally:
+            search._WORKSPACE_ROOT = orig
+
+    @pytest.mark.asyncio
+    async def test_dispatch_with_agent_name(self, registry):
+        """dispatch——带 agent_name 参数."""
+
+        async def h(text: str) -> str:
+            return text
+
+        registry.register_tool("named", "t", {"type": "function"}, h)
+        result = await registry.dispatch("named", {"text": "hi"}, agent_name="test_agent")
+        assert "hi" in result

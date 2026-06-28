@@ -277,7 +277,8 @@ class Scheduler:
 
         try:
             agent = self._agent_factory.create(
-                role, llm=agent_llm,
+                role,
+                llm=agent_llm,
                 compressor=self._compressor,
                 budget_tracker=self._budget_tracker,
             )

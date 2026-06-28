@@ -10,12 +10,19 @@ WHY DeferredActor: 父Agent 不需要等待子Agent 完成——
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from orbit.actors.registry import ActorRegistry
+    from orbit.agents.factory import AgentFactory
+    from orbit.events.bus import EventBus
+    from orbit.gateway.client import LLMClient
+    from orbit.tools.registry import ToolRegistry
 
 import structlog
 
 from orbit.actors.models import ActorOutcome, ActorRecord, ActorStatus
-from orbit.agents.base import AgentInput, AgentRole
+from orbit.agents.base import AgentInput, AgentRole, BaseAgent
 from orbit.stream.cancellation import CancellationToken
 
 logger = structlog.get_logger()
@@ -73,11 +80,15 @@ class ActorSpawn:
         result = await deferred.result(timeout=300)
     """
 
-    def __init__(self, registry: Any = None, agent_factory: Any = None) -> None:
+    def __init__(
+        self,
+        registry: ActorRegistry | None = None,
+        agent_factory: type[AgentFactory] | None = None,
+    ) -> None:
         from orbit.actors.registry import ActorRegistry
 
         self.registry: ActorRegistry = registry or ActorRegistry()
-        self.agent_factory = agent_factory  # AgentFactory
+        self.agent_factory = agent_factory  # type: type[AgentFactory] | None
 
     async def spawn(
         self,
@@ -85,9 +96,9 @@ class ActorSpawn:
         role: str = "developer",
         parent_task_id: str = "",
         context: dict | None = None,
-        llm: Any = None,
-        tools: Any = None,
-        event_bus: Any = None,
+        llm: LLMClient | None = None,
+        tools: ToolRegistry | None = None,
+        event_bus: EventBus | None = None,
         background: bool = False,
         workspace_path: str = "",  # Phase 4 AC-B4: Worktree 隔离工作区路径
     ) -> DeferredActor:
@@ -223,7 +234,13 @@ class ActorSpawn:
             deferred = DeferredActor(actor_id, task_obj, token)
             return deferred
 
-    def _create_agent(self, role: AgentRole, llm: Any, tools: Any, event_bus: Any) -> Any:
+    def _create_agent(
+        self,
+        role: AgentRole,
+        llm: LLMClient | None,
+        tools: ToolRegistry | None,
+        event_bus: EventBus | None,
+    ) -> BaseAgent:
         """创建 Agent 实例——优先用 AgentFactory，回退直接实例化。"""
         if self.agent_factory:
             try:
@@ -234,16 +251,12 @@ class ActorSpawn:
                     event_bus=event_bus,
                 )
             except (ValueError, RuntimeError, TypeError) as e:
-                # ValueError: AgentRole 未知
-                # RuntimeError: Agent 实例化失败
-                # TypeError: 参数类型不匹配
                 logger.warning("factory_create_failed", error=str(e), exc_info=True)
 
         # 回退——直接创建 ReActAgent
         from orbit.agents.react_agent import ReActAgent
 
-        class SpawnedAgent(ReActAgent):
-            pass
-
-        SpawnedAgent.role = role  # type: ignore[attr-defined]
-        return SpawnedAgent(llm=llm, tools=tools, event_bus=event_bus)
+        # WHY 不再用 class SpawnedAgent + type: ignore:
+        # ReActAgent.__init__ 现在接受 role 参数（Issue #3），
+        # 动态设置 class attribute 不再需要
+        return ReActAgent(llm=llm, tools=tools, event_bus=event_bus, role=role)

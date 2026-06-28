@@ -12,15 +12,21 @@ WHY ReAct 而非单次 LLM 调用:
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from orbit.compression.budget import TokenBudgetTracker
+    from orbit.compression.compressor import ContextCompressor
+    from orbit.events.bus import EventBus
+    from orbit.gateway.client import LLMClient
     from orbit.goal_judge.judge import GoalJudge
     from orbit.goal_judge.models import Goal
+    from orbit.graph.engines.code_graph import CodeGraphEngine
+    from orbit.sandbox.executor import Sandbox
 
 import structlog
 
-from orbit.agents.base import AgentInput, AgentOutput, BaseAgent
+from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
 from orbit.events.schemas import DashboardEvent
 from orbit.gateway.schemas import LLMRequest
 from orbit.stream.cancellation import CancellationToken
@@ -68,18 +74,19 @@ class ReActAgent(BaseAgent):
     ITERATION_BUDGET = 90  # 对标 Hermes max_iterations
 
     # Phase 2: 压缩管线（类级默认——子类通过 __init__ 注入）
-    _compressor: Any = None
-    _budget_tracker: Any = None
+    _compressor: ContextCompressor | None = None
+    _budget_tracker: TokenBudgetTracker | None = None
 
     def __init__(
         self,
-        llm: Any = None,
-        graph: Any = None,
-        sandbox: Any = None,
+        llm: LLMClient | None = None,
+        graph: CodeGraphEngine | None = None,
+        sandbox: Sandbox | None = None,
         tools: ToolRegistry | None = None,
-        event_bus: Any = None,
+        event_bus: EventBus | None = None,
         goal: Goal | None = None,  # Phase 4 AC-B1: Goal 模型
         goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge 实例
+        role: AgentRole | None = None,  # Issue #3: 消除 spawn.py type: ignore
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
@@ -87,6 +94,8 @@ class ReActAgent(BaseAgent):
         self._budget = IterationBudget(self.ITERATION_BUDGET)
         self._goal = goal  # Phase 4
         self._goal_judge = goal_judge  # Phase 4
+        # WHY role 优先取参数，回退取类属性——兼容子类 class-level role = AgentRole.XXX
+        self.role = role or type(self).role
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——向后兼容 wrapper。

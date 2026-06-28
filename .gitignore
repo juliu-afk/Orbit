@@ -41,6 +41,9 @@ src-tauri/target/
 src-tauri/orbit-backend.exe
 src-tauri/gen/
 
+# Orbit runtime
+.orbit/
+
 # 交付 + 构建产物
 Deliverables/
 backend/static/

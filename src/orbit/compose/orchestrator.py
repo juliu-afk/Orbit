@@ -80,11 +80,12 @@ class ComposeOrchestrator:
                 from orbit.worktree.models import WorktreeStrategy
 
                 wt_record = await self._worktree.create(strategy=WorktreeStrategy.DELEGATE)
-                logger.info(
-                    "compose_worktree_created",
-                    id=wt_record.worktree_id,
-                    branch=wt_record.branch_name,
-                )
+                if wt_record is not None:
+                    logger.info(
+                        "compose_worktree_created",
+                        id=wt_record.worktree_id,
+                        branch=wt_record.branch_name,
+                    )
             except Exception as e:
                 logger.warning("compose_worktree_failed_fallback_off", error=str(e))
 

@@ -11,6 +11,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from orbit.compression.budget import TokenBudgetTracker
+    from orbit.compression.compressor import ContextCompressor
     from orbit.events.bus import EventBus
     from orbit.gateway.client import LLMClient
     from orbit.goal_judge.judge import GoalJudge
@@ -141,8 +143,8 @@ class AgentFactory:
         sandbox: Sandbox | None = None,
         tools: ToolRegistry | None = None,
         event_bus: EventBus | None = None,
-        compressor: object | None = None,  # Phase 2 AC7: ContextCompressor
-        budget_tracker: object | None = None,  # Phase 2 AC7: TokenBudgetTracker
+        compressor: ContextCompressor | None = None,  # Phase 2 AC7
+        budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7
     ) -> BaseAgent:
         """create = get_agent alias for orchestrator."""
         return cls.get_agent(
@@ -167,8 +169,8 @@ class AgentFactory:
         event_bus: EventBus | None = None,
         goal: Goal | None = None,  # Phase 4 AC-B1: Goal
         goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge
-        compressor: object | None = None,  # Phase 2 AC7
-        budget_tracker: object | None = None,  # Phase 2 AC7
+        compressor: ContextCompressor | None = None,  # Phase 2 AC7
+        budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7
     ) -> BaseAgent:
         """按角色创建 Agent 实例。
 

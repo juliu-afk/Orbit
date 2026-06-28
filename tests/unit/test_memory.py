@@ -154,6 +154,36 @@ class TestMemoryScoring:
         assert r.entry_score == 2.5
 
 
+class TestHydeGeneration:
+    """Phase 3: HyDE 接口预留（async wrapper 未来 PR 启用）。"""
+
+    def test_hyde_placeholder_returns_empty(self, tmp_path):
+        """P1-2: _generate_hyde_questions 当前始终返回空字符串。"""
+        from orbit.memory.store import MemoryStore
+
+        store = MemoryStore(str(tmp_path))
+        # 带 LLM 也返回空——async wrapper 待实现
+        result = store._generate_hyde_questions("test", object())
+        assert result == ""
+
+    def test_hyde_skipped_without_llm(self, tmp_path):
+        """无 LLM 时 append_to_file 不应崩溃，内容正常写入。"""
+        from orbit.memory.store import MemoryStore
+
+        store = MemoryStore(str(tmp_path))
+        store.append_to_file(MemoryFileType.EPISODIC, "bare memory")
+        mem = store.read_file(MemoryFileType.EPISODIC)
+        assert "bare memory" in mem.body
+        assert "HyDE" not in mem.body
+
+    def test_hyde_interface_present(self):
+        """_generate_hyde_questions 方法存在——确保接口不退化。"""
+        from orbit.memory.store import MemoryStore
+
+        store = MemoryStore()
+        assert hasattr(store, "_generate_hyde_questions")
+
+
 class TestDreamVerifier:
     def test_pass(self):
         from orbit.dream.models import DreamConfig

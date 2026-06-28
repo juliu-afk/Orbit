@@ -46,10 +46,16 @@ class CodeGraphEngine(GraphEngineBase):
         return count
 
     async def incremental_update(self, file_path: str) -> bool:
-        """增量更新单个文件（SC3）。先删旧节点，再重新解析。"""
+        """增量更新单个文件（SC3）。先删旧节点+边+import，再重新解析。
+
+        P1-3: 清理 _import_edges——否则旧文件的 import 边残留，
+        导致 find_importers_of 返回已删除文件的错结果。
+        """
         path = Path(file_path)
-        # 删该文件的旧节点 + 相关边
         await self.delete_nodes_by_file(CodeNode, str(path))
+        # 清理该文件的 import 边
+        if hasattr(self, "_import_edges"):
+            self._import_edges.pop(str(path), None)
         return await self._parse_file(path)
 
     async def _parse_file(self, path: Path) -> bool:
@@ -112,6 +118,8 @@ class CodeGraphEngine(GraphEngineBase):
 
         # 第二遍：提取调用关系（需在符号定义入库后）
         await self._extract_calls(tree, str(path))
+        # Phase 3: 提取跨文件 import 关系
+        await self._extract_imports(tree, str(path))
         return True
 
     async def _extract_calls(self, tree: ast.AST, file_path: str) -> None:
@@ -167,6 +175,73 @@ class CodeGraphEngine(GraphEngineBase):
         if isinstance(node, ast.Attribute):
             return node.attr
         return None
+
+    async def _extract_imports(self, tree: ast.AST, file_path: str) -> None:
+        """Phase 3: 提取跨文件 import 关系——存入 Edge 表。
+
+        import X → 边: file_path -(imports)→ X 对应模块文件
+        from X import Y → 边: file_path -(imports symbol Y)→ X.Y
+        """
+        from_path = file_path
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    self._record_import_edge(from_path, alias.name, None)
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                for alias in node.names:
+                    self._record_import_edge(from_path, module, alias.name)
+
+    def _record_import_edge(self, from_path: str, module: str, symbol: str | None) -> None:
+        """记录导入边到实例字典——简单快速，无需 DB session。
+
+        WHY 字典而非 SQLAlchemy: import 边数量大（每个文件数十条），
+        批量解析时逐条 upsert 太慢。内存存储足够（查询时按文件查）。
+        """
+        if not hasattr(self, "_import_edges"):
+            self._import_edges: dict[str, list[dict]] = {}
+        key = from_path
+        self._import_edges.setdefault(key, []).append(
+            {
+                "module": module,
+                "symbol": symbol,
+            }
+        )
+
+    def find_imports_of(self, file_path: str) -> list[str]:
+        """Phase 3: 查询某文件导入了哪些模块。"""
+        edges = getattr(self, "_import_edges", {}).get(file_path, [])
+        return [e["module"] for e in edges if e["module"]]
+
+    async def find_definitions_cross_file(self, symbol_name: str) -> list[str]:
+        """Phase 3: 查询哪些文件定义了该符号——跨文件定义发现。
+
+        P1-1 修正: 原名 find_callers_cross_file 有误导性——此方法查询
+        符号的"定义位置"而非"调用者"。改名为 find_definitions_cross_file。
+        """
+        from sqlalchemy import select as sa_select
+
+        async with self.session_factory() as session:
+            stmt = sa_select(CodeNode).where(CodeNode.name == symbol_name)
+            result = await session.execute(stmt)
+            nodes = result.scalars().all()
+            return list({n.file_path for n in nodes if n.file_path})
+
+    def find_importers_of(self, module_path: str) -> list[str]:
+        """Phase 3: 哪些文件导入了指定模块（内存查询，毫秒级）。
+
+        P2-8: 去重——一个文件可能多次 import 同一模块。
+        """
+        module_name = module_path.replace("/", ".").replace(".py", "").lstrip(".")
+        results = []
+        for file_path, imports in getattr(self, "_import_edges", {}).items():
+            for entry in imports:
+                entry_module = entry["module"]
+                # 精确匹配 或 目标模块是父包（from X import Y where X=module_name）
+                if entry_module == module_name or entry_module.startswith(module_name + "."):
+                    results.append(file_path)
+                    break  # 一个文件只计一次
+        return list(set(results))
 
     # ---- 查询接口 ----
 

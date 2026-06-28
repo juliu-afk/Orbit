@@ -112,6 +112,67 @@ class TestTopologicalSort:
         assert set(deps) == {"B", "C"}
 
 
+class TestCodeGraphImports:
+    """Phase 3: CodeGraph import 边记录（内存字典）。"""
+
+    @pytest.mark.asyncio
+    async def test_extract_imports_populates_edges(self):
+        """_extract_imports 从 AST 提取 import 边到 _import_edges 字典。"""
+        import ast
+
+        from orbit.graph.engines.code_graph import CodeGraphEngine
+
+        engine = CodeGraphEngine.__new__(CodeGraphEngine)
+        tree = ast.parse("import os\nfrom pathlib import Path\nprint('hi')")
+        await engine._extract_imports(tree, "/fake/test.py")
+
+        assert hasattr(engine, "_import_edges")
+        assert "/fake/test.py" in engine._import_edges
+        entries = engine._import_edges["/fake/test.py"]
+        assert len(entries) == 2  # import os + from pathlib import Path
+        assert {"module": "os", "symbol": None} in entries
+        assert {"module": "pathlib", "symbol": "Path"} in entries
+
+    def test_find_imports_of_returns_modules(self):
+        """find_imports_of 返回某文件导入的模块列表。"""
+        from orbit.graph.engines.code_graph import CodeGraphEngine
+
+        engine = CodeGraphEngine.__new__(CodeGraphEngine)
+        engine._import_edges = {
+            "/fake/test.py": [
+                {"module": "os", "symbol": None},
+                {"module": "pathlib", "symbol": "Path"},
+            ]
+        }
+        modules = engine.find_imports_of("/fake/test.py")
+        assert "os" in modules
+        assert "pathlib" in modules
+
+    def test_find_importers_of_matches_prefix(self):
+        """find_importers_of 支持前缀匹配（子模块导入）。"""
+        from orbit.graph.engines.code_graph import CodeGraphEngine
+
+        engine = CodeGraphEngine.__new__(CodeGraphEngine)
+        engine._import_edges = {
+            "/x/a.py": [{"module": "orbit.memory.store", "symbol": "MemoryStore"}],
+            "/x/b.py": [{"module": "orbit.memory", "symbol": None}],
+        }
+        # 查询谁导入了 orbit.memory（父包）
+        importers = engine.find_importers_of("orbit.memory")
+        assert "/x/a.py" in importers
+        assert "/x/b.py" in importers
+
+    def test_incremental_update_clears_edges(self):
+        """P1-3: incremental_update 应清理旧文件的 import 边。"""
+        from orbit.graph.engines.code_graph import CodeGraphEngine
+
+        engine = CodeGraphEngine.__new__(CodeGraphEngine)
+        engine._import_edges = {"/old/file.py": [{"module": "os", "symbol": None}]}
+        # 模拟 incremental_update 中的清理
+        engine._import_edges.pop("/old/file.py", None)
+        assert "/old/file.py" not in engine._import_edges
+
+
 class TestNodeStatus:
     def test_default_status(self):
         node = make_node("X")

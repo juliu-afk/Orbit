@@ -16,7 +16,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict, deque
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 
 
 class RateLimiter:

@@ -201,10 +201,12 @@ class CodeGraphEngine(GraphEngineBase):
         if not hasattr(self, "_import_edges"):
             self._import_edges: dict[str, list[dict]] = {}
         key = from_path
-        self._import_edges.setdefault(key, []).append({
-            "module": module,
-            "symbol": symbol,
-        })
+        self._import_edges.setdefault(key, []).append(
+            {
+                "module": module,
+                "symbol": symbol,
+            }
+        )
 
     def find_imports_of(self, file_path: str) -> list[str]:
         """Phase 3: 查询某文件导入了哪些模块。"""

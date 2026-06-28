@@ -109,13 +109,15 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
         )
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
-    # 启动 EventBus→WS 广播协程
-    if event_bus is not None:
-
-        @app.on_event("startup")
-        async def _start_broadcaster() -> None:
+    # 启动后台任务（EventBus 广播 + Actor Watchdog）
+    @app.on_event("startup")
+    async def _startup_background() -> None:
+        if event_bus is not None:
             asyncio.create_task(start_broadcaster(event_bus))
             logger.info("ws_broadcaster_started")
+        # _actor_watchdog 是模块级单例（line 168），factory 闭包可直接引用
+        asyncio.create_task(_actor_watchdog.run())  # type: ignore[possibly-undefined]
+        logger.info("watchdog_started")
 
     # ClarifierAgent 用 Flash 轻量模型
     from orbit.gateway.client import LLMClient as _LLMClient
@@ -185,12 +187,3 @@ app = create_app(_event_bus)
 
 # Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
 app.state.compose_orchestrator = _compose_orchestrator
-
-
-# Phase 4 AC-A3: Watchdog 在 startup 事件中启动
-@app.on_event("startup")
-async def _start_watchdog() -> None:
-    import asyncio
-
-    asyncio.create_task(_actor_watchdog.run())
-    logger.info("watchdog_started")

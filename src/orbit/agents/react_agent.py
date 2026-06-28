@@ -187,131 +187,174 @@ class ReActAgent(BaseAgent):
         tool_call_count = 0
 
         # 3. ReAct 循环（streaming 版本）
-        for turn in range(self.MAX_TURNS):
-            # 3a. 检查取消信号（用户中断）
-            if cancel_token and cancel_token.is_cancelled:
-                yield StreamEvent(
-                    type=StreamEventType.CANCELLED,
-                    agent_id=agent_id,
-                    task_id=task_id,
-                    turn=turn,
-                    data={"message": "用户取消"},
-                )
-                return
-
-            # 3b. yield TURN_START
-            yield StreamEvent(
-                type=StreamEventType.TURN_START,
-                agent_id=agent_id,
-                task_id=task_id,
-                turn=turn,
-                data={"turn": turn, "remaining_turns": self.MAX_TURNS - turn},
-            )
-
-            # 3c. Phase 2: 上下文压缩
-            if self._compressor and self._budget_tracker:
-                try:
-                    from orbit.compression.models import CompressionAction
-
-                    result = await self._compressor.compress(
-                        messages,
+        try:
+            for turn in range(self.MAX_TURNS):
+                # 3a. 检查取消信号（用户中断）
+                if cancel_token and cancel_token.is_cancelled:
+                    yield StreamEvent(
+                        type=StreamEventType.CANCELLED,
+                        agent_id=agent_id,
                         task_id=task_id,
                         turn=turn,
+                        data={"message": "用户取消"},
                     )
-                    if result.action == CompressionAction.FORK:
-                        yield StreamEvent(
-                            type=StreamEventType.FINISH_STEP,
-                            agent_id=agent_id,
-                            task_id=task_id,
-                            turn=turn,
-                            data={
-                                "output": "上下文过大，已在子 Session 中继续。",
-                                "child_session_id": result.child_session_id,
-                                "turns": turn + 1,
-                                "tool_calls": tool_call_count,
-                            },
-                        )
-                        return
-                except Exception as e:
-                    logger.warning("compression_hook_failed", error=str(e))
+                    return
 
-            # 3d. 检查 mock 模式
-            if self.llm is None:
+                # 3b. yield TURN_START
                 yield StreamEvent(
-                    type=StreamEventType.FINISH_STEP,
+                    type=StreamEventType.TURN_START,
                     agent_id=agent_id,
                     task_id=task_id,
                     turn=turn,
-                    data={
-                        "output": "[mock] ReAct 循环跳过——无 LLM 连接",
-                        "task": input_data.task[:200],
-                        "turns": 1,
-                        "tool_calls": 0,
-                    },
+                    data={"turn": turn, "remaining_turns": self.MAX_TURNS - turn},
                 )
-                return
 
-            # 3e. LLM 流式调用
-            req = LLMRequest(
-                prompt=input_data.task,
-                system_prompt=system,
-                messages=messages if len(messages) > 2 else None,
-                tools=tools_schema if tools_schema else None,
-            )
+                # 3c. Phase 2: 上下文压缩
+                if self._compressor and self._budget_tracker:
+                    try:
+                        from orbit.compression.models import CompressionAction
 
-            # 流式接收 text_delta + tool_call
-            has_tool_calls = False
-            content_parts: list[str] = []
-            try:
-                async for event_type, event_data in self.llm.generate_stream_with_tools(
-                    req,
-                    task_id=task_id,
-                    agent_name=agent_id,
-                ):
-                    if event_type == StreamEventType.TEXT_DELTA:
-                        content_parts.append(event_data["delta"])
-                        yield StreamEvent(
-                            type=StreamEventType.TEXT_DELTA,
-                            agent_id=agent_id,
+                        result = await self._compressor.compress(
+                            messages,
                             task_id=task_id,
                             turn=turn,
-                            data=event_data,
                         )
+                        if result.action == CompressionAction.FORK:
+                            yield StreamEvent(
+                                type=StreamEventType.FINISH_STEP,
+                                agent_id=agent_id,
+                                task_id=task_id,
+                                turn=turn,
+                                data={
+                                    "output": "上下文过大，已在子 Session 中继续。",
+                                    "child_session_id": result.child_session_id,
+                                    "turns": turn + 1,
+                                    "tool_calls": tool_call_count,
+                                },
+                            )
+                            return
+                    except Exception as e:
+                        logger.warning("compression_hook_failed", error=str(e))
 
-                    elif event_type == StreamEventType.TOOL_CALL:
-                        has_tool_calls = True
-                        tool_calls = event_data.get("tool_calls", [])
+                # 3d. 检查 mock 模式
+                if self.llm is None:
+                    yield StreamEvent(
+                        type=StreamEventType.FINISH_STEP,
+                        agent_id=agent_id,
+                        task_id=task_id,
+                        turn=turn,
+                        data={
+                            "output": "[mock] ReAct 循环跳过——无 LLM 连接",
+                            "task": input_data.task[:200],
+                            "turns": 1,
+                            "tool_calls": 0,
+                        },
+                    )
+                    return
 
-                        # 推送 TOOL_CALL 事件
-                        yield StreamEvent(
-                            type=StreamEventType.TOOL_CALL,
-                            agent_id=agent_id,
-                            task_id=task_id,
-                            turn=turn,
-                            data={"tool_calls": tool_calls},
-                        )
+                # 3e. LLM 流式调用
+                req = LLMRequest(
+                    prompt=input_data.task,
+                    system_prompt=system,
+                    messages=messages if len(messages) > 2 else None,
+                    tools=tools_schema if tools_schema else None,
+                )
 
-                        # 执行每个工具
-                        for tc in tool_calls:
-                            func = tc.get("function", {})
-                            tool_name = func.get("name", "")
-                            tool_args_str = func.get("arguments", "{}")
+                # 流式接收 text_delta + tool_call
+                has_tool_calls = False
+                content_parts: list[str] = []
+                try:
+                    async for event_type, event_data in self.llm.generate_stream_with_tools(
+                        req,
+                        task_id=task_id,
+                        agent_name=agent_id,
+                    ):
+                        if event_type == StreamEventType.TEXT_DELTA:
+                            content_parts.append(event_data["delta"])
+                            yield StreamEvent(
+                                type=StreamEventType.TEXT_DELTA,
+                                agent_id=agent_id,
+                                task_id=task_id,
+                                turn=turn,
+                                data=event_data,
+                            )
 
-                            try:
-                                tool_args = json.loads(tool_args_str)
-                            except json.JSONDecodeError:
-                                tool_args = {"raw": tool_args_str}
+                        elif event_type == StreamEventType.TOOL_CALL:
+                            has_tool_calls = True
+                            tool_calls = event_data.get("tool_calls", [])
 
-                            # Doom Loop 检测——警告但不阻塞（非致命错误）
-                            agent_key = f"{self.role.value}_{task_id}"
-                            if self.tools.would_form_loop(agent_key, tool_name, tool_args):
-                                logger.warning(
-                                    "doom_loop_detected",
-                                    agent=self.role.value,
-                                    tool=tool_name,
+                            # 推送 TOOL_CALL 事件
+                            yield StreamEvent(
+                                type=StreamEventType.TOOL_CALL,
+                                agent_id=agent_id,
+                                task_id=task_id,
+                                turn=turn,
+                                data={"tool_calls": tool_calls},
+                            )
+
+                            # 执行每个工具
+                            for tc in tool_calls:
+                                func = tc.get("function", {})
+                                tool_name = func.get("name", "")
+                                tool_args_str = func.get("arguments", "{}")
+
+                                try:
+                                    tool_args = json.loads(tool_args_str)
+                                except json.JSONDecodeError:
+                                    tool_args = {"raw": tool_args_str}
+
+                                # Doom Loop 检测——警告但不阻塞（非致命错误）
+                                agent_key = f"{self.role.value}_{task_id}"
+                                if self.tools.would_form_loop(agent_key, tool_name, tool_args):
+                                    logger.warning(
+                                        "doom_loop_detected",
+                                        agent=self.role.value,
+                                        tool=tool_name,
+                                    )
+                                    # 注入完整消息对到历史——assistant(tool_calls) + tool(warning)
+                                    # WHY 必须先 assistant: 否则 provider 拒绝孤儿 tool 消息
+                                    messages.append(
+                                        {"role": "assistant", "content": None, "tool_calls": [tc]}
+                                    )
+                                    messages.append(
+                                        {
+                                            "role": "tool",
+                                            "tool_call_id": tc.get("id", ""),
+                                            "content": f"死循环检测——连续3次调用 {tool_name} 相同参数。请换一种方式完成任务或报告无法继续。",
+                                        }
+                                    )
+                                    continue
+
+                                self.tools.record_tool_call(agent_key, tool_name, tool_args)
+
+                                try:
+                                    result_str = await self.tools.dispatch(
+                                        tool_name,
+                                        tool_args,
+                                        agent_name=self.role.value,
+                                    )
+                                except DoomLoopError:
+                                    result_str = "检测到工具调用死循环，请换一种方式。"
+                                except Exception as e:
+                                    result_str = f"工具执行失败: {str(e)}"
+
+                                truncated = _truncate_output(result_str, MAX_RESULT_CHARS)
+
+                                # 推送 TOOL_RESULT
+                                yield StreamEvent(
+                                    type=StreamEventType.TOOL_RESULT,
+                                    agent_id=agent_id,
+                                    task_id=task_id,
+                                    turn=turn,
+                                    data={
+                                        "tool": tool_name,
+                                        "result_size": len(result_str),
+                                        "truncated": len(result_str) > MAX_RESULT_CHARS,
+                                        "result_preview": truncated[:200],
+                                    },
                                 )
-                                # 注入完整消息对到历史——assistant(tool_calls) + tool(warning)
-                                # WHY 必须先 assistant: 否则 provider 拒绝孤儿 tool 消息
+
+                                # 更新消息历史
                                 messages.append(
                                     {"role": "assistant", "content": None, "tool_calls": [tc]}
                                 )
@@ -319,157 +362,121 @@ class ReActAgent(BaseAgent):
                                     {
                                         "role": "tool",
                                         "tool_call_id": tc.get("id", ""),
-                                        "content": f"死循环检测——连续3次调用 {tool_name} 相同参数。请换一种方式完成任务或报告无法继续。",
+                                        "content": truncated,
                                     }
                                 )
-                                continue
 
-                            self.tools.record_tool_call(agent_key, tool_name, tool_args)
-
-                            try:
-                                result_str = await self.tools.dispatch(
-                                    tool_name,
-                                    tool_args,
-                                    agent_name=self.role.value,
+                                # 推理链记录
+                                reasoning_chain.append(
+                                    {
+                                        "turn": turn,
+                                        "action": tool_name,
+                                        "args": {
+                                            k: (str(v)[:100] if isinstance(v, str) else v)
+                                            for k, v in tool_args.items()
+                                        },
+                                        "result_preview": truncated[:200],
+                                    }
                                 )
-                            except DoomLoopError:
-                                result_str = "检测到工具调用死循环，请换一种方式。"
-                            except Exception as e:
-                                result_str = f"工具执行失败: {str(e)}"
 
-                            truncated = _truncate_output(result_str, MAX_RESULT_CHARS)
+                                tool_call_count += 1
+                                self._budget.consume()
 
-                            # 推送 TOOL_RESULT
+                        elif event_type == StreamEventType.ERROR:
                             yield StreamEvent(
-                                type=StreamEventType.TOOL_RESULT,
+                                type=StreamEventType.ERROR,
                                 agent_id=agent_id,
                                 task_id=task_id,
                                 turn=turn,
-                                data={
-                                    "tool": tool_name,
-                                    "result_size": len(result_str),
-                                    "truncated": len(result_str) > MAX_RESULT_CHARS,
-                                    "result_preview": truncated[:200],
-                                },
+                                data=event_data,
                             )
+                            return
 
-                            # 更新消息历史
-                            messages.append(
-                                {"role": "assistant", "content": None, "tool_calls": [tc]}
-                            )
-                            messages.append(
-                                {
-                                    "role": "tool",
-                                    "tool_call_id": tc.get("id", ""),
-                                    "content": truncated,
-                                }
-                            )
-
-                            # 推理链记录
-                            reasoning_chain.append(
-                                {
-                                    "turn": turn,
-                                    "action": tool_name,
-                                    "args": {
-                                        k: (str(v)[:100] if isinstance(v, str) else v)
-                                        for k, v in tool_args.items()
-                                    },
-                                    "result_preview": truncated[:200],
-                                }
-                            )
-
-                            tool_call_count += 1
-                            self._budget.consume()
-
-                    elif event_type == StreamEventType.ERROR:
-                        yield StreamEvent(
-                            type=StreamEventType.ERROR,
-                            agent_id=agent_id,
-                            task_id=task_id,
-                            turn=turn,
-                            data=event_data,
-                        )
-                        return
-
-            except Exception as e:
-                logger.error("stream_error", error=str(e), task_id=task_id)
-                yield StreamEvent(
-                    type=StreamEventType.ERROR,
-                    agent_id=agent_id,
-                    task_id=task_id,
-                    turn=turn,
-                    data={"message": str(e), "code": "LLM_ERROR"},
-                )
-                return
-
-            # Phase 4 AC-B1: GoalJudge 自检——每轮 LLM 返回后判定
-            if not has_tool_calls and self._goal_judge and self._goal:
-                transcript = "".join(content_parts)
-                try:
-                    verdict = await self._goal_judge.evaluate(
-                        self._goal, transcript=transcript, task_id=task_id
-                    )
                 except Exception as e:
-                    # P2-1: GoalJudge 异常→fail-open，不困住 Agent
-                    logger.warning("goal_judge_exception_fail_open", error=str(e))
-                    verdict = None  # 跳过判定，正常完成
-                if verdict is not None and not verdict.ok:
-                    # 目标未完成——注入合成 user turn，强制继续
-                    logger.info(
-                        "goal_judge_not_ok",
-                        turn=turn,
-                        reason=verdict.reason,
-                    )
+                    logger.error("stream_error", error=str(e), task_id=task_id)
                     yield StreamEvent(
-                        type=StreamEventType.THINKING,
+                        type=StreamEventType.ERROR,
                         agent_id=agent_id,
                         task_id=task_id,
                         turn=turn,
-                        data={"content": f"判定: {verdict.reason}"},
+                        data={"message": str(e), "code": "LLM_ERROR"},
                     )
-                    messages.append(
-                        {"role": "user", "content": f"任务尚未完成——{verdict.reason}。请继续。"}
+                    return
+
+                # Phase 4 AC-B1: GoalJudge 自检——每轮 LLM 返回后判定
+                if not has_tool_calls and self._goal_judge and self._goal:
+                    transcript = "".join(content_parts)
+                    try:
+                        verdict = await self._goal_judge.evaluate(
+                            self._goal, transcript=transcript, task_id=task_id
+                        )
+                    except Exception as e:
+                        # P2-1: GoalJudge 异常→fail-open，不困住 Agent
+                        logger.warning("goal_judge_exception_fail_open", error=str(e))
+                        verdict = None  # 跳过判定，正常完成
+                    if verdict is not None and not verdict.ok:
+                        # 目标未完成——注入合成 user turn，强制继续
+                        logger.info(
+                            "goal_judge_not_ok",
+                            turn=turn,
+                            reason=verdict.reason,
+                        )
+                        yield StreamEvent(
+                            type=StreamEventType.THINKING,
+                            agent_id=agent_id,
+                            task_id=task_id,
+                            turn=turn,
+                            data={"content": f"判定: {verdict.reason}"},
+                        )
+                        messages.append(
+                            {"role": "user", "content": f"任务尚未完成——{verdict.reason}。请继续。"}
+                        )
+                        continue  # 回到下一轮 turn
+                    # verdict.ok → 正常完成，继续走 finish_step 逻辑
+
+                # 3f. 无 tool_calls → 正常完成
+                if not has_tool_calls:
+                    reasoning_chain.append(
+                        {
+                            "turn": turn,
+                            "action": "finish",
+                            "reasoning": "".join(content_parts)[:500],
+                        }
                     )
-                    continue  # 回到下一轮 turn
-                # verdict.ok → 正常完成，继续走 finish_step 逻辑
+                    yield StreamEvent(
+                        type=StreamEventType.FINISH_STEP,
+                        agent_id=agent_id,
+                        task_id=task_id,
+                        turn=turn,
+                        data={
+                            "output": "".join(content_parts),
+                            "reasoning_chain": reasoning_chain,
+                            "turns": turn + 1,
+                            "tool_calls": tool_call_count,
+                        },
+                    )
+                    return
 
-            # 3f. 无 tool_calls → 正常完成
-            if not has_tool_calls:
-                reasoning_chain.append(
-                    {
-                        "turn": turn,
-                        "action": "finish",
-                        "reasoning": "".join(content_parts)[:500],
-                    }
-                )
-                yield StreamEvent(
-                    type=StreamEventType.FINISH_STEP,
-                    agent_id=agent_id,
-                    task_id=task_id,
-                    turn=turn,
-                    data={
-                        "output": "".join(content_parts),
-                        "reasoning_chain": reasoning_chain,
-                        "turns": turn + 1,
-                        "tool_calls": tool_call_count,
-                    },
-                )
-                return
-
-        # 4. 步数上限
-        logger.warning("react_max_turns", turns=self.MAX_TURNS, task_id=task_id)
-        yield StreamEvent(
-            type=StreamEventType.ERROR,
-            agent_id=agent_id,
-            task_id=task_id,
-            turn=self.MAX_TURNS,
-            data={
-                "message": f"超过最大轮数 ({self.MAX_TURNS})——任务未完成",
-                "code": "MAX_TURNS",
-                "turns": self.MAX_TURNS,
-                "tool_calls": tool_call_count,
-            },
-        )
+            # 4. 步数上限
+            logger.warning("react_max_turns", turns=self.MAX_TURNS, task_id=task_id)
+            yield StreamEvent(
+                type=StreamEventType.ERROR,
+                agent_id=agent_id,
+                task_id=task_id,
+                turn=self.MAX_TURNS,
+                data={
+                    "message": f"超过最大轮数 ({self.MAX_TURNS})——任务未完成",
+                    "code": "MAX_TURNS",
+                    "turns": self.MAX_TURNS,
+                    "tool_calls": tool_call_count,
+                },
+            )
+        finally:
+            # 客户端断连或正常结束时清理资源
+            # WHY: async generator 被 GC 或客户端断连时，保证取消信号传播
+            logger.debug("execute_stream_cleanup", task_id=task_id)
+            if cancel_token and not cancel_token.is_cancelled:
+                cancel_token.cancel()
 
     # ── 内部 ─────────────────────────────────────────────
 

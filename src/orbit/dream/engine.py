@@ -55,19 +55,26 @@ class DreamEngine:
         self._config = config or DreamConfig()
         self._verifier = DreamVerifier(self._config)
 
-    async def run(self) -> DreamResult:
-        """执行完整的 5 阶段 dream 循环."""
-        logger.info("dream_cycle_start")
+    async def run(self, config: DreamConfig | None = None) -> DreamResult:
+        """执行完整的 5 阶段 dream 循环.
+
+        Args:
+            config: 可选运行时配置——不传则用实例默认 _config。
+                    每个请求传入自己的 config，避免并发竞态。
+        """
+        # P1-2: 使用传入 config 或默认值——避免并发请求相互覆盖
+        active_config = config or self._config
+        logger.info("dream_cycle_start", config=active_config.model_dump())
 
         try:
             # Stage 1: GATHER
             memories = self._stage_gather()
 
             # Stage 2: MERGE_1
-            merged_1 = await self._stage_merge(memories, self._config.merge_temperature)
+            merged_1 = await self._stage_merge(memories, active_config.merge_temperature)
 
             # Stage 3: MERGE_2
-            merged_2 = await self._stage_merge(merged_1, self._config.verify_temperature)
+            merged_2 = await self._stage_merge(merged_1, active_config.verify_temperature)
 
             # Stage 4: DEDUP
             deduped = self._stage_dedup(merged_2)

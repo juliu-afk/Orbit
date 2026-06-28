@@ -369,6 +369,7 @@ class TestWorktreeManagerSubprocess:
     @pytest.mark.asyncio
     async def test_git_success_returns_stdout(self, manager, monkeypatch):
         """_git() 成功时应返回 stdout 字符串。"""
+
         async def fake_exec(*args, **kwargs):
             # args[0]="git", args[1:] 是传给 git 的子命令
             return FakeProc(returncode=0, stdout=b"branch-name\n")
@@ -381,6 +382,7 @@ class TestWorktreeManagerSubprocess:
     @pytest.mark.asyncio
     async def test_git_nonzero_raises_runtime_error(self, manager, monkeypatch):
         """_git() 非零退出码应抛出 RuntimeError。"""
+
         async def fake_exec(*args, **kwargs):
             return FakeProc(returncode=128, stderr=b"fatal: not a git repository")
 
@@ -391,6 +393,7 @@ class TestWorktreeManagerSubprocess:
     @pytest.mark.asyncio
     async def test_git_stderr_in_error_message(self, manager, monkeypatch):
         """_git() 失败时错误消息应包含 stderr 输出。"""
+
         async def fake_exec(*args, **kwargs):
             return FakeProc(returncode=1, stderr=b"error: pathspec 'xxx' did not match")
 
@@ -401,6 +404,7 @@ class TestWorktreeManagerSubprocess:
     @pytest.mark.asyncio
     async def test_git_empty_stdout(self, manager, monkeypatch):
         """_git() 正常退出但无输出时返回空字符串。"""
+
         async def fake_exec(*args, **kwargs):
             return FakeProc(returncode=0, stdout=b"")
 
@@ -411,6 +415,7 @@ class TestWorktreeManagerSubprocess:
     @pytest.mark.asyncio
     async def test_create_with_git_failure(self, manager, monkeypatch):
         """create() 在 git worktree add 失败时应抛出异常。"""
+
         async def fake_exec(*args, **kwargs):
             return FakeProc(returncode=128, stderr=b"fatal: branch already exists")
 
@@ -504,13 +509,17 @@ class TestWorktreeManagerEdgeCases:
     async def test_cleanup_safe_partial_failure(self, manager):
         """cleanup_safe() 单个记录 path 不存在时静默跳过。"""
         r1 = WorktreeRecord(
-            worktree_id="wt-ok", branch_name="orbit/wt-ok",
-            strategy=WorktreeStrategy.DELEGATE, path="/fake/wt-ok",
+            worktree_id="wt-ok",
+            branch_name="orbit/wt-ok",
+            strategy=WorktreeStrategy.DELEGATE,
+            path="/fake/wt-ok",
             state=WorktreeState.DISMISSED,
         )
         r2 = WorktreeRecord(
-            worktree_id="wt-nopath", branch_name="orbit/wt-nopath",
-            strategy=WorktreeStrategy.DELEGATE, path="/nonexistent",
+            worktree_id="wt-nopath",
+            branch_name="orbit/wt-nopath",
+            strategy=WorktreeStrategy.DELEGATE,
+            path="/nonexistent",
             state=WorktreeState.DISMISSED,
         )
         manager._worktrees["wt-ok"] = r1

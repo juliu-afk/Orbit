@@ -108,10 +108,20 @@ class MemoryStore:
         existing = self.read_file(file_type)
         new_body = existing.body.rstrip() + "\n\n" + entry.strip() + "\n"
 
-        # 检查大小限制
+        # Phase 3: HyDE 预留接口——在大小检查前追加，避免超限
+        fm = dict(existing.frontmatter)
+        if llm_client:
+            hyde = self._generate_hyde_questions(entry, llm_client)
+            if hyde:
+                new_body += "\n\n## HyDE 假设问答\n" + hyde + "\n"
+                fm["has_hyde"] = True
+
+        # 检查大小限制（含 HyDE 内容）
         if len(new_body.encode("utf-8")) > self._config.max_memory_file_size:
+            # 截断旧内容（保留 body 前 30%，丢掉 HyDE 和旧尾部）
             split_point = int(len(existing.body) * 0.3)
             truncated = existing.body[split_point:]
+            # 重建：归档标记 + 截断旧内容 + 新条目（HyDE 在超限时丢弃）
             new_body = (
                 f"[旧记忆已归档——超出 {self._config.max_memory_file_size // 1000}KB 限制]\n\n"
                 + truncated.rstrip()
@@ -119,15 +129,8 @@ class MemoryStore:
                 + entry.strip()
                 + "\n"
             )
+            fm.pop("has_hyde", None)  # 超限丢弃 HyDE
             logger.warning("memory_file_truncated", path=str(self._path_for(file_type)))
-
-        # Phase 3: HyDE 预留接口（async wrapper 未来 PR 启用）
-        fm = dict(existing.frontmatter)
-        if llm_client:
-            hyde = self._generate_hyde_questions(entry, llm_client)
-            if hyde:
-                new_body += "\n\n## HyDE 假设问答\n" + hyde + "\n"
-                fm["has_hyde"] = True
 
         self.write_file(file_type, new_body, fm)
 

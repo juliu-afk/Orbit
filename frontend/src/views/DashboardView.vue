@@ -64,6 +64,10 @@
           </span>
         </div>
 
+        <el-button size="small" class="aside-detail-btn" @click="composeTrigger?.open()">
+          Spec Compose ▸
+        </el-button>
+        <DreamPanel />
         <el-button size="small" class="aside-detail-btn" @click="showDetail = true">
           详情 ▸
         </el-button>
@@ -97,6 +101,7 @@
       <CodeDiffPanel v-if="taskStore.codeOutput" :code="taskStore.codeOutput" />
     </el-drawer>
 
+    <ComposeTrigger ref="composeTrigger" />
     <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
     <CrossProjectWarning v-if="chatStore.crossProjectWarning" />
   </div>
@@ -119,8 +124,11 @@ import ChatPanel from '@/components/chat/ChatPanel.vue'
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 import CrossProjectWarning from '@/components/chat/CrossProjectWarning.vue'
 import CodeDiffPanel from '@/components/chat/CodeDiffPanel.vue'
+import ComposeTrigger from '@/components/chat/ComposeTrigger.vue'
+import DreamPanel from '@/components/chat/DreamPanel.vue'
 
 const ws = useWebSocket()
+const composeTrigger = ref<InstanceType<typeof ComposeTrigger> | null>(null)
 const session = useSessionStore()
 const agentOpsStore = useAgentOpsStore()
 const chatStore = useChatStore()

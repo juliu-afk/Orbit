@@ -304,6 +304,18 @@ onUnmounted(() => {
   width: 100%;
 }
 
+.aside-section { margin-bottom: 4px; }
+.aside-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 4px 0 6px;
+}
+.aside-tools { display: flex; flex-direction: column; gap: 4px; }
+.aside-footer { margin-top: auto; padding-top: 8px; }
+
 /* ── 抽屉 ── */
 .drawer-alert {
   padding: 8px 12px; margin: 0 12px 4px; border-radius: 4px;

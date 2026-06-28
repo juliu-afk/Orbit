@@ -44,16 +44,14 @@ defineExpose({ open: () => { visible.value = true } })
       :rows="10"
       placeholder="粘贴 spec YAML...&#10;&#10;title: 实现登录功能&#10;tasks:&#10;  - id: login&#10;    description: 实现用户名密码登录&#10;    agent_role: developer&#10;    depends_on: []"
     />
+    <div v-if="result" class="compose-result"><pre>{{ result }}</pre></div>
+    <div v-if="error" class="compose-error">{{ error }}</div>
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
       <el-button type="primary" :loading="running" @click="triggerCompose">
         {{ running ? '执行中...' : '编排执行' }}
       </el-button>
     </template>
-    <div v-if="result" class="compose-result">
-      <pre>{{ result }}</pre>
-    </div>
-    <div v-if="error" class="compose-error">{{ error }}</div>
   </el-dialog>
 </template>
 

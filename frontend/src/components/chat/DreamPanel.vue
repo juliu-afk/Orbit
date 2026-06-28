@@ -17,7 +17,7 @@ const error = ref<string | null>(null)
 async function fetchStatus() {
   try {
     const data = await apiGet<DreamStatus>('/api/v1/dream/status')
-    status.value = data?.status === 'ready' ? 'ready' : 'idle'
+    status.value = data.status === 'ready' ? 'ready' : 'idle'
   } catch {
     status.value = 'error'
   }
@@ -46,7 +46,9 @@ onMounted(fetchStatus)
     <el-button size="small" :loading="loading" @click="triggerDream">
       {{ loading ? 'Dream 中...' : '记忆优化' }}
     </el-button>
-    <span class="dream-status">{{ status === 'ready' ? '✅ 就绪' : '⏳ 待优化' }}</span>
+    <span class="dream-status" :class="`dream-status--${status}`">
+      {{ status === 'ready' ? '就绪' : status === 'error' ? '异常' : '待优化' }}
+    </span>
     <div v-if="dreamResult" class="dream-result">
       <pre>{{ dreamResult }}</pre>
     </div>
@@ -57,6 +59,9 @@ onMounted(fetchStatus)
 <style scoped>
 .dream-panel { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .dream-status { font-size: 12px; color: #666; }
+.dream-status--ready { color: #4caf50; }
+.dream-status--error { color: #f44336; }
+.dream-status--idle { color: #666; }
 .dream-result { margin-top: 8px; background: #f5f5f5; padding: 6px; border-radius: 4px; max-height: 200px; overflow: auto; }
 .dream-result pre { margin: 0; font-size: 11px; }
 .dream-error { margin-top: 6px; color: #ff4d4f; font-size: 12px; }

@@ -67,22 +67,13 @@
           </div>
         </div>
 
-<<<<<<< HEAD
-        <el-button size="small" class="aside-detail-btn" @click="composeTrigger?.open()">
-          Spec Compose ▸
-        </el-button>
-        <DreamPanel />
-        <el-button size="small" class="aside-detail-btn" @click="showDetail = true">
-          详情 ▸
-        </el-button>
-=======
         <el-divider />
 
         <div class="aside-section">
           <div class="aside-section-title">工具箱</div>
           <div class="aside-tools">
             <el-button size="small" @click="composeTrigger?.open()">
-              ⚙️ Spec Compose
+              Spec Compose
             </el-button>
             <DreamPanel />
           </div>
@@ -93,7 +84,6 @@
             详情 ▸
           </el-button>
         </div>
->>>>>>> c3cadcd (feat: UI 布局优化——aside 分区 + ComposeTrigger/DreamPanel 组件)
       </div>
     </div>
 
@@ -151,7 +141,7 @@ import ComposeTrigger from '@/components/chat/ComposeTrigger.vue'
 import DreamPanel from '@/components/chat/DreamPanel.vue'
 
 const ws = useWebSocket()
-const composeTrigger = ref<InstanceType<typeof ComposeTrigger> | null>(null)
+const composeTrigger = ref<{ open: () => void } | null>(null)
 const session = useSessionStore()
 const agentOpsStore = useAgentOpsStore()
 const chatStore = useChatStore()

@@ -23,6 +23,7 @@ from orbit.api.routes import (
     chat,
     compliance,
     compose,
+    dream,
     health,
     knowledge,
     observability,
@@ -85,6 +86,8 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(agent_llm.router, prefix=settings.API_V1_STR)
     # Phase 4 AC-A7: Compose 编排端点
     app.include_router(compose.router, prefix=settings.API_V1_STR)
+    # Phase 2: /dream 记忆合并自循环端点
+    app.include_router(dream.router, prefix=settings.API_V1_STR)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
     # Phase 4 AC-A1: SSE 流式端点
@@ -169,6 +172,12 @@ _compose_orchestrator = ComposeOrchestrator(actor_spawn=_actor_spawn)
 _permission_engine = PermissionEngine()
 _actor_watchdog = ActorWatchdog(_actor_registry)
 
+# Phase 2: /dream 记忆合并引擎（无需 LLM 也能跑纯文本合并）
+from orbit.dream.engine import DreamEngine  # noqa: E402
+from orbit.memory.store import MemoryStore  # noqa: E402
+
+_dream_engine = DreamEngine(memory_store=MemoryStore())
+
 # Phase 4 AC-A4: PermissionEngine 挂载到 ToolRegistry
 from orbit.tools.registry import ToolRegistry  # noqa: E402
 
@@ -187,3 +196,5 @@ app = create_app(_event_bus)
 
 # Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
 app.state.compose_orchestrator = _compose_orchestrator
+# Phase 2: 注入 DreamEngine 到 app state（供 /dream 端点访问）
+app.state.dream_engine = _dream_engine

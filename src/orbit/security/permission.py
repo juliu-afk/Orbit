@@ -16,9 +16,11 @@ from typing import Any
 
 import structlog
 
+from orbit.observability.audit import AuditLogger
 from orbit.security.models import PermissionLayer, SecurityPolicy
 
 logger = structlog.get_logger()
+_audit = AuditLogger(trace_id="permission-engine")
 
 
 # 角色默认工具权限
@@ -74,6 +76,7 @@ class PermissionEngine:
                 agent=agent_role,
                 tool=tool_name,
             )
+            _audit.log("permission_engine", "deny_global", status="denied", agent=agent_role, tool=tool_name)
             return False
 
         # Layer 4: sandbox（shell 必须隔离）
@@ -101,6 +104,7 @@ class PermissionEngine:
                     agent=agent_role,
                     path=path,
                 )
+                _audit.log("permission_engine", "deny_path_scope", status="denied", agent=agent_role, path=path)
                 return False
 
         # Layer 2: tool_category（读写分类 + policy deny）
@@ -112,6 +116,7 @@ class PermissionEngine:
                     agent=agent_role,
                     tool=tool_name,
                 )
+                _audit.log("permission_engine", "deny_tool_category", status="denied", agent=agent_role, tool=tool_name)
                 return False
             if tool_name in policy.allowed_tools:
                 return True
@@ -125,11 +130,14 @@ class PermissionEngine:
                 agent=agent_role,
                 tool=tool_name,
             )
+            _audit.log("permission_engine", "deny_agent_role", status="denied", agent=agent_role, tool=tool_name)
             return False
         if tool_name in defaults.get("allow", []):
+            _audit.log("permission_engine", "allow_explicit", status="allowed", agent=agent_role, tool=tool_name)
             return True
 
         # 无匹配——默认允许（fail-open for tools）
+        _audit.log("permission_engine", "allow_default", status="allowed", agent=agent_role, tool=tool_name)
         return True
 
     # ── 内部 ─────────────────────────────────────

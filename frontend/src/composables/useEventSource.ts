@@ -5,6 +5,9 @@
 
  * 与 useWebSocket.ts 互补——WebSocket 用于 Dashboard 实时更新,
  * SSE 用于 Agent 执行流式输出。
+
+ * P2-2: 增加重连上限——EventSource 默认无限重连，
+ * 服务端持续非 200 时消耗客户端资源。限制最多 5 次重连。
  */
 import { ref, type Ref } from 'vue'
 import type { StreamEvent, StreamEventType } from '@/types/stream'
@@ -16,10 +19,13 @@ const EVENT_TYPES: StreamEventType[] = [
   'turn_start', 'finish_step', 'error', 'cancelled',
 ]
 
+const MAX_RECONNECT = 5
+
 export function useEventSource() {
   const eventSource: Ref<EventSource | null> = ref(null)
   const connectionStatus: Ref<ConnectionStatus> = ref('disconnected')
   const taskId: Ref<string | null> = ref(null)
+  const retryCount = ref(0)
 
   let onEvent: ((event: StreamEvent) => void) | null = null
 
@@ -30,12 +36,14 @@ export function useEventSource() {
   function connect(url: string) {
     disconnect()
     connectionStatus.value = 'connecting'
+    retryCount.value = 0
 
     const es = new EventSource(url)
     eventSource.value = es
 
     es.onopen = () => {
       connectionStatus.value = 'connected'
+      retryCount.value = 0
     }
 
     for (const eventType of EVENT_TYPES) {
@@ -57,11 +65,18 @@ export function useEventSource() {
 
     es.onerror = () => {
       connectionStatus.value = 'disconnected'
-      // EventSource 自动重连——无需手动处理
+      // P2-2: 有限重连——超限后彻底断开
+      retryCount.value++
+      if (retryCount.value >= MAX_RECONNECT) {
+        console.warn('[useEventSource] 已达重连上限', MAX_RECONNECT)
+        es.close()
+        eventSource.value = null
+      }
     }
   }
 
   function disconnect() {
+    retryCount.value = MAX_RECONNECT // 阻止自动重连
     eventSource.value?.close()
     eventSource.value = null
     connectionStatus.value = 'disconnected'
@@ -76,6 +91,7 @@ export function useEventSource() {
     eventSource,
     connectionStatus,
     taskId,
+    retryCount,
     connect,
     disconnect,
     setTaskId,

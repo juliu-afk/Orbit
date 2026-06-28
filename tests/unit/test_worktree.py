@@ -425,20 +425,28 @@ class TestWorktreeManagerSubprocess:
 
     @pytest.mark.asyncio
     async def test_create_custom_base_branch(self, manager, monkeypatch):
-        """create() 使用非默认 base_branch 时应正确命名分支。"""
+        """create() 使用非默认 base_branch 时应传给 git worktree add。
+
+        P2-3: 验证 git 命令参数包含 base_branch，而不仅是 record 字段。
+        git 命令格式: git worktree add -b <branch> --no-track <path> <base>
+        """
         called_args = []
 
         async def fake_exec(*args, **kwargs):
             called_args.append(args)
-            # 模拟 git worktree add 返回分支名
             return FakeProc(returncode=0, stdout=b"orbit/wt-foo\n")
 
         monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
         await manager.create(strategy=WorktreeStrategy.DELEGATE, base_branch="develop")
-        # 验证 branch_name 包含指定的 base
+
+        # 验证 record
         assert manager._worktrees
         record = list(manager._worktrees.values())[0]
         assert record.base_branch == "develop"
+        # 验证 git 命令——至少一次调用以 "develop" 结尾（即 git worktree add ... develop）
+        assert called_args
+        git_calls = [" ".join(a) for a in called_args]
+        assert any("develop" in call for call in git_calls), f"未找到 base_branch 参数: {git_calls}"
 
 
 class TestWorktreeManagerEdgeCases:

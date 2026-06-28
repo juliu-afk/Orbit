@@ -7,12 +7,14 @@ from __future__ import annotations
 
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from orbit.dream.engine import DreamEngine
 from orbit.dream.models import DreamConfig, DreamResult
 
+logger = structlog.get_logger("orbit.dream")
 router = APIRouter()
 
 
@@ -33,14 +35,17 @@ async def dream_run(request: Request, body: DreamRunRequest) -> dict[str, Any]:
     """执行 dream 循环——5 阶段记忆合并（GATHER→MERGE_1→MERGE_2→DEDUP→VERIFY）。
 
     无 LLM 配置时 MERGE 阶段退化为纯文本去重合并。
+    P1-2: config 作为参数传入 run()，避免并发竞态。
+    P1-3: 异常捕获返回统一错误格式，避免 FastAPI 默认 500 HTML。
     """
     engine: DreamEngine | None = getattr(request.app.state, "dream_engine", None)
     if engine is None:
         return {"code": 500, "data": None, "message": "DreamEngine 未配置"}
-    # 如果请求携带自定义 config，应用后运行
-    if body.config:
-        engine._config = body.config
-    result = await engine.run()
+    try:
+        result = await engine.run(config=body.config)
+    except Exception as e:
+        logger.exception("dream_run_failed", error=str(e))
+        return {"code": 500, "data": None, "message": f"Dream 执行失败: {str(e)}"}
     return {"code": 0, "data": result.model_dump(), "message": "ok"}
 
 

@@ -20,16 +20,21 @@ from fastapi import HTTPException, Request, status
 
 
 class RateLimiter:
-    """滑动窗口限流器——内存存储，重启清零（MVP 可接受）.
+    """滑动窗口限流器——类级共享存储（所有实例共享同一桶字典）.
+
+    WHY 类属性而非实例属性: K8s 多 worker/同一进程多端点多实例场景下，
+    不同 RateLimiter 实例应共享计数——否则单实例限制形同虚设。
 
     每个 key（IP + path）维护独立滑动窗口，
     超限返回 HTTP 429 + Retry-After header。
     """
 
+    # 类级共享——所有实例读写同一桶字典
+    _buckets: dict[str, deque[float]] = defaultdict(deque)
+
     def __init__(self, max_requests: int = 10, window_seconds: int = 60) -> None:
         self._max = max_requests
         self._window = window_seconds
-        self._buckets: dict[str, deque[float]] = defaultdict(deque)
 
     async def __call__(self, request: Request) -> None:
         """FastAPI Depends callable——每次请求触发限流检查."""
@@ -41,7 +46,7 @@ class RateLimiter:
         key = f"{client_ip}:{request.url.path}"
 
         now = time.time()
-        bucket = self._buckets[key]
+        bucket = RateLimiter._buckets[key]
         cutoff = now - self._window
 
         # 清除过期记录（滑动窗口边界）

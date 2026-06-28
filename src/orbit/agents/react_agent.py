@@ -87,6 +87,8 @@ class ReActAgent(BaseAgent):
         goal: Goal | None = None,  # Phase 4 AC-B1: Goal 模型
         goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge 实例
         role: AgentRole | None = None,  # Issue #3: 消除 spawn.py type: ignore
+        compressor: ContextCompressor | None = None,  # Phase 2 AC7: 上下文压缩
+        budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7: Token 预算
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
@@ -96,6 +98,9 @@ class ReActAgent(BaseAgent):
         self._goal_judge = goal_judge  # Phase 4
         # WHY role 优先取参数，回退取类属性——兼容子类 class-level role = AgentRole.XXX
         self.role = role or type(self).role
+        # Phase 2 AC7: 注入压缩管线——每轮 turn 自动检查触发
+        self._compressor = compressor
+        self._budget_tracker = budget_tracker
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——向后兼容 wrapper。

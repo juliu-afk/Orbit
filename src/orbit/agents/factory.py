@@ -141,6 +141,8 @@ class AgentFactory:
         sandbox: Sandbox | None = None,
         tools: ToolRegistry | None = None,
         event_bus: EventBus | None = None,
+        compressor: object | None = None,  # Phase 2 AC7: ContextCompressor
+        budget_tracker: object | None = None,  # Phase 2 AC7: TokenBudgetTracker
     ) -> BaseAgent:
         """create = get_agent alias for orchestrator."""
         return cls.get_agent(
@@ -150,6 +152,8 @@ class AgentFactory:
             sandbox=sandbox,
             tools=tools,
             event_bus=event_bus,
+            compressor=compressor,
+            budget_tracker=budget_tracker,
         )
 
     @classmethod
@@ -163,6 +167,8 @@ class AgentFactory:
         event_bus: EventBus | None = None,
         goal: Goal | None = None,  # Phase 4 AC-B1: Goal
         goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge
+        compressor: object | None = None,  # Phase 2 AC7
+        budget_tracker: object | None = None,  # Phase 2 AC7
     ) -> BaseAgent:
         """按角色创建 Agent 实例。
 
@@ -198,6 +204,8 @@ class AgentFactory:
                 goal=goal,
                 goal_judge=goal_judge,
                 role=role,  # Issue #3: 显式传递 role，消除 spawn.py type: ignore
+                compressor=compressor,  # Phase 2 AC7
+                budget_tracker=budget_tracker,  # Phase 2 AC7
             )
         return agent_cls(llm=llm, graph=graph, sandbox=sandbox)
 

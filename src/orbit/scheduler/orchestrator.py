@@ -79,6 +79,8 @@ class Scheduler:
         fail_fast: bool = True,
         # ── Step I1 集成胶水 ──────────────────────
         agent_factory: type[AgentFactory] | None = None,  # AgentFactory (延迟导入避免循环)
+        compressor: object | None = None,  # Phase 2 AC7: ContextCompressor
+        budget_tracker: object | None = None,  # Phase 2 AC7: TokenBudgetTracker
         message_bus: Any = None,  # AgentMessageBus (通信层未导出类型)
         tool_registry: ToolRegistry | None = None,  # ToolRegistry
         # ── Step 2.3 智能路由 ─────────────────────
@@ -98,6 +100,8 @@ class Scheduler:
         self._message_bus = message_bus
         self._tool_registry = tool_registry
         self._audit_logger = audit_logger
+        self._compressor = compressor  # Phase 2 AC7
+        self._budget_tracker = budget_tracker  # Phase 2 AC7
         self.router = router  # Step 2.3: RouterAgent（可选）
         # Step O1: 快车道模式
         self._fast_lane = False
@@ -272,7 +276,11 @@ class Scheduler:
         agent_llm = self._agent_llms.get(role) if self._agent_llms else None
 
         try:
-            agent = self._agent_factory.create(role, llm=agent_llm)
+            agent = self._agent_factory.create(
+                role, llm=agent_llm,
+                compressor=self._compressor,
+                budget_tracker=self._budget_tracker,
+            )
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
             if self._audit_logger:

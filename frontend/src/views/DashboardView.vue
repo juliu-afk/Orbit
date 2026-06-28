@@ -29,41 +29,45 @@
         <ChatPanel />
       </div>
 
-      <!-- 右侧摘要 -->
+      <!-- 右侧面板（监控 + 工具 + 操作） -->
       <div class="aside-col">
-        <div class="aside-item">
-          <span class="aside-label">活跃任务</span>
-          <span class="aside-val">{{ agentOpsStore.metrics?.active_tasks ?? '---' }}</span>
-        </div>
-        <div class="aside-item">
-          <span class="aside-label">Token 消耗</span>
-          <span class="aside-val">{{ totalTokens ?? '---' }}</span>
-        </div>
-        <div class="aside-item">
-          <span class="aside-label">防幻觉拦截</span>
-          <span class="aside-val">{{ totalIntercepted ?? '---' }}</span>
-        </div>
-        <div class="aside-item">
-          <span class="aside-label">熔断器</span>
-          <span class="aside-val aside-cb">
-            <CircuitBreakerLight name="RG" :state="agentOpsStore.metrics?.circuit_breaker_state?.resource_guard ?? -1" />
-            <CircuitBreakerLight name="Z3" :state="agentOpsStore.metrics?.circuit_breaker_state?.z3 ?? -1" />
-            <CircuitBreakerLight name="SB" :state="agentOpsStore.metrics?.circuit_breaker_state?.sandbox ?? -1" />
-          </span>
-        </div>
-        <div v-if="agentOpsStore.alerts.length > 0" class="aside-item aside-item--warn">
-          <span class="aside-label">告警</span>
-          <span class="aside-val">{{ agentOpsStore.alerts.length }}</span>
-        </div>
-        <div class="aside-item">
-          <span class="aside-label">系统健康</span>
-          <span class="aside-val" :class="`health--${agentOpsStore.overallHealth}`">
-            {{ agentOpsStore.overallHealth === 'healthy' ? '正常' :
-               agentOpsStore.overallHealth === 'degraded' ? '降级' :
-               agentOpsStore.overallHealth === 'unhealthy' ? '异常' : '---' }}
-          </span>
+        <div class="aside-section">
+          <div class="aside-section-title">运行状态</div>
+          <div class="aside-item">
+            <span class="aside-label">活跃任务</span>
+            <span class="aside-val">{{ agentOpsStore.metrics?.active_tasks ?? '---' }}</span>
+          </div>
+          <div class="aside-item">
+            <span class="aside-label">Token 消耗</span>
+            <span class="aside-val">{{ totalTokens ?? '---' }}</span>
+          </div>
+          <div class="aside-item">
+            <span class="aside-label">防幻觉拦截</span>
+            <span class="aside-val">{{ totalIntercepted ?? '---' }}</span>
+          </div>
+          <div class="aside-item">
+            <span class="aside-label">熔断器</span>
+            <span class="aside-val aside-cb">
+              <CircuitBreakerLight name="RG" :state="agentOpsStore.metrics?.circuit_breaker_state?.resource_guard ?? -1" />
+              <CircuitBreakerLight name="Z3" :state="agentOpsStore.metrics?.circuit_breaker_state?.z3 ?? -1" />
+              <CircuitBreakerLight name="SB" :state="agentOpsStore.metrics?.circuit_breaker_state?.sandbox ?? -1" />
+            </span>
+          </div>
+          <div v-if="agentOpsStore.alerts.length > 0" class="aside-item aside-item--warn">
+            <span class="aside-label">告警</span>
+            <span class="aside-val">{{ agentOpsStore.alerts.length }}</span>
+          </div>
+          <div class="aside-item">
+            <span class="aside-label">系统健康</span>
+            <span class="aside-val" :class="`health--${agentOpsStore.overallHealth}`">
+              {{ agentOpsStore.overallHealth === 'healthy' ? '正常' :
+                 agentOpsStore.overallHealth === 'degraded' ? '降级' :
+                 agentOpsStore.overallHealth === 'unhealthy' ? '异常' : '---' }}
+            </span>
+          </div>
         </div>
 
+<<<<<<< HEAD
         <el-button size="small" class="aside-detail-btn" @click="composeTrigger?.open()">
           Spec Compose ▸
         </el-button>
@@ -71,6 +75,25 @@
         <el-button size="small" class="aside-detail-btn" @click="showDetail = true">
           详情 ▸
         </el-button>
+=======
+        <el-divider />
+
+        <div class="aside-section">
+          <div class="aside-section-title">工具箱</div>
+          <div class="aside-tools">
+            <el-button size="small" @click="composeTrigger?.open()">
+              ⚙️ Spec Compose
+            </el-button>
+            <DreamPanel />
+          </div>
+        </div>
+
+        <div class="aside-footer">
+          <el-button size="small" class="aside-detail-btn" @click="showDetail = true">
+            详情 ▸
+          </el-button>
+        </div>
+>>>>>>> c3cadcd (feat: UI 布局优化——aside 分区 + ComposeTrigger/DreamPanel 组件)
       </div>
     </div>
 

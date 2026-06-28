@@ -220,14 +220,20 @@ class CodeGraphEngine(GraphEngineBase):
             return list({n.file_path for n in nodes if n.file_path})
 
     def find_importers_of(self, module_path: str) -> list[str]:
-        """Phase 3: 哪些文件导入了指定模块（内存查询，毫秒级）。"""
+        """Phase 3: 哪些文件导入了指定模块（内存查询，毫秒级）。
+
+        P2-8: 去重——一个文件可能多次 import 同一模块。
+        """
         module_name = module_path.replace("/", ".").replace(".py", "").lstrip(".")
         results = []
         for file_path, imports in getattr(self, "_import_edges", {}).items():
             for entry in imports:
-                if entry["module"] == module_name or module_name.endswith("." + entry["module"]):
+                entry_module = entry["module"]
+                # 精确匹配 或 目标模块是父包（from X import Y where X=module_name）
+                if entry_module == module_name or entry_module.startswith(module_name + "."):
                     results.append(file_path)
-        return results
+                    break  # 一个文件只计一次
+        return list(set(results))
 
     # ---- 查询接口 ----
 

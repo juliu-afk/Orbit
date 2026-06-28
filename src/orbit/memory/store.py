@@ -147,14 +147,15 @@ class MemoryStore:
             from orbit.gateway.schemas import LLMRequest
 
             prompt = (
-                "基于以下记忆片段，生成 3 条用户可能会问到的问题（问+答对）：\n\n"
-                f"记忆片段：{entry[:1000]}\n\n"
-                "输出格式（每行一条，Q: 开头）：\n"
-                "Q: 问题1？\nA: 简要回答1\n"
-                "Q: 问题2？\nA: 简要回答2\n"
-                "Q: 问题3？\nA: 简要回答3"
+                f"根据以下记忆，写出 3 个用户可能提出的问题及简要回答。\n"
+                f"只输出问答，不要额外解释。\n\n"
+                f"记忆：{entry[:800]}\n\n"
+                f"输出格式（严格遵守）：\n"
+                f"Q: （问题1）\nA: （回答1）\n"
+                f"Q: （问题2）\nA: （回答2）\n"
+                f"Q: （问题3）\nA: （回答3）"
             )
-            req = LLMRequest(prompt=prompt, max_tokens=300)
+            req = LLMRequest(prompt=prompt, max_tokens=256)
             # generate() 可能是 async——用 try/except 保护
             resp = llm_client.generate(req, task_id="hyde")
             content = getattr(resp, "content", None)

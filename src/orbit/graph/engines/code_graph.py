@@ -46,10 +46,16 @@ class CodeGraphEngine(GraphEngineBase):
         return count
 
     async def incremental_update(self, file_path: str) -> bool:
-        """增量更新单个文件（SC3）。先删旧节点，再重新解析。"""
+        """增量更新单个文件（SC3）。先删旧节点+边+import，再重新解析。
+
+        P1-3: 清理 _import_edges——否则旧文件的 import 边残留，
+        导致 find_importers_of 返回已删除文件的错结果。
+        """
         path = Path(file_path)
-        # 删该文件的旧节点 + 相关边
         await self.delete_nodes_by_file(CodeNode, str(path))
+        # 清理该文件的 import 边
+        if hasattr(self, "_import_edges"):
+            self._import_edges.pop(str(path), None)
         return await self._parse_file(path)
 
     async def _parse_file(self, path: Path) -> bool:

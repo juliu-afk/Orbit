@@ -121,47 +121,23 @@ class MemoryStore:
             )
             logger.warning("memory_file_truncated", path=str(self._path_for(file_type)))
 
-        # Phase 3: HyDE 假设问答生成
+        # Phase 3: HyDE 预留接口（async wrapper 未来 PR 启用）
         fm = dict(existing.frontmatter)
         if llm_client:
-            try:
-                hyde = self._generate_hyde_questions(entry, llm_client)
-                if hyde:
-                    new_body += "\n\n## HyDE 假设问答\n" + hyde + "\n"
-                    fm["has_hyde"] = True
-            except (OSError, RuntimeError, ValueError) as e:
-                logger.debug("hyde_generation_skipped", error=str(e))
+            hyde = self._generate_hyde_questions(entry, llm_client)
+            if hyde:
+                new_body += "\n\n## HyDE 假设问答\n" + hyde + "\n"
+                fm["has_hyde"] = True
 
         self.write_file(file_type, new_body, fm)
 
     def _generate_hyde_questions(self, entry: str, llm_client: object | None) -> str:
-        """Phase 3: 生成 HyDE 假设问答——用 LLM 预测用户可能如何提问。
+        """Phase 3: HyDE 假设问答——预留 async 集成接口。
 
-        WHY: 用户查询可能用不同措辞，假设问答桥接"同义不同词" gap。
-        NOTE: append_to_file 是同步方法，实际生产调用需配合 async wrapper。
-              当前返回空字符串，为未来集成预留接口。
+        P1-2: append_to_file 是同步方法，LLMClient.generate() 返回 coroutine，
+        同步调用无法 await。当前返回空字符串，待 async wrapper 实现后再启用。
         """
-        if llm_client is None:
-            return ""
-        try:
-            from orbit.gateway.schemas import LLMRequest
-
-            prompt = (
-                f"根据以下记忆，写出 3 个用户可能提出的问题及简要回答。\n"
-                f"只输出问答，不要额外解释。\n\n"
-                f"记忆：{entry[:800]}\n\n"
-                f"输出格式（严格遵守）：\n"
-                f"Q: （问题1）\nA: （回答1）\n"
-                f"Q: （问题2）\nA: （回答2）\n"
-                f"Q: （问题3）\nA: （回答3）"
-            )
-            req = LLMRequest(prompt=prompt, max_tokens=256)
-            # generate() 可能是 async——用 try/except 保护
-            resp = llm_client.generate(req, task_id="hyde")
-            content = getattr(resp, "content", None)
-            return content or ""
-        except Exception:
-            return ""
+        return ""  # TODO: async HyDE wrapper (future PR)
 
     # ── 搜索 ───────────────────────────────────────────
 

@@ -12,11 +12,13 @@ class Verdict(BaseModel):
     """Goal Judge 判定结果。
 
     fail-open: judge 出错 → ok=true（不困住用户）。
+    Phase 1 CRAG: not_ok 时附带 memory 检索的建议（suggestions）。
     """
 
     ok: bool = Field(..., description="目标是否已完成")
     impossible: bool = Field(False, description="目标是否不可完成")
     reason: str = Field("", description="判定理由")
+    suggestions: list[str] = Field(default_factory=list, description="CRAG: 相似经验建议")
 
 
 class Goal(BaseModel):

@@ -84,6 +84,8 @@ class DreamEngine:
 
             # 写入 MEMORY.md
             if result.status == DreamStatus.COMPLETE:
+                # Phase 1: 写入前先衰减旧记忆评分——旧的不用的记忆权重自然降低
+                self._store.decay_scores()
                 self._store.write_file(
                     MemoryFileType.EPISODIC,
                     deduped,

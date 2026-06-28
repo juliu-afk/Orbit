@@ -44,12 +44,16 @@ class MemorySearchQuery:
 
 @dataclass
 class MemorySearchResult:
-    """记忆搜索结果."""
+    """记忆搜索结果.
+
+    Phase 1: score 字段复用为质量评分——检索时偏爱高质量记忆。
+    """
 
     path: str
-    score: float  # BM25 评分
+    score: float  # BM25 评分 + 质量评分加成
     snippet: str  # 高亮片段
     line_number: int = 0
+    entry_score: float = 1.0  # Phase 1: 记忆条目的质量评分
 
 
 @dataclass

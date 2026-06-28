@@ -24,15 +24,19 @@ class GoalJudge:
     """目标达成判定器。
 
     Usage:
-        judge = GoalJudge(llm_client, actor_registry)
+        judge = GoalJudge(llm_client, actor_registry, memory_store)
         verdict = await judge.evaluate(goal, transcript)
         if verdict.ok:
             # 允许 Agent 停止
+
+    Phase 1 CRAG: not_ok 时自动从 memory 检索相似经验，
+    注入 verdict.suggestions——Agent 获得补充上下文。
     """
 
-    def __init__(self, llm: Any = None, registry: Any = None) -> None:
+    def __init__(self, llm: Any = None, registry: Any = None, memory_store: Any = None) -> None:
         self.llm = llm  # LLMClient
         self.registry = registry  # ActorRegistry
+        self._memory = memory_store  # MemoryStore (Phase 1 CRAG)
 
     async def evaluate(
         self,
@@ -40,7 +44,7 @@ class GoalJudge:
         transcript: str = "",
         task_id: str = "",
     ) -> Verdict:
-        """两级门禁判定。
+        """两级门禁判定 + CRAG 补充检索。
 
         Args:
             goal: 用户目标
@@ -48,12 +52,13 @@ class GoalJudge:
             task_id: 父任务 ID
 
         Returns:
-            Verdict——ok=true 表示可以停止
+            Verdict——ok=true 表示可以停止；
+            not_ok 时 suggestions 包含 memory 检索的相似经验。
         """
         # 1. Task Gate（便宜预检——检查未完成的子Actor）
         task_verdict = await self._task_gate(task_id)
         if task_verdict is not None:
-            return task_verdict
+            return self._enrich_with_suggestions(task_verdict, transcript)
 
         # 2. 无活跃 goal → 跳过 goal gate
         if not goal.description:
@@ -75,19 +80,36 @@ class GoalJudge:
         goal.react_count += 1
 
         if self.llm is None:
-            # mock 模式——无 LLM → fail-open: 当作完成
             logger.info("goal_judge_mock_mode_fail_open")
             return Verdict(ok=True, reason="mock mode fail-open")
 
         try:
-            return await self._goal_gate(goal, transcript)
+            verdict = await self._goal_gate(goal, transcript)
+            return self._enrich_with_suggestions(verdict, transcript)
         except (RuntimeError, OSError, ValueError, KeyError) as e:
-            # RuntimeError: LLM 调用失败
-            # OSError: 网络错误
-            # ValueError/KeyError: JSON 解析失败
-            # fail-open: judge 失败 → 当作已完成
             logger.error("goal_judge_failed_fail_open", error=str(e), exc_info=True)
             return Verdict(ok=True, reason=f"judge 失败→fail-open: {str(e)}")
+
+    def _enrich_with_suggestions(self, verdict: Verdict, transcript: str) -> Verdict:
+        """CRAG: not_ok 时从 memory 检索相似经验注入 suggestions。
+
+        WHY 不内嵌在 evaluate: 独立方法方便测试和禁用 CRAG。
+        """
+        if verdict.ok or not self._memory:
+            return verdict
+        try:
+            from orbit.memory.models import MemorySearchQuery
+
+            # 用 transcript 关键片段搜索——取最后 500 字符
+            query_text = transcript[-500:] if len(transcript) > 500 else transcript
+            results = self._memory.search(MemorySearchQuery(query=query_text, max_results=3))
+            if results:
+                verdict.suggestions = [r.snippet for r in results]
+                logger.info("crag_suggestions_found", count=len(results))
+        except (OSError, RuntimeError, ValueError) as e:
+            # CRAG 失败不阻塞——静默降级
+            logger.debug("crag_search_failed", error=str(e))
+        return verdict
 
     # ── 内部 ─────────────────────────────────────
 

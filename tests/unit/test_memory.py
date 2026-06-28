@@ -95,6 +95,65 @@ class TestMemoryStore:
         assert "通用" in mem.body or "developer" in mem.body.lower()
 
 
+class TestMemoryScoring:
+    """Phase 1: Memory 评分（hit + decay）。"""
+
+    @pytest.fixture
+    def tmp_store(self, tmp_path):
+        from orbit.memory.store import MemoryStore
+
+        store = MemoryStore(str(tmp_path))
+        # Phase 1: 扁平化前端存储——score.{key}: value
+        store.write_file(
+            MemoryFileType.EPISODIC,
+            "## Section A\nmemory alpha\n## Section B\nmemory beta\n",
+            frontmatter={"score.key-a": "3.0", "score.key-b": "1.0"},
+        )
+        return store
+
+    def test_hit_increases_score(self, tmp_store):
+        """hit() 应增加指定 key 的评分。"""
+        tmp_store.hit("key-b", delta=1.0)
+        mem = tmp_store.read_file(MemoryFileType.EPISODIC)
+        assert mem.frontmatter["score.key-b"] == "2.0"  # 1.0 + 1.0
+        assert mem.frontmatter["score.key-a"] == "3.0"  # unchanged
+
+    def test_hit_creates_new_score(self, tmp_store):
+        """hit() 对不存在的 key 应创建评分。"""
+        tmp_store.hit("key-new", delta=1.0)
+        mem = tmp_store.read_file(MemoryFileType.EPISODIC)
+        # frontmatter 值均为字符串（简单解析器）
+        assert float(mem.frontmatter["score.key-new"]) == 2.0  # default 1.0 + 1.0
+
+    def test_decay_reduces_all_scores(self, tmp_store):
+        """decay_scores() 应降低所有评分条目。"""
+        count = tmp_store.decay_scores(factor=0.5)
+        assert count == 2
+        mem = tmp_store.read_file(MemoryFileType.EPISODIC)
+        assert float(mem.frontmatter["score.key-a"]) == 1.5  # 3.0 * 0.5
+        assert float(mem.frontmatter["score.key-b"]) == 0.5  # 1.0 * 0.5
+
+    def test_decay_floor(self, tmp_store):
+        """decay_scores() 不低于 min=0.1。"""
+        tmp_store.hit("key-b", delta=-0.95)  # 1.0 - 0.95 = 0.05 → 会被 clamp
+        tmp_store.decay_scores(factor=0.5)
+        mem = tmp_store.read_file(MemoryFileType.EPISODIC)
+        assert float(mem.frontmatter["score.key-b"]) >= 0.1  # floor
+
+    def test_score_stored_in_frontmatter(self, tmp_store):
+        """评分应持久化在 frontmatter 中，格式为 score.{key}。"""
+        mem = tmp_store.read_file(MemoryFileType.EPISODIC)
+        assert "score.key-a" in mem.frontmatter
+        assert "score.key-b" in mem.frontmatter
+
+    def test_search_result_has_entry_score_field(self):
+        """MemorySearchResult 应有 entry_score 字段。"""
+        from orbit.memory.models import MemorySearchResult
+
+        r = MemorySearchResult(path="/x", score=0.8, snippet="test", entry_score=2.5)
+        assert r.entry_score == 2.5
+
+
 class TestDreamVerifier:
     def test_pass(self):
         from orbit.dream.models import DreamConfig

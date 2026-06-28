@@ -18,6 +18,7 @@ router = APIRouter()
 
 class DreamRunRequest(BaseModel):
     """触发 dream 循环请求."""
+
     config: DreamConfig | None = Field(None, description="合并配置——不传用默认值")
 
 

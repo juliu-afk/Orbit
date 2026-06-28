@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from orbit.actors.registry import ActorRegistry
     from orbit.agents.factory import AgentFactory
-    from orbit.agents.react_agent import ReActAgent
     from orbit.events.bus import EventBus
     from orbit.gateway.client import LLMClient
     from orbit.tools.registry import ToolRegistry
@@ -23,7 +22,7 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.actors.models import ActorOutcome, ActorRecord, ActorStatus
-from orbit.agents.base import AgentInput, AgentRole
+from orbit.agents.base import AgentInput, AgentRole, BaseAgent
 from orbit.stream.cancellation import CancellationToken
 
 logger = structlog.get_logger()
@@ -81,7 +80,11 @@ class ActorSpawn:
         result = await deferred.result(timeout=300)
     """
 
-    def __init__(self, registry: ActorRegistry | None = None, agent_factory: type[AgentFactory] | None = None) -> None:  # noqa: F821
+    def __init__(
+        self,
+        registry: ActorRegistry | None = None,
+        agent_factory: type[AgentFactory] | None = None,
+    ) -> None:
         from orbit.actors.registry import ActorRegistry
 
         self.registry: ActorRegistry = registry or ActorRegistry()
@@ -231,7 +234,13 @@ class ActorSpawn:
             deferred = DeferredActor(actor_id, task_obj, token)
             return deferred
 
-    def _create_agent(self, role: AgentRole, llm: LLMClient | None, tools: ToolRegistry | None, event_bus: EventBus | None) -> ReActAgent:  # noqa: F821
+    def _create_agent(
+        self,
+        role: AgentRole,
+        llm: LLMClient | None,
+        tools: ToolRegistry | None,
+        event_bus: EventBus | None,
+    ) -> BaseAgent:
         """创建 Agent 实例——优先用 AgentFactory，回退直接实例化。"""
         if self.agent_factory:
             try:

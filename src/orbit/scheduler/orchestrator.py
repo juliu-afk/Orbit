@@ -266,7 +266,7 @@ class Scheduler:
 
         # 记录审计
         if self._audit_logger:
-            self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, component=role)
+            self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, role=role)
 
         try:
             from orbit.agents.base import AgentInput
@@ -287,14 +287,14 @@ class Scheduler:
             logger.warning("agent_timeout", role=role, task_id=task_id)
             if self._audit_logger:
                 self._audit_logger.log(
-                    "orchestrator", "agent_timeout", task_id=task_id, component=role
+                    "orchestrator", "agent_timeout", task_id=task_id, role=role
                 )
             raise
         except Exception as e:
             logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
             if self._audit_logger:
                 self._audit_logger.log(
-                    "orchestrator", "agent_run_error", task_id=task_id, component=role, error=str(e)
+                    "orchestrator", "agent_run_error", task_id=task_id, role=role, error=str(e)
                 )
             raise
 

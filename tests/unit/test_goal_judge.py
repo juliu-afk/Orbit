@@ -45,7 +45,10 @@ class TestVerdictModel:
 
         v = Verdict(ok=True, reason="done")
         d = v.model_dump()
-        assert d == {"ok": True, "impossible": False, "reason": "done"}
+        assert d["ok"] is True
+        assert d["impossible"] is False
+        assert d["reason"] == "done"
+        assert d["suggestions"] == []  # Phase 1: 新字段，向后兼容
 
 
 class TestGoalModel:
@@ -220,3 +223,47 @@ class TestGoalJudge:
 
         verdict = await judge.evaluate(goal, transcript="...")
         assert verdict.ok is True
+
+    @pytest.mark.asyncio
+    async def test_suggestions_field_in_verdict(self):
+        """Verdict 支持 suggestions 字段——向后兼容（默认空列表）。"""
+        from orbit.goal_judge.models import Verdict
+
+        v = Verdict(ok=False, reason="incomplete", suggestions=["tip1", "tip2"])
+        assert v.suggestions == ["tip1", "tip2"]
+
+        v2 = Verdict(ok=True, reason="done")
+        assert v2.suggestions == []  # 默认空
+
+    @pytest.mark.asyncio
+    async def test_suggestions_field_serializable(self):
+        """Verdict.suggestions 正确序列化。"""
+        from orbit.goal_judge.models import Verdict
+
+        v = Verdict(ok=False, reason="nope", suggestions=["fix imports"])
+        d = v.model_dump()
+        assert d["suggestions"] == ["fix imports"]
+
+    @pytest.mark.asyncio
+    async def test_crag_enrich_no_memory(self):
+        """无 memory_store → suggestions 为空（不崩溃）。"""
+        from orbit.goal_judge.judge import GoalJudge
+        from orbit.goal_judge.models import Verdict
+
+        judge = GoalJudge()
+        result = judge._enrich_with_suggestions(
+            Verdict(ok=False, reason="test"), transcript="need help"
+        )
+        assert result.suggestions == []  # 无 memory，静默跳过
+
+    @pytest.mark.asyncio
+    async def test_crag_enrich_ok_skips_search(self):
+        """ok=True → 不触发搜索（避免不必要的 I/O）。"""
+        from orbit.goal_judge.judge import GoalJudge
+        from orbit.goal_judge.models import Verdict
+
+        judge = GoalJudge()  # no memory
+        result = judge._enrich_with_suggestions(
+            Verdict(ok=True, reason="all good"), transcript="done"
+        )
+        assert result.suggestions == []

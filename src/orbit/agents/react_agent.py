@@ -429,6 +429,7 @@ class ReActAgent(BaseAgent):
                             "goal_judge_not_ok",
                             turn=turn,
                             reason=verdict.reason,
+                            suggestions=len(verdict.suggestions) if verdict.suggestions else 0,
                         )
                         yield StreamEvent(
                             type=StreamEventType.THINKING,
@@ -437,9 +438,16 @@ class ReActAgent(BaseAgent):
                             turn=turn,
                             data={"content": f"判定: {verdict.reason}"},
                         )
-                        messages.append(
-                            {"role": "user", "content": f"任务尚未完成——{verdict.reason}。请继续。"}
-                        )
+                        # Phase 1 CRAG: 有相似经验时注入到 user turn
+                        prompt = f"任务尚未完成——{verdict.reason}。"
+                        if verdict.suggestions:
+                            prompt += "\n\n相关历史经验：\n" + "\n".join(
+                                f"- {s}" for s in verdict.suggestions
+                            )
+                            prompt += "\n\n请参考经验继续完成。"
+                        else:
+                            prompt += "请继续。"
+                        messages.append({"role": "user", "content": prompt})
                         continue  # 回到下一轮 turn
                     # verdict.ok → 正常完成，继续走 finish_step 逻辑
 

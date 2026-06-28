@@ -151,6 +151,49 @@ class MemoryStore:
         results.sort(key=lambda r: r.score, reverse=True)
         return results[: query.max_results]
 
+    # ── Phase 1: 评分 ──────────────────────────────────
+
+    def hit(self, key: str, delta: float = 1.0) -> None:
+        """命中记忆条目——增加评分。
+
+        WHY 独立方法: 每次检索命中后调用，Agent 任务成功时批量记分。
+        """
+        self._score_update(key, delta)
+        logger.debug("memory_hit", key=key, delta=delta)
+
+    def decay_scores(self, factor: float = 0.95) -> int:
+        """衰减所有条目评分——每天调用一次（/dream 触发）。
+
+        WHY 扁平存储: frontmatter 中每个条目占一行 score.{key}: value。
+        Returns:
+            衰减影响的条目数。
+        """
+        mem = self.read_file(MemoryFileType.EPISODIC)
+        updated = 0
+        keys_to_decay = [k for k in mem.frontmatter if k.startswith("score.")]
+        for key in keys_to_decay:
+            new_val = max(0.1, float(mem.frontmatter[key]) * factor)
+            mem.frontmatter[key] = new_val
+            updated += 1
+
+        if updated:
+            mem.frontmatter["last_decay"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            self.write_file(MemoryFileType.EPISODIC, mem.body, mem.frontmatter)
+            logger.info("memory_scores_decayed", count=updated, factor=factor)
+        return updated
+
+    def _score_update(self, key: str, delta: float) -> None:
+        """读写 frontmatter——扁平化存储：每个 key 一行 score.{key}: value。
+
+        WHY 扁平而非嵌套 dict: _parse_yaml_frontmatter 只支持 key: value，
+        不支持嵌套结构。用 prefix 编码实现多维 key。
+        """
+        mem = self.read_file(MemoryFileType.EPISODIC)
+        score_key = f"score.{key}"
+        current = float(mem.frontmatter.get(score_key, 1.0))
+        mem.frontmatter[score_key] = current + delta
+        self.write_file(MemoryFileType.EPISODIC, mem.body, mem.frontmatter)
+
     # ── 同步 ───────────────────────────────────────────
 
     def reconcile(self, file_type: MemoryFileType, in_memory_version: MemoryFile) -> bool:

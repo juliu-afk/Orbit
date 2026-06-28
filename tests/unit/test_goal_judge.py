@@ -248,7 +248,7 @@ class TestGoalJudge:
     async def test_crag_enrich_no_memory(self):
         """无 memory_store → suggestions 为空（不崩溃）。"""
         from orbit.goal_judge.judge import GoalJudge
-        from orbit.goal_judge.models import Goal, Verdict
+        from orbit.goal_judge.models import Verdict
 
         judge = GoalJudge()
         result = judge._enrich_with_suggestions(

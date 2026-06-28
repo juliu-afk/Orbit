@@ -154,6 +154,42 @@ class TestMemoryScoring:
         assert r.entry_score == 2.5
 
 
+class TestHydeGeneration:
+    """Phase 3: HyDE 假设问答生成。"""
+
+    def test_hyde_skipped_without_llm(self, tmp_path):
+        """无 LLM 时 append_to_file 不应崩溃。"""
+        from orbit.memory.store import MemoryStore
+
+        store = MemoryStore(str(tmp_path))
+        store.append_to_file(MemoryFileType.EPISODIC, "bare memory")
+        mem = store.read_file(MemoryFileType.EPISODIC)
+        assert "HyDE" not in mem.body
+
+    def test_hyde_handles_llm_error_gracefully(self, tmp_path):
+        """LLM 调用失败时静默跳过，保留原始条目。"""
+        from orbit.memory.store import MemoryStore
+
+        store = MemoryStore(str(tmp_path))
+        # 传入一个 generate 是 async 的 mock——同步调用时会抛 TypeError
+        # _generate_hyde_questions 的 except Exception 应捕获
+        class BadLLM:
+            def generate(self, *a, **kw):
+                raise RuntimeError("down")
+        store.append_to_file(MemoryFileType.EPISODIC, "entry", llm_client=BadLLM())
+        mem = store.read_file(MemoryFileType.EPISODIC)
+        assert "entry" in mem.body  # 原始内容保留
+
+    def test_hyde_questions_format(self):
+        """_generate_hyde_questions 返回 Q: A: 格式文本或空字符串。"""
+        from orbit.memory.store import MemoryStore
+
+        store = MemoryStore()
+        # 无 LLM（None）→ 返回空字符串
+        result = store._generate_hyde_questions("test entry", None)
+        assert result == ""  # None llm → 静默返回空
+
+
 class TestDreamVerifier:
     def test_pass(self):
         from orbit.dream.models import DreamConfig

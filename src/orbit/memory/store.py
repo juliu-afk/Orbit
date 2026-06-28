@@ -98,14 +98,18 @@ class MemoryStore:
         path.write_text(content, encoding="utf-8")
         logger.info("memory_file_written", path=str(path), size=len(content))
 
-    def append_to_file(self, file_type: MemoryFileType, entry: str) -> None:
-        """追加条目到记忆文件——保留已有内容."""
+    def append_to_file(
+        self, file_type: MemoryFileType, entry: str, llm_client: object = None
+    ) -> None:
+        """追加条目到记忆文件——保留已有内容.
+
+        Phase 3 HyDE: llm_client 参数用于写入时生成假设问答。
+        """
         existing = self.read_file(file_type)
         new_body = existing.body.rstrip() + "\n\n" + entry.strip() + "\n"
 
         # 检查大小限制
         if len(new_body.encode("utf-8")) > self._config.max_memory_file_size:
-            # 截断旧内容，保留最近的 70%
             split_point = int(len(existing.body) * 0.3)
             truncated = existing.body[split_point:]
             new_body = (
@@ -117,7 +121,46 @@ class MemoryStore:
             )
             logger.warning("memory_file_truncated", path=str(self._path_for(file_type)))
 
-        self.write_file(file_type, new_body, existing.frontmatter)
+        # Phase 3: HyDE 假设问答生成
+        fm = dict(existing.frontmatter)
+        if llm_client:
+            try:
+                hyde = self._generate_hyde_questions(entry, llm_client)
+                if hyde:
+                    new_body += "\n\n## HyDE 假设问答\n" + hyde + "\n"
+                    fm["has_hyde"] = "true"
+            except (OSError, RuntimeError, ValueError) as e:
+                logger.debug("hyde_generation_skipped", error=str(e))
+
+        self.write_file(file_type, new_body, fm)
+
+    def _generate_hyde_questions(self, entry: str, llm_client: object | None) -> str:
+        """Phase 3: 生成 HyDE 假设问答——用 LLM 预测用户可能如何提问。
+
+        WHY: 用户查询可能用不同措辞，假设问答桥接"同义不同词" gap。
+        NOTE: append_to_file 是同步方法，实际生产调用需配合 async wrapper。
+              当前返回空字符串，为未来集成预留接口。
+        """
+        if llm_client is None:
+            return ""
+        try:
+            from orbit.gateway.schemas import LLMRequest
+
+            prompt = (
+                "基于以下记忆片段，生成 3 条用户可能会问到的问题（问+答对）：\n\n"
+                f"记忆片段：{entry[:1000]}\n\n"
+                "输出格式（每行一条，Q: 开头）：\n"
+                "Q: 问题1？\nA: 简要回答1\n"
+                "Q: 问题2？\nA: 简要回答2\n"
+                "Q: 问题3？\nA: 简要回答3"
+            )
+            req = LLMRequest(prompt=prompt, max_tokens=300)
+            # generate() 可能是 async——用 try/except 保护
+            resp = llm_client.generate(req, task_id="hyde")
+            content = getattr(resp, "content", None)
+            return content or ""
+        except Exception:
+            return ""
 
     # ── 搜索 ───────────────────────────────────────────
 

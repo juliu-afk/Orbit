@@ -112,6 +112,8 @@ class CodeGraphEngine(GraphEngineBase):
 
         # 第二遍：提取调用关系（需在符号定义入库后）
         await self._extract_calls(tree, str(path))
+        # Phase 3: 提取跨文件 import 关系
+        self._extract_imports(tree, str(path))
         return True
 
     async def _extract_calls(self, tree: ast.AST, file_path: str) -> None:
@@ -167,6 +169,61 @@ class CodeGraphEngine(GraphEngineBase):
         if isinstance(node, ast.Attribute):
             return node.attr
         return None
+
+    async def _extract_imports(self, tree: ast.AST, file_path: str) -> None:
+        """Phase 3: 提取跨文件 import 关系——存入 Edge 表。
+
+        import X → 边: file_path -(imports)→ X 对应模块文件
+        from X import Y → 边: file_path -(imports symbol Y)→ X.Y
+        """
+        from_path = file_path
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    self._record_import_edge(from_path, alias.name, None)
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                for alias in node.names:
+                    self._record_import_edge(from_path, module, alias.name)
+
+    def _record_import_edge(self, from_path: str, module: str, symbol: str | None) -> None:
+        """记录导入边到实例字典——简单快速，无需 DB session。
+
+        WHY 字典而非 SQLAlchemy: import 边数量大（每个文件数十条），
+        批量解析时逐条 upsert 太慢。内存存储足够（查询时按文件查）。
+        """
+        if not hasattr(self, "_import_edges"):
+            self._import_edges: dict[str, list[dict]] = {}
+        key = from_path
+        self._import_edges.setdefault(key, []).append({
+            "module": module,
+            "symbol": symbol,
+        })
+
+    def find_imports_of(self, file_path: str) -> list[str]:
+        """Phase 3: 查询某文件导入了哪些模块。"""
+        edges = getattr(self, "_import_edges", {}).get(file_path, [])
+        return [e["module"] for e in edges if e["module"]]
+
+    async def find_callers_cross_file(self, symbol_name: str) -> list[str]:
+        """Phase 3: 查询哪些文件定义了同名符号——跨文件依赖发现。"""
+        from sqlalchemy import select as sa_select
+
+        async with self.session_factory() as session:
+            stmt = sa_select(CodeNode).where(CodeNode.name == symbol_name)
+            result = await session.execute(stmt)
+            nodes = result.scalars().all()
+            return list({n.file_path for n in nodes if n.file_path})
+
+    def find_importers_of(self, module_path: str) -> list[str]:
+        """Phase 3: 哪些文件导入了指定模块（内存查询，毫秒级）。"""
+        module_name = module_path.replace("/", ".").replace(".py", "").lstrip(".")
+        results = []
+        for file_path, imports in getattr(self, "_import_edges", {}).items():
+            for entry in imports:
+                if entry["module"] == module_name or module_name.endswith("." + entry["module"]):
+                    results.append(file_path)
+        return results
 
     # ---- 查询接口 ----
 

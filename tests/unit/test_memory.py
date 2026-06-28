@@ -171,11 +171,13 @@ class TestHydeGeneration:
         from orbit.memory.store import MemoryStore
 
         store = MemoryStore(str(tmp_path))
+
         # 传入一个 generate 是 async 的 mock——同步调用时会抛 TypeError
         # _generate_hyde_questions 的 except Exception 应捕获
         class BadLLM:
             def generate(self, *a, **kw):
                 raise RuntimeError("down")
+
         store.append_to_file(MemoryFileType.EPISODIC, "entry", llm_client=BadLLM())
         mem = store.read_file(MemoryFileType.EPISODIC)
         assert "entry" in mem.body  # 原始内容保留

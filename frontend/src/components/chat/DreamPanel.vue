@@ -2,8 +2,12 @@
 /** Dream 记忆合并触发组件——调用 /dream/run 进行 5 阶段记忆优化。
 
  * WHY: 后端 POST /api/v1/dream/run + GET /api/v1/dream/status 已实现但前端无入口。
+ * P2-2/P2-3: 使用共享 apiPost/apiGet，显示具体错误消息。
  */
 import { ref, onMounted } from 'vue'
+import { apiPost, apiGet } from '@/services/api'
+
+interface DreamStatus { status: string }
 
 const status = ref<'idle' | 'running' | 'ready'>('idle')
 const loading = ref(false)
@@ -12,12 +16,9 @@ const error = ref<string | null>(null)
 
 async function fetchStatus() {
   try {
-    const resp = await fetch(`${window.location.origin}/api/v1/dream/status`)
-    const body = await resp.json()
-    if (body.code === 0 && body.data?.status === 'ready') {
-      status.value = 'ready'
-    }
-  } catch { /* mute */ }
+    const data = await apiGet<DreamStatus>('/api/v1/dream/status')
+    if (data?.status === 'ready') status.value = 'ready'
+  } catch { /* mute on mount */ }
 }
 
 async function triggerDream() {
@@ -25,20 +26,11 @@ async function triggerDream() {
   error.value = null
   dreamResult.value = null
   try {
-    const resp = await fetch(`${window.location.origin}/api/v1/dream/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
-    const body = await resp.json()
-    if (body.code === 0) {
-      status.value = 'ready'
-      dreamResult.value = JSON.stringify(body.data, null, 2)
-    } else {
-      error.value = body.message || 'Dream 执行失败'
-    }
+    const data = await apiPost<Record<string, unknown>>('/api/v1/dream/run', {})
+    status.value = 'ready'
+    dreamResult.value = JSON.stringify(data, null, 2)
   } catch (e) {
-    error.value = `请求失败: ${String(e)}`
+    error.value = e instanceof Error ? e.message : '请求失败'
   } finally {
     loading.value = false
   }

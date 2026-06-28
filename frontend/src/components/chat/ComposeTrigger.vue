@@ -2,8 +2,10 @@
 /** Compose 编排触发组件——粘贴 spec YAML 并执行多 Agent 编排。
 
  * WHY: 后端 POST /api/v1/compose/run 已实现但前端无入口。
+ * P2-1/P2-3: 使用共享 apiPost 替代原始 fetch。
  */
 import { ref } from 'vue'
+import { apiPost } from '@/services/api'
 
 const emit = defineEmits<{
   (e: 'done', result: Record<string, unknown>): void
@@ -21,20 +23,11 @@ async function triggerCompose() {
   error.value = null
   result.value = null
   try {
-    const resp = await fetch(`${window.location.origin}/api/v1/compose/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spec: specYaml.value }),
-    })
-    const body = await resp.json()
-    if (body.code === 0) {
-      result.value = JSON.stringify(body.data, null, 2)
-      emit('done', body.data)
-    } else {
-      error.value = body.message || 'Compose 执行失败'
-    }
+    const data = await apiPost<Record<string, unknown>>('/api/v1/compose/run', { spec: specYaml.value })
+    result.value = JSON.stringify(data, null, 2)
+    emit('done', data)
   } catch (e) {
-    error.value = `请求失败: ${String(e)}`
+    error.value = e instanceof Error ? e.message : '请求失败'
   } finally {
     running.value = false
   }

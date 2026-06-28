@@ -336,6 +336,216 @@ class TestWorktreeManager:
             await manager._git("status")
 
 
+class FakeProc:
+    """模拟 asyncio.create_subprocess_exec 返回值.
+
+    WHY 独立类而非 AsyncMock: subprocess 需要 communicate()
+    返回 (stdout, stderr) 元组 + returncode 属性，
+    AsyncMock 无法同时满足这两个接口。
+    """
+
+    def __init__(self, returncode: int = 0, stdout: bytes = b"", stderr: bytes = b"") -> None:
+        self.returncode = returncode
+        self._stdout = stdout
+        self._stderr = stderr
+
+    async def communicate(self) -> tuple[bytes, bytes]:
+        return (self._stdout, self._stderr)
+
+
+class TestWorktreeManagerSubprocess:
+    """_git() subprocess 层测试——FakeProc 模拟真实 git 行为.
+
+    这类测试覆盖 _git() 实际代码路径：
+    asyncio.create_subprocess_exec → communicate() → returncode 检查，
+    而不只是 Mock 掉 _git() 本身。
+    """
+
+    @pytest.fixture
+    def manager(self, tmp_path):
+        repo = tmp_path / "repo"
+        return WorktreeManager(str(repo))
+
+    @pytest.mark.asyncio
+    async def test_git_success_returns_stdout(self, manager, monkeypatch):
+        """_git() 成功时应返回 stdout 字符串。"""
+
+        async def fake_exec(*args, **kwargs):
+            # args[0]="git", args[1:] 是传给 git 的子命令
+            return FakeProc(returncode=0, stdout=b"branch-name\n")
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        result = await manager._git("branch", "--show-current")
+        # _git() 调用 stdout.decode() 保留尾部换行符
+        assert result == "branch-name\n"
+
+    @pytest.mark.asyncio
+    async def test_git_nonzero_raises_runtime_error(self, manager, monkeypatch):
+        """_git() 非零退出码应抛出 RuntimeError。"""
+
+        async def fake_exec(*args, **kwargs):
+            return FakeProc(returncode=128, stderr=b"fatal: not a git repository")
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        with pytest.raises(RuntimeError, match="git branch"):
+            await manager._git("branch")
+
+    @pytest.mark.asyncio
+    async def test_git_stderr_in_error_message(self, manager, monkeypatch):
+        """_git() 失败时错误消息应包含 stderr 输出。"""
+
+        async def fake_exec(*args, **kwargs):
+            return FakeProc(returncode=1, stderr=b"error: pathspec 'xxx' did not match")
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        with pytest.raises(RuntimeError, match="error: pathspec"):
+            await manager._git("checkout", "xxx")
+
+    @pytest.mark.asyncio
+    async def test_git_empty_stdout(self, manager, monkeypatch):
+        """_git() 正常退出但无输出时返回空字符串。"""
+
+        async def fake_exec(*args, **kwargs):
+            return FakeProc(returncode=0, stdout=b"")
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        result = await manager._git("status")
+        assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_create_with_git_failure(self, manager, monkeypatch):
+        """create() 在 git worktree add 失败时应抛出异常。"""
+
+        async def fake_exec(*args, **kwargs):
+            return FakeProc(returncode=128, stderr=b"fatal: branch already exists")
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        with pytest.raises(RuntimeError, match="branch already exists"):
+            await manager.create(strategy=WorktreeStrategy.DELEGATE)
+
+    @pytest.mark.asyncio
+    async def test_create_custom_base_branch(self, manager, monkeypatch):
+        """create() 使用非默认 base_branch 时应传给 git worktree add。
+
+        P2-3: 验证 git 命令参数包含 base_branch，而不仅是 record 字段。
+        git 命令格式: git worktree add -b <branch> --no-track <path> <base>
+        """
+        called_args = []
+
+        async def fake_exec(*args, **kwargs):
+            called_args.append(args)
+            return FakeProc(returncode=0, stdout=b"orbit/wt-foo\n")
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+        await manager.create(strategy=WorktreeStrategy.DELEGATE, base_branch="develop")
+
+        # 验证 record
+        assert manager._worktrees
+        record = list(manager._worktrees.values())[0]
+        assert record.base_branch == "develop"
+        # 验证 git 命令——至少一次调用以 "develop" 结尾（即 git worktree add ... develop）
+        assert called_args
+        git_calls = [" ".join(a) for a in called_args]
+        assert any("develop" in call for call in git_calls), f"未找到 base_branch 参数: {git_calls}"
+
+
+class TestWorktreeManagerEdgeCases:
+    """边缘情况——并发、错误恢复、不常用策略。"""
+
+    @pytest.fixture
+    def manager(self, tmp_path):
+        repo = tmp_path / "repo"
+        mgr = WorktreeManager(str(repo))
+        mgr._git = AsyncMock(return_value="ok")
+        return mgr
+
+    @pytest.mark.asyncio
+    async def test_concurrent_create_yields_unique_ids(self, manager):
+        """并发 create() 应产生不同 worktree_id。"""
+        import asyncio as aio
+
+        async def _create():
+            return await manager.create()
+
+        r1, r2 = await aio.gather(_create(), _create())
+        assert r1.worktree_id != r2.worktree_id
+        assert r1.branch_name != r2.branch_name
+        assert len(manager._worktrees) == 2
+
+    @pytest.mark.asyncio
+    async def test_resolve_ask_strategy_merged(self, manager):
+        """ASK 策略 MERGED 状态——行为同 DELEGATE。"""
+        record = WorktreeRecord(
+            worktree_id="wt-ask",
+            branch_name="orbit/wt-ask",
+            strategy=WorktreeStrategy.ASK,
+            path="/fake/wt-ask",
+        )
+        manager._worktrees["wt-ask"] = record
+        await manager.resolve("wt-ask", WorktreeState.MERGED)
+        assert record.state == WorktreeState.MERGED
+
+    @pytest.mark.asyncio
+    async def test_resolve_ask_strategy_dismissed(self, manager):
+        """ASK 策略 DISMISSED 状态——应触发清理。"""
+        record = WorktreeRecord(
+            worktree_id="wt-ask2",
+            branch_name="orbit/wt-ask2",
+            strategy=WorktreeStrategy.ASK,
+            path="/fake/wt-ask2",
+        )
+        manager._worktrees["wt-ask2"] = record
+        await manager.resolve("wt-ask2", WorktreeState.DISMISSED)
+        assert record.state == WorktreeState.DISMISSED
+
+    @pytest.mark.asyncio
+    async def test_resolve_already_resolved(self, manager):
+        """resolve() 已处理记录——应保持终态。"""
+        record = WorktreeRecord(
+            worktree_id="wt-done",
+            branch_name="orbit/wt-done",
+            strategy=WorktreeStrategy.DELEGATE,
+            path="/fake/wt-done",
+            state=WorktreeState.MERGED,
+        )
+        manager._worktrees["wt-done"] = record
+        await manager.resolve("wt-done", WorktreeState.MERGED)
+        # 已是终态，不应重复操作
+        assert record.state == WorktreeState.MERGED
+
+    @pytest.mark.asyncio
+    async def test_cleanup_safe_partial_failure(self, manager):
+        """cleanup_safe() 单个记录 path 不存在时静默跳过。"""
+        r1 = WorktreeRecord(
+            worktree_id="wt-ok",
+            branch_name="orbit/wt-ok",
+            strategy=WorktreeStrategy.DELEGATE,
+            path="/fake/wt-ok",
+            state=WorktreeState.DISMISSED,
+        )
+        r2 = WorktreeRecord(
+            worktree_id="wt-nopath",
+            branch_name="orbit/wt-nopath",
+            strategy=WorktreeStrategy.DELEGATE,
+            path="/nonexistent",
+            state=WorktreeState.DISMISSED,
+        )
+        manager._worktrees["wt-ok"] = r1
+        manager._worktrees["wt-nopath"] = r2
+        # path 不存在时 _cleanup 应跳过 git 调用，不抛异常
+        with patch("orbit.worktree.manager.Path.exists", side_effect=[True, False]):
+            # 只清理 preview_safe（DISMISSED 状态）
+            removed = await manager.cleanup_safe("preview_safe")
+        assert "wt-ok" in removed
+        assert "wt-nopath" in removed  # path 不存在也删除记录（跳过 git 调用）
+
+    @pytest.mark.asyncio
+    async def test_cleanup_safe_unknown_mode_returns_empty(self, manager):
+        """cleanup_safe() 使用未知 mode 应返回空列表。"""
+        result = await manager.cleanup_safe("invalid_mode")
+        assert result == []
+
+
 class TestWorktreeCleanup:
     """WorktreeCleanup——安全清理策略。"""
 

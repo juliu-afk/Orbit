@@ -113,7 +113,7 @@ class CodeGraphEngine(GraphEngineBase):
         # 第二遍：提取调用关系（需在符号定义入库后）
         await self._extract_calls(tree, str(path))
         # Phase 3: 提取跨文件 import 关系
-        self._extract_imports(tree, str(path))
+        await self._extract_imports(tree, str(path))
         return True
 
     async def _extract_calls(self, tree: ast.AST, file_path: str) -> None:
@@ -205,8 +205,12 @@ class CodeGraphEngine(GraphEngineBase):
         edges = getattr(self, "_import_edges", {}).get(file_path, [])
         return [e["module"] for e in edges if e["module"]]
 
-    async def find_callers_cross_file(self, symbol_name: str) -> list[str]:
-        """Phase 3: 查询哪些文件定义了同名符号——跨文件依赖发现。"""
+    async def find_definitions_cross_file(self, symbol_name: str) -> list[str]:
+        """Phase 3: 查询哪些文件定义了该符号——跨文件定义发现。
+
+        P1-1 修正: 原名 find_callers_cross_file 有误导性——此方法查询
+        符号的"定义位置"而非"调用者"。改名为 find_definitions_cross_file。
+        """
         from sqlalchemy import select as sa_select
 
         async with self.session_factory() as session:

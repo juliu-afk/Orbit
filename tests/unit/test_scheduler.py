@@ -107,6 +107,51 @@ def test_state_sequence_correct(scheduler):
     ]
 
 
+# ── Phase 2: 黄金圈路由 ──
+
+
+def test_golden_route_implement():
+    """实现新功能 → architect + developer。"""
+    sched = Scheduler(agent_llms={})
+    route = sched._route_by_golden_why({"golden_why": "实现新功能"})
+    assert route == ["architect", "developer"]
+
+
+def test_golden_route_bugfix():
+    """修复Bug → qa + developer + reviewer。"""
+    sched = Scheduler(agent_llms={})
+    route = sched._route_by_golden_why({"golden_why": "修复Bug"})
+    assert route == ["qa", "developer", "reviewer"]
+
+
+def test_golden_route_review():
+    """代码审查 → reviewer。"""
+    sched = Scheduler(agent_llms={})
+    route = sched._route_by_golden_why({"golden_why": "代码审查"})
+    assert route == ["reviewer"]
+
+
+def test_golden_route_refactor():
+    """重构 → architect + developer。"""
+    sched = Scheduler(agent_llms={})
+    route = sched._route_by_golden_why({"golden_why": "重构"})
+    assert route == ["architect", "developer"]
+
+
+def test_golden_route_unknown_fallback():
+    """未知 Why → 默认 developer（向后兼容）。"""
+    sched = Scheduler(agent_llms={})
+    route = sched._route_by_golden_why({"golden_why": "随机任务"})
+    assert route == ["developer"]
+
+
+def test_golden_route_empty_context():
+    """空上下文 → 默认 developer。"""
+    sched = Scheduler(agent_llms={})
+    route = sched._route_by_golden_why({})
+    assert route == ["developer"]
+
+
 # ── Agent 循环 ──
 
 

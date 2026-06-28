@@ -33,6 +33,8 @@ from orbit.api.routes import (
     versioning,
 )
 from orbit.checkpoint.manager import CheckpointManager
+from orbit.compression.budget import TokenBudgetTracker as _BudgetTracker
+from orbit.compression.compressor import ContextCompressor as _ContextCompressor
 from orbit.core.config import settings
 from orbit.events.bus import EventBus
 from orbit.gateway.client import MODEL_FLASH, MODEL_GLM5, MODEL_PRO, LLMClient
@@ -148,6 +150,10 @@ _llm_pro = LLMClient(default_model=MODEL_PRO)
 _llm_flash = LLMClient(default_model=MODEL_FLASH)
 _llm_glm5 = LLMClient(default_model=MODEL_GLM5)
 
+# Phase 2 AC7: 上下文压缩实例
+_compressor = _ContextCompressor(llm_client=_llm_flash)
+_budget_tracker = _BudgetTracker()
+
 # Tier 分配: Flash(T1)=轻量, Pro(T2)=中档, GLM-5.2(T3)=最强
 # developer 默认 T2, 失败时升级链: T1→T2→T3
 _agent_llms: dict[str, LLMClient] = {
@@ -189,6 +195,8 @@ _scheduler = Scheduler(
     event_bus=_event_bus,
     agent_factory=AgentFactory,
     checkpoint_manager=_checkpoint_manager,
+    compressor=_compressor,  # Phase 2 AC7
+    budget_tracker=_budget_tracker,  # Phase 2 AC7
 )
 # Phase 4: 注入 Compose + ActorSpawn
 _scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-defined]

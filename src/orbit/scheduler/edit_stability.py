@@ -68,7 +68,8 @@ class EditStabilityDetector:
         self._history[file_path].append(record)
 
         # 裁剪——只保留 LOOKBACK_DAYS 内的记录
-        cutoff = datetime.now() - timedelta(days=self.LOOKBACK_DAYS)
+        # P0: cutoff 用 UTC 保持与 timestamp 一致，避免 aware/naive 比较 TypeError
+        cutoff = datetime.now(UTC) - timedelta(days=self.LOOKBACK_DAYS)
         self._history[file_path] = [r for r in self._history[file_path] if r.timestamp > cutoff]
 
     def check(self, file_path: str) -> StabilityReport:

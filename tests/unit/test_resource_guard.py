@@ -9,7 +9,7 @@ import pytest
 
 from orbit.resource_guard.budget_guard import BudgetGuard
 from orbit.resource_guard.degradation import DegradationPath
-from orbit.resource_guard.models import CircuitState, GuardDecision
+from orbit.resource_guard.models import GuardDecision
 from orbit.resource_guard.resource_guard import ResourceGuard
 from orbit.resource_guard.token_bucket import TokenBucket
 

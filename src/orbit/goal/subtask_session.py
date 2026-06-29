@@ -14,6 +14,7 @@ WHY 独立 Session 非协程: 独立 LLM 消息历史 = 独立上下文窗口。
 
 from __future__ import annotations
 
+import asyncio
 import structlog
 from typing import TYPE_CHECKING, Any
 
@@ -166,6 +167,8 @@ class SubTaskSession:
                 )
                 state = next_state
 
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error(
                 "subtask_pipeline_failed",
@@ -212,6 +215,8 @@ class SubTaskSession:
         agent_llm = None  # AgentFactory 内部路由模型
         try:
             agent = self._agent_factory.create(role, llm=agent_llm)
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.error("agent_create_failed", role=role, error=str(e))
             raise RuntimeError(f"Agent {role} 创建失败: {e}") from e
@@ -277,8 +282,11 @@ class SubTaskSession:
                     max_severity=result.max_severity,
                 )
             return result.approved
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.warning("critique_failed_fail_open", error=str(e))
+        except Exception as e:
             return True  # 批判失败 → fail-open——不阻塞流程
 
     # ── 内部: 状态转换 ─────────────────────────────────
@@ -322,5 +330,7 @@ class SubTaskSession:
                 context=safe_context,
             )
             await self._checkpoint.save(task_id, data)
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.warning("checkpoint_save_failed", task_id=task_id, error=str(e))

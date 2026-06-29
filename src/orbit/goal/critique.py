@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import structlog
 from typing import TYPE_CHECKING, Any
+import asyncio
 
 if TYPE_CHECKING:
     from orbit.compose.models import Task
@@ -189,8 +190,10 @@ class CritiqueAgent:
             )
             response = await self._llm.generate(req, task_id="critique")
             return self._parse_response(response.content or "")
-        except Exception as e:
+        except asyncio.CancelledError:
+            raise
             logger.warning("critique_llm_failed_fail_open", error=str(e))
+        except Exception as e:
             return CritiqueResult(
                 approved=True,
                 summary=f"批判 LLM 调用失败→fail-open: {str(e)}",

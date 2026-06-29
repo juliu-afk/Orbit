@@ -323,6 +323,8 @@ class MetaOrchestrator:
             # 记录到 Ledger
             self.memory.goal_description = goal.description
             self.memory.constraints = goal.constraints
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.warning("clarifier_failed", error=str(e))
         return goal
@@ -345,9 +347,14 @@ class MetaOrchestrator:
             logger.warning("goal_budget_exhausted", budget=goal.total_token_budget, consumed=goal.token_consumed)
             return True
         if goal.max_runtime_seconds > 0 and goal.started_at:
-            # P2-4: fromisoformat 不兼容 'Z' 后缀
-            started_str = goal.started_at.replace("Z", "+00:00")
-            elapsed = time.time() - datetime.fromisoformat(started_str).timestamp()
+            # P1-NEW5: 更稳健的 ISO 解析
+            try:
+                started_str = goal.started_at.replace("Z", "+00:00")
+                started_dt = datetime.fromisoformat(started_str)
+                elapsed = time.time() - started_dt.timestamp()
+            except (ValueError, TypeError):
+                logger.warning("goal_time_parse_failed", started_at=goal.started_at)
+                return False
             if elapsed >= goal.max_runtime_seconds:
                 logger.warning("goal_time_exhausted", max=goal.max_runtime_seconds, elapsed=int(elapsed))
                 return True

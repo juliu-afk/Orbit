@@ -17,6 +17,7 @@ from pathlib import Path
 import structlog
 
 from orbit.memory.models import (
+    DecisionRecord,
     MemoryConfig,
     MemoryFile,
     MemoryFileType,
@@ -130,6 +131,13 @@ class MemoryStore:
                 + "\n"
             )
             fm.pop("has_hyde", None)  # 超限丢弃 HyDE
+            # P1-1: 截断后二次检查——若 entry 本身太长，极限截断
+            if len(new_body.encode("utf-8")) > self._config.max_memory_file_size:
+                new_body = (
+                    f"[旧记忆已归档——超出 {self._config.max_memory_file_size // 1000}KB 限制]\n\n"
+                    + entry.strip()[: self._config.max_memory_file_size // 2]
+                    + "\n"
+                )
             logger.warning("memory_file_truncated", path=str(self._path_for(file_type)))
 
         self.write_file(file_type, new_body, fm)
@@ -173,6 +181,75 @@ class MemoryStore:
         # 按评分排序
         results.sort(key=lambda r: r.score, reverse=True)
         return results[: query.max_results]
+
+    # ── 决策日志（业务层减熵 P1）───────────────────────────
+
+    def save_decision(self, decision: DecisionRecord) -> None:
+        """保存设计决策——追加到 decisions.md."""
+
+        entry = (
+            f"## {decision.id}\n"
+            f"- **选择**: {decision.choice}\n"
+            f"- **理由**: {decision.why}\n"
+            f"- **约束**: {', '.join(decision.constraints) or '无'}\n"
+            f"- **替代方案**: {', '.join(decision.alternatives) or '无'}\n"
+            f"- **决策者**: {decision.made_by}\n"
+            f"- **时间**: {decision.timestamp}\n"
+        )
+        self.append_to_file(MemoryFileType.DECISIONS, entry)
+
+    def get_relevant_decisions(
+        self, keywords: list[str], max_count: int = 5
+    ) -> list[DecisionRecord]:
+        """按关键词检索相关设计决策."""
+        from orbit.memory.models import DecisionRecord as DR
+
+        mem = self.read_file(MemoryFileType.DECISIONS)
+        if not mem.body:
+            return []
+
+        results: list[DR] = []
+
+        # 简单 grep 匹配——每个 ## 段检查关键词命中
+        sections = mem.body.split("\n## ")
+        for section in sections[1:]:  # 跳过第一个空段
+            score = sum(1 for kw in keywords if kw.lower() in section.lower())
+            if score > 0:
+                # P1-2/P1-3: 完整解析 markdown 列表项
+                lines = section.strip().split("\n")
+                parsed = {}
+                for ln in lines:
+                    if ln.startswith("- **选择**:"):
+                        parsed["choice"] = ln.replace("- **选择**:", "").strip()
+                    elif ln.startswith("- **理由**:"):
+                        parsed["why"] = ln.replace("- **理由**:", "").strip()
+                    elif ln.startswith("- **约束**:"):
+                        parsed["constraints"] = ln.replace("- **约束**:", "").strip()
+                    elif ln.startswith("- **替代方案**:"):
+                        parsed["alternatives"] = ln.replace("- **替代方案**:", "").strip()
+                    elif ln.startswith("- **决策者**:"):
+                        parsed["made_by"] = ln.replace("- **决策者**:", "").strip()
+                    elif ln.startswith("- **时间**:"):
+                        parsed["timestamp"] = ln.replace("- **时间**:", "").strip()
+                results.append(
+                    DR(
+                        id=lines[0] if lines else "",
+                        choice=parsed.get("choice", ""),
+                        why=parsed.get("why", ""),
+                        constraints=[
+                            c.strip() for c in parsed.get("constraints", "").split(",") if c.strip()
+                        ],
+                        alternatives=[
+                            a.strip()
+                            for a in parsed.get("alternatives", "").split(",")
+                            if a.strip()
+                        ],
+                        made_by=parsed.get("made_by", ""),
+                        timestamp=parsed.get("timestamp", ""),
+                    )
+                )
+
+        return results[:max_count]
 
     # ── Phase 1: 评分 ──────────────────────────────────
 

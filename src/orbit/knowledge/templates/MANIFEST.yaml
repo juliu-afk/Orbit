@@ -1,0 +1,88 @@
+# 基础代码模板清单——业务层减熵 P1
+# 每个模板含名称/描述/参数/适用场景，供 TemplateSelector 匹配
+
+templates:
+  - name: api_route_get
+    description: FastAPI GET 路由——校验参数→调 service→返回统一响应
+    file: api_route_get.py.j2
+    parameters:
+      - {name: endpoint_path, desc: "端点路径", example: "/api/v1/tasks"}
+      - {name: response_model, desc: "Pydantic 响应模型类名", example: "TaskResponse"}
+      - {name: service_call, desc: "调用的 service 方法", example: "task_service.list_all()"}
+    applicable_when:
+      - "新增查询类 API"
+      - "列表接口"
+
+  - name: api_route_post
+    description: FastAPI POST 路由——Pydantic 校验→调 service→返回 id
+    file: api_route_post.py.j2
+    parameters:
+      - {name: endpoint_path, desc: "端点路径", example: "/api/v1/tasks"}
+      - {name: request_model, desc: "Pydantic 请求模型", example: "TaskCreateRequest"}
+      - {name: response_model, desc: "Pydantic 响应模型", example: "TaskResponse"}
+      - {name: service_call, desc: "创建方法", example: "task_service.create(data)"}
+    applicable_when:
+      - "新增创建类 API"
+      - "POST 端点"
+
+  - name: service_class
+    description: Service 类——事务边界/异常映射/审计日志
+    file: service_class.py.j2
+    parameters:
+      - {name: class_name, desc: "Service 类名", example: "TaskService"}
+      - {name: model_name, desc: "操作的主模型", example: "Task"}
+      - {name: methods, desc: "CRUD 方法列表", example: "create, get, list, update, delete"}
+    applicable_when:
+      - "新增业务逻辑"
+      - "Service 层"
+
+  - name: test_unit
+    description: pytest 单元测试——纯函数/类方法测试
+    file: test_unit.py.j2
+    parameters:
+      - {name: module_under_test, desc: "被测模块路径", example: "orbit.services.tax_service"}
+      - {name: class_name, desc: "测试类名", example: "TestTaxService"}
+    applicable_when:
+      - "写单元测试"
+      - "pytest"
+
+  - name: test_integration
+    description: pytest 集成测试——API 端点/数据库交互
+    file: test_integration.py.j2
+    parameters:
+      - {name: endpoint, desc: "被测端点", example: "/api/v1/tasks"}
+      - {name: test_class, desc: "测试类名", example: "TestTasksAPI"}
+    applicable_when:
+      - "写集成测试"
+      - "API 测试"
+
+  - name: sqlalchemy_model
+    description: SQLAlchemy 2.0 模型——Mapped + mapped_column 风格
+    file: sqlalchemy_model.py.j2
+    parameters:
+      - {name: table_name, desc: "表名", example: "tasks"}
+      - {name: class_name, desc: "模型类名", example: "Task"}
+      - {name: fields, desc: "字段列表(名:类型)", example: "id: int, name: str, status: str"}
+    applicable_when:
+      - "新增数据库表"
+      - "数据模型"
+
+  - name: pydantic_schema
+    description: Pydantic v2 请求/响应模型
+    file: pydantic_schema.py.j2
+    parameters:
+      - {name: class_name, desc: "Schema 类名", example: "TaskCreateRequest"}
+      - {name: fields, desc: "字段", example: "name: str, priority: int"}
+    applicable_when:
+      - "新增请求/响应模型"
+      - "Pydantic schema"
+
+  - name: alembic_migration
+    description: Alembic 数据库迁移——可重复执行
+    file: alembic_migration.py.j2
+    parameters:
+      - {name: revision_id, desc: "迁移ID", example: "a1b2c3d4e5f6"}
+      - {name: description, desc: "迁移描述", example: "add tasks table"}
+    applicable_when:
+      - "数据库 schema 变更"
+      - "Alembic 迁移"

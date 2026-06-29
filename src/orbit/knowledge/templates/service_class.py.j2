@@ -1,0 +1,54 @@
+"""{{ class_name }}——业务逻辑层（自动生成模板）.
+
+业务层减熵 P1: Agent 优先调用此模板.
+"""
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from orbit.models import {{ model_name }}
+
+
+class {{ class_name }}:
+    """{{ model_name }} 的业务逻辑——事务边界 + 审计."""
+
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
+
+    async def create(self, data: dict) -> {{ model_name }}:
+        """创建并持久化."""
+        obj = {{ model_name }}(**data)
+        self._db.add(obj)
+        await self._db.commit()
+        await self._db.refresh(obj)
+        return obj
+
+    async def get(self, id: int) -> {{ model_name }} | None:
+        """按主键查询."""
+        return await self._db.get({{ model_name }}, id)
+
+    async def list(self, skip: int = 0, limit: int = 100) -> list[{{ model_name }}]:
+        """分页查询."""
+        from sqlalchemy import select
+        result = await self._db.execute(
+            select({{ model_name }}).offset(skip).limit(limit)
+        )
+        return result.scalars().all()
+
+    async def update(self, id: int, data: dict) -> {{ model_name }} | None:
+        """更新并持久化."""
+        obj = await self.get(id)
+        if obj is None:
+            return None
+        for key, value in data.items():
+            setattr(obj, key, value)
+        await self._db.commit()
+        await self._db.refresh(obj)
+        return obj
+
+    async def delete(self, id: int) -> bool:
+        """硬删除——永久删除记录."""
+        obj = await self.get(id)
+        if obj is None:
+            return False
+        await self._db.delete(obj)
+        await self._db.commit()
+        return True

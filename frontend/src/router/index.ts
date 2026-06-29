@@ -22,18 +22,6 @@ const router = createRouter({
       component: DashboardView,
       meta: { requiresProbe: true },
     },
-    {
-      path: '/review/:taskId',
-      name: 'review',
-      component: () => import('@/views/ReviewView.vue'),
-      meta: { requiresProbe: true },
-    },
-    {
-      path: '/review/:taskId/:file',
-      name: 'review-file',
-      component: () => import('@/views/ReviewView.vue'),
-      meta: { requiresProbe: true },
-    },
   ],
 })
 

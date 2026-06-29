@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { apiPost, apiGet } from '@/services/api'
 
 interface ThreadComment { id: string; file: string; line: number; body: string; status: string; author: string; reply?: string }
@@ -30,15 +30,16 @@ const comments = ref<ThreadComment[]>([])
 const newComment = ref('')
 
 async function loadComments() {
-  try { const d = await apiGet<ThreadComment[]>(`/api/v1/review/sessions/${props.reviewId}/comments?file=${props.file}`); comments.value = d } catch {}
+  try { const d = await apiGet<ThreadComment[]>(`/api/v1/review/sessions/${props.reviewId}/comments?file=${props.file}`); comments.value = d } catch (e) { console.error('loadComments failed:', e) }
 }
+onMounted(() => loadComments())
 async function addComment() {
   if (!newComment.value.trim()) return
   try {
     await apiPost(`/api/v1/review/sessions/${props.reviewId}/comments`, { file_path: props.file, line_start: props.line, line_end: props.line, body: newComment.value, created_by: 'user' })
     comments.value.push({ id: '', file: props.file, line: props.line, body: newComment.value, status: 'open', author: 'user' })
     newComment.value = ''
-  } catch {}
+  } catch (e) { console.error('addComment failed:', e) }
 }
 </script>
 

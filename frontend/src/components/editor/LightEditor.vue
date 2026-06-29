@@ -2,11 +2,11 @@
 <template>
   <div class="light-editor">
     <div class="editor-toolbar">
-      <el-button size="small" :type="readOnly ? 'default' : 'primary'" @click="readOnly = !readOnly">
+      <el-button size="small" :type="readOnly ? 'default' : 'primary'" @click="toggleEdit">
         {{ readOnly ? 'Edit' : 'Lock' }}
       </el-button>
       <el-button size="small" @click="save" :loading="saving" :disabled="readOnly">Save</el-button>
-      <el-select size="small" v-model="language" style="width:120px" @change="loadSnippets">
+      <el-select size="small" v-model="language" style="width:120px" @change="changeLanguage">
         <el-option v-for="l in LANGUAGES" :key="l" :label="l" :value="l" />
       </el-select>
       <span v-if="saved" class="saved-msg">Saved</span>
@@ -49,6 +49,8 @@ const language = ref('python')
 const snippets = ref<{ label: string; body: string }[]>([])
 
 function loadSnippets() { snippets.value = SNIPPETS[language.value] || [] }
+function toggleEdit() { readOnly.value = !readOnly.value; editor.value?.updateOptions({ readOnly: readOnly.value }) }
+function changeLanguage() { loadSnippets(); editor.value && monaco.editor.setModelLanguage(editor.value.getModel()!, language.value) }
 
 onMounted(() => {
   if (!editorRef.value) return
@@ -74,7 +76,7 @@ async function save() {
     await apiPost('/api/v1/files/write', { path: props.file, content })
     saved.value = true; emit('saved', content)
     setTimeout(() => saved.value = false, 2000)
-  } catch {} finally { saving.value = false }
+  } catch (e) { console.error('Save failed:', e) } finally { saving.value = false }
 }
 onBeforeUnmount(() => editor.value?.dispose())
 </script>

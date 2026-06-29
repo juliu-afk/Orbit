@@ -17,6 +17,7 @@ from pathlib import Path
 import structlog
 
 from orbit.memory.models import (
+    DecisionRecord,
     MemoryConfig,
     MemoryFile,
     MemoryFileType,
@@ -42,6 +43,8 @@ class MemoryStore:
     def __init__(self, project_path: str = "") -> None:
         self._config = MemoryConfig(project_root=project_path)
         self._resolve_memory_dir()
+        # P2-4: 评分缓冲——减少 hit() 高频 IO
+        self._score_buffer: dict[str, float] = {}
 
     # ── 读 ─────────────────────────────────────────────
 
@@ -130,6 +133,13 @@ class MemoryStore:
                 + "\n"
             )
             fm.pop("has_hyde", None)  # 超限丢弃 HyDE
+            # P1-1: 截断后二次检查——若 entry 本身太长，极限截断
+            if len(new_body.encode("utf-8")) > self._config.max_memory_file_size:
+                new_body = (
+                    f"[旧记忆已归档——超出 {self._config.max_memory_file_size // 1000}KB 限制]\n\n"
+                    + entry.strip()[: self._config.max_memory_file_size // 2]
+                    + "\n"
+                )
             logger.warning("memory_file_truncated", path=str(self._path_for(file_type)))
 
         self.write_file(file_type, new_body, fm)
@@ -174,15 +184,103 @@ class MemoryStore:
         results.sort(key=lambda r: r.score, reverse=True)
         return results[: query.max_results]
 
+    # ── 决策日志（业务层减熵 P1）───────────────────────────
+
+    def save_decision(self, decision: DecisionRecord) -> None:
+        """保存设计决策——追加到 decisions.md."""
+
+        entry = (
+            f"## {decision.id}\n"
+            f"- **选择**: {decision.choice}\n"
+            f"- **理由**: {decision.why}\n"
+            f"- **约束**: {', '.join(decision.constraints) or '无'}\n"
+            f"- **替代方案**: {', '.join(decision.alternatives) or '无'}\n"
+            f"- **决策者**: {decision.made_by}\n"
+            f"- **时间**: {decision.timestamp}\n"
+        )
+        self.append_to_file(MemoryFileType.DECISIONS, entry)
+
+    def get_relevant_decisions(
+        self, keywords: list[str], max_count: int = 5
+    ) -> list[DecisionRecord]:
+        """按关键词检索相关设计决策."""
+        from orbit.memory.models import DecisionRecord as DR
+
+        mem = self.read_file(MemoryFileType.DECISIONS)
+        if not mem.body:
+            return []
+
+        results: list[DR] = []
+
+        # 简单 grep 匹配——每个 ## 段检查关键词命中
+        sections = mem.body.split("\n## ")
+        for section in sections[1:]:  # 跳过第一个空段
+            score = sum(1 for kw in keywords if kw.lower() in section.lower())
+            if score > 0:
+                # P1-2/P1-3: 完整解析 markdown 列表项
+                lines = section.strip().split("\n")
+                parsed = {}
+                for ln in lines:
+                    if ln.startswith("- **选择**:"):
+                        parsed["choice"] = ln.replace("- **选择**:", "").strip()
+                    elif ln.startswith("- **理由**:"):
+                        parsed["why"] = ln.replace("- **理由**:", "").strip()
+                    elif ln.startswith("- **约束**:"):
+                        parsed["constraints"] = ln.replace("- **约束**:", "").strip()
+                    elif ln.startswith("- **替代方案**:"):
+                        parsed["alternatives"] = ln.replace("- **替代方案**:", "").strip()
+                    elif ln.startswith("- **决策者**:"):
+                        parsed["made_by"] = ln.replace("- **决策者**:", "").strip()
+                    elif ln.startswith("- **时间**:"):
+                        parsed["timestamp"] = ln.replace("- **时间**:", "").strip()
+                results.append(
+                    DR(
+                        id=lines[0] if lines else "",
+                        choice=parsed.get("choice", ""),
+                        why=parsed.get("why", ""),
+                        constraints=[
+                            c.strip() for c in parsed.get("constraints", "").split(",") if c.strip()
+                        ],
+                        alternatives=[
+                            a.strip()
+                            for a in parsed.get("alternatives", "").split(",")
+                            if a.strip()
+                        ],
+                        made_by=parsed.get("made_by", ""),
+                        timestamp=parsed.get("timestamp", ""),
+                    )
+                )
+
+        return results[:max_count]
+
     # ── Phase 1: 评分 ──────────────────────────────────
 
     def hit(self, key: str, delta: float = 1.0) -> None:
-        """命中记忆条目——增加评分。
-
-        WHY 独立方法: 每次检索命中后调用，Agent 任务成功时批量记分。
-        """
-        self._score_update(key, delta)
+        """命中记忆条目——增加评分（P2-4: 缓冲批量写入）。"""
+        self._score_buffer[key] = self._score_buffer.get(key, 0.0) + delta
+        if len(self._score_buffer) >= 10:
+            self._flush_scores()
         logger.debug("memory_hit", key=key, delta=delta)
+
+    def _flush_scores(self) -> None:
+        """P1/P2-4: 原子 swap 批量写入——防止并发 race."""
+        # P1: 原子 swap——先拿走 buffer，再基于快照做 IO
+        buffer = self._score_buffer
+        self._score_buffer = {}
+        if not buffer:
+            return
+        try:
+            mem = self.read_file(MemoryFileType.EPISODIC)
+            for key, delta in buffer.items():
+                score_key = f"score.{key}"
+                current = float(mem.frontmatter.get(score_key, 1.0))
+                mem.frontmatter[score_key] = current + delta
+            self.write_file(MemoryFileType.EPISODIC, mem.body, mem.frontmatter)
+        except Exception as e:
+            # P2: write_file 失败不丢数据——回写 buffer
+            for key, delta in buffer.items():
+                self._score_buffer[key] = self._score_buffer.get(key, 0.0) + delta
+            logger.warning("score_flush_failed", error=str(e))
 
     def decay_scores(self, factor: float = 0.95) -> int:
         """衰减所有条目评分——每天调用一次（/dream 触发）。
@@ -204,18 +302,6 @@ class MemoryStore:
             self.write_file(MemoryFileType.EPISODIC, mem.body, mem.frontmatter)
             logger.info("memory_scores_decayed", count=updated, factor=factor)
         return updated
-
-    def _score_update(self, key: str, delta: float) -> None:
-        """读写 frontmatter——扁平化存储：每个 key 一行 score.{key}: value。
-
-        WHY 扁平而非嵌套 dict: _parse_yaml_frontmatter 只支持 key: value，
-        不支持嵌套结构。用 prefix 编码实现多维 key。
-        """
-        mem = self.read_file(MemoryFileType.EPISODIC)
-        score_key = f"score.{key}"
-        current = float(mem.frontmatter.get(score_key, 1.0))
-        mem.frontmatter[score_key] = current + delta
-        self.write_file(MemoryFileType.EPISODIC, mem.body, mem.frontmatter)
 
     # ── 同步 ───────────────────────────────────────────
 
@@ -265,7 +351,11 @@ def _sha256(text: str) -> str:
 
 
 def _parse_yaml_frontmatter(fm_text: str) -> dict:
-    """极简 YAML 解析——仅支持 key: value 格式."""
+    """极简 YAML 解析——仅支持 key: value 格式.
+
+    P2-6 复审: 保留手写解析器而非 yaml.safe_load——
+    手写解析器保证返回值永远是 str 类型，下游代码依赖此契约.
+    """
     result: dict = {}
     for line in fm_text.strip().splitlines():
         if ":" in line:

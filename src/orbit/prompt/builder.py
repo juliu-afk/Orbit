@@ -16,6 +16,10 @@ from typing import Any
 from orbit.agents.base import AgentRole
 from orbit.context.relevance import extract_relevant_context
 
+# P2-1: 上下文裁剪参数——从模块常量读取，允许调用方覆盖
+DEFAULT_MAX_FRAGMENTS = 5
+DEFAULT_MAX_CONTEXT_CHARS = 5000
+
 # ── Agent 角色描述（stable 层）─────────────────────────────
 # WHY 在这里集中定义: 不在 agent 各自文件中散落，统一管理+
 
@@ -74,6 +78,7 @@ RULES_BLOCK = """## 强制规则
    - 优先复用标准库和已有函数，不要自己重复造轮子
    - 写完检查：有能删掉的行吗？有能合并的变量吗？
    - 如果单个文件超过 200 行，重新审视——是不是做了太多事？
+   - P2-5: 本规则为新增代码的质量约束，规则 5（写注释）和规则 8（不添加未要求功能）优先于行数目标
 
 ## 输出格式
 
@@ -172,7 +177,10 @@ class PromptBuilder:
             task_keywords = ctx.get("keywords", [])
             if task_keywords:
                 truncated = extract_relevant_context(
-                    code_context, task_keywords, max_fragments=5, max_chars=5000
+                    code_context,
+                    task_keywords,
+                    max_fragments=DEFAULT_MAX_FRAGMENTS,
+                    max_chars=DEFAULT_MAX_CONTEXT_CHARS,
                 )
             else:
                 # 无关键词 → 降级为全文截断

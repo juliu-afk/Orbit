@@ -71,6 +71,7 @@ class Scheduler:
         self._agent_factory = agent_factory
         self._compressor = compressor
         self._budget_tracker = budget_tracker
+        self._message_bus = message_bus  # P1-5: 保存 message_bus
         self._tool_registry = tool_registry
         self._audit_logger = audit_logger
         self.router = router
@@ -82,6 +83,7 @@ class Scheduler:
             checkpoint=checkpoint_manager,
             event_bus=event_bus,
             compressor=compressor,
+            budget_tracker=budget_tracker,  # P1-4: 传递 budget_tracker
             tool_registry=tool_registry,
             audit_logger=audit_logger,
             router=router,

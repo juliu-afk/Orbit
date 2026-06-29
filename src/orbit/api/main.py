@@ -24,6 +24,7 @@ from orbit.api.routes import (
     chat,
     codegraph_routes,
     compliance,
+    compliance_routes,
     compose,
     diagnostics_ws,
     dream,
@@ -117,6 +118,7 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(blame_routes.router, prefix=settings.API_V1_STR)
     # Step 9 Phase 3: 智能洞察
     app.include_router(insights_routes.router, prefix=settings.API_V1_STR)
+    app.include_router(compliance_routes.router, prefix=settings.API_V1_STR)
     # Step 9 Phase 2.5: 集成终端
     app.include_router(terminal_routes.router, prefix=settings.API_V1_STR)
     # Phase 2: 实时诊断 WebSocket——不加 API_V1_STR 前缀
@@ -254,6 +256,7 @@ codegraph_routes.set_code_graph(_code_graph_engine)
 codegraph_routes.set_file_service(_file_service)
 insights_routes.set_code_graph(_code_graph_engine)
 insights_routes.set_review_service(_review_service)
+compliance_routes.set_file_service(_file_service)
 search_routes.set_workspace(_ws_dir)
 tests_routes.set_workspace(_ws_dir)
 # Step 9 Phase 2: 诊断服务

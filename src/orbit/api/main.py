@@ -38,6 +38,7 @@ from orbit.api.routes import (
     search_routes,
     sessions,
     tasks,
+    terminal_routes,
     tests_routes,
     loop,
     versioning,
@@ -113,6 +114,8 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(tests_routes.router, prefix=settings.API_V1_STR)
     # Step 9 Phase 2: Git Blame
     app.include_router(blame_routes.router, prefix=settings.API_V1_STR)
+    # Step 9 Phase 2.5: 集成终端
+    app.include_router(terminal_routes.router, prefix=settings.API_V1_STR)
     # Phase 2: 实时诊断 WebSocket——不加 API_V1_STR 前缀
     app.include_router(diagnostics_ws.router)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
@@ -253,6 +256,7 @@ from orbit.lsp.service import DiagnosticService  # noqa: E402
 _diagnostic_service = DiagnosticService(_ws_dir)
 
 blame_routes.set_workspace(_ws_dir)
+terminal_routes.set_workspace(_ws_dir)
 diagnostics_ws.set_diagnostic_service(_diagnostic_service)
 
 app = create_app(_event_bus)

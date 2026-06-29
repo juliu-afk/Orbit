@@ -31,15 +31,19 @@ async def list_gpg_keys():
         if proc.returncode != 0: return []
     except FileNotFoundError: return []
     keys = []; current = {}
-    for line in stdout.decode("utf-8", errors="replace").split("\n"):
-        if line.startswith("sec:"): current = {}
+    for line in stdout.decode("utf-8", errors="replace").splitlines():
+        if line.startswith("sec:"):
+            current = {}
+            parts = line.split(":")
+            if len(parts) > 4: current["id"] = parts[4]  # P0-3: key id from sec line
         elif line.startswith("uid:"):
             parts = line.split(":")
             ne = parts[9] if len(parts) > 9 else ""
             m = re.match(r"(.+?)\s*<(.+?)>", ne)
             if m:
                 current["name"] = m.group(1).strip(); current["email"] = m.group(2).strip()
-                if "id" in current: keys.append(GpgKey(id=current.get("id",""), name=current.get("name",""), email=current.get("email",""), fingerprint=current.get("fingerprint","")))
+                if "id" in current:
+                    keys.append(GpgKey(id=current["id"], name=current.get("name",""), email=current.get("email",""), fingerprint=current.get("fingerprint","")))
         elif line.startswith("fpr:"):
             parts = line.split(":"); current["fingerprint"] = parts[9] if len(parts) > 9 else ""
     return keys
@@ -48,9 +52,18 @@ async def list_gpg_keys():
 async def commit(req: CommitRequest):
     ws = Path(_ws())
     if not (ws / ".git").exists(): raise HTTPException(status_code=400, detail="Not a git repo")
+    # P2-6: validate file paths
+    for f in req.files:
+        if ".." in f: raise HTTPException(status_code=400, detail=f"Invalid path: {f}")
     proc = await asyncio.create_subprocess_exec("git","-C",str(ws),"status","--porcelain", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, _ = await proc.communicate()
     if not stdout.strip(): raise HTTPException(status_code=400, detail="No changes to commit")
+    # P0-2: git add before commit
+    add_cmd = ["git","-C",str(ws),"add"] + (req.files if req.files else ["-A"])
+    add_proc = await asyncio.create_subprocess_exec(*add_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    _, add_err = await add_proc.communicate()
+    if add_proc.returncode != 0:
+        raise HTTPException(status_code=400, detail=f"git add failed: {add_err.decode('utf-8', errors='replace')}")
     cmd = ["git","-C",str(ws),"commit"]
     if req.sign and req.gpg_key_id: cmd.append(f"-S{req.gpg_key_id}")
     elif req.sign: cmd.append("-S")
@@ -75,5 +88,6 @@ async def get_merge_conflicts():
     if not (ws / ".git").exists(): raise HTTPException(status_code=400, detail="Not a git repo")
     proc = await asyncio.create_subprocess_exec("git","-C",str(ws),"diff","--name-only","--diff-filter=U", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, _ = await proc.communicate()
-    files = stdout.decode("utf-8").strip().split("\n") if stdout.strip() else []
+    # P1-3: errors="replace" 避免非 UTF-8 路径崩
+    files = stdout.decode("utf-8", errors="replace").strip().splitlines() if stdout.strip() else []
     return {"conflicts": files}

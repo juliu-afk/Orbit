@@ -35,5 +35,8 @@ class DiagnosticService:
             diagnostics.append(Diagnostic(file_path=m.group(1), line=int(m.group(2)), column=int(m.group(3)), severity=sev, message=m.group(5).strip(), rule_id=m.group(6)))
         return diagnostics
 
+    # P1-1: 并发执行避免顺序阻塞
     async def get_diagnostics(self, file_paths: list[str]) -> dict[str, list[Diagnostic]]:
-        return {fp: await self.run_mypy(fp) for fp in file_paths}
+        tasks = [self.run_mypy(fp) for fp in file_paths]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return {fp: (r if isinstance(r, list) else []) for fp, r in zip(file_paths, results)}

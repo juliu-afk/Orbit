@@ -14,9 +14,9 @@ def _svc() -> FileService:
     return _file_service
 
 @router.get("/tree")
-async def list_files(task_id: str | None = Query(None)):
-    try: files = await _svc().list_files(task_id)
-    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+async def list_files():
+    try: files = await _svc().list_files()
+    except (OSError, RuntimeError) as e: raise HTTPException(status_code=500, detail=str(e))
     return {"files": [f.model_dump() for f in files]}
 
 @router.get("/read")

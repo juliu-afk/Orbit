@@ -1,7 +1,7 @@
 """审查模块 SQLAlchemy 2.0 ORM 模型。独立 Base，与 graph 模块隔离。"""
 from __future__ import annotations
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -14,11 +14,12 @@ class ReviewBase(DeclarativeBase):
 class Review(ReviewBase):
     __tablename__ = "reviews"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    task_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True, unique=True)
+    # 业务层检查活跃审查去重，DB 不强制唯一以允许历史记录 (P1-4)
+    task_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     created_by: Mapped[str] = mapped_column(String(100), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(tz=timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(tz=timezone.utc), onupdate=lambda: datetime.now(tz=timezone.utc))
     decisions: Mapped[list["ReviewDecision"]] = relationship(back_populates="review", cascade="all, delete-orphan")
     comments: Mapped[list["ReviewComment"]] = relationship(back_populates="review", cascade="all, delete-orphan")
 
@@ -31,7 +32,7 @@ class ReviewDecision(ReviewBase):
     decision: Mapped[str] = mapped_column(String(20), nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     decided_by: Mapped[str] = mapped_column(String(100), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(tz=timezone.utc))
     review: Mapped["Review"] = relationship(back_populates="decisions")
 
 class ReviewComment(ReviewBase):
@@ -45,6 +46,6 @@ class ReviewComment(ReviewBase):
     status: Mapped[str] = mapped_column(String(20), default="open")
     assigned_to: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_by: Mapped[str] = mapped_column(String(100), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(tz=timezone.utc))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     review: Mapped["Review"] = relationship(back_populates="comments")

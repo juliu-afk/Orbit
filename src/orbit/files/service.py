@@ -5,6 +5,10 @@ from enum import Enum
 from pathlib import Path
 from pydantic import BaseModel
 
+MAX_READ_SIZE = 1_000_000  # 1MB 上限，超限拒绝读取 (P0-6)
+# 无扩展名但应显示的文件 (P1-6)
+NAMELESS_WHITELIST = {"Makefile","Dockerfile","LICENSE",".gitignore",".env",".dockerignore"}
+
 class FileStatus(str, Enum):
     ADDED="added"; MODIFIED="modified"; DELETED="deleted"; UNCHANGED="unchanged"
 
@@ -17,11 +21,13 @@ class FileService:
 
     def _safe_path(self, relative: str) -> Path:
         resolved = (self.workspace / relative).resolve()
-        if not str(resolved).startswith(str(self.workspace)): raise ValueError(f"Path traversal denied: {relative}")
+        if not str(resolved).startswith(str(self.workspace)):
+            raise ValueError(f"Path traversal denied: {relative}")
         return resolved
 
-    async def list_files(self, task_id: str | None = None) -> list[FileInfo]:
-        EXCLUDE_DIRS = {"__pycache__","node_modules",".git",".venv","venv","data",".orbit",".claude","dist","build"}
+    # P0-5: 提取同步逻辑，通过 asyncio.to_thread 避免阻塞事件循环
+    def _list_files_sync(self) -> list[FileInfo]:
+        EXCLUDE_DIRS = {"__pycache__","node_modules",".git",".venv","venv","data",".orbit",".claude","dist","build",".mypy_cache",".ruff_cache",".pytest_cache"}
         EXCLUDE_EXT = {".pyc",".pyo",".exe",".dll",".so",".o",".db"}
         TEXT_EXT = {".py",".ts",".tsx",".js",".jsx",".vue",".css",".scss",".html",".md",".json",".yaml",".yml",".toml",".sql",".txt",".cfg",".ini",".env",".sh",".svg"}
         files = []
@@ -30,14 +36,20 @@ class FileService:
             for f in filenames:
                 ext = os.path.splitext(f)[1].lower()
                 if ext in EXCLUDE_EXT: continue
-                if ext not in TEXT_EXT and f not in TEXT_EXT: continue
+                if ext not in TEXT_EXT and f not in NAMELESS_WHITELIST: continue
                 full = Path(root) / f
                 rel = str(full.relative_to(self.workspace)).replace("\\", "/")
                 files.append(FileInfo(path=rel, size=full.stat().st_size, status=FileStatus.UNCHANGED))
         return sorted(files, key=lambda x: x.path)
 
+    async def list_files(self) -> list[FileInfo]:
+        return await asyncio.to_thread(self._list_files_sync)
+
     async def read_file(self, path: str) -> str:
-        return self._safe_path(path).read_text(encoding="utf-8")
+        target = self._safe_path(path)
+        if target.stat().st_size > MAX_READ_SIZE:
+            raise ValueError(f"File too large: {target.stat().st_size} > {MAX_READ_SIZE}")
+        return target.read_text(encoding="utf-8")
 
     def detect_language(self, path: str) -> str:
         M = {".py":"python",".ts":"typescript",".tsx":"typescript",".js":"javascript",".vue":"html",".css":"css",".scss":"scss",".html":"html",".json":"json",".yaml":"yaml",".yml":"yaml",".toml":"toml",".sql":"sql",".md":"markdown",".sh":"shell",".svg":"xml",".xml":"xml"}
@@ -50,7 +62,8 @@ class FileService:
         else: cmd.extend([rev_a, "--", str(target)])
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         stdout, stderr = await proc.communicate()
-        if proc.returncode == 0: return {"diff_text": stdout.decode("utf-8", errors="replace"), "language": self.detect_language(path)}
+        if proc.returncode == 0:
+            return {"diff_text": stdout.decode("utf-8", errors="replace"), "language": self.detect_language(path)}
         return {"diff_text": "", "language": self.detect_language(path), "error": stderr.decode("utf-8", errors="replace") if stderr else ""}
 
     async def write_file(self, path: str, content: str) -> None:

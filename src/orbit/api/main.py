@@ -38,6 +38,7 @@ from orbit.api.routes import (
     search_routes,
     sessions,
     tasks,
+    terminal_routes,
     tests_routes,
     loop,
     versioning,
@@ -113,6 +114,8 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(tests_routes.router, prefix=settings.API_V1_STR)
     # Step 9 Phase 2: Git Blame
     app.include_router(blame_routes.router, prefix=settings.API_V1_STR)
+    # Step 9 Phase 2.5: 集成终端
+    app.include_router(terminal_routes.router, prefix=settings.API_V1_STR)
     # Phase 2: 实时诊断 WebSocket——不加 API_V1_STR 前缀
     app.include_router(diagnostics_ws.router)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
@@ -253,6 +256,7 @@ from orbit.lsp.service import DiagnosticService  # noqa: E402
 _diagnostic_service = DiagnosticService(_ws_dir)
 
 blame_routes.set_workspace(_ws_dir)
+terminal_routes.set_workspace(_ws_dir)
 diagnostics_ws.set_diagnostic_service(_diagnostic_service)
 
 app = create_app(_event_bus)
@@ -270,3 +274,23 @@ async def _shutdown_review() -> None:
 app.state.compose_orchestrator = _compose_orchestrator
 # Phase 2: 注入 DreamEngine 到 app state（供 /dream 端点访问）
 app.state.dream_engine = _dream_engine
+# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler + CritiqueAgent + ModelEnsemble
+from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
+from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402
+from orbit.goal.critique import CritiqueAgent  # noqa: E402
+from orbit.goal.ensemble import ModelEnsemble  # noqa: E402
+from orbit.loop.scheduler import LoopScheduler  # noqa: E402
+
+_critique_agent = CritiqueAgent(llm=_llm_flash, model_family="anthropic")
+_model_ensemble = ModelEnsemble(agent_factory=AgentFactory, judge_llm=_llm_flash, ensemble_models=["claude-opus", "gpt-4o"])
+_meta_orchestrator = MetaOrchestrator(
+    compose_bridge=GoalComposeBridge(llm=_llm_flash),
+    critique_agent=_critique_agent,
+    ensemble=_model_ensemble,
+    compose_orchestrator=_compose_orchestrator,
+    agent_factory=AgentFactory,
+    max_parallel_tasks=5,
+)
+_loop_scheduler = LoopScheduler(command_executor=_meta_orchestrator.run)
+app.state.meta_orchestrator = _meta_orchestrator
+app.state.loop_scheduler = _loop_scheduler

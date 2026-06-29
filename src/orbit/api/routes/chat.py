@@ -110,44 +110,7 @@ async def chat_endpoint(ws: WebSocket) -> None:
 
 
 
-async def _handle_goal_command(ws, text: str):
-    """/goal <desc> | /goal status | /goal clear."""
-    orch = getattr(ws.app.state, "meta_orchestrator", None)
-    if orch is None:
-        await _send(ws, 503, None, "MetaOrchestrator 未初始化")
-        return
-    cmd = text[5:].strip()
-    if not cmd:
-        await _send(ws, 1, None, "/goal <desc> | /goal status | /goal clear")
-        return
-    if cmd == "status":
-        from orbit.api.routes import goal as gr
-        t = gr._active_task
-        await _send(ws, 0, {"active": t is not None and not t.done(), "goal_id": gr._active_goal_id, "status": "running" if (t and not t.done()) else "idle"}, "Goal 状态")
-        return
-    if cmd == "clear":
-        from orbit.api.routes import goal as gr
-        t = gr._active_task
-        gid = gr._active_goal_id
-        if t and not t.done():
-            t.cancel()
-            gr._active_task = None
-            gr._active_goal_id = None
-            await _send(ws, 0, {"goal_id": gid}, "Goal 已取消")
-            return
-        await _send(ws, 0, {}, "无活跃 Goal")
-        return
-    # 创建新 Goal (P1-1: sync to goal_route)
-    from orbit.goal.models import GoalSession
-    from orbit.api.routes import goal as gr
-    import asyncio
-    goal = GoalSession(description=cmd)
-    task = asyncio.create_task(orch.run(goal))
-    task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
-    gr._active_task = task
-    gr._active_goal_id = goal.id
-    await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动")
-
+# P1-2: Goal 后台任务异常回调
 def _on_goal_task_done(goal_id: str, task) -> None:
     try:
         task.result()
@@ -163,9 +126,22 @@ async def _handle_chat(
         await _send(ws, 1, None, "输入为空")
         return
 
-    # /goal 命令族
+    # /goal 命令——投喂目标给 MetaOrchestrator
     if text.strip().startswith("/goal"):
-        await _handle_goal_command(ws, text.strip())
+        goal_text = text.strip()[5:].strip()
+        if not goal_text:
+            await _send(ws, 1, None, "/goal 需要目标描述")
+            return
+        orch = getattr(ws.app.state, "meta_orchestrator", None)
+        if orch is None:
+            await _send(ws, 503, None, "MetaOrchestrator 未初始化")
+            return
+        from orbit.goal.models import GoalSession
+        import asyncio
+        goal = GoalSession(description=goal_text)
+        task = asyncio.create_task(orch.run(goal))
+        task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
+        await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动: {goal_text[:80]}")
         return
 
     # 验证 session 存在

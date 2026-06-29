@@ -8,6 +8,7 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/search", tags=["search"])
 
 _workspace_dir: str | None = None
+MAX_RESULTS = 200  # P2: 搜索结果上限
 
 def set_workspace(d: str) -> None:
     global _workspace_dir; _workspace_dir = d
@@ -21,22 +22,22 @@ class SearchResult(BaseModel):
 
 
 @router.get("", response_model=list[SearchResult])
-async def search(q: str = Query(..., min_length=2), type: str = Query("content"), max: int = Query(50)):
-    """全局搜索。type=file 按文件名搜索，type=content 按内容搜索（使用 ripgrep）。"""
+async def search(q: str = Query(..., min_length=2), search_type: str = Query("content"), max_results: int = Query(50, ge=1, le=MAX_RESULTS)):
+    """全局搜索。search_type=file 按文件名，search_type=content 按内容（ripgrep）。"""
     ws = Path(_ws())
     if not ws.exists():
         raise HTTPException(status_code=500, detail="Workspace not found")
     try:
-        if type == "file":
-            return _search_filenames(ws, q, max)
+        if search_type == "file":
+            return await asyncio.to_thread(_search_filenames, ws, q, max_results)
         else:
-            return await _search_content(ws, q, max)
+            return await _search_content(ws, q, max_results)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 def _search_filenames(ws: Path, q: str, max_results: int) -> list[SearchResult]:
-    """文件名模糊匹配——遍历项目目录。"""
+    """文件名模糊匹配——在独立线程中运行（通过 asyncio.to_thread 调用）。"""
     results = []
     EXCLUDE = {"__pycache__","node_modules",".git",".venv","venv","data",".orbit","dist","build","__pycache__"}
     q_lower = q.lower()
@@ -54,10 +55,11 @@ def _search_filenames(ws: Path, q: str, max_results: int) -> list[SearchResult]:
 async def _search_content(ws: Path, q: str, max_results: int) -> list[SearchResult]:
     """内容搜索——使用 rg (ripgrep) 子进程。"""
     try:
+        # P2: 安全防护——禁止 rg 参数注入，q 通过位置参数传递
         proc = await asyncio.create_subprocess_exec(
-            "rg", "--line-number", "--max-count=1", "--no-heading",
-            "--max-count=" + str(max_results),
-            q, str(ws),
+            "rg", "--line-number", "--no-heading",
+            "--max-count", str(max_results),
+            "--", q, str(ws),  # -- 分隔符防止 q 被解析为 rg 参数
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10.0)
@@ -65,7 +67,6 @@ async def _search_content(ws: Path, q: str, max_results: int) -> list[SearchResu
         results = []
         for line in lines[:max_results]:
             if not line: continue
-            # rg format: file:lineno:content
             parts = line.split(":", 2)
             if len(parts) >= 2:
                 f = os.path.relpath(parts[0], ws).replace("\\", "/")
@@ -75,4 +76,4 @@ async def _search_content(ws: Path, q: str, max_results: int) -> list[SearchResu
                 ))
         return results
     except (FileNotFoundError, asyncio.TimeoutError):
-        return []  # rg 未安装或超时，返回空
+        return []

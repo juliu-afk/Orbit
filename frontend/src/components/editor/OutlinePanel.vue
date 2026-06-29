@@ -3,7 +3,7 @@
   <div class="outline-panel">
     <div class="outline-header">Outline</div>
     <div v-if="!items.length" class="outline-empty">No symbols</div>
-    <div v-for="item in items" :key="item.name + item.line" class="outline-item"
+    <div v-for="(item, i) in items" :key="`${item.kind}:${item.name}:${item.line}:${i}`" class="outline-item"
       :class="'kind-' + item.kind" :style="{ paddingLeft: item.kind === 'method' ? 20 : 8 + 'px' }"
       @click="$emit('select', item.line)">
       <span class="outline-icon">{{ item.kind === 'class' ? 'C' : item.kind === 'method' ? 'M' : 'F' }}</span>

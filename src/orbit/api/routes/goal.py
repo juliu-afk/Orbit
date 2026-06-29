@@ -14,6 +14,23 @@ from orbit.goal.models import GoalSession
 
 router = APIRouter(prefix="/api/v1/goal", tags=["goal"])
 
+_active_task: asyncio.Task | None = None
+_active_goal_id: str | None = None
+
+
+def _on_goal_done(task: asyncio.Task) -> None:
+    global _active_task, _active_goal_id
+    try:
+        task.result()
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        import structlog
+        structlog.get_logger("orbit.goal").error("goal_background_failed", exc_info=True)
+    finally:
+        _active_task = None
+        _active_goal_id = None
+
 
 class CreateGoalRequest(BaseModel):
     description: str = Field("", description="目标描述")
@@ -37,6 +54,7 @@ def _get_orch(request: Request):
 @router.post("")
 async def create_goal(request: Request, req: CreateGoalRequest):
     """创建 Goal——统一入口。后台异步执行。"""
+    global _active_task, _active_goal_id
     orch = _get_orch(request)
     goal = GoalSession(
         description=req.description or req.source_file or req.source_dir,
@@ -47,7 +65,10 @@ async def create_goal(request: Request, req: CreateGoalRequest):
         max_parallel_tasks=req.max_parallel_tasks,
         max_react=req.max_react,
     )
-    asyncio.create_task(orch.run(goal))
+    task = asyncio.create_task(orch.run(goal))
+    task.add_done_callback(_on_goal_done)
+    _active_task = task
+    _active_goal_id = goal.id
     return {
         "code": 0,
         "data": {"goal_id": goal.id, "status": "active", "message": "Goal 已启动"},
@@ -56,31 +77,42 @@ async def create_goal(request: Request, req: CreateGoalRequest):
 
 @router.get("")
 async def get_goal_status(request: Request):
-    """查询当前活跃 Goal 状态。"""
-    orch = _get_orch(request)
+    """GET /api/v1/goal ——查询当前 Goal 状态。"""
+    _get_orch(request)
+    task = _active_task
     return {
         "code": 0,
         "data": {
-            "active": True,
-            "description": orch.memory.goal_description,
-            "status": "active",
-            "sub_tasks": orch.memory.sub_tasks,
+            "active": task is not None and not task.done(),
+            "goal_id": _active_goal_id,
+            "status": "running" if (task and not task.done()) else "idle",
+            "sub_tasks": {},
         },
     }
 
 
 @router.delete("")
 async def cancel_goal(request: Request):
-    """取消当前活跃 Goal。"""
-    _get_orch(request)  # 验证 orch 可用
-    return {"code": 0, "data": {"message": "Goal 已取消"}}
+    """DELETE /api/v1/goal — /goal clear ——取消当前 Goal。"""
+    global _active_task, _active_goal_id
+    _get_orch(request)
+    task = _active_task
+    gid = _active_goal_id
+    if task and not task.done():
+        task.cancel()
+        _active_task = None
+        _active_goal_id = None
+        return {"code": 0, "data": {"goal_id": gid, "message": "Goal 已取消"}}
+    _active_task = None
+    _active_goal_id = None
+    return {"code": 0, "data": {"message": "无活跃 Goal"}}
 
 
 @router.post("/pause")
 async def pause_goal(request: Request):
-    return {"code": 0, "data": {"message": "Goal 已暂停"}}
+    raise HTTPException(status_code=501, detail="Goal pause/resume 功能待实现")
 
 
 @router.post("/resume")
 async def resume_goal(request: Request):
-    return {"code": 0, "data": {"message": "Goal 已恢复"}}
+    raise HTTPException(status_code=501, detail="Goal pause/resume 功能待实现")

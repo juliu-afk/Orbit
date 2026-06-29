@@ -9,9 +9,11 @@ WebSocket 端点: ws://host:18888/api/v1/chat
 
 from __future__ import annotations
 
+import asyncio as _asyncio
 import json as _json
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from orbit.agents.base import AgentInput
@@ -19,6 +21,8 @@ from orbit.agents.clarifier import ClarifierAgent, StructuredPRD, validate_prd
 from orbit.context.matcher import ContextMatcher
 from orbit.projects.registry import ProjectRegistry
 from orbit.sessions.registry import SessionRegistry
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -265,17 +269,23 @@ async def _handle_confirm(
         task_resp = await _create_task(task_req)
         task_id = task_resp.task_id
 
-        import asyncio as _asyncio
-
         try:
             from orbit.api.main import _scheduler
 
             if _scheduler is not None:
-                _asyncio.create_task(_scheduler.run_task(task_id, prd_text[:5000]))
+                # P1-2: done_callback 避免 fire-and-forget 无感知
+                task = _asyncio.create_task(_scheduler.run_task(task_id, prd_text[:5000]))
+                task.add_done_callback(
+                    lambda t: (
+                        logger.warning("task_cancelled", task_id=task_id)
+                        if t.cancelled()
+                        else logger.error("task_failed", task_id=task_id, error=str(t.exception()))
+                        if t.exception()
+                        else None
+                    )
+                )
         except Exception as e:
-            import structlog as _sl
-
-            _sl.get_logger().warning("run_task_trigger_failed", task_id=task_id, error=str(e))
+            logger.warning("run_task_trigger_failed", task_id=task_id, error=str(e))
 
         await _send(
             ws,

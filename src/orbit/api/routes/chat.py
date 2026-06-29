@@ -109,6 +109,15 @@ async def chat_endpoint(ws: WebSocket) -> None:
         pass  # 客户端正常断开
 
 
+
+# P1-2: Goal 后台任务异常回调
+def _on_goal_task_done(goal_id: str, task) -> None:
+    try:
+        task.result()
+    except Exception:
+        import structlog
+        structlog.get_logger("orbit.chat").error("goal_background_failed", goal_id=goal_id, exc_info=True)
+
 async def _handle_chat(
     ws: WebSocket, text: str, session_id: str, project_name: str, payload: dict[str, Any]
 ) -> None:
@@ -130,7 +139,8 @@ async def _handle_chat(
         from orbit.goal.models import GoalSession
         import asyncio
         goal = GoalSession(description=goal_text)
-        asyncio.create_task(orch.run(goal))
+        task = asyncio.create_task(orch.run(goal))
+        task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
         await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动: {goal_text[:80]}")
         return
 

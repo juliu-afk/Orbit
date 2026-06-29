@@ -16,6 +16,7 @@ WHY 独立角色：现有 5 个 Agent（architect/developer/reviewer/qa/config_m
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 import structlog
@@ -23,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
 from orbit.gateway.schemas import LLMRequest
+from orbit.scheduler.clarifier import ClarificationEngine
 
 logger = structlog.get_logger()
 
@@ -144,15 +146,11 @@ _PLACEHOLDER_WORDS: tuple[str, ...] = (
     "未知",
 )
 
-# 矛盾方向对（V3 用，借鉴 ClarificationEngine.CONTRADICTION_PAIRS 思路）
-# 每项 (关键词A, 关键词B, 说明)：goal/scope 出现 A 且 acceptance/constraints 出现 B 则矛盾
-_CONTRADICTION_PAIRS: list[tuple[str, str, str]] = [
-    ("延迟", "全量扫描", "降低延迟与全量扫描方向冲突"),
-    ("延迟", "遍历", "低延迟与遍历操作方向冲突"),
-    ("性能", "实时同步", "高性能与强制实时同步方向冲突"),
-    ("离线", "实时", "离线优先与实时要求方向冲突"),
-    ("轻量", "引入", "轻量化与引入新依赖方向冲突"),
-]
+# 矛盾方向对——统一从 ClarificationEngine 取（P0 消重）
+# WHY: 不再各自维护一份 CONTRADICTION_PAIRS，单点维护在 scheduler/clarifier.py
+_CONTRADICTION_PAIRS: list[tuple[str, str, str]] = (
+    ClarificationEngine.CONTRADICTION_PAIRS
+)
 
 
 class ClarifierAgent(BaseAgent):
@@ -415,11 +413,11 @@ def _check_cross_contradiction(
     constraint_text = " ".join(constraints).lower()
 
     for kw_a, kw_b, desc in _CONTRADICTION_PAIRS:
-        # goal/scope 出现 A 且 acceptance 出现 B
-        if kw_a in combined and kw_b in ac_text:
+        # goal/scope 出现 A 且 acceptance 出现 B → 用 regex 匹配（P0 消重后统一格式）
+        if re.search(kw_a, combined) and re.search(kw_b, ac_text):
             reasons.append(desc)
-        # scope 出现 A 且 constraints 出现 B
-        if kw_a in scope.lower() and kw_b in constraint_text:
+        # scope 出现 A 且 constraints 出现 B → regex 匹配
+        if re.search(kw_a, scope.lower()) and re.search(kw_b, constraint_text):
             reasons.append(desc)
 
     return reasons

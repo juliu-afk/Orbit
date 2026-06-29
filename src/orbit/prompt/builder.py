@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from orbit.agents.base import AgentRole
+from orbit.context.relevance import extract_relevant_context
 
 # ── Agent 角色描述（stable 层）─────────────────────────────
 # WHY 在这里集中定义: 不在 agent 各自文件中散落，统一管理+
@@ -69,6 +70,10 @@ RULES_BLOCK = """## 强制规则
 6. **路径用正斜杠 `/`**——跨平台兼容。
 7. **编辑已有文件优先于新建**——三个相似行好过一个过早抽象。
 8. **不添加未要求的功能、抽象、错误处理、兼容层**。
+9. **简洁优先**——用最少代码行数实现功能但保持可读性。
+   - 优先复用标准库和已有函数，不要自己重复造轮子
+   - 写完检查：有能删掉的行吗？有能合并的变量吗？
+   - 如果单个文件超过 200 行，重新审视——是不是做了太多事？
 
 ## 输出格式
 
@@ -163,10 +168,19 @@ class PromptBuilder:
             parts.append(f"**技术栈**: {tech_stack}")
 
         if code_context:
-            # 截断过大的代码上下文
-            truncated = (
-                code_context[:5000] + "\n... (截断)" if len(code_context) > 5000 else code_context
-            )
+            # 业务层减熵 P0: 用任务关键词提取最相关的代码片段
+            task_keywords = ctx.get("keywords", [])
+            if task_keywords:
+                truncated = extract_relevant_context(
+                    code_context, task_keywords, max_fragments=5, max_chars=5000
+                )
+            else:
+                # 无关键词 → 降级为全文截断
+                truncated = (
+                    code_context[:5000] + "\n... (截断)"
+                    if len(code_context) > 5000
+                    else code_context
+                )
             parts.append(f"\n已有代码上下文：\n```\n{truncated}\n```")
 
         if env_info:

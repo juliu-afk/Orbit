@@ -190,17 +190,19 @@ class TestResourceGuard:
             guard.record_result("tx", success=False)
         r = guard.guard_request("tx", 10)
         assert r.decision == GuardDecision.DENY
-        assert guard._state == CircuitState.OPEN
+        # P0 消重: _state→_circuit (GatewayCircuitState)
+        assert guard._circuit.opened_at is not None
+        assert guard._circuit.half_open is False
 
     def test_recovery_after_success(self) -> None:
         guard = ResourceGuard()
         # 2 次失败，未达阈值
         guard.record_result("tx", success=False)
         guard.record_result("tx", success=False)
-        assert guard._state == CircuitState.CLOSED
+        assert guard._circuit.opened_at is None  # CLOSED
         # 成功恢复
         guard.record_result("tx", success=True)
-        assert guard._failure_count == 0
+        assert guard._circuit.failure_count == 0
 
     def test_audit_event_on_open(self) -> None:
         guard = ResourceGuard()
@@ -236,8 +238,9 @@ class TestResourceGuard:
         guard.record_result("t1", success=False)
         guard.degrade(1)
         guard.reset()
-        assert guard._state == CircuitState.CLOSED
-        assert guard._failure_count == 0
+        assert guard._circuit.failure_count == 0  # P0 消重: _failure_count→_circuit.failure_count
+        assert guard._circuit.opened_at is None
+        assert guard._circuit.half_open is False
         assert len(guard.get_audit_events()) == 0
         assert guard.get_state().degradation_stats == {}
 

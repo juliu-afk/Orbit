@@ -20,10 +20,12 @@ from orbit.agents.factory import AgentFactory
 from orbit.api.routes import (
     agent_llm,
     backup,
+    blame_routes,
     chat,
     codegraph_routes,
     compliance,
     compose,
+    diagnostics_ws,
     dream,
     goal,
     files_routes,
@@ -109,6 +111,10 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(search_routes.router, prefix=settings.API_V1_STR)
     # Step 9 Phase 1.4: 测试结果 + 覆盖率
     app.include_router(tests_routes.router, prefix=settings.API_V1_STR)
+    # Step 9 Phase 2: Git Blame
+    app.include_router(blame_routes.router, prefix=settings.API_V1_STR)
+    # Phase 2: 实时诊断 WebSocket——不加 API_V1_STR 前缀
+    app.include_router(diagnostics_ws.router)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
     # Phase 4 AC-A1: SSE 流式端点
@@ -242,6 +248,12 @@ codegraph_routes.set_code_graph(_code_graph_engine)
 codegraph_routes.set_file_service(_file_service)
 search_routes.set_workspace(_ws_dir)
 tests_routes.set_workspace(_ws_dir)
+# Step 9 Phase 2: 诊断服务
+from orbit.lsp.service import DiagnosticService  # noqa: E402
+_diagnostic_service = DiagnosticService(_ws_dir)
+
+blame_routes.set_workspace(_ws_dir)
+diagnostics_ws.set_diagnostic_service(_diagnostic_service)
 
 app = create_app(_event_bus)
 

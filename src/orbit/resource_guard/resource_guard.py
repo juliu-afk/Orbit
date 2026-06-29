@@ -21,11 +21,21 @@ from typing import Any
 import structlog
 
 from orbit.gateway.circuit_breaker import (
+<<<<<<< HEAD
+    DEFAULT_COoldown,
+    DEFAULT_FAILURE_THRESHOLD,
+    HALF_OPEN_PROBE_LIMIT,
+)
+from orbit.gateway.schemas import (
+    CircuitBreakerState as GatewayCircuitState,
+)
+=======
     DEFAULT_FAILURE_THRESHOLD,
     HALF_OPEN_PROBE_LIMIT,
     DEFAULT_COoldown,
 )
 from orbit.gateway.schemas import CircuitBreakerState as GatewayCircuitState
+>>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
 from orbit.observability.metrics import orbit_circuit_breaker_state
 from orbit.resource_guard.budget_guard import BudgetGuard
 from orbit.resource_guard.degradation import DegradationPath, DegradationResult

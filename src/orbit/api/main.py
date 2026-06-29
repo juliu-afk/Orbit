@@ -260,6 +260,6 @@ from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402
 from orbit.loop.scheduler import LoopScheduler  # noqa: E402
 
 _meta_orchestrator = MetaOrchestrator(compose_bridge=GoalComposeBridge(llm=_llm_flash), agent_factory=AgentFactory, max_parallel_tasks=5)
-_loop_scheduler = LoopScheduler()
+_loop_scheduler = LoopScheduler(command_executor=_meta_orchestrator.run)
 app.state.meta_orchestrator = _meta_orchestrator
 app.state.loop_scheduler = _loop_scheduler

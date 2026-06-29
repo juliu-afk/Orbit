@@ -13,7 +13,7 @@ WHY: PromptBuilder._build_context() 当前硬截断 5000 字符。
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass

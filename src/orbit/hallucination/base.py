@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from orbit.hallucination.base import BaseValidator as BaseValidatorType
 
 from orbit.hallucination import HallucinationLevel, ValidationResult
 
@@ -16,7 +19,7 @@ def skip_if_empty(func: Callable) -> Callable:
     """代码为空时跳过验证——返回 passed=True 的 ValidationResult."""
 
     @functools.wraps(func)
-    def wrapper(self: Any, code: str, *args: Any, **kwargs: Any) -> ValidationResult:
+    def wrapper(self: BaseValidatorType, code: str, *args: Any, **kwargs: Any) -> ValidationResult:
         if not code.strip():
             return ValidationResult(
                 passed=True,
@@ -32,7 +35,9 @@ def skip_if_no_sandbox(func: Callable) -> Callable:
     """沙箱不可用时跳过验证."""
 
     @functools.wraps(func)
-    async def wrapper(self: Any, code: str, *args: Any, **kwargs: Any) -> ValidationResult:
+    async def wrapper(
+        self: BaseValidatorType, code: str, *args: Any, **kwargs: Any
+    ) -> ValidationResult:
         sandbox = getattr(self, "_sandbox", None)
         if sandbox and not await sandbox.is_available():
             return ValidationResult(

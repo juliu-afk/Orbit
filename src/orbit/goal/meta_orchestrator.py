@@ -11,23 +11,21 @@ v5 架构核心:
 from __future__ import annotations
 
 import asyncio
-import structlog
 import time
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
+import structlog
 
 from orbit.goal.intake_router import IntakeRouter
 from orbit.goal.memory_tiers import ThreeTierMemory
-from typing import TYPE_CHECKING, Any
-
 from orbit.goal.models import (
-    GoalBatchReport,
     GoalResult,
     GoalSession,
     SubTaskResult,
 )
 
 if TYPE_CHECKING:
-    from orbit.compose.models import Spec, Task
     from orbit.goal.alignment import AlignmentCheck
     from orbit.goal.budget_allocator import BudgetAllocator
     from orbit.goal.compose_bridge import GoalComposeBridge
@@ -36,7 +34,6 @@ if TYPE_CHECKING:
     from orbit.goal.preflight import PreFlightEstimator
     from orbit.goal.progress_tracker import ProgressTracker
     from orbit.goal.regression_guard import RegressionGuard
-    from orbit.goal.subtask_session import SubTaskSession
     from orbit.goal.verifier import ExecutorVerifier
     from orbit.worktree.manager import WorktreeManager
 
@@ -45,6 +42,7 @@ logger = structlog.get_logger("orbit.goal")
 
 class AutoMergeRejected(Exception):
     """自主合入被拒绝——门禁未通过。"""
+
     def __init__(self, pr_id: str, reason: str) -> None:
         self.pr_id = pr_id
         self.reason = reason
@@ -68,7 +66,7 @@ class MetaOrchestrator:
         intake_router: IntakeRouter | None = None,
         dependency_analyzer: DependencyAnalyzer | None = None,
         compose_bridge: GoalComposeBridge | None = None,
-        clarifier: Any = None,          # ClarifierAgent
+        clarifier: Any = None,  # ClarifierAgent
         progress_tracker: ProgressTracker | None = None,
         alignment_check: AlignmentCheck | None = None,
         regression_guard: RegressionGuard | None = None,
@@ -78,7 +76,7 @@ class MetaOrchestrator:
         verifier: ExecutorVerifier | None = None,
         critique_agent: CritiqueAgent | None = None,
         worktree_manager: WorktreeManager | None = None,
-        agent_factory: Any = None,       # AgentFactory
+        agent_factory: Any = None,  # AgentFactory
         max_parallel_tasks: int = 5,
     ) -> None:
         self.intake_router = intake_router or IntakeRouter()
@@ -126,7 +124,7 @@ class MetaOrchestrator:
                     confirmed = await self._present_for_confirmation(estimate, spec, goal)
                     if not confirmed:
                         return GoalResult(status="cancelled", reason="用户取消")
-                    goal.spec = spec.model_dump() if hasattr(spec, 'model_dump') else spec
+                    goal.spec = spec.model_dump() if hasattr(spec, "model_dump") else spec
                     goal.sub_tasks = {t.id: "pending" for t in spec.tasks}
 
             # 已有 TaskDAG→直接执行
@@ -153,10 +151,14 @@ class MetaOrchestrator:
                     )
 
                 # 层内并行
-                layer_results = await asyncio.gather(*[
-                    self._run_subtask(t, task_bases.get(t.id, "main"), goal, budgets.get(t.id, 0))
-                    for t in layer
-                ])
+                layer_results = await asyncio.gather(
+                    *[
+                        self._run_subtask(
+                            t, task_bases.get(t.id, "main"), goal, budgets.get(t.id, 0)
+                        )
+                        for t in layer
+                    ]
+                )
 
                 # 处理结果
                 for task, result in zip(layer, layer_results):
@@ -199,7 +201,8 @@ class MetaOrchestrator:
                 # 预算检查
                 if self._budget_exhausted(goal):
                     return GoalResult(
-                        status="done", reason="预算耗尽",
+                        status="done",
+                        reason="预算耗尽",
                         tasks_completed=completed_count,
                     )
 
@@ -252,6 +255,7 @@ class MetaOrchestrator:
         """单任务模式——无拆解，直接执行。"""
         # 创建虚拟 Task
         from orbit.compose.models import Task as ComposeTask
+
         task = ComposeTask(id="task-0", description=goal.description)
         result = await self._run_subtask(task, "main", goal, goal.total_token_budget)
         return GoalResult(
@@ -290,9 +294,11 @@ class MetaOrchestrator:
         results: list[GoalResult] = []
         sem = asyncio.Semaphore(self._max_parallel)
         for layer in layers:
+
             async def _run_one(g):
                 async with sem:
                     return await self.run(g)
+
             layer_results = await asyncio.gather(*[_run_one(g) for g in layer])
             results.extend(layer_results)
 
@@ -329,9 +335,7 @@ class MetaOrchestrator:
             logger.warning("clarifier_failed", error=str(e))
         return goal
 
-    async def _present_for_confirmation(
-        self, estimate, spec, goal: GoalSession
-    ) -> bool:
+    async def _present_for_confirmation(self, estimate, spec, goal: GoalSession) -> bool:
         """展示拆解结果——等待用户确认。
 
         实际实现: 通过 WebSocket/chat 界面展示。
@@ -344,7 +348,11 @@ class MetaOrchestrator:
     def _budget_exhausted(self, goal: GoalSession) -> bool:
         """检查预算是否耗尽。"""
         if goal.total_token_budget > 0 and goal.token_consumed >= goal.total_token_budget:
-            logger.warning("goal_budget_exhausted", budget=goal.total_token_budget, consumed=goal.token_consumed)
+            logger.warning(
+                "goal_budget_exhausted",
+                budget=goal.total_token_budget,
+                consumed=goal.token_consumed,
+            )
             return True
         if goal.max_runtime_seconds > 0 and goal.started_at:
             # P1-NEW5: 更稳健的 ISO 解析
@@ -356,7 +364,9 @@ class MetaOrchestrator:
                 logger.warning("goal_time_parse_failed", started_at=goal.started_at)
                 return False
             if elapsed >= goal.max_runtime_seconds:
-                logger.warning("goal_time_exhausted", max=goal.max_runtime_seconds, elapsed=int(elapsed))
+                logger.warning(
+                    "goal_time_exhausted", max=goal.max_runtime_seconds, elapsed=int(elapsed)
+                )
                 return True
         return False
 
@@ -381,7 +391,9 @@ class MetaOrchestrator:
             else:
                 dep_shas = [previous_merges[d] for d in t.depends_on if d in previous_merges]
                 if not dep_shas:
-                    logger.warning("resolve_bases_no_deps_found", task_id=t.id, depends_on=list(t.depends_on))
+                    logger.warning(
+                        "resolve_bases_no_deps_found", task_id=t.id, depends_on=list(t.depends_on)
+                    )
                     bases[t.id] = "main"
                 else:
                     bases[t.id] = dep_shas[-1]
@@ -398,7 +410,9 @@ class MetaOrchestrator:
                 if dep in adj:
                     adj[dep].append(t.id)
                 else:
-                    logger.warning("topological_sort_missing_dependency", task_id=t.id, missing_dep=dep)
+                    logger.warning(
+                        "topological_sort_missing_dependency", task_id=t.id, missing_dep=dep
+                    )
 
         layers = []
         current = [t for t in tasks if in_degree[t.id] == 0]
@@ -421,7 +435,8 @@ class MetaOrchestrator:
     def _deserialize_spec(spec_data: dict) -> Any:
         """反序列化 Spec——兼容 dict 和 pydantic。"""
         try:
-            from orbit.compose.models import Spec, Task
+            from orbit.compose.models import Spec
+
             return Spec(**spec_data)
         except Exception:
             return spec_data

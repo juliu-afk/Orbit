@@ -15,7 +15,6 @@ _registry = VersionRegistry()
 
 
 class InstallRequest(BaseModel):
-
     version: str
     description: str = ""
 

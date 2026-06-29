@@ -263,7 +263,6 @@ async def startup_probe_reset() -> dict[str, Any]:
 async def startup_probe_install(name: str) -> dict[str, Any]:
     """后台安装指定组件（如 Docker Desktop）。"""
     if name == "docker":
-
         asyncio.create_task(_async_install_docker())
         return {
             "code": 0,

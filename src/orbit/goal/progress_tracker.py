@@ -9,9 +9,10 @@ ProgressTracker 从 Beads 层恢复进度——Beads 不会被压缩。
 
 from __future__ import annotations
 
-import structlog
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
+
+import structlog
 
 if TYPE_CHECKING:
     from orbit.goal.models import GoalSession

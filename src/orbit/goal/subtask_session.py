@@ -15,14 +15,15 @@ WHY 独立 Session 非协程: 独立 LLM 消息历史 = 独立上下文窗口。
 from __future__ import annotations
 
 import asyncio
-import structlog
 from typing import TYPE_CHECKING, Any
+
+import structlog
 
 from orbit.api.schemas.task import TaskState
 from orbit.goal.models import GoalSession, SubTaskResult
 from orbit.goal.process_guard import (
-    FULL_PIPELINE_TRANSITIONS,
     FAST_LANE_TRANSITIONS,
+    FULL_PIPELINE_TRANSITIONS,
     TERMINAL_STATES,
     ProcessGuard,
 )
@@ -30,8 +31,8 @@ from orbit.goal.process_guard import (
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
     from orbit.checkpoint.manager import CheckpointManager
-    from orbit.compression.budget import TokenBudgetTracker
     from orbit.compose.models import Task
+    from orbit.compression.budget import TokenBudgetTracker
     from orbit.worktree.manager import WorktreeManager
 
 logger = structlog.get_logger("orbit.goal")
@@ -72,8 +73,8 @@ class SubTaskSession:
         worktree_manager: WorktreeManager | None = None,
         checkpoint_manager: CheckpointManager | None = None,
         budget_tracker: TokenBudgetTracker | None = None,
-        critique_agent: Any = None,   # CritiqueAgent——延迟导入避免循环
-        verifier: Any = None,          # ExecutorVerifier
+        critique_agent: Any = None,  # CritiqueAgent——延迟导入避免循环
+        verifier: Any = None,  # ExecutorVerifier
     ) -> None:
         self.task = task
         self.base_ref = base_ref
@@ -286,7 +287,7 @@ class SubTaskSession:
             raise
         except Exception as e:
             logger.warning("critique_failed_fail_open", error=str(e))
-        except Exception as e:
+        except Exception:
             return True  # 批判失败 → fail-open——不阻塞流程
 
     # ── 内部: 状态转换 ─────────────────────────────────

@@ -8,9 +8,10 @@ WHY 非 LLM: LLM 估算偏差 ±40%（实测），静态分析偏差 ±20%。
 
 from __future__ import annotations
 
-import structlog
 from dataclasses import dataclass
 from typing import Any
+
+import structlog
 
 logger = structlog.get_logger("orbit.goal")
 
@@ -18,21 +19,23 @@ logger = structlog.get_logger("orbit.goal")
 @dataclass
 class Estimate:
     """单项估算。"""
+
     token_low: int = 50000
     token_high: int = 200000
-    time_low: int = 300    # 秒
+    time_low: int = 300  # 秒
     time_high: int = 1200
 
 
 @dataclass
 class PreFlightResult:
     """预估算结果。"""
+
     token_low: int = 50000
     token_high: int = 200000
     time_low_seconds: int = 300
     time_high_seconds: int = 1200
     confidence: float = 0.5
-    source: str = "fuzzy"       # kb | fuzzy
+    source: str = "fuzzy"  # kb | fuzzy
     similar_tasks_found: int = 0
     suggestion: str = ""
 
@@ -88,7 +91,9 @@ class PreFlightEstimator:
             token_low=token_low,
             token_high=token_high,
             time_low_seconds=kb_estimate.time_low if similar_count > 0 else fuzzy_estimate.time_low,
-            time_high_seconds=kb_estimate.time_high if similar_count > 0 else fuzzy_estimate.time_high,
+            time_high_seconds=kb_estimate.time_high
+            if similar_count > 0
+            else fuzzy_estimate.time_high,
             confidence=confidence,
             source=source,
             similar_tasks_found=similar_count,
@@ -105,29 +110,33 @@ class PreFlightEstimator:
         try:
             from orbit.memory.models import MemorySearchQuery
 
-            results = self._memory.search(MemorySearchQuery(
-                query=description,
-                max_results=5,
-            ))
+            results = self._memory.search(
+                MemorySearchQuery(
+                    query=description,
+                    max_results=5,
+                )
+            )
             if not results:
                 return Estimate(), 0.0, 0
 
             total_weight = sum(r.score for r in results)
-            token_avg = sum(
-                r.metadata.get("token_consumed", 0) * r.score
-                for r in results
-            ) / max(total_weight, 0.001)
-            time_avg = sum(
-                r.metadata.get("runtime_seconds", 0) * r.score
-                for r in results
-            ) / max(total_weight, 0.001)
+            token_avg = sum(r.metadata.get("token_consumed", 0) * r.score for r in results) / max(
+                total_weight, 0.001
+            )
+            time_avg = sum(r.metadata.get("runtime_seconds", 0) * r.score for r in results) / max(
+                total_weight, 0.001
+            )
 
-            return Estimate(
-                token_low=int(token_avg * 0.7),
-                token_high=int(token_avg * 1.5),
-                time_low=int(time_avg * 0.7),
-                time_high=int(time_avg * 1.5),
-            ), results[0].score, len(results)
+            return (
+                Estimate(
+                    token_low=int(token_avg * 0.7),
+                    token_high=int(token_avg * 1.5),
+                    time_low=int(time_avg * 0.7),
+                    time_high=int(time_avg * 1.5),
+                ),
+                results[0].score,
+                len(results),
+            )
         except Exception as e:
             logger.warning("preflight_kb_search_failed", error=str(e))
             return Estimate(), 0.0, 0
@@ -149,7 +158,9 @@ class PreFlightEstimator:
             base_tokens, base_time = 300000, 1800  # 30min
         elif any(kw in desc_lower for kw in ("实现", "新增", "implement", "new module", "模块")):
             base_tokens, base_time = 200000, 1200  # 20min
-        elif any(kw in desc_lower for kw in ("文档", "doc", "readme", "注释", "修复", "fix", "bug")):
+        elif any(
+            kw in desc_lower for kw in ("文档", "doc", "readme", "注释", "修复", "fix", "bug")
+        ):
             base_tokens, base_time = 50000, 300  # 5min
         else:
             base_tokens, base_time = 150000, 900  # 15min

@@ -19,13 +19,11 @@ _restorer = Restorer()
 
 
 class SnapshotCreateRequest(BaseModel):
-
     source_path: str
     db_type: str = "sqlite"  # sqlite | knowledge | checkpoint | file
 
 
 class RestoreRequest(BaseModel):
-
     snapshot_id: str
     target_path: str
 

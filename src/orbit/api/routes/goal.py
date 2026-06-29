@@ -47,6 +47,7 @@ def _on_goal_done(task: asyncio.Task) -> None:
         pass
     except Exception:
         import structlog
+
         logger = structlog.get_logger("orbit.goal")
         logger.error("goal_background_task_failed", exc_info=True)
     finally:

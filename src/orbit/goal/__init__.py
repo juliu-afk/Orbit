@@ -23,7 +23,7 @@ from orbit.goal.budget_allocator import BudgetAllocator
 from orbit.goal.compose_bridge import GoalComposeBridge
 from orbit.goal.critique import CritiqueAgent, CritiqueResult
 from orbit.goal.dependency_analyzer import DependencyAnalyzer
-from orbit.goal.ensemble import ModelEnsemble, EnsembleResult
+from orbit.goal.ensemble import EnsembleResult, ModelEnsemble
 from orbit.goal.intake_router import IntakeRouter
 from orbit.goal.memory_tiers import ThreeTierMemory
 from orbit.goal.meta_orchestrator import MetaOrchestrator

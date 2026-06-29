@@ -31,9 +31,7 @@ def _get_engine() -> KnowledgeEngine:
 
 @router.get("", summary="Ã¦ÂÂ¥Ã¨Â¯Â¢Ã§ÂÂ¥Ã¨Â¯ÂÃ¦Â¦ÂÃ¥Â¿Âµ")
 async def query_knowledge(
-    domain: str = Query(
-        ..., min_length=1, description="Ã©Â¢ÂÃ¥ÂÂÃ¯Â¼Âaccounting/finance/legal"
-    ),
+    domain: str = Query(..., min_length=1, description="Ã©Â¢ÂÃ¥ÂÂÃ¯Â¼Âaccounting/finance/legal"),
     concept: str = Query(
         ..., min_length=1, description="Ã¦Â¦ÂÃ¥Â¿ÂµÃ¥ÂÂÃ¯Â¼ÂCurrentRatio/ROE Ã§Â­Â"
     ),

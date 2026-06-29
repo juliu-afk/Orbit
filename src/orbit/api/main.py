@@ -21,6 +21,7 @@ from orbit.api.routes import (
     agent_llm,
     backup,
     chat,
+    codegraph_routes,
     compliance,
     compose,
     dream,
@@ -32,6 +33,7 @@ from orbit.api.routes import (
     observability,
     projects,
     review,
+    search_routes,
     sessions,
     tasks,
     loop,
@@ -101,6 +103,9 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(review.router, prefix=settings.API_V1_STR)
     app.include_router(files_routes.router, prefix=settings.API_V1_STR)
     app.include_router(git_routes.router, prefix=settings.API_V1_STR)
+    # Step 9 Phase 1.3: 代码导航 + 搜索
+    app.include_router(codegraph_routes.router, prefix=settings.API_V1_STR)
+    app.include_router(search_routes.router, prefix=settings.API_V1_STR)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
     # Phase 4 AC-A1: SSE 流式端点
@@ -226,6 +231,13 @@ _file_service = FileService(_ws_dir)
 review.set_review_service(_review_service)
 files_routes.set_file_service(_file_service)
 git_routes.set_workspace_dir(_ws_dir)
+# Step 9 Phase 1.3: CodeGraph 引擎——复用 graph 数据库连接
+from orbit.graph.engines.code_graph import CodeGraphEngine  # noqa: E402
+_code_graph_engine = CodeGraphEngine(_review_session_factory)
+
+codegraph_routes.set_code_graph(_code_graph_engine)
+codegraph_routes.set_file_service(_file_service)
+search_routes.set_workspace(_ws_dir)
 
 app = create_app(_event_bus)
 

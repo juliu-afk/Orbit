@@ -1,4 +1,4 @@
-"""Éó²éÒýÇæÒµÎñÂß¼­¡£×´Ì¬»ú×ª»»+¾ö²ß¾ÛºÏ¡£"""
+"""å®¡æŸ¥å¼•æ“Žä¸šåŠ¡é€»è¾‘ã€‚çŠ¶æ€æœºè½¬æ¢+å†³ç­–èšåˆã€‚"""
 from __future__ import annotations
 from datetime import datetime
 from sqlalchemy import select
@@ -22,9 +22,7 @@ class ReviewService:
             if existing.scalar_one_or_none():
                 raise ValueError(f"Task {task_id} has active review")
             review = Review(task_id=task_id, created_by=created_by, status="pending")
-            session.add(review)
-            await session.commit()
-            await session.refresh(review)
+            session.add(review); await session.commit(); await session.refresh(review)
             return review
 
     async def get_review(self, review_id: str) -> Review | None:
@@ -38,8 +36,7 @@ class ReviewService:
                 hunk_index=hunk_index, decision=decision, decided_by=decided_by, comment=comment)
             session.add(rd)
             review = await session.get(Review, review_id)
-            if review and review.status == "pending":
-                review.status = "in_review"
+            if review and review.status == "pending": review.status = "in_review"
             await session.commit()
             return rd
 
@@ -48,8 +45,7 @@ class ReviewService:
         async with self.session_factory() as session:
             c = ReviewComment(review_id=review_id, file_path=file_path,
                 line_start=line_start, line_end=line_end, body=body, created_by=created_by)
-            session.add(c)
-            await session.commit()
+            session.add(c); await session.commit()
             return c
 
     async def transition_status(self, review_id: str, new_status: str) -> Review:
@@ -57,12 +53,10 @@ class ReviewService:
                  "changes_requested":{"in_review"},"approved":{"merged"}}
         async with self.session_factory() as session:
             review = await session.get(Review, review_id)
-            if not review:
-                raise ValueError(f"Review {review_id} not found")
+            if not review: raise ValueError(f"Review {review_id} not found")
             if new_status not in VALID.get(review.status, set()):
                 raise ValueError(f"Invalid transition: {review.status} -> {new_status}")
-            review.status = new_status
-            review.updated_at = datetime.utcnow()
+            review.status = new_status; review.updated_at = datetime.utcnow()
             await session.commit()
             return review
 
@@ -72,7 +66,6 @@ class ReviewService:
             decisions = r.scalars().all()
             by_file = {}
             for d in decisions:
-                if d.file_path not in by_file:
-                    by_file[d.file_path] = {"approved":0,"rejected":0,"comment":0}
+                if d.file_path not in by_file: by_file[d.file_path] = {"approved":0,"rejected":0,"comment":0}
                 by_file[d.file_path][d.decision] += 1
             return {"total_files":len(by_file),"files":by_file,"total_decisions":len(decisions)}

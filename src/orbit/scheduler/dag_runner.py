@@ -79,10 +79,13 @@ class DagRunner:
     async def resume_dag(self, graph: TaskGraph) -> dict[str, NodeStatus]:
         """从检查点恢复 DAG——跳过 SUCCESS, 重置 RUNNING/FAILED."""
         for node in graph.nodes:
+            if node.status == NodeStatus.SUCCESS:
+                continue  # P0-2: 跳过已成功节点
             if node.status == NodeStatus.RUNNING:
                 node.status = NodeStatus.PENDING
             elif node.status == NodeStatus.FAILED:
                 node.retry_count = 0
+                node.error = None  # P2-15: 重置错误信息
                 node.status = NodeStatus.PENDING
 
         logger.info("dag_resume", task_id=graph.task_id)
@@ -91,14 +94,29 @@ class DagRunner:
     # ── 内部 ────────────────────────────────────────────
 
     async def _execute_layer(self, graph: TaskGraph, layer: list[str]) -> None:
-        """并发执行一层中所有节点."""
+        """并发执行一层中所有节点.
+
+        P0-3: 跳过上游依赖已失败的节点——不需要执行下游.
+        """
         sem = asyncio.Semaphore(self._max_concurrent)
 
         async def _run_one(nid: str) -> None:
             async with sem:
                 node = graph.get_node(nid)
                 if node is None:
+                    logger.warning("dag_node_not_found", node_id=nid)  # P2-13
                     return
+                # P0-3: 检查上游依赖——任何上游失败则跳过
+                if not self._fail_fast:
+                    upstream_failed = any(
+                        (up := graph.get_node(dep_id)) and up.status == NodeStatus.FAILED
+                        for dep_id in getattr(node, "depends_on", [])
+                    )
+                    if upstream_failed:
+                        node.status = NodeStatus.SKIPPED
+                        logger.info("dag_node_skipped_upstream_failed", node_id=nid)
+                        self._publish_dag_update(graph)
+                        return
                 await self._execute_node_with_retry(graph, node)
 
         tasks = [_run_one(nid) for nid in layer]
@@ -121,9 +139,11 @@ class DagRunner:
                 await self._save_dag_checkpoint(graph)
                 self._publish_dag_update(graph)
                 return
-            except TimeoutError:
+            except TimeoutError:  # P1-6: 兼容 Python <3.11
                 node.error = f"Timeout after {self._node_timeout}s (attempt {attempt+1})"
                 logger.warning("dag_node_timeout", node=node.id, attempt=attempt + 1)
+            except asyncio.CancelledError:
+                raise  # P0-1: 不吞取消信号
             except Exception as e:
                 node.error = str(e)
                 logger.warning("dag_node_failed", node=node.id, error=str(e))
@@ -136,7 +156,8 @@ class DagRunner:
         logger.error("dag_node_all_retries_exhausted", node=node.id)
 
     async def _execute_node(self, node: GraphNode) -> dict[str, Any]:
-        """执行单个节点的 Agent 逻辑（占位）."""
+        """执行单个节点的 Agent 逻辑."""
+        # P2-12: TODO(#92) — Step 5.2 接入 AgentFactory 后根据 agent_role 路由到具体 Agent
         await asyncio.sleep(0.01)
         return {"status": "ok", "node": node.id, "role": node.agent_role}
 
@@ -153,15 +174,20 @@ class DagRunner:
                         "status": n.status.value,
                         "retry_count": n.retry_count,
                         "error": n.error,
+                        "output": n.output,  # P2-14: 保存节点输出
                     }
                     for n in graph.nodes
                 ],
             }
+            # P1-8: 计算实际完成进度
+            total = len(graph.nodes)
+            completed = sum(1 for n in graph.nodes if n.status == NodeStatus.SUCCESS)
+            progress = completed / total if total > 0 else 0.0
             data = CheckpointData(
                 task_id=graph.task_id,
                 state="DAG_RUNNING",
                 retry_count=0,
-                progress=0.0,
+                progress=progress,
                 context=snapshot,
                 version=1,
             )
@@ -170,7 +196,11 @@ class DagRunner:
             logger.warning("dag_checkpoint_save_failed", error=str(e))
 
     def _publish_dag_update(self, graph: TaskGraph) -> None:
-        """发布 DAG 状态快照."""
+        """发布 DAG 状态快照.
+
+        P1-7: 同步方法——当前 EventBus.publish 是纯内存操作无 I/O,
+        保持 sync 签名。若未来 publish 需 I/O 则改为 async.
+        """
         if self._event_bus is None:
             return
         dag_nodes = [

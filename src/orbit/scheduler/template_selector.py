@@ -84,34 +84,16 @@ class TemplateSelector:
 
     @staticmethod
     def _match_score(task_lower: str, template: dict) -> float:
-        """关键词匹配打分——每个 applicable_when 命中加分."""
+        """关键词匹配打分——每个 applicable_when 命中 +0.3."""
         score = 0.0
         for condition in template.get("applicable_when", []):
             cond_lower = condition.lower()
             if cond_lower in task_lower:
                 score += 0.5  # 精确匹配
                 continue
-            # P2-5: 中文 bigram 滑窗分词——每个 segment 得分上限 0.4
-            for seg in cond_lower.replace(" ", "").split("/"):
-                if not seg:
-                    continue
-                seg_score = 0.0
-                has_ascii = any(ord(c) < 128 for c in seg)
-                if not has_ascii and len(seg) >= 2:
-                    # 纯中文——2 字 sliding window (bigram)
-                    # 多个 bigram 命中是预期 fuzzy 行为
-                    for i in range(len(seg) - 1):
-                        if seg[i : i + 2] in task_lower:
-                            seg_score += 0.15
-                elif has_ascii:
-                    # P2: 混合段——提取 CJK 子串走 bigram，ASCII 走精确
-                    cjk = "".join(c for c in seg if ord(c) > 127)
-                    for i in range(len(cjk) - 1):
-                        if cjk[i : i + 2] in task_lower:
-                            seg_score += 0.15
-                    if seg in task_lower:
-                        seg_score += 0.2
-                elif len(seg) >= 2 and seg in task_lower:
-                    seg_score += 0.2
-                score += min(seg_score, 0.4)  # P2: 每 segment 上限 0.4
+            # 分词匹配: "新增查询类 API" 的每个词在任务中出现
+            tokens = cond_lower.replace(" ", "").split("/")
+            for token in tokens:
+                if len(token) >= 2 and token in task_lower:
+                    score += 0.2
         return score

@@ -34,7 +34,10 @@ class LoopScheduler:
         self._executor = command_executor
         self._loops: dict[str, LoopRunner] = {}
         self._schedules: dict[str, LoopSchedule] = {}
+<<<<<<< HEAD
         self._tasks: dict[str, asyncio.Task] = {}  # P1-NEW2/3: Task 引用用于取消
+=======
+>>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
 
     async def create(self, interval: str, command: str) -> LoopSchedule:
         """创建 Loop。
@@ -68,10 +71,16 @@ class LoopScheduler:
         runner = LoopRunner(loop, self._executor or self._mock_executor)
         self._loops[loop_id] = runner
 
+<<<<<<< HEAD
         # P1-5/P1-NEW2: 后台运行，存 Task 引用用于取消
         task = asyncio.create_task(runner.run())
         task.add_done_callback(self._on_loop_task_done)
         self._tasks[loop_id] = task
+=======
+        # P1-5: 后台运行，异常回调防止静默崩溃
+        task = asyncio.create_task(runner.run())
+        task.add_done_callback(self._on_loop_task_done)
+>>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         logger.info("loop_started", loop_id=loop_id)
 
     def _on_loop_task_done(self, task: asyncio.Task) -> None:
@@ -83,11 +92,16 @@ class LoopScheduler:
             pass
 
     async def stop(self, loop_id: str) -> None:
+<<<<<<< HEAD
         """停止 Loop。P1-NEW2: 取消后台 Task 防止泄漏。"""
         runner = self._loops.pop(loop_id, None)
         task = self._tasks.pop(loop_id, None)
         if task and not task.done():
             task.cancel()
+=======
+        """停止 Loop。"""
+        runner = self._loops.pop(loop_id, None)
+>>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         if runner:
             runner.stop()
             logger.info("loop_stopped", loop_id=loop_id)

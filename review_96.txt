@@ -1,0 +1,134 @@
+## PR #96 Code Review Report
+
+**Reviewer:** WB (automated)  
+**Date:** 2026-06-30  
+**Commit reviewed:** `9d6c635`  
+**Files changed:** 3  
+
+---
+
+### Summary
+
+| File | P0 | P1 | P2 |
+|------|----|----|----|
+| `src/orbit/scheduler/edit_stability.py` | 1 | 2 | 3 |
+| `src/orbit/memory/store.py` | 0 | 3 | 4 |
+| `src/orbit/scheduler/template_selector.py` | 0 | 0 | 5 |
+| **Total** | **1** | **5** | **12** |
+
+**Verdict: 不建议合并，直到 P0 和核心 P1 修复。**
+
+---
+
+### `edit_stability.py` — 1 P0 + 2 P1 + 3 P2
+
+#### [P0] `datetime.now(UTC)` vs naive timestamp 会崩溃
+- **位置**: `record_edit()` 第 ~73 行
+- **问题**: 旧代码用 `datetime.now()`（naive），现有 `FileEditRecord.timestamp` 存储的值大概率也是 naive。新代码改成 `datetime.now(UTC)`（aware），naive 与 aware 比较直接抛 `TypeError: can't compare offset-naive and offset-aware datetimes`。
+- **建议**: 统一策略——要么所有 timestamp 都加 `timezone.utc`，要么 cutoff 保持 naive（`datetime.now(timezone.utc).replace(tzinfo=None)`）。
+
+#### [P1] `datetime.min` 与 aware timestamp 不匹配
+- **位置**: `_cleanup_stale()` 第 ~138 行
+- **问题**: 如果按 P0 建议把 timestamp 改成 aware，`max(..., default=datetime.min)` 会炸（`datetime.min` 是 naive）。
+- **建议**: 使用 `datetime.min.replace(tzinfo=timezone.utc)` 作为 aware 的默认值，或保持全 naive。
+
+#### [P1] `_cleanup_stale()` dict 并发不安全
+- **位置**: `_cleanup_stale()` 整函数
+- **问题**: `_history` 是 plain dict。async 调度器里多协程并发调 `record_edit()` 时，cleanup 的遍历+删除穿插其他协程的 append，会触发 `RuntimeError: dictionary changed size during iteration` 或静默丢数据。
+- **建议**: 用 `asyncio.Lock` 保护 `record_edit()` 和 `_cleanup_stale()`；或把 dict 操作收进一个原子段。
+
+#### [P2] 50% 驱逐策略太激进
+- **位置**: `_cleanup_stale()` 第 ~141-142 行
+- **问题**: 超限 1 个文件（1001）直接删 501 个（最旧的一半）。正常 LRU 应该只删到刚好回限 + 少量缓冲。
+- **建议**: `remove_count = len(sorted_files) - self.MAX_HISTORY_FILES + self.MAX_HISTORY_FILES // 10`（删到 90% 容量）。
+
+#### [P2] 超限后每次 edit 都跑 O(n log n)
+- **位置**: `record_edit()` cleanup 触发逻辑
+- **问题**: 一旦超限，每调一次 `record_edit()` 就全排序 1000 个文件，高负载下自增强性能悬崖。
+- **建议**: 加 cooldown——每 N 次 edit 才清一次，或设置 10% 超限时缓冲（>1100 才触发）。
+
+#### [P2] `MAX_HISTORY_FILES` 与 `LOOKBACK_DAYS` 冲突
+- **位置**: 类常量
+- **问题**: 活跃项目 7 天内完全可能编辑 >1000 个文件。数量硬帽会覆盖时间窗口预期，用户以为能查 7 天其实早被删了。
+- **建议**: 调大到 5000，或改为可配置，或按内存占用而非文件数限制。
+
+---
+
+### `store.py` — 3 P1 + 4 P2
+
+#### [P1] 评分缓冲并发不安全（race + lost updates）
+- **位置**: `hit()` / `_flush_scores()`
+- **问题**: 多任务并发调 `hit()` 时：① 一个任务在 `items()` 遍历，另一个在写 buffer → `RuntimeError`；② 两个任务同时读 EPISODIC 文件，各自加 delta 后写回，第二个覆盖第一个 → **更新必丢**；③ `hit()` 在 `_flush_scores()` 的 `clear()` 前插新条目 → 新条目被吞。
+- **建议**: 原子 swap buffer：`buffer, self._score_buffer = self._score_buffer, {}`，再基于 `buffer` 做文件 IO。读写文件加同一把锁。
+
+#### [P1] `yaml.safe_load` 类型契约破坏
+- **位置**: `_parse_yaml_frontmatter()`
+- **问题**: 旧解析器永远返回 `str` 值。`yaml.safe_load` 会返回 `int/float/bool/None`。下游代码如果期望字符串（拼接、比较、传 API），会崩。
+- **建议**: 递归 stringify 返回值保持兼容，或全局审计 frontmatter 消费点。
+
+#### [P1] YAML 解析失败静默吞掉全部 frontmatter
+- **位置**: `_parse_yaml_frontmatter()` exception handler
+- **问题**: 一行 YAML 语法错误 → 整个 frontmatter 变 `{}`，所有 score 重置为默认。旧解析器至少能保留格式正确的行。
+- **建议**: 记日志。考虑降级 fallback 到旧解析器，或至少 fail loud 而不是默默丢数据。
+
+#### [P2] 缺 shutdown flush
+- **位置**: `MemoryStore` 生命周期
+- **问题**: 进程退出/崩溃前，buffer 里的评分全丢。
+- **建议**: 加 `close()/flush()` 方法并 `atexit.register`；或加定时后台 flush（如 30s）。
+
+#### [P2] 阈值 10 是魔法数字
+- **位置**: `hit()`
+- **问题**: 没说明为什么是 10，低流量 Agent 可能等很久才持久化。
+- **建议**: 放进 `MemoryConfig.score_buffer_size` 可配置。
+
+#### [P2] `yaml` 是新依赖未声明
+- **位置**: `_parse_yaml_frontmatter()`
+- **问题**: `src/` 里没有现有 yaml 用法。lazy import 意味着 PyYAML 缺失时运行时才炸。`pyproject.toml`/`requirements.txt` 大概率没加。
+- **建议**: ① `import yaml` 移到模块顶层（fail fast）；② 确保依赖文件已声明 PyYAML；③ 如用 mypy 加 `types-PyYAML`。
+
+#### [P2] write_file 失败导致缓冲无限增长
+- **位置**: `_flush_scores()`
+- **问题**: 若 `write_file()` 持续抛异常，`clear()` 永远走不到，buffer 无限累积 → 内存泄漏。
+- **建议**: 用原子 swap 后，失败只丢本地 buffer（可接受）；不用 swap 则加 try/except + 重试上限或丢弃机制。
+
+#### [P2] `_score_update` 疑似死代码
+- **位置**: `MemoryStore`
+- **问题**: `hit()` 不再调用 `_score_update()`，如果 `decay_scores()` 也不用，该删。
+- **建议**: 确认无引用后删除。
+
+---
+
+### `template_selector.py` — 5 P2
+
+#### [P2] 注释与代码不符
+- **位置**: 第 ~87 行注释
+- **问题**: 注释说"2-4 字滑动窗口"，代码只有 bigram（2 字）。
+- **建议**: 改注释为 "2 字滑动窗口 (bigram)"，或补 tri/quad-gram。
+
+#### [P2] 中文长条件分数膨胀
+- **位置**: bigram 匹配循环
+- **问题**: 4 字纯中文段产生 3 个 bigram，每个 +0.2，总分 0.6，是旧精确匹配（0.2）的 3 倍。长条件会显著压过短条件/英文条件。
+- **建议**: 每个 segment 设 score 上限（如 max 0.3-0.4）。
+
+#### [P2] 混合 CJK-ASCII 段 fallback 到精确匹配
+- **位置**: `has_ascii` 判断 + `elif` 分支
+- **问题**: "API接口" 含 ASCII，不走 bigram，fallback 到 `seg in task_lower` 精确匹配。任务写 "新增API的接口" 匹配失败，但纯中文 "查询接口" 却能 partial match。
+- **建议**: 混合段里提取 CJK 子串单独走 bigram。
+
+#### [P2] 无测试
+- **位置**: 整个改动
+- **问题**: 评分算法改动没测试覆盖，容易回归。
+- **建议**: 补单元测试：纯中文 bigram、混合匹配、分数上限、中文标点、重叠 bigram。
+
+#### [P2] 重叠 bigram 累加行为未说明
+- **位置**: bigram 循环
+- **问题**: "新增查询" → "新增"/"增查"/"查询" 都匹配得 +0.6，这是预期行为吗？代码没注释。
+- **建议**: 注释或测试里说明多 bigram hit 是预期 fuzzy 行为。
+
+---
+
+### Blockers (P0 + 关键 P1)
+1. `edit_stability.py`: naive/aware datetime 比较 → **必崩**
+2. `edit_stability.py`: dict 并发不安全 → **async 下调度器必出问题**
+3. `store.py`: 评分缓冲并发 race + lost updates → **多 Agent 必丢数据**
+4. `store.py`: yaml.safe_load 类型破坏 + 静默失败 → **数据完整性风险**

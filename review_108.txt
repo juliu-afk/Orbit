@@ -1,0 +1,67 @@
+# PR #108 R1 审查报告
+
+| 项 | 值 |
+|---|---|
+| head | `968d9de` |
+| 文件 | 4 — compliance_routes.py(新65), CompliancePanel.vue(新31), ThemeToggle.vue(新16), main.py(+3) |
+| 审查 | R1 |
+
+---
+
+## 🟡 P1
+
+### P1-1: `missing-permission` 规则误报率 100%
+
+```python
+("missing-permission", "API 端点缺少 @require_permission 装饰器", "warning",
+ r"@router\.(?:get|post|put|delete|patch)\("),
+```
+
+正则匹配**所有**路由装饰器，而非检查装饰器是否**缺失**。每个有 `@router.get(...)` 的行都会被标记为 `missing-permission`，无论是否已有 `@require_permission`。
+
+**修复**: 改为正向检查——扫描文件收集所有路由端点，再检查每个端点的前面/上面是否有 `@require_permission` 行。
+
+---
+
+### P1-2: ThemeToggle 图标字符串未导入，可能渲染空白
+
+```vue
+<el-button :icon="isDark ? 'Sunny' : 'Moon'">
+```
+
+Element Plus 的 `el-button` `icon` prop 需要导入的组件引用，不是字符串：
+
+**修复**:
+```typescript
+import { Sunny, Moon } from '@element-plus/icons-vue'
+// template: :icon="isDark ? Sunny : Moon"
+```
+
+---
+
+## 🟢 P2
+
+| # | 文件 | 问题 |
+|---|------|------|
+| P2-1 | `compliance_routes.py` | `\bfloat\b` 匹配 "floatValue"/"my_float"/注释中的 float——误报噪音大 |
+| P2-2 | `compliance_routes.py` | `direct-sql` 正则在 SQLAlchemy ORM 字符串/日志中也命中 |
+| P2-3 | `compliance_routes.py` | `/check` 无请求频率限制，每请求全量扫描 |
+| P2-4 | `main.py` | `compliance`(旧) 和 `compliance_routes`(新) 两个独立路由模块命名混淆 |
+
+---
+
+## ✅ 亮点
+
+- `set_file_service` 注入正确（main.py:259）
+- `/checklist` 端点简洁实用
+- CompliancePanel 纯展示组件，数据由父组件传入——职责清晰
+- ThemeToggle localStorage 持久化主题偏好
+
+---
+
+## 合并建议
+
+**⚠️ P1-1（误报100%）和 P1-2（图标空白）建议修。P2 不阻塞。**
+
+---
+*Reviewed by: WorkBuddy R1*

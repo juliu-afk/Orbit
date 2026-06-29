@@ -6,12 +6,16 @@ from pydantic import BaseModel, Field
 router = APIRouter(prefix="/api/v1/loop", tags=["loop"])
 
 class CreateLoopRequest(BaseModel):
+<<<<<<< HEAD
     # P2-5: interval 格式校验——数字+单位或 cron 5字段
     interval: str = Field(
         ..., min_length=2, max_length=50,
         pattern=r"^(\d+\s*(s|sec|second|m|min|minute|h|hr|hour|d|day)|hourly|daily|weekly|[\d\*/,]+\s+[\d\*/,]+\s+[\d\*/,]+\s+[\d\*/,]+\s+[\d\*/,]+)$",
         description="30s/5m/1h/hourly/daily/0 9 * * *"
     )
+=======
+    interval: str = Field(..., description="30s/5m/1h/0 9 * * *")
+>>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
     command: str = Field(..., min_length=1)
 
 def _get_scheduler(request: Request):

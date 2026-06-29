@@ -1,0 +1,21 @@
+"""{{ endpoint_path }}——GET 端点（自动生成模板）.
+
+业务层减熵 P1: Agent 优先调用此模板，填充参数而非自由生成.
+"""
+from fastapi import APIRouter, Depends, Query
+
+from orbit.api.dependencies import get_current_user
+from orbit.api.schemas import {{ response_model }}
+
+router = APIRouter()
+
+
+@router.get("{{ endpoint_path }}", response_model=list[{{ response_model }}])
+async def list_items(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    current_user = Depends(get_current_user),
+) -> list[{{ response_model }}]:
+    """查询列表."""
+    items = await {{ service_call }}
+    return [{{ response_model }}.model_validate(i) for i in items[skip:skip + limit]]

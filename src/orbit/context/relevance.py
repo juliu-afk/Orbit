@@ -39,6 +39,9 @@ BODY_MATCH_WEIGHT = 0.2
 # 被调用函数名包含关键词的权重
 CALLEE_MATCH_WEIGHT = 0.1
 
+# P0-1: ast.parse 输入大小限制——超大文件（>500KB）拒绝解析防止内存耗尽
+MAX_SOURCE_SIZE = 500_000
+
 
 class RelevanceScorer:
     """基于 ast 的关键词->代码片段相关性打分器。
@@ -75,6 +78,10 @@ class RelevanceScorer:
         if not source_code.strip() or not keywords:
             return []
 
+        # P0-1: 超大文件拒绝解析——防止内存耗尽（>500KB）
+        if len(source_code) > MAX_SOURCE_SIZE:
+            return []
+
         keywords_lower = [k.lower() for k in keywords]
 
         try:
@@ -86,8 +93,8 @@ class RelevanceScorer:
         lines = source_code.splitlines()
         fragments: list[CodeFragment] = []
 
-        for node in ast.walk(tree):
-            # 只处理顶层函数和类
+        # P1-1: 直接迭代 tree.body 顶层节点，避免递归 walk 全树
+        for node in tree.body:
             if not isinstance(
                 node,
                 ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
@@ -152,7 +159,9 @@ class RelevanceScorer:
                             score += CALLEE_MATCH_WEIGHT
                             break
 
-        # 归一化到 0-1
+        # P2-2: max_possible 补全——每个 keyword 可同时匹配 EXACT/SUBSTRING + BODY + CALLEE
+        #        SUBSTRING_MATCH_WEIGHT 和 EXACT_MATCH_WEIGHT 互斥，各 keyword 对标识符只加一次
+        #        BODY_MATCH_WEIGHT 和 CALLEE_MATCH_WEIGHT 可叠加
         max_possible = len(keywords_lower) * (
             EXACT_MATCH_WEIGHT + BODY_MATCH_WEIGHT + CALLEE_MATCH_WEIGHT
         )
@@ -175,12 +184,18 @@ class RelevanceScorer:
 
     @staticmethod
     def _get_call_name(node: ast.Call) -> str | None:
-        """从 ast.Call 节点提取被调用函数名。"""
+        """从 ast.Call 节点提取被调用函数名。
+
+        P2-3: 扩展支持 ast.Subscript——处理 obj[0].method() 等模式。
+        """
         func = node.func
         if isinstance(func, ast.Name):
             return func.id
         if isinstance(func, ast.Attribute):
             return func.attr
+        # P2-3: Subscript——提取下标表达式内的 Name（如 arr[0] → arr）
+        if isinstance(func, ast.Subscript) and isinstance(func.value, ast.Name):
+            return func.value.id
         return None
 
 

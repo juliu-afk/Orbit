@@ -148,9 +148,7 @@ _PLACEHOLDER_WORDS: tuple[str, ...] = (
 
 # 矛盾方向对——统一从 ClarificationEngine 取（P0 消重）
 # WHY: 不再各自维护一份 CONTRADICTION_PAIRS，单点维护在 scheduler/clarifier.py
-_CONTRADICTION_PAIRS: list[tuple[str, str, str]] = (
-    ClarificationEngine.CONTRADICTION_PAIRS
-)
+_CONTRADICTION_PAIRS: list[tuple[str, str, str]] = ClarificationEngine.CONTRADICTION_PAIRS
 
 
 class ClarifierAgent(BaseAgent):

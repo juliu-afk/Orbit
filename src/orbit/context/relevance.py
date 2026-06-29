@@ -20,9 +20,9 @@ from dataclasses import dataclass, field
 class CodeFragment:
     """提取出的代码片段——函数或类定义的一部分。"""
 
-    identifier: str         # 函数名/类名
-    node_type: str          # "function" / "async_function" / "class"
-    source: str             # 完整源代码（含签名和 body）
+    identifier: str  # 函数名/类名
+    node_type: str  # "function" / "async_function" / "class"
+    source: str  # 完整源代码（含签名和 body）
     line_start: int
     line_end: int
     relevance_score: float  # 0.0-1.0，越高越相关
@@ -94,9 +94,7 @@ class RelevanceScorer:
             ):
                 continue
 
-            fragment = self._extract_fragment(
-                node, lines, keywords_lower
-            )
+            fragment = self._extract_fragment(node, lines, keywords_lower)
             if fragment and fragment.relevance_score > 0:
                 fragments.append(fragment)
 
@@ -155,18 +153,15 @@ class RelevanceScorer:
                             break
 
         # 归一化到 0-1
-        max_possible = (
-            len(keywords_lower)
-            * (EXACT_MATCH_WEIGHT + BODY_MATCH_WEIGHT + CALLEE_MATCH_WEIGHT)
+        max_possible = len(keywords_lower) * (
+            EXACT_MATCH_WEIGHT + BODY_MATCH_WEIGHT + CALLEE_MATCH_WEIGHT
         )
         normalized = min(score / max(0.1, max_possible), 1.0)
 
         node_type = (
             "async_function"
             if isinstance(node, ast.AsyncFunctionDef)
-            else "class"
-            if isinstance(node, ast.ClassDef)
-            else "function"
+            else "class" if isinstance(node, ast.ClassDef) else "function"
         )
 
         return CodeFragment(
@@ -219,8 +214,7 @@ def extract_relevant_context(
         return source_code
 
     parts: list[str] = [
-        f"# {f.node_type} {f.identifier} (相关度={f.relevance_score:.2f})"
-        f"\n{f.source}"
+        f"# {f.node_type} {f.identifier} (相关度={f.relevance_score:.2f})" f"\n{f.source}"
         for f in fragments
     ]
     result = "\n\n".join(parts)

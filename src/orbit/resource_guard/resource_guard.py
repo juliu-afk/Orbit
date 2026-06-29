@@ -239,6 +239,4 @@ class ResourceGuard:
         else:
             s = CircuitState.CLOSED
         state_map = {CircuitState.CLOSED: 0, CircuitState.OPEN: 1, CircuitState.HALF_OPEN: 2}
-        orbit_circuit_breaker_state.labels(breaker="resource_guard").set(
-            state_map.get(s, 0)
-        )
+        orbit_circuit_breaker_state.labels(breaker="resource_guard").set(state_map.get(s, 0))

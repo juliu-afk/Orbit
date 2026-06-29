@@ -77,6 +77,8 @@ class MetaOrchestrator:
         budget_allocator: BudgetAllocator | None = None,
         verifier: ExecutorVerifier | None = None,
         critique_agent: CritiqueAgent | None = None,
+        compose_orchestrator: Any = None,  # ComposeOrchestrator
+        ensemble: Any = None,  # ModelEnsemble
         worktree_manager: WorktreeManager | None = None,
         agent_factory: Any = None,       # AgentFactory
         max_parallel_tasks: int = 5,
@@ -93,6 +95,8 @@ class MetaOrchestrator:
         self.budget_allocator = budget_allocator
         self.verifier = verifier
         self.critique_agent = critique_agent
+        self.compose_orchestrator = compose_orchestrator
+        self.ensemble = ensemble
         self._worktree = worktree_manager
         self._agent_factory = agent_factory
         self._max_parallel = max_parallel_tasks
@@ -136,6 +140,15 @@ class MetaOrchestrator:
                 return await self._run_single_task(goal)
 
             spec = self._deserialize_spec(spec_data)
+
+            # Goal→Compose: delegate to ComposeOrchestrator when available
+            if self.compose_orchestrator:
+                logger.info("goal_delegating_to_compose", goal_id=goal.id)
+                compose_result = await self.compose_orchestrator.run_spec(goal.description, parent_task_id=goal.id)
+                elapsed = time.time() - started_at
+                ok = compose_result.get("status") == "ok"
+                return GoalResult(status="done" if ok else "partial", total_time_seconds=elapsed)
+
             layers = self._topological_layers(spec.tasks)
             previous_merge_shas: dict[str, str] = {}
 

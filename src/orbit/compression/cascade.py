@@ -312,22 +312,17 @@ class CascadePruner:
         content_head = content[:500].lower()
         return any(m.lower() in content_head for m in error_markers)
 
-    @staticmethod
     def _is_consumed(
+        self,
         tool_msg: dict[str, Any],
         messages: list[dict[str, Any]],
         tool_index: int,
     ) -> bool:
-        """检查工具输出是否已被后续 assistant 消息引用/消费。
-
-        "已消费" = 后续 assistant 消息中引用了此输出的内容。
-        """
+        """P0-N1: 去掉 @staticmethod——方法访问 self._consumed_turns。"""
         tool_content = tool_msg.get("content", "")
         if not isinstance(tool_content, str) or not tool_content:
             return False
 
-        # 只在最近 self._consumed_turns 轮后的 assistant 中检查
-        tool_id = tool_msg.get("tool_call_id", "")
         for j in range(tool_index + 1, min(tool_index + 1 + self._consumed_turns * 2, len(messages))):
             msg = messages[j]
             if msg.get("role") == "assistant":

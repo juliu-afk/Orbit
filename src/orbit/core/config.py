@@ -42,7 +42,6 @@ class Settings:
 
     # 数据库（开发默认 SQLite 零依赖启动，生产切 PostgreSQL）
     DATABASE_URL: str = _get("DATABASE_URL", "sqlite+aiosqlite:///./data/graph.db")
-    WORKSPACE_DIR: str = _get("WORKSPACE_DIR", "")  # Step 9: 项目根目录
 
     # Redis（检查点/缓存，Step 2.2 启用）
     REDIS_URL: str = _get("REDIS_URL", "redis://localhost:6379/0")

@@ -77,6 +77,8 @@ class MetaOrchestrator:
         budget_allocator: BudgetAllocator | None = None,
         verifier: ExecutorVerifier | None = None,
         critique_agent: CritiqueAgent | None = None,
+        compose_orchestrator: Any = None,  # ComposeOrchestrator
+        ensemble: Any = None,  # ModelEnsemble
         worktree_manager: WorktreeManager | None = None,
         agent_factory: Any = None,       # AgentFactory
         max_parallel_tasks: int = 5,
@@ -93,6 +95,8 @@ class MetaOrchestrator:
         self.budget_allocator = budget_allocator
         self.verifier = verifier
         self.critique_agent = critique_agent
+        self.compose_orchestrator = compose_orchestrator
+        self.ensemble = ensemble
         self._worktree = worktree_manager
         self._agent_factory = agent_factory
         self._max_parallel = max_parallel_tasks
@@ -136,6 +140,15 @@ class MetaOrchestrator:
                 return await self._run_single_task(goal)
 
             spec = self._deserialize_spec(spec_data)
+
+            # Goal→Compose: delegate to ComposeOrchestrator when available
+            if self.compose_orchestrator:
+                logger.info("goal_delegating_to_compose", goal_id=goal.id)
+                compose_result = await self.compose_orchestrator.run_spec(goal.description, parent_task_id=goal.id)
+                elapsed = time.time() - started_at
+                ok = compose_result.get("status") == "ok"
+                return GoalResult(status="done" if ok else "partial", total_time_seconds=elapsed)
+
             layers = self._topological_layers(spec.tasks)
             previous_merge_shas: dict[str, str] = {}
 
@@ -289,10 +302,12 @@ class MetaOrchestrator:
         # P0-1: 逐层执行——Semaphore 包裹每个协程
         results: list[GoalResult] = []
         sem = asyncio.Semaphore(self._max_parallel)
+
+        async def _run_one(g):
+            async with sem:
+                return await self.run(g)
+
         for layer in layers:
-            async def _run_one(g):
-                async with sem:
-                    return await self.run(g)
             layer_results = await asyncio.gather(*[_run_one(g) for g in layer])
             results.extend(layer_results)
 
@@ -345,9 +360,12 @@ class MetaOrchestrator:
             logger.warning("goal_budget_exhausted", budget=goal.total_token_budget, consumed=goal.token_consumed)
             return True
         if goal.max_runtime_seconds > 0 and goal.started_at:
-            # P2-4: fromisoformat 不兼容 'Z' 后缀
-            started_str = goal.started_at.replace("Z", "+00:00")
-            elapsed = time.time() - datetime.fromisoformat(started_str).timestamp()
+            # P1-3: 防御 None/空字符串
+            try:
+                started_str = goal.started_at.replace("Z", "+00:00")
+                elapsed = time.time() - datetime.fromisoformat(started_str).timestamp()
+            except (ValueError, TypeError, AttributeError):
+                return False
             if elapsed >= goal.max_runtime_seconds:
                 logger.warning("goal_time_exhausted", max=goal.max_runtime_seconds, elapsed=int(elapsed))
                 return True
@@ -412,11 +430,12 @@ class MetaOrchestrator:
 
     @staticmethod
     def _deserialize_spec(spec_data: dict) -> Any:
-        """反序列化 Spec——兼容 dict 和 pydantic。"""
+        """反序列化 Spec——兼容 dict 和 pydantic。P1-4: 日志记录。"""
         try:
             from orbit.compose.models import Spec, Task
             return Spec(**spec_data)
-        except Exception:
+        except Exception as e:
+            logger.warning("spec_deserialize_failed", error=str(e)[:200])
             return spec_data
 
     @staticmethod

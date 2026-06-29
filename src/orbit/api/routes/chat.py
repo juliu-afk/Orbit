@@ -9,11 +9,9 @@ WebSocket 端点: ws://host:18888/api/v1/chat
 
 from __future__ import annotations
 
-import asyncio as _asyncio
 import json as _json
 from typing import Any
 
-import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from orbit.agents.base import AgentInput
@@ -21,8 +19,6 @@ from orbit.agents.clarifier import ClarifierAgent, StructuredPRD, validate_prd
 from orbit.context.matcher import ContextMatcher
 from orbit.projects.registry import ProjectRegistry
 from orbit.sessions.registry import SessionRegistry
-
-logger = structlog.get_logger()
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -113,58 +109,14 @@ async def chat_endpoint(ws: WebSocket) -> None:
         pass  # 客户端正常断开
 
 
-async def _handle_goal_command(ws: WebSocket, text: str) -> None:
-    """处理 /goal 命令族: /goal <desc>, /goal status, /goal clear."""
-    orch = getattr(ws.app.state, "meta_orchestrator", None)
-    if orch is None:
-        await _send(ws, 503, None, "MetaOrchestrator 未初始化")
-        return
 
-    cmd = text[5:].strip()  # 去掉 "/goal"
-
-    if not cmd:
-        await _send(ws, 1, None, "/goal <目标> | /goal status | /goal clear")
-        return
-
-    if cmd == "status":
-        from orbit.api.routes import goal as goal_route
-        task = goal_route._active_task
-        await _send(ws, 0, {
-            "active": task is not None and not task.done(),
-            "goal_id": goal_route._active_goal_id,
-            "status": "running" if (task and not task.done()) else "idle",
-        }, "Goal 状态")
-        return
-
-    if cmd == "clear":
-        from orbit.api.routes import goal as goal_route
-        task = goal_route._active_task
-        gid = goal_route._active_goal_id
-        if task and not task.done():
-            task.cancel()
-            goal_route._active_task = None
-            goal_route._active_goal_id = None
-            await _send(ws, 0, {"goal_id": gid}, "Goal 已取消")
-            return
-        await _send(ws, 0, {}, "无活跃 Goal")
-        return
-
-    # 默认: 创建新 Goal
-    from orbit.goal.models import GoalSession
-    import asyncio
-    goal = GoalSession(description=cmd)
-    task = asyncio.create_task(orch.run(goal))
-    task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
-    await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动")
-
-
+# P1-2: Goal 后台任务异常回调
 def _on_goal_task_done(goal_id: str, task) -> None:
     try:
         task.result()
     except Exception:
         import structlog
         structlog.get_logger("orbit.chat").error("goal_background_failed", goal_id=goal_id, exc_info=True)
-
 
 async def _handle_chat(
     ws: WebSocket, text: str, session_id: str, project_name: str, payload: dict[str, Any]
@@ -174,9 +126,22 @@ async def _handle_chat(
         await _send(ws, 1, None, "输入为空")
         return
 
-    # /goal 命令族
+    # /goal 命令——投喂目标给 MetaOrchestrator
     if text.strip().startswith("/goal"):
-        await _handle_goal_command(ws, text.strip())
+        goal_text = text.strip()[5:].strip()
+        if not goal_text:
+            await _send(ws, 1, None, "/goal 需要目标描述")
+            return
+        orch = getattr(ws.app.state, "meta_orchestrator", None)
+        if orch is None:
+            await _send(ws, 503, None, "MetaOrchestrator 未初始化")
+            return
+        from orbit.goal.models import GoalSession
+        import asyncio
+        goal = GoalSession(description=goal_text)
+        task = asyncio.create_task(orch.run(goal))
+        task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
+        await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动: {goal_text[:80]}")
         return
 
     # 验证 session 存在
@@ -327,23 +292,17 @@ async def _handle_confirm(
         task_resp = await _create_task(task_req)
         task_id = task_resp.task_id
 
+        import asyncio as _asyncio
+
         try:
             from orbit.api.main import _scheduler
 
             if _scheduler is not None:
-                # P1-2: done_callback 避免 fire-and-forget 无感知
-                task = _asyncio.create_task(_scheduler.run_task(task_id, prd_text[:5000]))
-                task.add_done_callback(
-                    lambda t: (
-                        logger.warning("task_cancelled", task_id=task_id)
-                        if t.cancelled()
-                        else logger.error("task_failed", task_id=task_id, error=str(t.exception()))
-                        if t.exception()
-                        else None
-                    )
-                )
+                _asyncio.create_task(_scheduler.run_task(task_id, prd_text[:5000]))
         except Exception as e:
-            logger.warning("run_task_trigger_failed", task_id=task_id, error=str(e))
+            import structlog as _sl
+
+            _sl.get_logger().warning("run_task_trigger_failed", task_id=task_id, error=str(e))
 
         await _send(
             ws,

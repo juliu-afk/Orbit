@@ -111,13 +111,14 @@ async def cancel_goal(request: Request):
 
 @router.post("/pause")
 async def pause_goal(request: Request):
-    """P1-3: 暂停——等待 orchestrator 支持。当前返回 Goal 状态。"""
+    """P1-3: 暂停——orchestrator 暂不支持，返回 501。"""
     _get_orch(request)
-    return {"code": 0, "data": {"active": _active_task is not None, "status": "paused" if _active_task else "idle"}}
+    raise HTTPException(status_code=501, detail="Goal pause/resume 功能待实现")
 
 
 @router.post("/resume")
 async def resume_goal(request: Request):
-    """P1-3: 恢复——等待 orchestrator 支持。"""
+    """P1-3: 恢复——orchestrator 暂不支持，返回 501。"""
     _get_orch(request)
+    raise HTTPException(status_code=501, detail="Goal pause/resume 功能待实现")
     return {"code": 0, "data": {"status": "active" if _active_task else "idle"}}

@@ -225,31 +225,9 @@ _loop_scheduler = LoopScheduler()
 
 app = create_app(_event_bus)
 
-@app.on_event("startup")
-async def _init_review_tables() -> None:
-    async with _review_engine.begin() as conn:
-        await conn.run_sync(ReviewBase.metadata.create_all)
-
-@app.on_event("shutdown")
-async def _shutdown_review() -> None:
-    await _review_engine.dispose()  # P0-8: 释放连接池
-
-# Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
+# Phase 4: 注入 ComposeOrchestrator 到 app state
 app.state.compose_orchestrator = _compose_orchestrator
 app.state.dream_engine = _dream_engine
-app.state.meta_orchestrator = _meta_orchestrator
-app.state.loop_scheduler = _loop_scheduler
-
-# ── Goal+Loop: 注入 MetaOrchestrator + LoopScheduler (P1-1) ──
-from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
-from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402
-from orbit.loop.scheduler import LoopScheduler  # noqa: E402
-
-_meta_orchestrator = MetaOrchestrator(
-    compose_bridge=GoalComposeBridge(llm=_llm_flash),
-    agent_factory=AgentFactory,
-    max_parallel_tasks=5,
-)
-_loop_scheduler = LoopScheduler()
+# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler (P1-1, P0-1/2 fixed)
 app.state.meta_orchestrator = _meta_orchestrator
 app.state.loop_scheduler = _loop_scheduler

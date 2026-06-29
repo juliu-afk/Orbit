@@ -142,9 +142,11 @@ class IntakeRouter:
         if "--from" in desc or goal.three_tier_memory.get("batch_goals"):
             return "batch"
 
-        # 文件路径——含 .md 且指向文件
+        # P1-3: 文件路径——结合 os.path.exists 避免误判
         if desc.endswith(".md") and not desc.startswith("--"):
-            return "single_file"
+            import os
+            if os.path.exists(desc) or "/" in desc or "\\" in desc:
+                return "single_file"
 
         # 技术方案——含 TaskDAG 关键词
         if any(kw in desc.lower() for kw in ("## 任务", "## task", "depends_on", "子任务列表")):

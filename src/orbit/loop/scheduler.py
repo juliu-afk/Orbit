@@ -67,9 +67,18 @@ class LoopScheduler:
         runner = LoopRunner(loop, self._executor or self._mock_executor)
         self._loops[loop_id] = runner
 
-        # 后台运行
-        asyncio.create_task(runner.run())
+        # P1-5: 后台运行，异常回调防止静默崩溃
+        task = asyncio.create_task(runner.run())
+        task.add_done_callback(self._on_loop_task_done)
         logger.info("loop_started", loop_id=loop_id)
+
+    def _on_loop_task_done(self, task: asyncio.Task) -> None:
+        try:
+            exc = task.exception()
+            if exc:
+                logger.error("loop_task_crashed", error=str(exc), exc_info=True)
+        except (asyncio.CancelledError, asyncio.InvalidStateError):
+            pass
 
     async def stop(self, loop_id: str) -> None:
         """停止 Loop。"""

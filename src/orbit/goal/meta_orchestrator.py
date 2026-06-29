@@ -344,7 +344,9 @@ class MetaOrchestrator:
             logger.warning("goal_budget_exhausted", budget=goal.total_token_budget, consumed=goal.token_consumed)
             return True
         if goal.max_runtime_seconds > 0 and goal.started_at:
-            elapsed = time.time() - datetime.fromisoformat(goal.started_at).timestamp()
+            # P2-4: fromisoformat 不兼容 'Z' 后缀
+            started_str = goal.started_at.replace("Z", "+00:00")
+            elapsed = time.time() - datetime.fromisoformat(started_str).timestamp()
             if elapsed >= goal.max_runtime_seconds:
                 logger.warning("goal_time_exhausted", max=goal.max_runtime_seconds, elapsed=int(elapsed))
                 return True
@@ -363,19 +365,23 @@ class MetaOrchestrator:
         layer: list[Any],  # list[Task]
         previous_merges: dict[str, str],
     ) -> dict[str, str]:
-        """确定每个 task 的 base_ref。"""
+        """P1-1: 确定每个 task 的 base_ref。多依赖取最晚合入 SHA。"""
         bases = {}
         for t in layer:
             if not t.depends_on:
                 bases[t.id] = "main"
             else:
                 dep_shas = [previous_merges[d] for d in t.depends_on if d in previous_merges]
-                bases[t.id] = dep_shas[-1] if dep_shas else "main"
+                if not dep_shas:
+                    logger.warning("resolve_bases_no_deps_found", task_id=t.id, depends_on=list(t.depends_on))
+                    bases[t.id] = "main"
+                else:
+                    bases[t.id] = dep_shas[-1]
         return bases
 
     @staticmethod
     def _topological_layers(tasks: list[Any]) -> list[list[Any]]:
-        """Kahn 算法按层分组。"""
+        """P1-2/P2-6: Kahn 算法按层分组。缺失依赖 warning，不可达节点报错。"""
         task_map = {t.id: t for t in tasks}
         in_degree = {t.id: len(t.depends_on) for t in tasks}
         adj: dict[str, list[str]] = {t.id: [] for t in tasks}
@@ -383,6 +389,8 @@ class MetaOrchestrator:
             for dep in t.depends_on:
                 if dep in adj:
                     adj[dep].append(t.id)
+                else:
+                    logger.warning("topological_sort_missing_dependency", task_id=t.id, missing_dep=dep)
 
         layers = []
         current = [t for t in tasks if in_degree[t.id] == 0]
@@ -398,7 +406,7 @@ class MetaOrchestrator:
 
         if sum(len(l) for l in layers) != len(tasks):
             remaining = {t.id for t in tasks} - {t.id for l in layers for t in l}
-            raise ValueError(f"环形依赖: {remaining}")
+            raise ValueError(f"环形依赖或不可达节点: {remaining}")
         return layers
 
     @staticmethod

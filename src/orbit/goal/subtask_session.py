@@ -52,7 +52,7 @@ class SubTaskSession:
         result = await session.run_full_pipeline()
     """
 
-    # 每个状态对应的 Agent 角色
+    # P2-5: CRITIQUE_GATE 无对应 Agent——由 CritiqueAgent 外部处理
     STATE_ROLE_MAP: dict[TaskState, str] = {
         TaskState.IDLE: "clarifier",
         TaskState.PARSING: "clarifier",

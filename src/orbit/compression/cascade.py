@@ -25,12 +25,15 @@ from orbit.compression.models import CompressionAction
 
 logger = structlog.get_logger("orbit.compression")
 
-# 大型工具输出的最小字符阈值
-LARGE_OUTPUT_THRESHOLD = 5000
-# 已消费输出的最大保留轮次
-CONSUMED_OUTPUT_MAX_TURNS = 3
-# 无效果推理的最小内容长度
-INEFFECTUAL_MIN_CHARS = 100
+# P2-2: 阈值通过 __init__ 可配置
+DEFAULT_LARGE_OUTPUT_THRESHOLD = 5000
+DEFAULT_CONSUMED_OUTPUT_MAX_TURNS = 3
+DEFAULT_INEFFECTUAL_MIN_CHARS = 100
+
+# 保留旧名以兼容其他模块引用
+LARGE_OUTPUT_THRESHOLD = DEFAULT_LARGE_OUTPUT_THRESHOLD
+CONSUMED_OUTPUT_MAX_TURNS = DEFAULT_CONSUMED_OUTPUT_MAX_TURNS
+INEFFECTUAL_MIN_CHARS = DEFAULT_INEFFECTUAL_MIN_CHARS
 
 
 class CascadePruner:
@@ -40,12 +43,21 @@ class CascadePruner:
     逐级增加破坏性——每级后检查预算是否已满足。
 
     Usage:
-        pruner = CascadePruner(memory=None)  # memory = ThreeTierMemory
+        pruner = CascadePruner(memory=None, large_output_threshold=5000)
         messages, memory = await pruner.prune(messages, memory, budget)
     """
 
-    def __init__(self, memory: Any = None) -> None:  # ThreeTierMemory
+    def __init__(
+        self,
+        memory: Any = None,
+        large_output_threshold: int = DEFAULT_self._large_threshold,
+        consumed_output_max_turns: int = DEFAULT_CONSUMED_OUTPUT_MAX_TURNS,
+        ineffectual_min_chars: int = DEFAULT_INEFFECTUAL_MIN_CHARS,
+    ) -> None:
         self._memory = memory
+        self._large_threshold = large_output_threshold
+        self._consumed_turns = consumed_output_max_turns
+        self._ineffectual_min = ineffectual_min_chars
         self._stages_applied: list[str] = []
         self._bytes_removed_total: int = 0
 
@@ -130,7 +142,7 @@ class CascadePruner:
                 continue
 
             # 小型输出——不处理
-            if len(content) < LARGE_OUTPUT_THRESHOLD:
+            if len(content) < self._large_threshold:
                 result.append(msg)
                 continue
 
@@ -187,7 +199,7 @@ class CascadePruner:
 
                 # 无 tool_calls + 内容短 → 可能是无效果推理
                 if not has_tool_calls and isinstance(content, str):
-                    if len(content) < INEFFECTUAL_MIN_CHARS:
+                    if len(content) < self._ineffectual_min:
                         consecutive_ineffectual += 1
                         if consecutive_ineffectual > max_ineffectual:
                             # 记录到失败方法
@@ -314,9 +326,9 @@ class CascadePruner:
         if not isinstance(tool_content, str) or not tool_content:
             return False
 
-        # 只在最近 CONSUMED_OUTPUT_MAX_TURNS 轮后的 assistant 中检查
+        # 只在最近 self._consumed_turns 轮后的 assistant 中检查
         tool_id = tool_msg.get("tool_call_id", "")
-        for j in range(tool_index + 1, min(tool_index + 1 + CONSUMED_OUTPUT_MAX_TURNS * 2, len(messages))):
+        for j in range(tool_index + 1, min(tool_index + 1 + self._consumed_turns * 2, len(messages))):
             msg = messages[j]
             if msg.get("role") == "assistant":
                 content = msg.get("content", "")

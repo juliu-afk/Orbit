@@ -54,7 +54,6 @@ class TaskRunner:
         checkpoint: CheckpointManager | None = None,
         event_bus: EventBus | None = None,
         compressor: ContextCompressor | None = None,
-        budget_tracker: Any = None,  # P1-4: budget_tracker 注入
         tool_registry: ToolRegistry | None = None,
         audit_logger: Any = None,
         router: Any = None,
@@ -65,7 +64,6 @@ class TaskRunner:
         self.checkpoint = checkpoint
         self._event_bus = event_bus
         self._compressor = compressor
-        self._budget_tracker = budget_tracker  # P1-4
         self._tool_registry = tool_registry
         self._audit_logger = audit_logger
         self.router = router
@@ -97,8 +95,6 @@ class TaskRunner:
                 )
                 state = _transition(state, self._fast_lane)
                 await self._save_checkpoint(task_id, state, context)
-            except asyncio.CancelledError:
-                raise  # P0-1: 不吞取消信号，保持协作式取消语义
             except Exception as e:
                 logger.error("task_failed", task_id=task_id, state=state.value, error=str(e))
                 state = TaskState.FAILED
@@ -141,8 +137,6 @@ class TaskRunner:
                     )
                     context["model_tier"] = decision.tier.value
                     context["router_decision"] = decision
-                except asyncio.CancelledError:
-                    raise  # P2-10: 不吞取消信号
                 except Exception as e:
                     logger.warning("router_evaluate_failed", error=str(e))
 
@@ -160,12 +154,7 @@ class TaskRunner:
         agent_llm = self._agent_llms.get(role) if self._agent_llms else None
 
         try:
-            agent = self._agent_factory.create(
-                role,
-                llm=agent_llm,
-                compressor=self._compressor,
-                budget_tracker=self._budget_tracker,  # P1-4: 传递 budget_tracker
-            )
+            agent = self._agent_factory.create(role, llm=agent_llm, compressor=self._compressor)
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
             if self._audit_logger:
@@ -198,11 +187,9 @@ class TaskRunner:
                 output = r.get("design") or r.get("code") or r.get("review") or str(r)
             else:
                 raise RuntimeError(f"Agent {role} 返回错误: {output_obj.error}")
-        except TimeoutError:  # P1-6: 兼容 Python <3.11
+        except TimeoutError:
             logger.warning("agent_timeout", role=role, task_id=task_id)
             raise
-        except asyncio.CancelledError:
-            raise  # P0-1: 不吞取消信号
         except Exception as e:
             logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
             if self._audit_logger:
@@ -230,10 +217,8 @@ class TaskRunner:
             progress = store.read_file(MemoryFileType.PROGRESS)
             if progress.body:
                 l4["progress"] = progress.body[:1000]
-        except asyncio.CancelledError:
-            raise  # P2-11: 不吞取消信号
         except Exception:
-            logger.debug("memory_load_skipped", task_id=task_id)  # P2-11: 至少记日志
+            pass
 
         return TaskContext(
             task_id=task_id,
@@ -261,8 +246,6 @@ class TaskRunner:
                 context.setdefault("artifacts", {})[current.value] = observation
                 current = _transition(current, self._fast_lane)
                 await self._save_checkpoint(task_id, current, context)
-            except asyncio.CancelledError:
-                raise  # P0-1: 不吞取消信号
             except Exception as e:
                 logger.error("resume_failed", task_id=task_id, error=str(e))
                 current = TaskState.FAILED
@@ -356,11 +339,7 @@ FAST_LANE_TRANSITIONS: dict[TaskState, TaskState] = {
 
 
 class InvalidStateTransitionError(Exception):
-    """非法状态转换.
-
-    P2-9: 不再继承 orchestrator.SchedulerError（避免循环导入）,
-    SchedulerError 本身只是 Exception 别名, 功能等价.
-    """
+    """非法状态转换."""
 
 
 def _transition(current: TaskState, fast_lane: bool = False) -> TaskState:

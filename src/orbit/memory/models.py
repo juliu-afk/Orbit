@@ -16,6 +16,7 @@ class MemoryFileType(StrEnum):
     CHECKPOINT = "checkpoint.md"  # 消息级检查点：turn 状态、token 快照
     PROGRESS = "progress.md"  # 任务进度：已完成/进行中/下一步/产出物
     NOTES = "notes.md"  # 自由格式笔记：带 tag 索引
+    DECISIONS = "decisions.md"  # P1: 设计决策日志——Agent 不可逆选择
 
 
 @dataclass
@@ -63,3 +64,20 @@ class MemoryConfig:
     project_root: str = ""
     memory_dir: str = ".orbit/memory"
     max_memory_file_size: int = 50_000  # 50KB per file
+
+
+@dataclass
+class DecisionRecord:
+    """Agent 做出的不可逆设计决策——业务层减熵 P1.
+
+    持久化到 decisions.md，调度时注入 context 避免 Agent 重选.
+    """
+
+    id: str  # "DD-20260629-042"
+    choice: str  # 选择描述，如 "PostgreSQL over MySQL"
+    why: str  # 理由
+    constraints: list[str] = field(default_factory=list)  # 决策时约束
+    alternatives: list[str] = field(default_factory=list)  # 考虑过的替代方案
+    made_by: str = ""  # AgentRole
+    scope: list[str] = field(default_factory=list)  # 影响范围
+    timestamp: str = ""  # ISO 8601

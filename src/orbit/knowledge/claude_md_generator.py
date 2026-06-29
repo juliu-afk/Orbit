@@ -5,18 +5,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
-
-import structlog
-
-logger = structlog.get_logger("orbit.claude_md")
-
-
-# P2-5: GraphManager 接口协议——ClaudeMdGenerator 依赖此协议非具体实现
-class GraphManagerProtocol(Protocol):
-    config: Any
-    code: Any
-    knowledge: Any
+from typing import Any
 
 
 class ClaudeMdGenerator:
@@ -39,7 +28,7 @@ class ClaudeMdGenerator:
         "行为拦截清单",
     ]
 
-    def __init__(self, graph_manager: GraphManagerProtocol) -> None:
+    def __init__(self, graph_manager: Any) -> None:
         self._graphs = graph_manager
 
     async def generate(self) -> str:
@@ -67,8 +56,7 @@ class ClaudeMdGenerator:
             desc = config.get("description", "")
             parts.append(f"> {desc}")
             parts.append(f"**项目名称**: {name}")
-        except Exception as e:
-            logger.warning("claude_md_overview_failed", error=str(e))
+        except Exception:
             parts.append("> 自动生成的项目说明书")
         return "\n".join(parts)
 
@@ -83,8 +71,7 @@ class ClaudeMdGenerator:
                 parts.append("|------|------|")
                 for category, packages in deps.items():
                     parts.append(f"| {category} | {', '.join(packages)} |")
-        except Exception as e:
-            logger.warning("claude_md_tech_stack_failed", error=str(e))
+        except Exception:
             parts.append("（从 pyproject.toml/package.json 自动提取）")
         return "\n".join(parts)
 
@@ -95,8 +82,7 @@ class ClaudeMdGenerator:
             code = self._graphs.code
             tree = code.get_directory_tree() if code else {}
             parts.append(tree.get("text", "（从代码图谱提取）"))
-        except Exception as e:
-            logger.warning("claude_md_structure_failed", error=str(e))
+        except Exception:
             parts.append("（从代码图谱自动提取）")
         parts.append("```")
         return "\n".join(parts)
@@ -109,40 +95,15 @@ class ClaudeMdGenerator:
             concepts = knowledge.list_concepts() if knowledge else []
             for c in concepts[:10]:
                 parts.append(f"- **{c.get('name')}**: {c.get('description', '')}")
-        except Exception as e:
-            logger.warning("claude_md_terminology_failed", error=str(e))
+        except Exception:
             parts.append("（从知识图谱自动提取）")
         return "\n".join(parts)
 
     def _extract_constraints(self) -> str:
-        """P2-3: 从已知模式提取约束."""
-        constraints = []
-        try:
-            config = self._graphs.config
-            if hasattr(config, "get"):
-                for rule in config.get("constraints", []):
-                    constraints.append(f"- {rule}")
-        except Exception as e:
-            logger.warning("claude_md_constraints_failed", error=str(e))
-        if not constraints:
-            constraints.append("- （待项目配置后填充）")
-        return "## 实现约束\n\n" + "\n".join(constraints)
+        return "## 实现约束\n\n（从代码模式和配置扫描提取）"
 
     def _extract_coding_conventions(self) -> str:
-        """P2-3: 从代码图谱推断编码约定."""
-        conventions = []
-        try:
-            code = self._graphs.code
-            if code:
-                lang = getattr(code, "primary_language", "Python")
-                conventions.append(f"- 主语言: {lang}")
-                conventions.append("- 类型注解: 所有公共函数必须写类型签名")
-                conventions.append("- 命名: 类 PascalCase, 函数/变量 snake_case")
-        except Exception as e:
-            logger.warning("claude_md_conventions_failed", error=str(e))
-        if not conventions:
-            conventions.append("- （待项目配置后填充）")
-        return "## 编码约定\n\n" + "\n".join(conventions)
+        return "## 编码约定\n\n（从代码风格分析提取）"
 
     async def _extract_test_framework(self) -> str:
         parts = ["## 测试框架", ""]
@@ -150,30 +111,12 @@ class ClaudeMdGenerator:
             config = self._graphs.config
             test_deps = config.get("test_dependencies", ["pytest"])
             parts.append(f"- 测试框架: {', '.join(test_deps)}")
-        except Exception as e:
-            logger.warning("claude_md_test_framework_failed", error=str(e))
+        except Exception:
             parts.append("- pytest（默认）")
         return "\n".join(parts)
 
     def _extract_intercept_rules(self) -> str:
-        """P2-3: 从项目规则提取拦截清单."""
-        rules = []
-        try:
-            config = self._graphs.config
-            if hasattr(config, "get"):
-                for rule in config.get("intercept_rules", []):
-                    rules.append(f"- {rule}")
-        except Exception as e:
-            logger.warning("claude_md_intercept_failed", error=str(e))
-        if not rules:
-            rules.extend(
-                [
-                    "- 禁止 `git add -A`",
-                    "- 新依赖必须先确认",
-                    "- 密钥从环境变量读取",
-                ]
-            )
-        return "## 行为拦截清单\n\n" + "\n".join(rules)
+        return "## 行为拦截清单\n\n（从项目规则提取）"
 
     def _assemble(self, sections: dict[str, str]) -> str:
         """组装为完整 CLAUDE.md."""

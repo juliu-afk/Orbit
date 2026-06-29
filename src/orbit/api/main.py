@@ -39,7 +39,6 @@ from orbit.api.routes import (
     sessions,
     tasks,
     tests_routes,
-    tests_routes,
     loop,
     versioning,
 )
@@ -254,7 +253,7 @@ from orbit.lsp.service import DiagnosticService  # noqa: E402
 _diagnostic_service = DiagnosticService(_ws_dir)
 
 blame_routes.set_workspace(_ws_dir)
-diagnostics_ws.set_diag_service(_diagnostic_service)
+diagnostics_ws.set_diagnostic_service(_diagnostic_service)
 
 app = create_app(_event_bus)
 

@@ -34,6 +34,3 @@ async def diagnostics_ws(ws: WebSocket, task_id: str):
         if not conns:
             _active_connections.pop(task_id, None)
 
-def set_diag_service(svc) -> None:
-    """别名——供 main.py 使用。"""
-    set_diagnostic_service(svc)

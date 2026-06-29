@@ -211,6 +211,9 @@ class MetaOrchestrator:
                 total_time_seconds=elapsed,
             )
 
+        except asyncio.CancelledError:
+            logger.info("meta_orchestrator_cancelled", goal_id=goal.id)
+            raise
         except Exception as e:
             logger.error("meta_orchestrator_failed", goal_id=goal.id, error=str(e), exc_info=True)
             return GoalResult(
@@ -282,14 +285,15 @@ class MetaOrchestrator:
         else:
             layers = [goals]
 
-        # 逐层执行
+        # P0-1: 逐层执行——Semaphore 包裹每个协程
         results: list[GoalResult] = []
+        sem = asyncio.Semaphore(self._max_parallel)
         for layer in layers:
-            async with asyncio.Semaphore(self._max_parallel):
-                layer_results = await asyncio.gather(*[
-                    self.run(g) for g in layer
-                ])
-                results.extend(layer_results)
+            async def _run_one(g):
+                async with sem:
+                    return await self.run(g)
+            layer_results = await asyncio.gather(*[_run_one(g) for g in layer])
+            results.extend(layer_results)
 
         # 汇总报告
         total_tokens = sum(r.total_tokens for r in results)

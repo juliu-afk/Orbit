@@ -374,14 +374,21 @@ class DependencyAnalyzer:
 
     @staticmethod
     def _find_goal_by_name(goals: list[GoalSession], name: str) -> GoalSession | None:
-        """按名称/ID 模糊匹配 Goal。"""
+        """按名称/ID 匹配 Goal。P0-3: word-boundary 避免子串误判。"""
+        import re
         name_lower = name.strip().lower()
         for g in goals:
-            if name_lower in g.description.lower():
+            if g.id.lower() == name_lower or g.description.strip().lower() == name_lower:
                 return g
-            if name_lower in g.id.lower():
-                return g
-        return None
+        try:
+            pattern = re.compile(r'\b' + re.escape(name_lower) + r'\b', re.IGNORECASE)
+        except re.error:
+            return None
+        best, best_len = None, float("inf")
+        for g in goals:
+            if pattern.search(g.description) and len(g.description) < best_len:
+                best, best_len = g, len(g.description)
+        return best
 
     @staticmethod
     def _extract_keywords(description: str) -> list[str]:

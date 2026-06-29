@@ -24,10 +24,13 @@ from orbit.api.routes import (
     compliance,
     compose,
     dream,
+    files_routes,
+    git_routes,
     health,
     knowledge,
     observability,
     projects,
+    review,
     sessions,
     tasks,
     versioning,
@@ -90,6 +93,10 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(compose.router, prefix=settings.API_V1_STR)
     # Phase 2: /dream 记忆合并自循环端点
     app.include_router(dream.router, prefix=settings.API_V1_STR)
+    # Step 9: IDE 功能追赶——审查 + 文件 + Git
+    app.include_router(review.router, prefix=settings.API_V1_STR)
+    app.include_router(files_routes.router, prefix=settings.API_V1_STR)
+    app.include_router(git_routes.router, prefix=settings.API_V1_STR)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
     # Phase 4 AC-A1: SSE 流式端点
@@ -200,7 +207,27 @@ _scheduler = Scheduler(
 )
 # Phase 4: 注入 Compose + ActorSpawn
 _scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-defined]
+# Step 9: 审查模块——SQLAlchemy 2.0 ORM
+from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession, create_async_engine  # noqa: E402
+from orbit.review.service import ReviewService  # noqa: E402
+from orbit.review.models import ReviewBase  # noqa: E402
+from orbit.files.service import FileService  # noqa: E402
+
+_review_engine = create_async_engine(settings.DATABASE_URL, echo=False)
+_review_session_factory = async_sessionmaker(_review_engine, expire_on_commit=False)
+_review_service = ReviewService(_review_session_factory)
+_file_service = FileService(os.getcwd())
+
+review.set_review_service(_review_service)
+files_routes.set_file_service(_file_service)
+git_routes.set_workspace_dir(os.getcwd())
+
 app = create_app(_event_bus)
+
+@app.on_event("startup")
+async def _init_review_tables() -> None:
+    async with _review_engine.begin() as conn:
+        await conn.run_sync(ReviewBase.metadata.create_all)
 
 # Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
 app.state.compose_orchestrator = _compose_orchestrator

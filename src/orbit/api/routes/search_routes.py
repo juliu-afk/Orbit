@@ -32,8 +32,11 @@ async def search(q: str = Query(..., min_length=2), search_type: str = Query("co
             return await asyncio.to_thread(_search_filenames, ws, q, max_results)
         else:
             return await _search_content(ws, q, max_results)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except (OSError, RuntimeError) as e:
+        # P2: 不泄露内部路径，返回通用错误
+        import structlog
+        structlog.get_logger().error("search_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Search failed")
 
 
 def _search_filenames(ws: Path, q: str, max_results: int) -> list[SearchResult]:

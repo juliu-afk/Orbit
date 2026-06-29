@@ -33,6 +33,7 @@ httpx = ">=0.27.0"
 # 结构化日志（开发计划 3.4.1）
 structlog = ">=24.1.0"
 prometheus-fastapi-instrumentator = "^8.0.2"
+gitpython = "^3.1.50"
 
 [tool.poetry.group.dev.dependencies]
 # 测试（开发计划 3.4.1）

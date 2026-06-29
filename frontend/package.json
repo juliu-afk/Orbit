@@ -15,6 +15,7 @@
     "@tauri-apps/api": "^2.11.1",
     "echarts": "^5.5.0",
     "element-plus": "^2.7.0",
+    "monaco-editor": "^0.55.1",
     "pinia": "^2.1.7",
     "vis-data": "^7.1.9",
     "vis-network": "^9.1.9",
@@ -28,6 +29,7 @@
     "jsdom": "^24.0.0",
     "typescript": "^5.4.2",
     "vite": "^5.0.12",
+    "vite-plugin-monaco-editor": "^1.1.0",
     "vitest": "^1.4.0",
     "vue-tsc": "^2.0.6"
   }

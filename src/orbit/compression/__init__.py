@@ -1,10 +1,9 @@
-"""上下文压缩模块 (Phase 2 AC7+AC8 + v4 CascadePruner).
+"""上下文压缩模块 (Phase 2 AC7+AC8).
 
-8-step 算法 + 5-layer 压缩管线 + 级联裁剪 + Token 预算管理.
+8-step 算法 + 5-layer 压缩管线 + Token 预算管理.
 """
 
 from orbit.compression.budget import TokenBudgetTracker
-from orbit.compression.cascade import CascadePruner
 from orbit.compression.compressor import ContextCompressor
 from orbit.compression.models import (
     CompressionAction,
@@ -16,7 +15,6 @@ from orbit.compression.models import (
 from orbit.compression.pipeline import CompressionPipeline
 
 __all__ = [
-    "CascadePruner",
     "CompressionAction",
     "CompressionPipeline",
     "CompressionResult",

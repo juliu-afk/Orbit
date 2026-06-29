@@ -14,6 +14,9 @@ import asyncio
 import structlog
 import time
 from datetime import UTC, datetime
+
+from orbit.goal.intake_router import IntakeRouter
+from orbit.goal.memory_tiers import ThreeTierMemory
 from typing import TYPE_CHECKING, Any
 
 from orbit.goal.models import (
@@ -30,8 +33,6 @@ if TYPE_CHECKING:
     from orbit.goal.compose_bridge import GoalComposeBridge
     from orbit.goal.critique import CritiqueAgent
     from orbit.goal.dependency_analyzer import DependencyAnalyzer
-    from orbit.goal.intake_router import IntakeRouter
-    from orbit.goal.memory_tiers import ThreeTierMemory
     from orbit.goal.preflight import PreFlightEstimator
     from orbit.goal.progress_tracker import ProgressTracker
     from orbit.goal.regression_guard import RegressionGuard

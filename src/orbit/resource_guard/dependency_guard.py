@@ -47,12 +47,16 @@ class DependencyGuard:
             print(f"建议: {check.recommendation}")
     """
 
-    async def check(self, proposed_package: str, reason: str = "") -> DependencyCheck:
-        """检查提议的依赖.
+    # P2-1/P2-2: 已知传递依赖数量（典型包 → 传递依赖数）
+    _TRANSITIVE_COUNTS: dict[str, int] = {
+        "fuzzywuzzy": 0,  # 纯 Python, 0 传递依赖
+        "python-levenshtein": 1,  # 依赖 C 扩展
+        "schedule": 0,
+        "requests": 5,  # urllib3+certifi+charset_normalizer+idna+h11
+    }
 
-        Returns:
-            DependencyCheck——若 needs_confirmation=True 则拦截
-        """
+    def check(self, proposed_package: str, reason: str = "") -> DependencyCheck:
+        """检查提议的依赖（同步——纯内存操作）."""
         result = DependencyCheck(package=proposed_package)
 
         # 检查 1: 标准库替代
@@ -63,5 +67,12 @@ class DependencyGuard:
             result.needs_confirmation = True
             return result
 
-        # 检查 2: 无已知替代——放行
+        # P2-1: 传递依赖数量
+        transitive = self._TRANSITIVE_COUNTS.get(proposed_package, -1)
+        if transitive >= 0:
+            result.transitive_count = transitive
+            if transitive > 3:
+                result.warnings.append(f"将新增 {transitive} 个传递依赖")
+                result.needs_confirmation = True
+
         return result

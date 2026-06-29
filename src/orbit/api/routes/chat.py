@@ -117,6 +117,23 @@ async def _handle_chat(
         await _send(ws, 1, None, "输入为空")
         return
 
+    # /goal 命令——投喂目标给 MetaOrchestrator
+    if text.strip().startswith("/goal"):
+        goal_text = text.strip()[5:].strip()
+        if not goal_text:
+            await _send(ws, 1, None, "/goal 需要目标描述")
+            return
+        orch = getattr(ws.app.state, "meta_orchestrator", None)
+        if orch is None:
+            await _send(ws, 503, None, "MetaOrchestrator 未初始化")
+            return
+        from orbit.goal.models import GoalSession
+        import asyncio
+        goal = GoalSession(description=goal_text)
+        asyncio.create_task(orch.run(goal))
+        await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动: {goal_text[:80]}")
+        return
+
     # 验证 session 存在
     if session_id and _session_registry.get(session_id) is None:
         await _send(ws, 1, None, f"会话 {session_id} 不存在")

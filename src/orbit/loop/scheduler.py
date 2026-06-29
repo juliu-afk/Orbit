@@ -83,7 +83,9 @@ class LoopScheduler:
             pass
 
     async def stop(self, loop_id: str) -> None:
-        """停止 Loop。P1-NEW2: 取消后台 Task 防止泄漏。"""
+        """停止 Loop。P1-N3: 不存在 ID 报错。"""
+        if loop_id not in self._schedules:
+            raise ValueError(f"Loop {loop_id} 不存在")
         runner = self._loops.pop(loop_id, None)
         task = self._tasks.pop(loop_id, None)
         if task and not task.done():
@@ -91,20 +93,21 @@ class LoopScheduler:
         if runner:
             runner.stop()
             logger.info("loop_stopped", loop_id=loop_id)
-        if loop_id in self._schedules:
-            self._schedules[loop_id].status = "stopped"
+        self._schedules[loop_id].status = "stopped"
 
     async def pause(self, loop_id: str) -> None:
-        """暂停 Loop。"""
-        if loop_id in self._schedules:
-            self._schedules[loop_id].status = "paused"
-            logger.info("loop_paused", loop_id=loop_id)
+        """暂停 Loop。P1-N3: 不存在 ID 报错。"""
+        if loop_id not in self._schedules:
+            raise ValueError(f"Loop {loop_id} 不存在")
+        self._schedules[loop_id].status = "paused"
+        logger.info("loop_paused", loop_id=loop_id)
 
     async def resume(self, loop_id: str) -> None:
-        """恢复 Loop。"""
-        if loop_id in self._schedules:
-            self._schedules[loop_id].status = "active"
-            logger.info("loop_resumed", loop_id=loop_id)
+        """恢复 Loop。P1-N3: 不存在 ID 报错。"""
+        if loop_id not in self._schedules:
+            raise ValueError(f"Loop {loop_id} 不存在")
+        self._schedules[loop_id].status = "active"
+        logger.info("loop_resumed", loop_id=loop_id)
 
     def list_all(self) -> list[LoopSchedule]:
         """列出所有 Loop。"""

@@ -110,12 +110,9 @@ class TestLoopAPI:
         assert isinstance(data["loops"], list)
 
     def test_stop_nonexistent(self, client):
-        # P1-5: 校验响应体内容
+        # P1-N3: 不存在 ID 返回 404
         resp = client.delete("/api/v1/loop/nonexistent")
-        assert resp.status_code == 200
-        data = resp.json()["data"]
-        assert data["loop_id"] == "nonexistent"
-        assert data["status"] == "stopped"
+        assert resp.status_code == 404
 
     def test_goal_pause_returns_501(self, client):
         # P1-3: pause/resume 未实现→501

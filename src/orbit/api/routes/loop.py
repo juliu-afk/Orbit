@@ -35,15 +35,26 @@ async def list_loops(request: Request):
 
 @router.delete("/{loop_id}")
 async def stop_loop(request: Request, loop_id: str):
-    await _get_scheduler(request).stop(loop_id)
+    try:
+        await _get_scheduler(request).stop(loop_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Loop {loop_id} 不存在")
     return {"code": 0, "data": {"loop_id": loop_id, "status": "stopped"}}
 
 @router.post("/{loop_id}/pause")
 async def pause_loop(request: Request, loop_id: str):
-    await _get_scheduler(request).pause(loop_id)
+    try:
+        await _get_scheduler(request).pause(loop_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Loop {loop_id} 不存在")
     return {"code": 0, "data": {"status": "paused"}}
 
 @router.post("/{loop_id}/resume")
 async def resume_loop(request: Request, loop_id: str):
+    try:
+        await _get_scheduler(request).resume(loop_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Loop {loop_id} 不存在")
+    return {"code": 0, "data": {"status": "active"}}
     await _get_scheduler(request).resume(loop_id)
     return {"code": 0, "data": {"status": "active"}}

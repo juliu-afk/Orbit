@@ -121,4 +121,3 @@ async def resume_goal(request: Request):
     """P1-3: 恢复——orchestrator 暂不支持，返回 501。"""
     _get_orch(request)
     raise HTTPException(status_code=501, detail="Goal pause/resume 功能待实现")
-    return {"code": 0, "data": {"status": "active" if _active_task else "idle"}}

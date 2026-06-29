@@ -68,9 +68,6 @@ async def get_blame(file: str = Query(...)):
                     current["email"] = v
                     # R2-1: OR 逻辑——邮箱后缀匹配追加，不覆盖作者名判定
                     current["is_agent"] = current.get("is_agent", False) or _is_agent_email(v)
-                elif k == "author-mail":
-                    current["email"] = v
-                    current["is_agent"] = _is_agent_email(v)
         return lines
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Git blame timed out (>30s)")

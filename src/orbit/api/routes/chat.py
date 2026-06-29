@@ -21,6 +21,8 @@ from orbit.projects.registry import ProjectRegistry
 from orbit.sessions.registry import SessionRegistry
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+import asyncio as _asyncio
+_goal_lock = _asyncio.Lock()
 
 _registry = ProjectRegistry()
 _session_registry = SessionRegistry()
@@ -118,6 +120,56 @@ def _on_goal_task_done(goal_id: str, task) -> None:
         import structlog
         structlog.get_logger("orbit.chat").error("goal_background_failed", goal_id=goal_id, exc_info=True)
 
+async def _handle_goal_command(ws: WebSocket, text: str) -> None:
+    """/goal <desc> | /goal status | /goal clear."""
+    from orbit.api.routes import goal as goal_route
+    orch = getattr(ws.app.state, "meta_orchestrator", None)
+    if orch is None:
+        await _send(ws, 503, None, "MetaOrchestrator 未初始化")
+        return
+    cmd = text[5:].strip()
+    if not cmd:
+        await _send(ws, 1, None, "/goal <desc> | /goal status | /goal clear")
+        return
+    if cmd == "status":
+        t = goal_route._active_task
+        detail = "idle" if t is None else ("cancelled" if t.cancelled() else ("done" if t.done() and not t.exception() else ("failed" if t.done() else "running")))
+        await _send(ws, 0, {"active": t is not None and not t.done(), "goal_id": goal_route._active_goal_id, "status": detail}, "Goal 状态")
+        return
+    if cmd == "clear":
+        t = goal_route._active_task
+        gid = goal_route._active_goal_id
+        if t and not t.done():
+            t.cancel()
+            goal_route._active_task = None
+            goal_route._active_goal_id = None
+            await _send(ws, 0, {"goal_id": gid}, "Goal 已取消")
+            return
+        await _send(ws, 0, {}, "无活跃 Goal")
+        return
+    # 创建新 Goal: 先取消旧任务
+    async with _goal_lock:
+        old = goal_route._active_task
+        if old and not old.done():
+            old.cancel()
+        from orbit.goal.models import GoalSession
+        import asyncio
+        goal = GoalSession(description=cmd)
+        task = asyncio.create_task(orch.run(goal))
+        task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
+        goal_route._active_task = task
+        goal_route._active_goal_id = goal.id
+        await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动")
+
+
+def _on_goal_task_done(goal_id: str, task) -> None:
+    try:
+        task.result()
+    except Exception:
+        import structlog
+        structlog.get_logger("orbit.chat").error("goal_background_failed", goal_id=goal_id, exc_info=True)
+
+
 async def _handle_chat(
     ws: WebSocket, text: str, session_id: str, project_name: str, payload: dict[str, Any]
 ) -> None:
@@ -126,22 +178,9 @@ async def _handle_chat(
         await _send(ws, 1, None, "输入为空")
         return
 
-    # /goal 命令——投喂目标给 MetaOrchestrator
+    # /goal 命令族
     if text.strip().startswith("/goal"):
-        goal_text = text.strip()[5:].strip()
-        if not goal_text:
-            await _send(ws, 1, None, "/goal 需要目标描述")
-            return
-        orch = getattr(ws.app.state, "meta_orchestrator", None)
-        if orch is None:
-            await _send(ws, 503, None, "MetaOrchestrator 未初始化")
-            return
-        from orbit.goal.models import GoalSession
-        import asyncio
-        goal = GoalSession(description=goal_text)
-        task = asyncio.create_task(orch.run(goal))
-        task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
-        await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动: {goal_text[:80]}")
+        await _handle_goal_command(ws, text.strip())
         return
 
     # 验证 session 存在

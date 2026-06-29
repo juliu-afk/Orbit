@@ -216,11 +216,12 @@ from orbit.files.service import FileService  # noqa: E402
 _review_engine = create_async_engine(settings.DATABASE_URL, echo=False)
 _review_session_factory = async_sessionmaker(_review_engine, expire_on_commit=False)
 _review_service = ReviewService(_review_session_factory)
-_file_service = FileService(os.getcwd())
+_ws_dir = settings.WORKSPACE_DIR or os.getcwd()  # P0-7: 优先使用配置
+_file_service = FileService(_ws_dir)
 
 review.set_review_service(_review_service)
 files_routes.set_file_service(_file_service)
-git_routes.set_workspace_dir(os.getcwd())
+git_routes.set_workspace_dir(_ws_dir)
 
 app = create_app(_event_bus)
 
@@ -228,6 +229,10 @@ app = create_app(_event_bus)
 async def _init_review_tables() -> None:
     async with _review_engine.begin() as conn:
         await conn.run_sync(ReviewBase.metadata.create_all)
+
+@app.on_event("shutdown")
+async def _shutdown_review() -> None:
+    await _review_engine.dispose()  # P0-8: 释放连接池
 
 # Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
 app.state.compose_orchestrator = _compose_orchestrator

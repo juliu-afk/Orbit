@@ -258,3 +258,12 @@ async def _shutdown_review() -> None:
 app.state.compose_orchestrator = _compose_orchestrator
 # Phase 2: 注入 DreamEngine 到 app state（供 /dream 端点访问）
 app.state.dream_engine = _dream_engine
+# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler
+from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
+from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402
+from orbit.loop.scheduler import LoopScheduler  # noqa: E402
+
+_meta_orchestrator = MetaOrchestrator(compose_bridge=GoalComposeBridge(llm=_llm_flash), agent_factory=AgentFactory, max_parallel_tasks=5)
+_loop_scheduler = LoopScheduler(command_executor=_meta_orchestrator.run)
+app.state.meta_orchestrator = _meta_orchestrator
+app.state.loop_scheduler = _loop_scheduler

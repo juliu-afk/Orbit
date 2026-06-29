@@ -50,7 +50,7 @@ class CascadePruner:
     def __init__(
         self,
         memory: Any = None,
-        large_output_threshold: int = DEFAULT_self._large_threshold,
+        large_output_threshold: int = DEFAULT_LARGE_OUTPUT_THRESHOLD,
         consumed_output_max_turns: int = DEFAULT_CONSUMED_OUTPUT_MAX_TURNS,
         ineffectual_min_chars: int = DEFAULT_INEFFECTUAL_MIN_CHARS,
     ) -> None:

@@ -5,7 +5,7 @@
 
 from __future__ import annotations
 
-import asyncio
+import threading
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -58,20 +58,20 @@ class EditStabilityDetector:
 
     def __init__(self) -> None:
         self._history: dict[str, list[FileEditRecord]] = {}
-        # P1: async 锁——保护 record_edit + cleanup 并发
-        self._lock = asyncio.Lock()
+        # P1: threading.Lock——保护 record_edit + cleanup 并发，保持 sync 签名
+        self._lock = threading.Lock()
         self._edit_since_cleanup = 0
 
-    async def record_edit(
+    def record_edit(
         self, file_path: str, agent_id: str = "", changed_functions: list[str] | None = None
     ) -> None:
-        """记录一次文件编辑——async 安全."""
+        """记录一次文件编辑——线程安全."""
         record = FileEditRecord(
             file_path=file_path,
             agent_id=agent_id,
             changed_functions=changed_functions or [],
         )
-        async with self._lock:
+        with self._lock:
             if file_path not in self._history:
                 self._history[file_path] = []
             self._history[file_path].append(record)

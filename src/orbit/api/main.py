@@ -36,6 +36,7 @@ from orbit.api.routes import (
     search_routes,
     sessions,
     tasks,
+    tests_routes,
     loop,
     versioning,
 )
@@ -106,6 +107,8 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     # Step 9 Phase 1.3: 代码导航 + 搜索
     app.include_router(codegraph_routes.router, prefix=settings.API_V1_STR)
     app.include_router(search_routes.router, prefix=settings.API_V1_STR)
+    # Step 9 Phase 1.4: 测试结果 + 覆盖率
+    app.include_router(tests_routes.router, prefix=settings.API_V1_STR)
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
     # Phase 4 AC-A1: SSE 流式端点
@@ -238,6 +241,7 @@ _code_graph_engine = CodeGraphEngine(_review_session_factory)
 codegraph_routes.set_code_graph(_code_graph_engine)
 codegraph_routes.set_file_service(_file_service)
 search_routes.set_workspace(_ws_dir)
+tests_routes.set_workspace(_ws_dir)
 
 app = create_app(_event_bus)
 

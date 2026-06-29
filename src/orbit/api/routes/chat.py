@@ -9,6 +9,7 @@ WebSocket 端点: ws://host:18888/api/v1/chat
 
 from __future__ import annotations
 
+import asyncio as _asyncio
 import json as _json
 from typing import Any
 
@@ -265,13 +266,32 @@ async def _handle_confirm(
         task_resp = await _create_task(task_req)
         task_id = task_resp.task_id
 
-        import asyncio as _asyncio
-
         try:
             from orbit.api.main import _scheduler
 
             if _scheduler is not None:
-                _asyncio.create_task(_scheduler.run_task(task_id, prd_text[:5000]))
+                # P1-2: add_done_callback 记录任务异常，避免 fire-and-forget 无感知
+                task = _asyncio.create_task(
+                    _scheduler.run_task(task_id, prd_text[:5000])
+                )
+
+                def _on_task_done(t: _asyncio.Task) -> None:
+                    if t.cancelled():
+                        import structlog as _sl2
+
+                        _sl2.get_logger().warning(
+                            "task_cancelled", task_id=task_id
+                        )
+                    elif t.exception():
+                        import structlog as _sl2
+
+                        _sl2.get_logger().error(
+                            "task_failed",
+                            task_id=task_id,
+                            error=str(t.exception()),
+                        )
+
+                task.add_done_callback(_on_task_done)
         except Exception as e:
             import structlog as _sl
 

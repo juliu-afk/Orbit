@@ -33,13 +33,13 @@ async def exec_command(req: ExecRequest):
     if not cmd_parts:
         raise HTTPException(status_code=400, detail="Empty command")
     # 白名单检查
-    if cmd_parts[0] not in ALLOWED_COMMANDS and cmd_parts[0] not in {"./", "../"}:
+    if cmd_parts[0] not in ALLOWED_COMMANDS:
         raise HTTPException(status_code=403, detail=f"Command not allowed: {cmd_parts[0]}")
     cwd = os.path.join(ws, req.cwd) if req.cwd != "." else ws
     if not os.path.isdir(cwd):
         raise HTTPException(status_code=400, detail=f"Directory not found: {req.cwd}")
-    import time
-    start = time.monotonic()
+    import time as _time
+    start = _time.monotonic()
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd_parts, cwd=cwd,
@@ -50,7 +50,7 @@ async def exec_command(req: ExecRequest):
             exit_code=proc.returncode or 0,
             stdout=stdout.decode("utf-8", errors="replace")[-50000:],
             stderr=stderr.decode("utf-8", errors="replace")[-10000:],
-            duration_ms=(time.monotonic() - start) * 1000,
+            duration_ms=(_time.monotonic() - start) * 1000,
         )
     except asyncio.TimeoutError:
         proc.kill()

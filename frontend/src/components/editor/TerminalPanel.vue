@@ -11,7 +11,7 @@
     </div>
     <div class="term-input-row">
       <span class="term-prompt">$</span>
-      <input ref="inputRef" v-model="input" class="term-input" @keyup.enter="execute" placeholder="command..." />
+      <input ref="inputRef" v-model="input" class="term-input" :disabled="loading" @keyup.enter="execute" :placeholder="loading ? "Running..." : "command..."" />
     </div>
   </div>
 </template>
@@ -38,8 +38,8 @@ async function execute() {
       '/api/v1/terminal/exec', { command: cmd, timeout: 30 }
     )
     history.value.push({ command: cmd, stdout: res.stdout, stderr: res.stderr, exitCode: res.exit_code, duration: Math.round(res.duration_ms) })
-  } catch (e: any) {
-    history.value.push({ command: cmd, stdout: '', stderr: e.message || 'Command failed', exitCode: -1, duration: 0 })
+  } catch (e: unknown) {
+    history.value.push({ command: cmd, stdout: '', stderr: (e as Error).message || 'Command failed', exitCode: -1, duration: 0 })
   } finally {
     loading.value = false
     await nextTick()

@@ -1,7 +1,7 @@
 <!-- 主题切换 (Phase 3.5) -->
 <template>
-  <el-button size="small" @click="toggle" :icon="isDark ? 'Sunny' : 'Moon'">
-    {{ isDark ? 'Light' : 'Dark' }}
+  <el-button size="small" @click="toggle">
+    {{ isDark ? '☀ Light' : '🌙 Dark' }}
   </el-button>
 </template>
 

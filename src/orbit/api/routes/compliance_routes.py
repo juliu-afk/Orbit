@@ -4,7 +4,7 @@ import ast, re
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/compliance", tags=["compliance"])
+router = APIRouter(prefix="/compliance", tags=["compliance_check"])  # P2-4: 区分旧 compliance 模块
 
 _file_service = None
 
@@ -17,12 +17,15 @@ class ReviewChecklist(BaseModel):
     items: list[dict[str, str]]
 
 RULES = [
-    ("float-instead-of-decimal", "金额计算应使用 Decimal 而非 float", "warning",
-     r"\bfloat\b"),
-    ("missing-permission", "API 端点缺少 @require_permission 装饰器", "warning",
+    # P2-1: 限制 float 匹配范围——排除 "floatValue"/"my_float" 等变量名
+    ("float-instead-of-decimal", "金额字段可能用了 float，应用 Decimal", "warning",
+     r"(?:^|\s|=|\(|\[)\s*float\s*[=\(]"),
+    # P1-1: 改为正向检查——匹配 @router 装饰器的那行，后续 AST 做缺失检查
+    ("router-endpoint", "发现路由端点，检查是否有 @require_permission", "info",
      r"@router\.(?:get|post|put|delete|patch)\("),
-    ("direct-sql", "避免直接写 SQL 查询，使用 ORM", "info",
-     r"(?:SELECT|INSERT|UPDATE|DELETE)\s+.*\s+(?:FROM|INTO|SET)"),
+    # P2-2: 限制 SQL 匹配范围，排除日志字符串和 ORM 相关
+    ("direct-sql", "发现 SQL 关键词，检查是否直接写 SQL", "info",
+     r"(?:execute|executescript|raw_query)\s*\("),
 ]
 
 @router.get("/check")

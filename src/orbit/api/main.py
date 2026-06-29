@@ -274,12 +274,23 @@ async def _shutdown_review() -> None:
 app.state.compose_orchestrator = _compose_orchestrator
 # Phase 2: 注入 DreamEngine 到 app state（供 /dream 端点访问）
 app.state.dream_engine = _dream_engine
-# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler
+# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler + CritiqueAgent + ModelEnsemble
 from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
 from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402
+from orbit.goal.critique import CritiqueAgent  # noqa: E402
+from orbit.goal.ensemble import ModelEnsemble  # noqa: E402
 from orbit.loop.scheduler import LoopScheduler  # noqa: E402
 
-_meta_orchestrator = MetaOrchestrator(compose_bridge=GoalComposeBridge(llm=_llm_flash), agent_factory=AgentFactory, max_parallel_tasks=5)
+_critique_agent = CritiqueAgent(llm=_llm_flash, model_family="anthropic")
+_model_ensemble = ModelEnsemble(agent_factory=AgentFactory, judge_llm=_llm_flash, ensemble_models=["claude-opus", "gpt-4o"])
+_meta_orchestrator = MetaOrchestrator(
+    compose_bridge=GoalComposeBridge(llm=_llm_flash),
+    critique_agent=_critique_agent,
+    ensemble=_model_ensemble,
+    compose_orchestrator=_compose_orchestrator,
+    agent_factory=AgentFactory,
+    max_parallel_tasks=5,
+)
 _loop_scheduler = LoopScheduler(command_executor=_meta_orchestrator.run)
 app.state.meta_orchestrator = _meta_orchestrator
 app.state.loop_scheduler = _loop_scheduler

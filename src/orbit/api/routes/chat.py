@@ -109,12 +109,39 @@ async def chat_endpoint(ws: WebSocket) -> None:
         pass  # 客户端正常断开
 
 
+
+# P1-2: Goal 后台任务异常回调
+def _on_goal_task_done(goal_id: str, task) -> None:
+    try:
+        task.result()
+    except Exception:
+        import structlog
+        structlog.get_logger("orbit.chat").error("goal_background_failed", goal_id=goal_id, exc_info=True)
+
 async def _handle_chat(
     ws: WebSocket, text: str, session_id: str, project_name: str, payload: dict[str, Any]
 ) -> None:
     """处理用户聊天消息：项目匹配(首轮) + ClarifierAgent 澄清。"""
     if not text.strip():
         await _send(ws, 1, None, "输入为空")
+        return
+
+    # /goal 命令——投喂目标给 MetaOrchestrator
+    if text.strip().startswith("/goal"):
+        goal_text = text.strip()[5:].strip()
+        if not goal_text:
+            await _send(ws, 1, None, "/goal 需要目标描述")
+            return
+        orch = getattr(ws.app.state, "meta_orchestrator", None)
+        if orch is None:
+            await _send(ws, 503, None, "MetaOrchestrator 未初始化")
+            return
+        from orbit.goal.models import GoalSession
+        import asyncio
+        goal = GoalSession(description=goal_text)
+        task = asyncio.create_task(orch.run(goal))
+        task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
+        await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动: {goal_text[:80]}")
         return
 
     # 验证 session 存在

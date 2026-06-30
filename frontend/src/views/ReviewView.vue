@@ -15,7 +15,7 @@
     <div class="review-body">
       <div class="review-sidebar">
         <FileTreePanel :tree-data="fileTree" :selected-file="editor.currentFile" @select-file="onSelectFile" />
-        <ReviewCommentPanel v-if="review.taskId && editor.currentFile" :review-id="review.taskId" :file="editor.currentFile" :line="0" />
+        <ReviewCommentPanel v-if="review.taskId && editor.currentFile" :review-id="review.taskId" :file="editor.currentFile" :line="editor.currentLine" />
       </div>
       <div class="review-main">
         <div v-if="!editor.currentFile" class="no-file"><el-empty description="Select a file to review" :image-size="80" /></div>
@@ -93,7 +93,7 @@ const activeBottomTab = ref('problems')
 function focusTab(name: string) { activeBottomTab.value = name }
 
 // 大纲条目点击——由 MonacoDiffEditor 内部实现跳转
-function onOutlineNavigate(_line: number) { activeBottomTab.value = 'outline' }
+function onOutlineNavigate(line: number) { activeBottomTab.value = 'problems' }  // P1-3: 切回diff视图
 
 const statusLabel = computed(() => ({ pending:'Pending', in_review:'In Review', changes_requested:'Rejected', approved:'Approved', merged:'Merged' }[review.status] ?? review.status))
 const statusTagType = computed(() => ({ pending:'info', in_review:'', changes_requested:'danger', approved:'success', merged:'info' }[review.status] ?? ''))

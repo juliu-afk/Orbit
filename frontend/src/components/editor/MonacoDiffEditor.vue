@@ -29,6 +29,8 @@ const containerRef = ref<HTMLDivElement>()
 const diffEditor = shallowRef<monaco.editor.IStandaloneDiffEditor>()
 const currentHunk = ref(0)
 const hunks = ref<monaco.editor.ILineChange[]>([])
+const _hunkTimer = ref<ReturnType<typeof setTimeout>>()  // P1-1
+const _oldModel = { o: null as monaco.editor.ITextModel | null, m: null as monaco.editor.ITextModel | null }  // P2-1
 
 // 从 Monaco diff 中提取 hunk 列表
 function updateHunks() {
@@ -44,8 +46,9 @@ function navigateHunk(direction: number) {
   if (next < 0 || next >= hunks.value.length) return
   currentHunk.value = next
   const hunk = hunks.value[next]
-  const line = hunk.modifiedStartLineNumber ?? hunk.originalStartLineNumber
-  if (line) diffEditor.value?.revealPositionInCenter({ lineNumber: line, column: 1 })
+  const line = hunk.modifiedStartLineNumber != null && hunk.modifiedStartLineNumber > 0
+    ? hunk.modifiedStartLineNumber : hunk.originalStartLineNumber
+  if (line > 0) diffEditor.value?.revealPositionInCenter({ lineNumber: line, column: 1 })
 }
 
 onMounted(() => {
@@ -60,14 +63,23 @@ onMounted(() => {
 
 function updateModel() {
   if (!diffEditor.value) return
+  if (_oldModel.o) _oldModel.o.dispose()  // P2-1
+  if (_oldModel.m) _oldModel.m.dispose()
   const om = monaco.editor.createModel(props.original, props.language)
   const mm = monaco.editor.createModel(props.modified, props.language)
+  _oldModel.o = om; _oldModel.m = mm
   diffEditor.value.setModel({ original: om, modified: mm })
 }
 watch(() => [props.original, props.modified, props.language], updateModel)
 // 模型变更后重新计算 hunk 列表
-watch(() => [props.original, props.modified], () => setTimeout(updateHunks, 100))
-onBeforeUnmount(() => diffEditor.value?.dispose())
+watch(() => [props.original, props.modified], () => {
+  if (_hunkTimer.value) clearTimeout(_hunkTimer.value)
+  _hunkTimer.value = setTimeout(updateHunks, 100)
+})
+onBeforeUnmount(() => {
+  if (_hunkTimer.value) clearTimeout(_hunkTimer.value)
+  diffEditor.value?.dispose()
+})
 </script>
 
 <style scoped>

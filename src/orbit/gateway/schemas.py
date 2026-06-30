@@ -72,3 +72,5 @@ class CircuitBreakerState(BaseModel):
     opened_at: float | None = None
     # 半开状态标记
     half_open: bool = False
+    # P1 LOG-4: 半开探测进行中——限制并发探测数
+    probe_active: bool = False

@@ -44,9 +44,10 @@ def session_id() -> str:
 
 @pytest.mark.asyncio
 async def test_health(client):
+    """P1 ERR-1: 健康检查验证 Redis 连通性——测试环境无 Redis 时允许 degraded。"""
     resp = await client.get("/health")
     assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
+    assert resp.json()["status"] in ("ok", "degraded")
 
 
 @pytest.mark.asyncio

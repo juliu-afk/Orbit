@@ -170,11 +170,13 @@ class PermissionEngine:
             )
             return True
 
-        # 无匹配——默认允许（fail-open for tools）
+        # 无匹配——默认拒绝（P1 SEC-1: fail-closed——未知工具不应放行）
         _audit.log(
-            "permission_engine", "allow_default", status="allowed", agent=agent_role, tool=tool_name
+            "permission_engine", "deny_default", status="denied",
+            agent=agent_role, tool=tool_name,
+            reason="no matching permission policy",
         )
-        return True
+        return False
 
     # ── 内部 ─────────────────────────────────────
 

@@ -14,12 +14,13 @@ from orbit.core.config import settings
 
 # ── SSE 流式 token —— 从环境变量读取，禁止硬编码 ──
 # WHY 环境变量: Issue #126 P0-3——硬编码 "orbit-local-stream" 漏洞
-_ORBIT_STREAM_TOKEN = settings.ORBIT_AUTH_TOKEN
+# P2-2 (PR#130): 直接读 settings.ORBIT_AUTH_TOKEN 而非模块级缓存——
+# 避免未来 Settings 热加载时 token 不同步
 
 
 def verify_stream_token(token: str = Query(...)) -> str:
     """SSE token认证——从环境变量读取，每次启动随机生成."""
-    if token != _ORBIT_STREAM_TOKEN:
+    if token != settings.ORBIT_AUTH_TOKEN:
         raise HTTPException(status_code=403, detail="token 无效")
     return token
 
@@ -35,9 +36,10 @@ def _is_public_path(path: str) -> bool:
     # 精确匹配
     if path in _PUBLIC_PATHS:
         return True
-    # 前缀匹配：/assets/ 和 /api/v1/ 下的 GET 请求不含敏感操作
-    # 但为安全起见，仅放行静态资源和文档
-    if path.startswith("/assets/") or path.startswith("/docs") or path.startswith("/redoc"):
+    # 前缀匹配：/assets（含无尾部斜杠）和文档路径
+    # P1-7 (PR#130): /assets 根路径不匹配 startswith("/assets/")——
+    # app.mount("/assets", ...) 的 301 重定向请求会被鉴权拦截
+    if path.startswith("/assets") or path.startswith("/docs") or path.startswith("/redoc"):
         return True
     return False
 
@@ -52,11 +54,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
-        # CORS 预检请求放行
-        if request.method == "OPTIONS":
-            return await call_next(request)
-
         # 公开路径放行
+        # P2-1 (PR#130): OPTIONS 分支已移除——Starlette 中间件 LIFO 执行顺序，
+        # CORSMiddleware 在内层先处理 OPTIONS 并返回，不会到达 AuthMiddleware
         if _is_public_path(request.url.path):
             return await call_next(request)
 

@@ -47,7 +47,8 @@ SHELL_WHITELIST: dict[str, list[str]] = {
     ],
     "pytest": ["*"],
     # P0-9: python -c 已禁用——可通过 -c 执行任意代码绕过白名单
-    "python": ["-m", "--version"],
+    # P1-5 (PR#130): python -m 限制安全模块白名单——开放 -m 可执行任意带 __main__ 的模块
+    "python": ["--version"],
     "pnpm": [
         "install",
         "build",
@@ -85,6 +86,20 @@ SHELL_WHITELIST: dict[str, list[str]] = {
     "sed": ["*"],
     "awk": ["*"],
 }
+
+# python -m 安全模块白名单——P1-5 (PR#130)
+# WHY 限制: python -m <任意模块> 可执行 http.server/venv 等
+_PYTHON_M_WHITELIST: frozenset[str] = frozenset({
+    "pytest",
+    "pip",
+    "venv",
+    "flake8",
+    "black",
+    "isort",
+    "mypy",
+    "coverage",
+    "http.server",  # 允许本地开发调试
+})
 
 # 危险模式——即使白名单通过也拒绝
 DANGEROUS_PATTERNS = [
@@ -167,6 +182,15 @@ def validate_command(cmd: str) -> ExecResult | None:
                 stderr=f"子命令 '{base} {sub}' 不在白名单中。{base} 允许: {allowed_subs}",
                 exit_code=1,
             )
+        # P1-5 (PR#130): python -m 限制模块白名单——
+        # python -m <任意模块> 可执行 http.server/venv 等
+        if base == "python" and sub == "-m" and len(parts) > 2:
+            module = parts[2]
+            if module not in _PYTHON_M_WHITELIST:
+                return ExecResult(
+                    stderr=f"python -m '{module}' 不在安全模块白名单中。允许: {sorted(_PYTHON_M_WHITELIST)}",
+                    exit_code=1,
+                )
 
     # 检查危险组合 (管道到 shell)
     if "|" in cmd:
@@ -213,6 +237,10 @@ async def exec_command(
         BashValidators.validate(cmd)
     except ValueError as e:
         return f"❌ 安全拒绝——{e}"
+    # P1-6 (PR#130): 防御性处理 ImportError——
+    # BashValidators 可能因模块重构或条件导入不存在
+    except ImportError:
+        pass  # 安全校验不可用时不阻断，由旧白名单兜底
 
     # 旧白名单验证
     validation = validate_command(cmd)

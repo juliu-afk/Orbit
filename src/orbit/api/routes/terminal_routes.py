@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shlex
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -57,9 +58,22 @@ class ExecResult(BaseModel):
 
 @router.post("/exec", response_model=ExecResult)
 async def exec_command(req: ExecRequest):
-    """执行终端命令——白名单限制+30s超时。"""
+    """执行终端命令——白名单限制+30s超时。
+
+    安全基线（Issue #126 + PR #130 review）:
+    - shlex.split 防引号绕过
+    - python -c 禁用
+    - shell 元字符拒绝
+    - cwd 路径遍历防护
+    - 超时后 wait() 防僵尸进程
+    """
     ws = _ws()
-    cmd_parts = req.command.split()
+    # P0-1 (PR#130): shlex.split 防引号绕过——str.split 不处理 shell 引号语法
+    try:
+        cmd_parts = shlex.split(req.command)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"命令解析失败: {e}")
+
     if not cmd_parts:
         raise HTTPException(status_code=400, detail="Empty command")
     # 白名单检查
@@ -75,9 +89,11 @@ async def exec_command(req: ExecRequest):
             raise HTTPException(
                 status_code=403, detail=f"Shell 元字符已禁用: {arg}"
             )
-    cwd = os.path.join(ws, req.cwd) if req.cwd != "." else ws
-    if not os.path.isdir(cwd):
-        raise HTTPException(status_code=400, detail=f"Directory not found: {req.cwd}")
+    # P1-1 (PR#130): cwd 路径遍历防护——禁止通过 ../ 逃逸 workspace
+    _raw_cwd = os.path.normpath(os.path.join(ws, req.cwd)) if req.cwd != "." else ws
+    if os.path.commonpath([ws, _raw_cwd]) != os.path.normpath(ws):
+        raise HTTPException(status_code=403, detail="cwd 超出 workspace")
+    cwd = _raw_cwd if os.path.isdir(_raw_cwd) else ws
     import time
 
     start = time.monotonic()
@@ -97,4 +113,6 @@ async def exec_command(req: ExecRequest):
         )
     except TimeoutError:
         proc.kill()
+        # P1-2 (PR#130): wait() 防止僵尸进程
+        await proc.wait()
         raise HTTPException(status_code=504, detail=f"Command timed out ({req.timeout}s)")

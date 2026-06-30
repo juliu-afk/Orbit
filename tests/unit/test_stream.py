@@ -250,6 +250,63 @@ class TestSSEEndpoints:
         assert resp.headers.get("cache-control") == "no-cache"
 
 
+# ── P2-5 (PR#130): verify_stream_token + _is_public_path 覆盖测试 ──
+
+
+class TestAuthCoverage:
+    """verify_stream_token 鉴权 + _is_public_path 公开路径判定。"""
+
+    def test_verify_stream_token_correct(self):
+        """正确 token → 返回 token 字符串。"""
+        from orbit.api.dependencies import verify_stream_token
+        from orbit.core.config import settings
+
+        result = verify_stream_token(token=settings.ORBIT_AUTH_TOKEN)
+        assert result == settings.ORBIT_AUTH_TOKEN
+
+    def test_verify_stream_token_wrong(self):
+        """错误 token → HTTPException 403。"""
+        from fastapi import HTTPException
+
+        from orbit.api.dependencies import verify_stream_token
+
+        with pytest.raises(HTTPException) as exc_info:
+            verify_stream_token(token="wrong-token")
+        assert exc_info.value.status_code == 403
+
+    def test_verify_stream_token_empty(self):
+        """空 token → HTTPException 403。"""
+        from fastapi import HTTPException
+
+        from orbit.api.dependencies import verify_stream_token
+
+        with pytest.raises(HTTPException) as exc_info:
+            verify_stream_token(token="")
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.parametrize(
+        "path,expected",
+        [
+            ("/health", True),
+            ("/metrics", True),
+            ("/docs", True),
+            ("/redoc", True),
+            ("/openapi.json", True),
+            ("/assets/app.js", True),
+            ("/assets", True),  # P1-7: 无尾部斜杠也应放行
+            ("/assets/", True),
+            ("/api/v1/tasks", False),
+            ("/api/v1/loop", False),
+            ("/ws", False),
+        ],
+    )
+    def test_is_public_path(self, path, expected):
+        """公开路径判定——健康/文档/静态资源放行，API 端点拒绝。"""
+        from orbit.api.dependencies import _is_public_path
+
+        assert _is_public_path(path) == expected
+
+
 # ── 流式 Gateway Client 测试 ────────────────────────
 
 

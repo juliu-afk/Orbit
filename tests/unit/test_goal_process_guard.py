@@ -1,17 +1,27 @@
 """ProcessGuard unit tests."""
+
 from __future__ import annotations
 import pytest
 from orbit.api.schemas.task import TaskState
 from orbit.goal.process_guard import ProcessGuard, ProcessViolationError
+
 
 class TestNormalFlow:
     @pytest.mark.asyncio
     async def test_full_pipeline(self):
         guard = ProcessGuard(task_id="t1", goal_id="g1")
         arts = {}
-        for s in [TaskState.IDLE, TaskState.PARSING, TaskState.PLANNING, TaskState.CODING, TaskState.VERIFYING, TaskState.DONE]:
+        for s in [
+            TaskState.IDLE,
+            TaskState.PARSING,
+            TaskState.PLANNING,
+            TaskState.CODING,
+            TaskState.VERIFYING,
+            TaskState.DONE,
+        ]:
             await guard.check(s, {"artifacts": arts})
             arts[s.value] = f"out_{s.value}"
+
 
 class TestMandatoryStates:
     @pytest.mark.asyncio
@@ -33,6 +43,7 @@ class TestMandatoryStates:
         with pytest.raises(ProcessViolationError) as exc:
             await guard.check(TaskState.VERIFYING, {"artifacts": arts})
         assert "CODING" in str(exc.value)
+
 
 class TestFastLane:
     @pytest.mark.asyncio
@@ -59,6 +70,7 @@ class TestFastLane:
         guard = ProcessGuard(task_id="t1", goal_id="g1")
         guard.authorize_fast_lane(None)
         assert not guard.fast_lane
+
 
 class TestMissingArtifact:
     @pytest.mark.asyncio

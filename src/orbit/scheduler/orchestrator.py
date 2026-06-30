@@ -119,11 +119,6 @@ class Scheduler:
             return route
         return ["developer"]
 
-    def _transition(self, current: TaskState) -> TaskState:
-        from orbit.scheduler.task_runner import _transition as _do
-
-        return _do(current, self._fast_lane)
-
     def _publish_task_update(
         self,
         task_id: str,

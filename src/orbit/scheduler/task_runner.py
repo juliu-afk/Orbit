@@ -21,10 +21,15 @@ if TYPE_CHECKING:
 
 import structlog
 
+from orbit.agents.base import AgentInput
+from orbit.agents.context import TaskContext
 from orbit.api.schemas.task import TaskState
 from orbit.checkpoint.manager import CheckpointData, CheckpointManager
 from orbit.events.bus import EventBus
 from orbit.events.schemas import DashboardEvent, TaskUpdatePayload, TokenUpdatePayload
+from orbit.memory.models import MemoryFileType
+from orbit.memory.store import MemoryStore
+from orbit.scheduler.complexity import ComplexityScorer
 
 logger = structlog.get_logger()
 
@@ -85,7 +90,6 @@ class TaskRunner:
 
         # 复杂度评估→决定快车道
         if context.get("mode") == "auto":
-            from orbit.scheduler.complexity import ComplexityScorer
 
             scorer = ComplexityScorer()
             c_result = scorer.evaluate(prd)
@@ -188,8 +192,6 @@ class TaskRunner:
             self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, role=role)
 
         try:
-            from orbit.agents.base import AgentInput
-
             ctx_dict = agent_context.to_dict() if hasattr(agent_context, "to_dict") else {}
             agent_input = AgentInput(
                 task=ctx_dict.get("l3", {}).get("prd", ""),
@@ -219,12 +221,8 @@ class TaskRunner:
 
     def _build_context(self, task_id: str, context: dict[str, Any]) -> Any:
         """构建 L1-L5 TaskContext."""
-        from orbit.agents.context import TaskContext
-
         l4: dict[str, Any] = {}
         try:
-            from orbit.memory.models import MemoryFileType
-            from orbit.memory.store import MemoryStore
 
             project_path = context.get("project_path", "")
             store = MemoryStore(project_path=project_path)

@@ -18,6 +18,7 @@ from typing import Any
 
 import structlog
 
+from orbit.gateway.schemas import LLMRequest
 from orbit.router.agent import ModelTier
 
 logger = structlog.get_logger("orbit.scheduler.escalation")
@@ -113,7 +114,6 @@ async def merge_outputs(
     prompt = build_merge_prompt(attempts, task)
 
     try:
-        from orbit.gateway.schemas import LLMRequest
 
         resp = await llm_client.generate(
             LLMRequest(prompt=prompt, system_prompt="你是方案合并 Agent。输出纯 JSON。"),

@@ -70,9 +70,8 @@ class DecisionLog:
             "task_id": decision.task_id,
             "timestamp": decision.timestamp,
         }
-        with self._lock:
-            with open(self._path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(raw, ensure_ascii=False) + "\n")
+        with self._lock, open(self._path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(raw, ensure_ascii=False) + "\n")
 
     # ── 检索 ───────────────────────────────────────────
 

@@ -187,7 +187,7 @@ async def _handle_goal_command(ws: WebSocket, text: str) -> None:
         task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
         goal_route._active_task = task
         goal_route._active_goal_id = goal.id
-        await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, f"Goal 已启动")
+        await _send(ws, 0, {"goal_id": goal.id, "status": "active"}, "Goal 已启动")
 
 
 def _on_goal_task_done(goal_id: str, task) -> None:

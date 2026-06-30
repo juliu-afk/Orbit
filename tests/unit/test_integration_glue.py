@@ -14,7 +14,7 @@ class TestBuildContext:
 
     def test_build_context_layers(self) -> None:
         sched = Scheduler()
-        ctx = sched._build_context("t1", {"prd": "测试需求", "state": "CODING"})
+        ctx = sched._task_runner._build_context("t1", {"prd": "测试需求", "state": "CODING"})
         assert isinstance(ctx, TaskContext)
         assert ctx.task_id == "t1"
         # L1 协作宪法
@@ -27,7 +27,7 @@ class TestBuildContext:
 
     def test_build_context_defaults(self) -> None:
         sched = Scheduler()
-        ctx = sched._build_context("t2", {})
+        ctx = sched._task_runner._build_context("t2", {})
         assert ctx.l2 == {}
         # Phase 2: L4 可能从文件记忆加载内容（非严格空）
         assert isinstance(ctx.l4, dict)
@@ -46,7 +46,7 @@ class TestRunAgent:
         """无 AgentFactory → 抛 RuntimeError（不再降级到直接 LLM）。"""
         sched = Scheduler()
         with pytest.raises(RuntimeError, match="AgentFactory"):
-            await sched._run_agent("developer", "t1", {"prd": "test"})
+            await sched._task_runner._run_agent("developer", "t1", {"prd": "test"})
 
     @pytest.mark.asyncio
     async def test_run_agent_with_mock_factory(self) -> None:
@@ -67,7 +67,7 @@ class TestRunAgent:
                 return agent
 
         sched = Scheduler(agent_factory=MockFactory)
-        output = await sched._run_agent("developer", "t1", {"prd": "test"})
+        output = await sched._task_runner._run_agent("developer", "t1", {"prd": "test"})
         assert "mock done" in output
 
     @pytest.mark.asyncio
@@ -89,7 +89,7 @@ class TestRunAgent:
 
         sched = Scheduler(agent_factory=SlowFactory)
         with pytest.raises(TimeoutError):
-            await sched._run_agent("developer", "t1", {"prd": "test"}, timeout=0.05)
+            await sched._task_runner._run_agent("developer", "t1", {"prd": "test"}, timeout=0.05)
 
     @pytest.mark.asyncio
     async def test_dependency_injection(self) -> None:
@@ -115,5 +115,5 @@ class TestRunAgent:
             agent_llms={"developer": "fake-llm"},
             agent_factory=CheckFactory,
         )
-        await sched._run_agent("developer", "t1", {"prd": "test"})
+        await sched._task_runner._run_agent("developer", "t1", {"prd": "test"})
         assert injected["llm"] == "fake-llm"

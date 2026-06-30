@@ -116,5 +116,5 @@ async def _search_content(ws: Path, q: str, max_results: int) -> list[SearchResu
                     )
                 )
         return results
-    except (FileNotFoundError, asyncio.TimeoutError):
+    except (TimeoutError, FileNotFoundError):
         return []

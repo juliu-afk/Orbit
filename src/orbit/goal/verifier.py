@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 if TYPE_CHECKING:
-    from orbit.sandbox.executor import Sandbox
+    pass
 
 logger = structlog.get_logger("orbit.goal")
 
@@ -130,7 +130,7 @@ class ExecutorVerifier:
         for cmd in commands:
             try:
                 cmd_result = await self._run_command(cmd)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("verification_command_timeout", command=cmd)
                 cmd_result = {
                     "command": cmd,
@@ -193,7 +193,7 @@ class ExecutorVerifier:
         )
         try:
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self._timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             proc.kill()
             raise
 

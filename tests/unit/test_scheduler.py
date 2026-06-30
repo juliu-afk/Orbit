@@ -303,11 +303,21 @@ async def test_dag_resume_skips_completed(dag_scheduler, diamond_graph):
     assert results["D"] == NodeStatus.SUCCESS
 
 
+def _async_mock(**kwargs):
+    """创建支持 await 的 mock——MagicMock 不能 await。"""
+    m = MagicMock(**kwargs)
+    # 让 save/resume 等异步方法返回可 await 的值
+    m.save = AsyncMock()
+    m.resume = AsyncMock()
+    m.load = AsyncMock()
+    return m
+
+
 @pytest.mark.asyncio
 async def test_dag_node_timeout():
     sched = Scheduler(
         agent_llms={},
-        checkpoint_manager=MagicMock(),
+        checkpoint_manager=_async_mock(),
         max_concurrent=1,
         node_timeout=0.01,
         max_retries=0,
@@ -317,7 +327,7 @@ async def test_dag_node_timeout():
         await asyncio.sleep(0.1)
         return {}
 
-    sched._execute_node = slow
+    sched._dag_runner._execute_node = slow
     graph = TaskGraph(task_id="to", nodes=[GraphNode(id="A")], edges=[])
     results = await sched.run_dag(graph)
     assert results["A"] == NodeStatus.FAILED
@@ -327,12 +337,12 @@ async def test_dag_node_timeout():
 async def test_dag_max_retries_exceeded():
     sched = Scheduler(
         agent_llms={},
-        checkpoint_manager=MagicMock(),
+        checkpoint_manager=_async_mock(),
         max_concurrent=1,
         node_timeout=30,
         max_retries=2,
     )
-    sched._execute_node = AsyncMock(side_effect=RuntimeError("boom"))
+    sched._dag_runner._execute_node = AsyncMock(side_effect=RuntimeError("boom"))
     graph = TaskGraph(task_id="retry", nodes=[GraphNode(id="A")], edges=[])
     results = await sched.run_dag(graph)
     assert results["A"] == NodeStatus.FAILED
@@ -349,7 +359,7 @@ async def test_dag_empty_graph(dag_scheduler):
 async def test_dag_fail_fast_abort():
     sched = Scheduler(
         agent_llms={},
-        checkpoint_manager=MagicMock(),
+        checkpoint_manager=_async_mock(),
         max_concurrent=1,
         node_timeout=30,
         max_retries=0,
@@ -361,7 +371,7 @@ async def test_dag_fail_fast_abort():
             raise RuntimeError("A failed")
         return {}
 
-    sched._execute_node = fail_a
+    sched._dag_runner._execute_node = fail_a
     graph = TaskGraph(
         task_id="ff",
         nodes=[GraphNode(id="A"), GraphNode(id="B"), GraphNode(id="C")],

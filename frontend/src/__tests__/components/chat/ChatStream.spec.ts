@@ -23,7 +23,7 @@ describe('ChatStream', () => {
     const wrapper = shallowMount(ChatStream, {
       props: { agentId: 'developer' },
     })
-    wrapper.vm.currentText = '正在生成代码...'
+    await wrapper.setData({ currentText: '正在生成代码...' })
     await wrapper.vm.$nextTick()
     const streamBlock = wrapper.find('.streaming')
     expect(streamBlock.exists()).toBe(true)

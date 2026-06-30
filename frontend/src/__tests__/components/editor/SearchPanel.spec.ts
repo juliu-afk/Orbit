@@ -20,7 +20,7 @@ describe('SearchPanel', () => {
     expect(wrapper.findComponent({ name: 'el-dialog' }).exists()).toBe(true)
   })
 
-  it.skip('renders file search radio option', () => {
+  it('renders file search radio option', () => {
     const wrapper = mount(SearchPanel, {
       global: { stubs: { 'el-dialog': true, 'el-input': true, 'el-radio-group': false, 'el-radio': false, 'el-icon': true, 'el-empty': true } }
     })

@@ -20,6 +20,38 @@ from orbit.goal_judge.models import JUDGE_SYSTEM_PROMPT, Goal, Verdict
 logger = structlog.get_logger()
 
 
+def _extract_complete_json(text: str) -> str | None:
+    """栈计数提取完整JSON对象——字符串字面量内花括号不计入.
+
+    P0-NEW-1/P1-1: 感知引号和转义符，避免 reason 中的花括号误截断.
+    """
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escape = False
+    for i, ch in enumerate(text[start:], start):
+        if escape:
+            escape = False
+            continue
+        if ch == "\\":
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
 class GoalJudge:
     """目标达成判定器。
 
@@ -166,47 +198,30 @@ class GoalJudge:
 
         # 解析 JSON 响应
         import json
-        import re
 
         try:
             content = response.content.strip()
-            # P0-6 (Issue#126): 栈计数匹配完整 JSON——
-            # 非贪婪正则/简单 strip 会截断嵌套 JSON
-            _md_block = re.search(r"```(?:json)?\s*", content)
+            parsed = False
+            # P0-6+P0-NEW-1:
+            # 1. 优先提取 ```json...``` 代码块内JSON
+            # 2. 回退提取纯文本中第一个完整JSON对象
+            # 栈计数匹配——字符串字面量内花括号不计入
+            import re as _re
+            _md_block = _re.search(r"```(?:json)?\s*", content)
             if _md_block:
                 _json_start = _md_block.end()
                 _json_end = content.find("```", _json_start)
                 if _json_end >= 0:
-                    _candidate = content[_json_start:_json_end].strip()
-                    if _candidate.startswith("{"):
-                        depth = 0
-                        end_idx = 0
-                        for i, ch in enumerate(_candidate):
-                            if ch == "{":
-                                depth += 1
-                            elif ch == "}":
-                                depth -= 1
-                                if depth == 0:
-                                    end_idx = i + 1
-                                    break
-                        if end_idx > 0:
-                            content = _candidate[:end_idx]
-            # 回退: 无 markdown 包裹时找第一个 { 到匹配的 }
-            if not content or not content.startswith("{"):
-                _json_start = content.find("{")
-                if _json_start >= 0:
-                    depth = 0
-                    end_idx = 0
-                    for i, ch in enumerate(content[_json_start:], _json_start):
-                        if ch == "{":
-                            depth += 1
-                        elif ch == "}":
-                            depth -= 1
-                            if depth == 0:
-                                end_idx = i + 1
-                                break
-                    if end_idx > 0:
-                        content = content[_json_start:end_idx]
+                    extracted = _extract_complete_json(
+                        content[_json_start:_json_end]
+                    )
+                    if extracted:
+                        content = extracted
+                        parsed = True
+            if not parsed:
+                extracted = _extract_complete_json(content)
+                if extracted:
+                    content = extracted
             data = json.loads(content)
             return Verdict(
                 ok=data.get("ok", True),  # 默认 fail-open

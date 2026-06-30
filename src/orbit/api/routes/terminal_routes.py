@@ -65,6 +65,16 @@ async def exec_command(req: ExecRequest):
     # 白名单检查
     if cmd_parts[0] not in ALLOWED_COMMANDS and cmd_parts[0] not in {"./", "../"}:
         raise HTTPException(status_code=403, detail=f"Command not allowed: {cmd_parts[0]}")
+    # P0-2: 阻止 python -c 绕过白名单执行任意代码
+    if cmd_parts[0] == "python" and any(a == "-c" for a in cmd_parts[1:]):
+        raise HTTPException(status_code=403, detail="python -c 已禁用——安全基线")
+    # P0-2: 阻止 shell 元字符注入（; | && $() ``）
+    _SHELL_META = {"|", ";", "&", "&&", "||", "$(", "`"}
+    for arg in cmd_parts[1:]:
+        if any(m in arg for m in _SHELL_META):
+            raise HTTPException(
+                status_code=403, detail=f"Shell 元字符已禁用: {arg}"
+            )
     cwd = os.path.join(ws, req.cwd) if req.cwd != "." else ws
     if not os.path.isdir(cwd):
         raise HTTPException(status_code=400, detail=f"Directory not found: {req.cwd}")

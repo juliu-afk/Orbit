@@ -231,6 +231,8 @@ class TestSSEEndpoints:
 
     def test_agent_stream_endpoint_sets_headers(self, sse_client):
         """SSE 流式端点返回正确的 content-type 和 headers。"""
+        from orbit.core.config import settings
+
         # 先创建 task
         run_resp = sse_client.post(
             "/api/v1/agent/dev/run",
@@ -241,7 +243,7 @@ class TestSSEEndpoints:
         # 连接 SSE 流（带 mock LLM——但请求可能因缺少真实 llm 而失败）
         # 测试 SSE headers 设置
         resp = sse_client.get(
-            f"/api/v1/agent/dev/stream?task_id={task_id}&task=echo+hello&token=orbit-local-stream",
+            f"/api/v1/agent/dev/stream?task_id={task_id}&task=echo+hello&token={settings.ORBIT_AUTH_TOKEN}",
         )
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers.get("content-type", "")

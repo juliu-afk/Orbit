@@ -46,7 +46,8 @@ SHELL_WHITELIST: dict[str, list[str]] = {
         "config",
     ],
     "pytest": ["*"],
-    "python": ["-m", "-c", "--version"],
+    # P0-9: python -c 已禁用——可通过 -c 执行任意代码绕过白名单
+    "python": ["-m", "--version"],
     "pnpm": [
         "install",
         "build",

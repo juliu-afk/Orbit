@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.agents.factory import AgentFactory
+from orbit.api.dependencies import AuthMiddleware
 from orbit.api.routes import (
     agent_llm,
     backup,
@@ -59,7 +60,10 @@ from orbit.ws.router import start_broadcaster
 logger = structlog.get_logger()
 
 
-def create_app(event_bus: EventBus | None = None) -> FastAPI:
+def create_app(
+    event_bus: EventBus | None = None,
+    enable_auth: bool = True,
+) -> FastAPI:
     """应用工厂。
 
     WHY 工厂模式而非模块级全局 app：测试时每个用例可独立配置 app，
@@ -67,6 +71,7 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
 
     event_bus：Step 6.1 Dashboard 事件总线。测试可注入 Mock，
     生产传 EventBus() 实例。为 None 时不启动广播协程。
+    enable_auth：测试可传 False 跳过鉴权中间件（默认 True）。
     """
     app = FastAPI(
         title=settings.PROJECT_NAME,
@@ -75,10 +80,18 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
     )
-    # CORS——data: URI boot.html 跨域请求后端 API
+    # 鉴权中间件——CORS 之后注册（Starlette 中间件执行顺序：后注册的先执行）
+    # WHY: Issue #126 P0-1——CORS全开+无鉴权=本地RCE攻击链
+    # WHY 显式 ORBIT_AUTH_TOKEN 环境变量才启用: 向后兼容测试/开发环境
+    if enable_auth and settings.AUTH_ENABLED:
+        app.add_middleware(AuthMiddleware)
+
+    # CORS——Tauri 桌面壳跨域请求后端 API
+    # WHY 从settings读取而非硬编码"*": P0-1 修复——收紧跨域来源
+    _origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )

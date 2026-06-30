@@ -163,9 +163,35 @@ class ExecutorVerifier:
     # ── 内部 ──────────────────────────────────────────
 
     def _validate_commands(self, commands: list[str]) -> None:
-        """验证命令白名单——安全基线。"""
+        """验证命令白名单 + shell 元字符检测——安全基线。
+
+        WHY 双重验证: Issue #126 P0-5——仅检查命令名不足以防止注入，
+        `python -c "import os; os.system('rm -rf /')"` 通过白名单但可执行任意代码。
+        """
+        # shell 元字符——禁止命令拼接和代码注入
+        _SHELL_META = frozenset({";", "|", "&&", "||", "$(", "`", ">"})
+        # python -c 允许执行任意 Python 代码——安全拒绝
+        _PYTHON_C_FLAG = " -c "
+
         for cmd in commands:
-            cmd_name = cmd.strip().split()[0] if cmd.strip() else ""
+            cmd_stripped = cmd.strip()
+            if not cmd_stripped:
+                continue
+
+            # 检测 shell 元字符
+            for meta in _SHELL_META:
+                if meta in cmd_stripped:
+                    raise CommandNotAllowedError(
+                        f"验证命令包含禁止的 shell 元字符 '{meta}': {cmd_stripped[:80]}"
+                    )
+
+            # 检测 python -c（任意代码执行入口）
+            if _PYTHON_C_FLAG in cmd_stripped or cmd_stripped.startswith("python -c "):
+                raise CommandNotAllowedError(
+                    "python -c 已禁用——安全基线，请使用 pytest/ruff/mypy 等专用工具"
+                )
+
+            cmd_name = cmd_stripped.split()[0] if cmd_stripped else ""
             # 去除路径前缀: /usr/bin/pytest → pytest
             if "/" in cmd_name:
                 cmd_name = cmd_name.rsplit("/", 1)[-1]

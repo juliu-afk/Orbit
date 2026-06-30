@@ -24,11 +24,30 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.agents.base import AgentRole, BaseAgent
+from orbit.knowledge.templates import get_registry
 from orbit.agents.clarifier import ClarifierAgent
 from orbit.agents.dream_agent import DreamAgent
 from orbit.agents.react_agent import ReActAgent
 
 logger = structlog.get_logger()
+
+
+def _build_templates_prompt(task_keywords: list[str] | None) -> str:
+    """从模板库匹配模板，返回可注入 system_prompt 的文本块.
+
+    WHY 独立函数: Architect 和 Developer 的 system_prompt() 复用同一套匹配逻辑。
+    匹配分数 > 0.5 的模板会被注入，无匹配时返回空字符串（提示不变）。
+    """
+    if not task_keywords:
+        return ""
+    try:
+        text = get_registry().match_and_format(task_keywords, threshold=0.5)
+        if not text:
+            return ""
+        return "\n\n## 优先使用以下已验证模板\n\n" + text
+    except Exception:
+        logger.exception("模板匹配失败，跳过模板注入")
+        return ""
 
 
 class ArchitectAgent(ReActAgent):
@@ -44,7 +63,7 @@ class ArchitectAgent(ReActAgent):
     MAX_TURNS = 10  # 设计任务不需要太多轮
 
     def system_prompt(self) -> str:
-        """多视角架构师提示——CARO 风格结构化思维。
+        """多视角架构师提示——CARO 风格结构化思维.
 
         WHY 覆盖基类: 标准 prompt 只要求输出 JSON，不要求多方案。
         多视角降低单方案"隧道效应"风险。
@@ -57,7 +76,8 @@ class ArchitectAgent(ReActAgent):
 3. **多方案生成**：生成至少 2 个互斥的备选方案（不同架构模式、不同技术栈、不同粒度）
 4. **三维评分**：对每个方案从 [可行性/可维护性/性能] 三个维度打分（0-10），选最优
 5. **最优方案详述**：对最高分方案详细说明接口设计、数据流、需改动的文件"""
-        return f"{base}\n\n{extra}"
+        tmpl_block = _build_templates_prompt(self._task_keywords)
+        return f"{base}\n\n{extra}{tmpl_block}"
 
 
 class DeveloperAgent(ReActAgent):
@@ -68,6 +88,15 @@ class DeveloperAgent(ReActAgent):
     """
 
     role = AgentRole.DEVELOPER
+
+    def system_prompt(self) -> str:
+        """开发者提示——含模板参考（如有匹配）.
+
+        WHY 覆盖基类: 注入匹配的代码模板，减少低级格式错误的反复迭代。
+        """
+        base = super().system_prompt()
+        tmpl_block = _build_templates_prompt(self._task_keywords)
+        return f"{base}{tmpl_block}"
 
 
 class ReviewerAgent(ReActAgent):
@@ -145,6 +174,9 @@ class AgentFactory:
         event_bus: EventBus | None = None,
         compressor: ContextCompressor | None = None,  # Phase 2 AC7
         budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7
+        task_keywords: list[str] | None = None,  # 模板匹配关键词
+        goal: Goal | None = None,  # Phase 4 AC-B1: Goal
+        goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge
     ) -> BaseAgent:
         """create = get_agent alias for orchestrator."""
         return cls.get_agent(
@@ -154,8 +186,11 @@ class AgentFactory:
             sandbox=sandbox,
             tools=tools,
             event_bus=event_bus,
+            goal=goal,
+            goal_judge=goal_judge,
             compressor=compressor,
             budget_tracker=budget_tracker,
+            task_keywords=task_keywords,
         )
 
     @classmethod
@@ -171,6 +206,7 @@ class AgentFactory:
         goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge
         compressor: ContextCompressor | None = None,  # Phase 2 AC7
         budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7
+        task_keywords: list[str] | None = None,  # 模板匹配关键词
     ) -> BaseAgent:
         """按角色创建 Agent 实例。
 
@@ -183,6 +219,7 @@ class AgentFactory:
             event_bus: EventBus 实例（供实时事件推送）
             goal: Goal 模型（Phase 4——GoalJudge 判定用）
             goal_judge: GoalJudge 实例（Phase 4——每轮 turn 后自检）
+            task_keywords: 任务关键词列表（供模板库匹配注入 system_prompt）
 
         Returns:
             对应角色的 BaseAgent 实例
@@ -208,6 +245,7 @@ class AgentFactory:
                 role=role,  # Issue #3: 显式传递 role，消除 spawn.py type: ignore
                 compressor=compressor,  # Phase 2 AC7
                 budget_tracker=budget_tracker,  # Phase 2 AC7
+                task_keywords=task_keywords,  # 模板匹配关键词
             )
         return agent_cls(llm=llm, graph=graph, sandbox=sandbox)
 

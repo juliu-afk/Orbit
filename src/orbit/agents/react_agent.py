@@ -205,7 +205,7 @@ class ReActAgent(BaseAgent):
                             lines.append(line)
                         decision_history_block = "\n".join(lines)
         except Exception:
-            pass  # fail-open：决策日志异常不阻塞 Agent
+            logger.debug("decision_query_failed", exc_info=True)  # fail-open
 
         # 1. 构建 system prompt——按角色裁剪工具列表
         # WHY list_for_role: Clarifier 不应看到 exec_command，缩小攻击面+减少 prompt 噪音
@@ -498,7 +498,7 @@ class ReActAgent(BaseAgent):
                                 decision.task_id = task_id
                                 dlog.record(decision)
                     except Exception:
-                        pass  # fail-open
+                        logger.debug("decision_record_failed", exc_info=True)  # fail-open
 
                     reasoning_chain.append(
                         {
@@ -536,11 +536,9 @@ class ReActAgent(BaseAgent):
                 },
             )
         finally:
-            # 客户端断连或正常结束时清理资源
-            # WHY: async generator 被 GC 或客户端断连时，保证取消信号传播
+            # 仅在被外部取消时才传播取消信号，正常完成不取消 token
+            # WHY: 多个 Agent 可能共享 CancellationToken，正常完成不应影响兄弟 Agent
             logger.debug("execute_stream_cleanup", task_id=task_id)
-            if cancel_token and not cancel_token.is_cancelled:
-                cancel_token.cancel()
 
     # ── 内部 ─────────────────────────────────────────────
 
@@ -552,6 +550,7 @@ class ReActAgent(BaseAgent):
             self._decision_log = DecisionLog()
             return self._decision_log
         except Exception:
+            logger.debug("decision_log_init_failed", exc_info=True)
             return None
 
     async def _emit(self, task_id: str, event_type: str, data: dict) -> None:
@@ -569,7 +568,7 @@ class ReActAgent(BaseAgent):
             )
             self._event_bus.publish(event)
         except Exception:
-            pass  # 驾驶舱事件丢失不阻塞 Agent
+            logger.debug("event_publish_failed", exc_info=True)  # fail-open
 
 
 # ── 模块级函数 ─────────────────────────────────────────

@@ -100,8 +100,33 @@ class MetaOrchestrator:
         self._worktree = worktree_manager
         self._agent_factory = agent_factory
         self._max_parallel = max_parallel_tasks
+        # Goal pause/resume——asyncio.Event 控制流暂停
+        # WHY Event: set()=不阻塞(正常运行), clear()=阻塞(暂停中)
+        self._pause_event = asyncio.Event()
+        self._pause_event.set()  # 初始: 不暂停
+        self._paused = False
 
     # ── 公共 API ──────────────────────────────────────
+
+    def pause(self) -> None:
+        """暂停当前 Goal——运行中的循环在下一个检查点阻塞。
+
+        WHY asyncio.Event.clear: 使 _pause_event.wait() 阻塞，
+        循环在层间或子任务间暂停。
+        """
+        self._paused = True
+        self._pause_event.clear()
+        logger.info("meta_orchestrator_paused")
+
+    def resume(self) -> None:
+        """恢复已暂停的 Goal——解除检查点阻塞。"""
+        self._paused = False
+        self._pause_event.set()
+        logger.info("meta_orchestrator_resumed")
+
+    @property
+    def is_paused(self) -> bool:
+        return self._paused
 
     async def run(self, goal: GoalSession) -> GoalResult:
         """执行完整 Goal 生命周期。"""
@@ -194,6 +219,9 @@ class MetaOrchestrator:
                                 status="failed",
                                 reason=f"连续 {goal.consecutive_failures} 个子任务失败",
                             )
+
+                # 暂停检查点——在层间检查暂停信号
+                await self._pause_event.wait()
 
                 # 进度更新
                 if self.progress_tracker:

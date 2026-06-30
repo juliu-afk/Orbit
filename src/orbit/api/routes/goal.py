@@ -110,9 +110,19 @@ async def cancel_goal(request: Request):
 
 @router.post("/pause")
 async def pause_goal(request: Request):
-    raise HTTPException(status_code=501, detail="Goal pause/resume 功能待实现")
+    """POST /api/v1/goal/pause ——暂停当前 Goal。"""
+    orch = _get_orch(request)
+    if not _active_task or _active_task.done():
+        return {"code": 0, "data": {"message": "无活跃 Goal 可暂停"}}
+    orch.pause()
+    return {"code": 0, "data": {"goal_id": _active_goal_id, "status": "paused"}}
 
 
 @router.post("/resume")
 async def resume_goal(request: Request):
-    raise HTTPException(status_code=501, detail="Goal pause/resume 功能待实现")
+    """POST /api/v1/goal/resume ——恢复已暂停的 Goal。"""
+    orch = _get_orch(request)
+    if not orch.is_paused:
+        return {"code": 0, "data": {"message": "Goal 未处于暂停状态"}}
+    orch.resume()
+    return {"code": 0, "data": {"goal_id": _active_goal_id, "status": "running"}}

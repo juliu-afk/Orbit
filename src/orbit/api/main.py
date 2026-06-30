@@ -43,7 +43,6 @@ from orbit.api.routes import (
     tasks,
     terminal_routes,
     tests_routes,
-    loop,
     versioning,
 )
 from orbit.checkpoint.manager import CheckpointManager
@@ -104,6 +103,7 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(compose.router, prefix=settings.API_V1_STR)
     # Phase 2: /dream 记忆合并自循环端点
     app.include_router(dream.router, prefix=settings.API_V1_STR)
+    # goal/loop 路由文件已自带 /api/v1/goal 前缀，不重复加 API_V1_STR
     app.include_router(goal.router)
     app.include_router(loop.router)
 # Step 9: IDE 功能追赶——审查 + 文件 + Git

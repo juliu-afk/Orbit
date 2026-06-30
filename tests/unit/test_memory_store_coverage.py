@@ -119,6 +119,25 @@ class TestTruncation:
         assert "new entry" in mem.body
 
 
+
+    def test_get_decisions_body_starts_with_hash(self, store) -> None:
+        """回归: body以##开头时section不丢失."""
+        from orbit.memory.models import DecisionRecord, MemoryFileType
+        store.save_decision(DecisionRecord(
+            id='DD-REG-001', choice='SQLite', why='简单',
+            constraints=[], alternatives=[], made_by='dev', timestamp='2026',
+        ))
+        store.save_decision(DecisionRecord(
+            id='DD-REG-002', choice='PostgreSQL', why='扩展性',
+            constraints=['并发'], alternatives=['MySQL'], made_by='architect', timestamp='2026',
+        ))
+        mem = store.read_file(MemoryFileType.DECISIONS)
+        assert mem.body.startswith('##'), f'Body不以##开头: {repr(mem.body[:50])}'
+        results = store.get_relevant_decisions(['PostgreSQL'])
+        assert len(results) == 1
+        assert results[0].id == 'DD-REG-002'
+
+
 class TestScoreBufferFlush:
     """hit 评分缓冲——缓冲区满时自动刷新."""
 

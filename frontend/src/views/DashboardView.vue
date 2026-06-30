@@ -75,6 +75,9 @@
             <el-button size="small" @click="composeTrigger?.open()">
               Spec Compose
             </el-button>
+            <el-button size="small" @click="showSearch = true">
+              Search
+            </el-button>
             <DreamPanel />
           </div>
         </div>
@@ -117,6 +120,7 @@
     <ComposeTrigger ref="composeTrigger" />
     <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
     <CrossProjectWarning v-if="chatStore.crossProjectWarning" />
+    <SearchPanel v-if="showSearch" @close="showSearch = false" />
   </div>
 </template>
 
@@ -139,6 +143,7 @@ import CrossProjectWarning from '@/components/chat/CrossProjectWarning.vue'
 import CodeDiffPanel from '@/components/chat/CodeDiffPanel.vue'
 import ComposeTrigger from '@/components/chat/ComposeTrigger.vue'
 import DreamPanel from '@/components/chat/DreamPanel.vue'
+import SearchPanel from '@/components/editor/SearchPanel.vue'
 
 const ws = useWebSocket()
 const composeTrigger = ref<{ open: () => void } | null>(null)
@@ -149,6 +154,7 @@ const taskStore = useTaskStore()
 
 const showNewDialog = ref(false)
 const showDetail = ref(false)
+const showSearch = ref(false)
 const showCodeDiff = ref(false)
 const tokenPoints = ref<TokenPoint[]>([])
 const MAX_TOKEN_POINTS = 100

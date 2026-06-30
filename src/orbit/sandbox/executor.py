@@ -136,8 +136,11 @@ class Sandbox:
                 docker_path = _to_docker_path(rp)
                 mounts.append(f"{docker_path}:/readonly/{name}:ro")
 
-        # 外部引用路径 → 只读
-        # P0-11 (Issue#126): 校验外部路径不穿越 workspace 边界
+        # 外部引用路径 → 只读（已实质废弃——仅允许 workspace 内路径）
+        # P0-11 (Issue#126): commonpath 校验有效封闭了外部路径
+        # P1-2 (PR#133): external_paths 现只能挂载 workspace 内路径——
+        # 与 readonly_paths 冗余。保留参数签名兼容，语义已变。
+        # TODO: 需要外部路径访问时改用 SANDBOX_ALLOWED_EXTERNAL_PATHS 环境变量 allowlist
         ext_paths = external_paths or []
         for i, ep in enumerate(ext_paths[:MAX_READONLY_MOUNTS]):
             _resolved = os.path.realpath(ep)

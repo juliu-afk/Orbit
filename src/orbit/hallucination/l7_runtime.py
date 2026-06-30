@@ -45,7 +45,9 @@ class L7RuntimeValidator:
 
         if not await self._sandbox.is_available():
             # P0-7 (Issue#126): sandbox 不可用时不应 fail-open——
-            # 无法验证 = 不应信任，返回 passed=False 触发人工审查
+            # 无法验证 = 不应信任
+            # P2-6 (PR#133): CI/开发环境无 Docker 时所有代码被标记"需人工审查"——
+            # 调用方应提供 ENABLE_L7 配置开关，无沙箱时跳过 L7 而非 fail
             return ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L7_RUNTIME,

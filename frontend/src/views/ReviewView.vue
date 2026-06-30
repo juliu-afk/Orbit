@@ -5,22 +5,27 @@
       <el-button text @click="$router.push('/dashboard')"><el-icon><ArrowLeft /></el-icon>Back</el-button>
       <span class="task-info" v-if="review.taskId">Task: {{ review.taskId.slice(0, 8) }}...</span>
       <el-tag :type="statusTagType">{{ statusLabel }}</el-tag>
+      <el-button text size="small" @click="focusTab('search')"><el-icon><Search /></el-icon></el-button>
+      <el-button text size="small" @click="focusTab('outline')"><el-icon><List /></el-icon></el-button>
       <div class="toolbar-spacer" />
       <el-button v-if="review.status === 'approved'" type="primary" @click="showCommitDialog = true">Commit</el-button>
       <el-button v-if="review.status === 'in_review'" type="warning" @click="review.transitionStatus('changes_requested')">Reject All</el-button>
       <el-button v-if="review.status === 'in_review'" type="success" @click="review.transitionStatus('approved')">Approve All</el-button>
     </div>
     <div class="review-body">
-      <FileTreePanel class="review-sidebar" :tree-data="fileTree" :selected-file="editor.currentFile" @select-file="onSelectFile" />
+      <div class="review-sidebar">
+        <FileTreePanel :tree-data="fileTree" :selected-file="editor.currentFile" @select-file="onSelectFile" />
+        <ReviewCommentPanel v-if="review.taskId && editor.currentFile" :review-id="review.taskId" :file="editor.currentFile" :line="0" />
+      </div>
       <div class="review-main">
         <div v-if="!editor.currentFile" class="no-file"><el-empty description="Select a file to review" :image-size="80" /></div>
         <MonacoDiffEditor v-else :key="editor.currentFile" :original="editor.original" :modified="editor.modified" :language="editor.language" height="100%" />
       </div>
     </div>
     <div class="review-bottom">
-      <el-tabs>
-        <el-tab-pane label="Problems"><ProblemPanel :diagnostics="diag.diagnostics" /></el-tab-pane>
-        <el-tab-pane :label="`Decisions (${review.decisions.length})`">
+      <el-tabs v-model="activeBottomTab">
+        <el-tab-pane label="Problems" name="problems"><ProblemPanel :diagnostics="diag.diagnostics" /></el-tab-pane>
+        <el-tab-pane :label="`Decisions (${review.decisions.length})`" name="decisions">
           <div class="decision-list">
             <div v-for="(d, i) in review.decisions.slice(-20)" :key="i" class="decision-item">
               <el-tag size="small" :type="d.decision === 'approved' ? 'success' : 'danger'">{{ d.decision }}</el-tag>
@@ -29,6 +34,10 @@
             </div>
           </div>
         </el-tab-pane>
+        <el-tab-pane label="Outline" name="outline"><OutlinePanel :items="outlineItems" @select="onOutlineNavigate" /></el-tab-pane>
+        <el-tab-pane label="Search" name="search"><SearchPanel /></el-tab-pane>
+        <el-tab-pane label="Tests" name="tests"><TestPanel /></el-tab-pane>
+        <el-tab-pane label="Terminal" name="terminal"><TerminalPanel /></el-tab-pane>
       </el-tabs>
     </div>
     <el-dialog v-model="showCommitDialog" title="Commit" width="500px">
@@ -51,16 +60,22 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, Search, List } from '@element-plus/icons-vue'
 import MonacoDiffEditor from '@/components/editor/MonacoDiffEditor.vue'
 import FileTreePanel from '@/components/editor/FileTreePanel.vue'
 import ProblemPanel from '@/components/editor/ProblemPanel.vue'
+import OutlinePanel from '@/components/editor/OutlinePanel.vue'
+import SearchPanel from '@/components/editor/SearchPanel.vue'
+import TestPanel from '@/components/editor/TestPanel.vue'
+import TerminalPanel from '@/components/editor/TerminalPanel.vue'
+import ReviewCommentPanel from '@/components/editor/ReviewCommentPanel.vue'
 import { useReviewStore } from '@/stores/review'
 import { useEditorStore } from '@/stores/editor'
 import { useDiagnosticsStore } from '@/stores/diagnostics'
 import { useGitStore } from '@/stores/gitStore'
 import { apiGet } from '@/services/api'
 import type { FileNode } from '@/components/editor/FileTreePanel.vue'
+import type { OutlineItem } from '@/components/editor/OutlinePanel.vue'
 
 const route = useRoute()
 const review = useReviewStore()
@@ -70,6 +85,15 @@ const git = useGitStore()
 
 const showCommitDialog = ref(false); const commitMessage = ref(''); const signCommit = ref(false); const selectedGpgKey = ref('')
 const fileTree = ref<FileNode[]>([])
+const outlineItems = ref<OutlineItem[]>([])
+const wsDir = ref('')
+const activeBottomTab = ref('problems')
+
+// 工具栏按钮→切换底部标签页
+function focusTab(name: string) { activeBottomTab.value = name }
+
+// 大纲条目点击——由 MonacoDiffEditor 内部实现跳转
+function onOutlineNavigate(_line: number) { activeBottomTab.value = 'outline' }
 
 const statusLabel = computed(() => ({ pending:'Pending', in_review:'In Review', changes_requested:'Rejected', approved:'Approved', merged:'Merged' }[review.status] ?? review.status))
 const statusTagType = computed(() => ({ pending:'info', in_review:'', changes_requested:'danger', approved:'success', merged:'info' }[review.status] ?? ''))
@@ -83,6 +107,9 @@ onMounted(async () => {
     const data = await apiGet<{ files: { path: string }[] }>('/api/v1/files/tree')
     fileTree.value = buildTree(data.files || [])
   } catch {}
+  // 加载大纲和工作区路径
+  try { outlineItems.value = await apiGet<OutlineItem[]>('/api/v1/review/outline?task_id=' + tid) } catch {}
+  try { const ws = await apiGet<{ path: string }>('/api/v1/workspace'); wsDir.value = ws.path } catch {}
 })
 
 function buildTree(files: { path: string }[]): FileNode[] {

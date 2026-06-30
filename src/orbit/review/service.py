@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -15,9 +15,8 @@ class ReviewService:
         self.session_factory = session_factory
 
     async def init_db(self) -> None:
-        async with self.session_factory() as session:
-            async with session.begin():
-                await session.run_sync(ReviewBase.metadata.create_all)
+        async with self.session_factory() as session, session.begin():
+            await session.run_sync(ReviewBase.metadata.create_all)
 
     async def create_review(self, task_id: str, created_by: str) -> Review:
         async with self.session_factory() as session:
@@ -100,7 +99,7 @@ class ReviewService:
             if new_status not in VALID.get(review.status, set()):
                 raise ValueError(f"Invalid transition: {review.status} -> {new_status}")
             review.status = new_status
-            review.updated_at = datetime.now(tz=timezone.utc)
+            review.updated_at = datetime.now(tz=UTC)
             await session.commit()
             return review
 

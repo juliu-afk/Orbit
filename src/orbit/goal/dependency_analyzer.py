@@ -21,9 +21,7 @@ import structlog
 from orbit.goal.models import DepEdge, DependencyConflict
 
 if TYPE_CHECKING:
-    from orbit.gateway.client import LLMClient
     from orbit.goal.models import GoalSession
-    from orbit.graph.engines.code_graph import CodeGraphEngine
 
 logger = structlog.get_logger("orbit.goal")
 

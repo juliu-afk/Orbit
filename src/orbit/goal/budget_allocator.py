@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 if TYPE_CHECKING:
-    from orbit.compose.models import Task
+    pass
 
 logger = structlog.get_logger("orbit.goal")
 

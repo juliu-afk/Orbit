@@ -155,10 +155,9 @@ class MemoryStore:
     # ── 搜索 ───────────────────────────────────────────
 
     def search(self, query: MemorySearchQuery) -> list[MemorySearchResult]:
-        """在记忆文件中搜索——简单子字符串匹配.
+        """在记忆文件中搜索——BM25 排序 (5B.4 升级)."""
+        from orbit.memory.fts import rank_by_bm25
 
-        Phase 2 基础实现，Phase 3 升级为 FTS5+BM25。
-        """
         results: list[MemorySearchResult] = []
         pattern = query.query.lower()
 
@@ -167,20 +166,23 @@ class MemoryStore:
             mem = self.read_file(ft)
             if not mem.body:
                 continue
-            for i, line in enumerate(mem.body.splitlines()):
-                if pattern in line.lower():
-                    # 简单评分：匹配长度 / 行长度
-                    score = len(pattern) / max(len(line), 1)
-                    results.append(
-                        MemorySearchResult(
-                            path=mem.path,
-                            score=score,
-                            snippet=line.strip()[:200],
-                            line_number=i + 1,
-                        )
+            paragraphs = [p.strip() for p in mem.body.split("\n\n") if p.strip()]
+            if not paragraphs:
+                continue
+            ranked = rank_by_bm25(pattern, [(i, p) for i, p in enumerate(paragraphs)])
+            for doc_id, score in ranked:
+                if score <= 0:
+                    continue
+                para = paragraphs[doc_id]
+                snippet = para[:200] if len(para) > 200 else para
+                results.append(
+                    MemorySearchResult(
+                        path=mem.path,
+                        score=round(score, 4),
+                        snippet=snippet,
+                        line_number=doc_id + 1,
                     )
-
-        # 按评分排序
+                )
         results.sort(key=lambda r: r.score, reverse=True)
         return results[: query.max_results]
 

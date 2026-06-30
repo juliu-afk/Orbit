@@ -15,8 +15,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
-    from orbit.compose.models import Spec, Task
-    from orbit.gateway.client import LLMClient
+    pass
 
 logger = structlog.get_logger("orbit.goal")
 
@@ -103,7 +102,7 @@ class GoalComposeBridge:
 
         WHY: 避免 Agent 重复执行已完成的任务。
         """
-        from orbit.compose.models import Spec, Task
+        from orbit.compose.models import Spec
 
         if isinstance(spec, dict):
             tasks_dicts = spec.get("tasks", [])

@@ -15,17 +15,23 @@ if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
     from orbit.compression.budget import TokenBudgetTracker
     from orbit.compression.compressor import ContextCompressor
-    from orbit.goal.intake_router import IntakeRouter
     from orbit.gateway.client import LLMClient
+    from orbit.goal.intake_router import IntakeRouter
     from orbit.observability.audit import AuditLogger
     from orbit.tools.registry import ToolRegistry
 
 import structlog
 
+from orbit.agents.base import AgentInput
+from orbit.agents.context import TaskContext
 from orbit.api.schemas.task import TaskState
 from orbit.checkpoint.manager import CheckpointData, CheckpointManager
 from orbit.events.bus import EventBus
 from orbit.events.schemas import DashboardEvent, TaskUpdatePayload, TokenUpdatePayload
+from orbit.memory.models import MemoryFileType
+from orbit.memory.store import MemoryStore
+from orbit.scheduler.complexity import ComplexityScorer
+from orbit.scheduler.edit_stability import EditStabilityDetector
 
 logger = structlog.get_logger()
 
@@ -75,6 +81,8 @@ class TaskRunner:
         self._audit_logger = audit_logger
         self.router = router
         self._fast_lane = fast_lane
+        # 减熵闭环-2: 编辑摇摆检测器（全局单例）
+        self._edit_detector = EditStabilityDetector()
 
     # ── 公共入口 ────────────────────────────────────────
 
@@ -83,10 +91,19 @@ class TaskRunner:
         state = TaskState.IDLE
         await self._save_checkpoint(task_id, state, {"prd": prd})
         context: dict[str, Any] = {"prd": prd, "artifacts": {}, "mode": "auto"}
+        # 减熵闭环-2 B4: 检查目标文件编辑稳定性
+        try:
+            target_file = context.get("target_file", "")
+            if target_file:
+                report = self._edit_detector.check(target_file)
+                if report.is_high_entropy:
+                    logger.warning("high_entropy_file_detected", file=target_file, suggestion=report.suggestion)
+                    context["entropy_warning"] = report.suggestion
+        except Exception:
+            pass  # fail-open
 
         # 复杂度评估→决定快车道
         if context.get("mode") == "auto":
-            from orbit.scheduler.complexity import ComplexityScorer
 
             scorer = ComplexityScorer()
             c_result = scorer.evaluate(prd)
@@ -173,7 +190,7 @@ class TaskRunner:
                 llm=agent_llm,
                 compressor=self._compressor,
                 budget_tracker=self._budget_tracker,
-                task_keywords=task_keywords,
+                task_keywords=task_keywords,  # 减熵闭环-1
             )
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
@@ -193,8 +210,6 @@ class TaskRunner:
             self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, role=role)
 
         try:
-            from orbit.agents.base import AgentInput
-
             ctx_dict = agent_context.to_dict() if hasattr(agent_context, "to_dict") else {}
             agent_input = AgentInput(
                 task=ctx_dict.get("l3", {}).get("prd", ""),
@@ -220,16 +235,20 @@ class TaskRunner:
                 )
             raise
 
+        # 减熵闭环-2 B4: 记录文件编辑
+        try:
+            target_file = context.get("target_file", "")
+            if target_file and role:
+                self._edit_detector.record_edit(target_file, agent_id=role)
+        except Exception:
+            pass  # fail-open
+
         return str(output)
 
     def _build_context(self, task_id: str, context: dict[str, Any]) -> Any:
         """构建 L1-L5 TaskContext."""
-        from orbit.agents.context import TaskContext
-
         l4: dict[str, Any] = {}
         try:
-            from orbit.memory.models import MemoryFileType
-            from orbit.memory.store import MemoryStore
 
             project_path = context.get("project_path", "")
             store = MemoryStore(project_path=project_path)
@@ -378,6 +397,53 @@ class TaskRunner:
                 uniq.append(k)
         return uniq[:20]
 
+
+    @staticmethod
+    def _extract_keywords(prd_text: str) -> list[str]:
+        """从 PRD 文本提取技术关键词——减熵闭环-1.
+
+        简单分词 + 停用词过滤 + 标识符保留。零外部依赖。
+        供 B1(上下文裁剪)/B3(模板库)/B5(决策日志) 使用。
+        """
+        if not prd_text:
+            return []
+
+        # 中文停用词——高频虚词
+        _stop = {
+            "的", "是", "在", "和", "了", "有", "不", "我", "我们", "要", "可以",
+            "这个", "那个", "一个", "一些", "需要", "应该", "能够", "使用", "通过",
+            "进行", "实现", "添加", "修改", "删除", "支持", "提供", "包括", "用于",
+            "the", "a", "an", "is", "are", "be", "to", "of", "in", "for", "and",
+            "or", "not", "this", "that", "with", "from", "will", "can", "should",
+            "it", "we", "you", "as", "if", "but", "so", "all", "no", "on", "at",
+        }
+
+        # 技术关键词——CamelCase/snake_case/中文技术词
+        keywords: list[str] = []
+        # 1. 提取英文标识符（CamelCase/snake_case）
+        for word in prd_text.replace("\n", " ").split():
+            word = word.strip(".,;:()[]{}<>\"'`/\\|!@#$%^&*+-=~")
+            if len(word) < 2:
+                continue
+            # 标识符模式：含大写字母或下划线
+            if any(c.isupper() for c in word) or "_" in word:
+                if word.lower() not in _stop:
+                    keywords.append(word)
+        # 2. 提取中文技术词（2-6 个汉字）
+        import re as _re
+        cn_terms = _re.findall(r"[一-鿿]{2,6}", prd_text)
+        for t in cn_terms:
+            if t not in _stop and t not in keywords:
+                keywords.append(t)
+        # 去重 + 限制数量
+        seen: set[str] = set()
+        uniq = []
+        for k in keywords:
+            if k.lower() not in seen:
+                seen.add(k.lower())
+                uniq.append(k)
+        # 最多 20 个关键词，避免 prompt 膨胀
+        return uniq[:20]
 
 # ── 共享工具函数 ────────────────────────────────────────
 

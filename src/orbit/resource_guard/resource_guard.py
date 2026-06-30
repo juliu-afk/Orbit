@@ -35,6 +35,7 @@ from orbit.resource_guard.models import (
     GuardResult,
     ResourceGuardState,
 )
+from orbit.resource_guard.dependency_guard import DependencyGuard  # 减熵闭环-2 B6
 from orbit.resource_guard.token_bucket import TokenBucket
 
 logger = structlog.get_logger("orbit.resource_guard")
@@ -81,6 +82,8 @@ class ResourceGuard:
         self._failure_threshold = DEFAULT_FAILURE_THRESHOLD
         self._cooldown_seconds = DEFAULT_COoldown
         self._half_open_probes: int = 0
+        # 减熵闭环-2 B6: 依赖膨胀拦截
+        self._dep_guard = DependencyGuard()
 
         # 审计事件记录
         self._audit_events: list[dict[str, Any]] = []
@@ -88,6 +91,19 @@ class ResourceGuard:
         self._degradation_stats: dict[str, int] = {}
 
     # ── 核心 API ──────────────────────────────────────────
+
+    def check_dependency(self, package_name: str) -> dict[str, Any]:
+        """检查新增依赖——减熵闭环-2 B6."""
+        result = self._dep_guard.check(package_name)
+        info = {
+            "allowed": not result.needs_confirmation,
+            "package": result.package,
+            "reason": result.recommendation or "",
+            "alternative": result.stdlib_alternative or "",
+        }
+        if not info["allowed"]:
+            logger.warning("dependency_blocked", package=package_name, reason=info["reason"])
+        return info
 
     def guard_request(self, task_id: str, estimated_tokens: int = 500) -> GuardResult:
         """请求放行——检查资源预算。"""

@@ -15,6 +15,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, shallowRef } from 'vue'
 import * as monaco from 'monaco-editor'
+import { apiGet } from '@/services/api'
 
 const props = withDefaults(defineProps<{
   original: string; modified: string; language?: string; height?: string; readOnly?: boolean
@@ -56,7 +57,62 @@ onMounted(() => {
     folding: true, lineNumbers: 'on', renderIndicators: true, originalEditable: false,
   })
   updateModel()
+  // IDE功能追赶: 注册 Go to Def / References / Hover providers
+  registerLanguageProviders()
 })
+
+// IDE功能追赶——Monaco Language Providers (Go to Def / References / Hover)
+function registerLanguageProviders() {
+  const lang = props.language
+  // Definition Provider: Ctrl+Click → GET /api/v1/codegraph/definition
+  monaco.languages.registerDefinitionProvider(lang, {
+    provideDefinition: async (model, position) => {
+      const word = model.getWordAtPosition(position)
+      if (!word) return null
+      try {
+        const data = await apiGet<{ file: string; line: number; column: number }>(
+          `/api/v1/codegraph/definition?symbol=${encodeURIComponent(word.word)}`
+        )
+        if (data?.file) {
+          return { uri: monaco.Uri.file(data.file), range: { startLineNumber: data.line || 1, startColumn: data.column || 1, endLineNumber: data.line || 1, endColumn: (data.column || 1) + 10 } }
+        }
+      } catch { /* fail-silent */ }
+      return null
+    },
+  })
+  // Reference Provider: Shift+F12 → GET /api/v1/codegraph/references
+  monaco.languages.registerReferenceProvider(lang, {
+    provideReferences: async (model, position) => {
+      const word = model.getWordAtPosition(position)
+      if (!word) return []
+      try {
+        const data = await apiGet<{ references: { name: string; file?: string; line?: number }[] }>(
+          `/api/v1/codegraph/references?symbol=${encodeURIComponent(word.word)}`
+        )
+        return (data?.references || []).map(ref => ({
+          uri: monaco.Uri.file(ref.file || ''),
+          range: { startLineNumber: ref.line || 1, startColumn: 1, endLineNumber: ref.line || 1, endColumn: 10 },
+        }))
+      } catch { return [] }
+    },
+  })
+  // Hover Provider: hover → GET /api/v1/codegraph/hover
+  monaco.languages.registerHoverProvider(lang, {
+    provideHover: async (model, position) => {
+      const word = model.getWordAtPosition(position)
+      if (!word) return null
+      try {
+        const data = await apiGet<{ info: string }>(
+          `/api/v1/codegraph/hover?symbol=${encodeURIComponent(word.word)}`
+        )
+        if (data?.info) {
+          return { contents: [{ value: data.info }] }
+        }
+      } catch { /* fail-silent */ }
+      return null
+    },
+  })
+}
 
 function updateModel() {
   if (!diffEditor.value) return

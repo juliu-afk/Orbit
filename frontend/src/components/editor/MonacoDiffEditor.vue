@@ -1,6 +1,15 @@
 <!-- Monaco DiffEditor 封装——Phase 1 审查界面核心组件 -->
 <template>
-  <div ref="containerRef" class="monaco-diff-container" :style="{ height }" />
+  <div class="monaco-diff-wrapper" :style="{ height }">
+    <div ref="containerRef" class="monaco-diff-container" style="flex:1;overflow:hidden;" />
+    <div v-if="hunks.length" class="hunk-nav">
+      <span class="hunk-label">Hunk {{ currentHunk + 1 }} / {{ hunks.length }}</span>
+      <el-button size="small" :disabled="currentHunk <= 0" @click="navigateHunk(-1)">&lt;</el-button>
+      <el-button size="small" :disabled="currentHunk >= hunks.length - 1" @click="navigateHunk(1)">&gt;</el-button>
+      <el-button size="small" type="success" @click="$emit('approve-hunk', currentHunk)">Approve Hunk</el-button>
+      <el-button size="small" type="danger" @click="$emit('reject-hunk', currentHunk)">Reject Hunk</el-button>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -11,8 +20,33 @@ const props = withDefaults(defineProps<{
   original: string; modified: string; language?: string; height?: string; readOnly?: boolean
 }>(), { language: 'python', height: '600px', readOnly: true })
 
+const emit = defineEmits<{
+  (e: 'approve-hunk', hunkIndex: number): void
+  (e: 'reject-hunk', hunkIndex: number): void
+}>()
+
 const containerRef = ref<HTMLDivElement>()
 const diffEditor = shallowRef<monaco.editor.IStandaloneDiffEditor>()
+const currentHunk = ref(0)
+const hunks = ref<monaco.editor.ILineChange[]>([])
+
+// 从 Monaco diff 中提取 hunk 列表
+function updateHunks() {
+  if (!diffEditor.value) { hunks.value = []; return }
+  const changes = diffEditor.value.getLineChanges()
+  hunks.value = changes || []
+  if (currentHunk.value >= hunks.value.length) currentHunk.value = Math.max(0, hunks.value.length - 1)
+}
+
+// 导航到上一个/下一个 hunk
+function navigateHunk(direction: number) {
+  const next = currentHunk.value + direction
+  if (next < 0 || next >= hunks.value.length) return
+  currentHunk.value = next
+  const hunk = hunks.value[next]
+  const line = hunk.modifiedStartLineNumber ?? hunk.originalStartLineNumber
+  if (line) diffEditor.value?.revealPositionInCenter({ lineNumber: line, column: 1 })
+}
 
 onMounted(() => {
   if (!containerRef.value) return
@@ -31,9 +65,14 @@ function updateModel() {
   diffEditor.value.setModel({ original: om, modified: mm })
 }
 watch(() => [props.original, props.modified, props.language], updateModel)
+// 模型变更后重新计算 hunk 列表
+watch(() => [props.original, props.modified], () => setTimeout(updateHunks, 100))
 onBeforeUnmount(() => diffEditor.value?.dispose())
 </script>
 
 <style scoped>
-.monaco-diff-container { border: 1px solid var(--el-border-color-light); border-radius: 4px; overflow: hidden; }
+.monaco-diff-container { border: 1px solid var(--el-border-color-light); border-radius: 4px; }
+.monaco-diff-wrapper { display: flex; flex-direction: column; }
+.hunk-nav { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--el-border-color-light); border-top: none; border-radius: 0 0 4px 4px; background: var(--el-bg-color); flex-shrink: 0; }
+.hunk-label { font-size: 12px; color: var(--el-text-color-secondary); margin-right: auto; }
 </style>

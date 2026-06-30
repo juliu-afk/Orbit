@@ -20,11 +20,15 @@ def set_workspace_root(path: str | Path) -> None:
     _WORKSPACE_ROOT = Path(path).resolve()
 
 
-def _guard_path(path: str, allow_outside: bool = False) -> Path:
-    """路径安全守卫——Phase 4 升级: WorkspaceGuard + 已有边界检查.
+def _guard_path(path: str) -> Path:
+    """路径安全守卫——workspace 隔离是硬约束，所有文件操作不得越界。
 
     对标 OpenClaw wrapToolWorkspaceRootGuard():
     拒绝绝对路径越界、../ 穿透、符号链接逃逸。
+
+    P1-1 (PR#133): 删除 allow_outside 参数——
+    relative_to 是硬安全网，allow_outside 从未真正生效过。
+    两个开关（guard + relative_to）语义冲突，保留死代码误导维护者。
     """
     p = (_WORKSPACE_ROOT / path).resolve()
 
@@ -33,9 +37,10 @@ def _guard_path(path: str, allow_outside: bool = False) -> Path:
         from orbit.security.guard import WorkspaceGuard
 
         guard = WorkspaceGuard(str(_WORKSPACE_ROOT))
-        guard.validate(str(p), allow_outside=allow_outside)
+        guard.validate(str(p))
     except ValueError as e:
         raise WorkspaceViolationError(str(e)) from None
+    # 硬安全网：无论如何都不能越界
     try:
         p.relative_to(_WORKSPACE_ROOT)
     except ValueError:
@@ -57,7 +62,7 @@ async def read_file(path: str, offset: int = 0, limit: int = 200) -> str:
         limit: 最大行数
     """
     # P0-10 (Issue#126): 禁止工作区外读取——可读 /etc/passwd、~/.ssh/id_rsa 等敏感文件
-    p = _guard_path(path, allow_outside=False)
+    p = _guard_path(path)
     if not p.exists():
         return f"文件不存在: {path}"
     if p.is_dir():
@@ -83,7 +88,7 @@ async def write_file(path: str, content: str) -> str:
     - 父目录不存在则自动创建
     - 内容以 UTF-8 写入
     """
-    p = _guard_path(path, allow_outside=False)  # 写操作禁止工作区外
+    p = _guard_path(path)  # 写操作禁止工作区外
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content, encoding="utf-8")
     lines = content.count("\n") + (0 if content.endswith("\n") else 1)
@@ -105,7 +110,7 @@ async def edit_file(path: str, old_string: str, new_string: str, replace_all: bo
     Raises:
         ValueError: old_string 不唯一或未找到
     """
-    p = _guard_path(path, allow_outside=False)
+    p = _guard_path(path)
     if not p.exists():
         return f"文件不存在: {path}"
 

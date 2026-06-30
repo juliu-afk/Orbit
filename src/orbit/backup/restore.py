@@ -86,7 +86,13 @@ class Restorer:
             elapsed_ms=elapsed,
         )
 
+        # P2-2 (PR#133): 恢复成功后清理 .backup——多次恢复不残留临时文件
         if result.success:
+            try:
+                if os.path.exists(backup_target):
+                    os.remove(backup_target)
+            except OSError:
+                pass  # 清理失败不阻塞恢复流程
             logger.info("restore_ok", snapshot_id=meta.snapshot_id, elapsed_ms=round(elapsed))
         else:
             logger.warning("restore_verify_fail", snapshot_id=meta.snapshot_id)

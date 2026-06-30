@@ -121,9 +121,7 @@ class LoopScheduler:
         P1-1: 逐条 try/except——单条损坏不阻塞其他 loop 和应用启动。
         """
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM loop_schedules WHERE status != 'stopped'"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM loop_schedules WHERE status != 'stopped'").fetchall()
         for row in rows:
             try:
                 schedule = LoopSchedule(
@@ -141,8 +139,10 @@ class LoopScheduler:
                 )
                 self._schedules[schedule.id] = schedule
                 logger.info(
-                    "loop_restored", loop_id=schedule.id,
-                    command=schedule.command, status=schedule.status,
+                    "loop_restored",
+                    loop_id=schedule.id,
+                    command=schedule.command,
+                    status=schedule.status,
                 )
             except Exception as e:
                 logger.error("loop_restore_failed", loop_id=row["id"], error=str(e))
@@ -163,7 +163,8 @@ class LoopScheduler:
                 except Exception as e:
                     logger.error(
                         "loop_restore_start_failed",
-                        loop_id=schedule.id, error=str(e),
+                        loop_id=schedule.id,
+                        error=str(e),
                     )
         logger.info("loop_restore_all_done", count=count)
         return count

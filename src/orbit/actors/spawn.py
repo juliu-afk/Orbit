@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 import structlog
 
+from orbit.actors.lifecycle import ActorLifecycle  # 5C.4
 from orbit.actors.models import ActorOutcome, ActorRecord, ActorStatus
 from orbit.agents.base import AgentInput, AgentRole, BaseAgent
 from orbit.stream.cancellation import CancellationToken
@@ -89,6 +90,7 @@ class ActorSpawn:
 
         self.registry: ActorRegistry = registry or ActorRegistry()
         self.agent_factory = agent_factory  # type: type[AgentFactory] | None
+        self._lifecycles: dict[str, ActorLifecycle] = {}  # 5C.4
 
     async def spawn(
         self,
@@ -145,6 +147,7 @@ class ActorSpawn:
             status=ActorStatus.PENDING,
         )
         self.registry.register(record)
+        self._lifecycles[actor_id] = ActorLifecycle(actor_id)  # 5C.4
 
         # 5. 创建 Agent 实例
         agent = self._create_agent(agent_role, llm, tools, event_bus)
@@ -233,6 +236,21 @@ class ActorSpawn:
             await task_obj  # 确保完成
             deferred = DeferredActor(actor_id, task_obj, token)
             return deferred
+
+    async def reap_stale(self) -> list[str]:
+        """回收僵死Actor——5C.4."""
+        stale = []
+        for aid, lc in list(self._lifecycles.items()):
+            if lc.is_stale:
+                lc.reap()
+                stale.append(aid)
+                self._lifecycles.pop(aid, None)
+                r = self.registry.get(aid)
+                if r:
+                    r.status = ActorStatus.FAILED
+        if stale:
+            logger.warning("reaped_stale_actors", count=len(stale), ids=stale[:5])
+        return stale
 
     def _create_agent(
         self,

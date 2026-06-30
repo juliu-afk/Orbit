@@ -74,6 +74,7 @@ class TaskGraph(BaseModel):
             if dst not in node_ids:
                 raise ValueError(f"Edge target '{dst}' not in nodes")
         # 循环检测：拓扑排序节点数 < 总节点数 → 有环
+        # P1 LOG-1: 空图 (0 nodes) 为合法 DAG——len(flat)==len(nodes) 均为 0，不抛异常
         try:
             order = self.topological_sort()
             flat = [nid for layer in order for nid in layer]

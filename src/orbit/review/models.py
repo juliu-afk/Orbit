@@ -53,7 +53,6 @@ class ReviewDecision(ReviewBase):
     review: Mapped[Review] = relationship(back_populates="decisions")
 
 
-
 class ReviewComment(ReviewBase):
     __tablename__ = "review_comments"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)

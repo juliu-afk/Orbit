@@ -97,7 +97,9 @@ class TaskRunner:
             if target_file:
                 report = self._edit_detector.check(target_file)
                 if report.is_high_entropy:
-                    logger.warning("high_entropy_file_detected", file=target_file, suggestion=report.suggestion)
+                    logger.warning(
+                        "high_entropy_file_detected", file=target_file, suggestion=report.suggestion
+                    )
                     context["entropy_warning"] = report.suggestion
         except Exception:
             pass  # fail-open
@@ -370,12 +372,55 @@ class TaskRunner:
         if not prd_text:
             return []
         _stop = {
-            "的", "是", "在", "和", "了", "有", "不", "要", "可以",
-            "需要", "应该", "能够", "使用", "通过", "进行", "实现",
-            "添加", "修改", "删除", "支持", "提供", "包括", "用于",
-            "the", "a", "an", "is", "are", "be", "to", "of", "in",
-            "for", "and", "or", "not", "this", "that", "with", "from",
-            "it", "we", "you", "as", "if", "but", "so", "all", "no",
+            "的",
+            "是",
+            "在",
+            "和",
+            "了",
+            "有",
+            "不",
+            "要",
+            "可以",
+            "需要",
+            "应该",
+            "能够",
+            "使用",
+            "通过",
+            "进行",
+            "实现",
+            "添加",
+            "修改",
+            "删除",
+            "支持",
+            "提供",
+            "包括",
+            "用于",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "be",
+            "to",
+            "of",
+            "in",
+            "for",
+            "and",
+            "or",
+            "not",
+            "this",
+            "that",
+            "with",
+            "from",
+            "it",
+            "we",
+            "you",
+            "as",
+            "if",
+            "but",
+            "so",
+            "all",
+            "no",
         }
         keywords: list[str] = []
         for word in prd_text.replace("\n", " ").split():
@@ -397,7 +442,6 @@ class TaskRunner:
                 uniq.append(k)
         return uniq[:20]
 
-
     @staticmethod
     def _extract_keywords(prd_text: str) -> list[str]:
         """从 PRD 文本提取技术关键词——减熵闭环-1.
@@ -410,12 +454,66 @@ class TaskRunner:
 
         # 中文停用词——高频虚词
         _stop = {
-            "的", "是", "在", "和", "了", "有", "不", "我", "我们", "要", "可以",
-            "这个", "那个", "一个", "一些", "需要", "应该", "能够", "使用", "通过",
-            "进行", "实现", "添加", "修改", "删除", "支持", "提供", "包括", "用于",
-            "the", "a", "an", "is", "are", "be", "to", "of", "in", "for", "and",
-            "or", "not", "this", "that", "with", "from", "will", "can", "should",
-            "it", "we", "you", "as", "if", "but", "so", "all", "no", "on", "at",
+            "的",
+            "是",
+            "在",
+            "和",
+            "了",
+            "有",
+            "不",
+            "我",
+            "我们",
+            "要",
+            "可以",
+            "这个",
+            "那个",
+            "一个",
+            "一些",
+            "需要",
+            "应该",
+            "能够",
+            "使用",
+            "通过",
+            "进行",
+            "实现",
+            "添加",
+            "修改",
+            "删除",
+            "支持",
+            "提供",
+            "包括",
+            "用于",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "be",
+            "to",
+            "of",
+            "in",
+            "for",
+            "and",
+            "or",
+            "not",
+            "this",
+            "that",
+            "with",
+            "from",
+            "will",
+            "can",
+            "should",
+            "it",
+            "we",
+            "you",
+            "as",
+            "if",
+            "but",
+            "so",
+            "all",
+            "no",
+            "on",
+            "at",
         }
 
         # 技术关键词——CamelCase/snake_case/中文技术词
@@ -431,6 +529,7 @@ class TaskRunner:
                     keywords.append(word)
         # 2. 提取中文技术词（2-6 个汉字）
         import re as _re
+
         cn_terms = _re.findall(r"[一-鿿]{2,6}", prd_text)
         for t in cn_terms:
             if t not in _stop and t not in keywords:
@@ -444,6 +543,7 @@ class TaskRunner:
                 uniq.append(k)
         # 最多 20 个关键词，避免 prompt 膨胀
         return uniq[:20]
+
 
 # ── 共享工具函数 ────────────────────────────────────────
 

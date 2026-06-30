@@ -144,6 +144,7 @@ class MetaOrchestrator:
         # 减熵闭环-3 B8: 自动生成 CLAUDE.md
         try:
             from orbit.knowledge.claude_md_generator import ClaudeMdGenerator
+
             gen = ClaudeMdGenerator()
             md_content = await gen.generate()
             if md_content:

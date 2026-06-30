@@ -122,9 +122,9 @@ class CritiqueAgent:
 
     # 生成模型族 → 批判模型族映射
     GENERATOR_TO_CRITIC_MODEL: dict[str, str] = {
-        "anthropic": "openai",     # Claude 生成 → GPT 批判
-        "openai": "anthropic",     # GPT 生成 → Claude 批判
-        "glm": "anthropic",        # GLM 生成 → Claude 批判
+        "anthropic": "openai",  # Claude 生成 → GPT 批判
+        "openai": "anthropic",  # GPT 生成 → Claude 批判
+        "glm": "anthropic",  # GLM 生成 → Claude 批判
         "default": "anthropic",
     }
 
@@ -161,20 +161,26 @@ class CritiqueAgent:
             return CritiqueResult(approved=True, summary="mock mode——自动通过")
 
         # 构建审查 prompt——仅含代码和验证结果，不含生成 Agent 的推理过程
-        prompt_parts = [f"## 任务\n{task.description if hasattr(task, 'description') else str(task)}"]
+        prompt_parts = [
+            f"## 任务\n{task.description if hasattr(task, 'description') else str(task)}"
+        ]
 
         if code_artifact:
             # 截断超长代码——批判关注质量不关注全量
             truncated = code_artifact[:10000]
             if len(code_artifact) > 10000:
                 truncated += f"\n\n... [截断 {len(code_artifact) - 10000} 字符]"
-            prompt_parts.append(f"\n## {'Diff' if diff_only else '代码产物'}\n```\n{truncated}\n```")
+            prompt_parts.append(
+                f"\n## {'Diff' if diff_only else '代码产物'}\n```\n{truncated}\n```"
+            )
 
         if verification_results:
             prompt_parts.append(f"\n## 验证结果\n{self._format_verification(verification_results)}")
 
         if ensemble_alternatives:
-            prompt_parts.append(f"\n## 其他方案（供对比）\n{self._format_alternatives(ensemble_alternatives)}")
+            prompt_parts.append(
+                f"\n## 其他方案（供对比）\n{self._format_alternatives(ensemble_alternatives)}"
+            )
 
         prompt = "\n".join(prompt_parts)
 
@@ -184,7 +190,7 @@ class CritiqueAgent:
             req = LLMRequest(
                 prompt=prompt,
                 system_prompt=CRITIQUE_SYSTEM_PROMPT,
-                temperature=0.3,   # 低温度——确定性审查
+                temperature=0.3,  # 低温度——确定性审查
                 max_tokens=1000,
             )
             response = await self._llm.generate(req, task_id="critique")
@@ -235,9 +241,7 @@ class CritiqueAgent:
         lines = []
         for r in results:
             icon = "✅" if r.get("passed") else "❌"
-            lines.append(
-                f"- {icon} `{r.get('command', '?')}` → exit={r.get('exit_code', '?')}"
-            )
+            lines.append(f"- {icon} `{r.get('command', '?')}` → exit={r.get('exit_code', '?')}")
         return "\n".join(lines)
 
     @staticmethod
@@ -246,7 +250,6 @@ class CritiqueAgent:
         lines = []
         for i, alt in enumerate(alternatives):
             lines.append(
-                f"方案 {i+1} ({alt.get('model', '?')}): "
-                f"{str(alt.get('output', ''))[:200]}"
+                f"方案 {i+1} ({alt.get('model', '?')}): " f"{str(alt.get('output', ''))[:200]}"
             )
         return "\n".join(lines)

@@ -44,9 +44,7 @@ class ProcessViolationError(Exception):
         self.from_state = from_state
         self.to_state = to_state
         self.reason = reason
-        super().__init__(
-            f"流程违规: task={task_id} {from_state}→{to_state}: {reason}"
-        )
+        super().__init__(f"流程违规: task={task_id} {from_state}→{to_state}: {reason}")
 
 
 # 完整流水线状态转换表
@@ -61,14 +59,18 @@ FULL_PIPELINE_TRANSITIONS: dict[TaskState, TaskState] = {
 # 快车道路径——跳过 PLANNING + VERIFYING（仅 ComplexityScorer 可授权）
 FAST_LANE_TRANSITIONS: dict[TaskState, TaskState] = {
     TaskState.IDLE: TaskState.PARSING,
-    TaskState.PARSING: TaskState.CODING,    # 跳过 PLANNING
-    TaskState.CODING: TaskState.DONE,       # 跳过 VERIFYING
+    TaskState.PARSING: TaskState.CODING,  # 跳过 PLANNING
+    TaskState.CODING: TaskState.DONE,  # 跳过 VERIFYING
     TaskState.DONE: TaskState.DONE,
 }
 
-TERMINAL_STATES: frozenset[TaskState] = frozenset({
-    TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED,
-})
+TERMINAL_STATES: frozenset[TaskState] = frozenset(
+    {
+        TaskState.DONE,
+        TaskState.FAILED,
+        TaskState.CANCELLED,
+    }
+)
 
 
 class ProcessGuard:
@@ -80,14 +82,20 @@ class ProcessGuard:
     """
 
     # 任何情况下不可跳过的状态
-    MANDATORY_STATES: frozenset[TaskState] = frozenset({
-        TaskState.PARSING, TaskState.CODING,
-    })
+    MANDATORY_STATES: frozenset[TaskState] = frozenset(
+        {
+            TaskState.PARSING,
+            TaskState.CODING,
+        }
+    )
 
     # 快车道可跳过的状态——仅 ComplexityScorer 可授权
-    FAST_LANE_SKIPPABLE: frozenset[TaskState] = frozenset({
-        TaskState.PLANNING, TaskState.VERIFYING,
-    })
+    FAST_LANE_SKIPPABLE: frozenset[TaskState] = frozenset(
+        {
+            TaskState.PLANNING,
+            TaskState.VERIFYING,
+        }
+    )
 
     def __init__(self, task_id: str, goal_id: str) -> None:
         self.task_id = task_id

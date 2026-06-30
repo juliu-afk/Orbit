@@ -71,8 +71,8 @@ class SubTaskSession:
         worktree_manager: WorktreeManager | None = None,
         checkpoint_manager: CheckpointManager | None = None,
         budget_tracker: TokenBudgetTracker | None = None,
-        critique_agent: Any = None,   # CritiqueAgent——延迟导入避免循环
-        verifier: Any = None,          # ExecutorVerifier
+        critique_agent: Any = None,  # CritiqueAgent——延迟导入避免循环
+        verifier: Any = None,  # ExecutorVerifier
     ) -> None:
         self.task = task
         self.base_ref = base_ref
@@ -165,7 +165,6 @@ class SubTaskSession:
                     to_state=next_state.value,
                 )
                 state = next_state
-
 
         except Exception as e:
             logger.error(

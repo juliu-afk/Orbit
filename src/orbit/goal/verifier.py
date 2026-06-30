@@ -23,14 +23,27 @@ if TYPE_CHECKING:
 logger = structlog.get_logger("orbit.goal")
 
 # 验证命令白名单——安全基线
-ALLOWED_VERIFICATION_COMMANDS: frozenset[str] = frozenset({
-    "pytest", "python", "npm", "pnpm", "tsc", "eslint",
-    "ruff", "mypy", "cargo", "go", "make", "pre-commit",
-})
+ALLOWED_VERIFICATION_COMMANDS: frozenset[str] = frozenset(
+    {
+        "pytest",
+        "python",
+        "npm",
+        "pnpm",
+        "tsc",
+        "eslint",
+        "ruff",
+        "mypy",
+        "cargo",
+        "go",
+        "make",
+        "pre-commit",
+    }
+)
 
 
 class CommandNotAllowedError(ValueError):
     """验证命令不在白名单中。"""
+
     pass
 
 
@@ -178,9 +191,7 @@ class ExecutorVerifier:
             cwd=self._working_dir,
         )
         try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=self._timeout
-            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self._timeout)
         except asyncio.TimeoutError:
             proc.kill()
             raise

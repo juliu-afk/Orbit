@@ -81,12 +81,14 @@ class BudgetAllocator:
         基础 1.0 + 依赖数(0.5/dep) + 关键词因子。
         """
         weight = 1.0
-        deps = getattr(task, 'depends_on', [])
+        deps = getattr(task, "depends_on", [])
         weight += len(deps) * 0.5
 
-        desc = getattr(task, 'description', '').lower()
+        desc = getattr(task, "description", "").lower()
         # 实现/重构类——高权重
-        if any(kw in desc for kw in ("实现", "implement", "重构", "refactor", "中间件", "middleware")):
+        if any(
+            kw in desc for kw in ("实现", "implement", "重构", "refactor", "中间件", "middleware")
+        ):
             weight *= 1.5
         # 测试类——中低权重
         if any(kw in desc for kw in ("测试", "test", "e2e")):

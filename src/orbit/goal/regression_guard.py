@@ -60,6 +60,7 @@ class RegressionGuard:
 
         try:
             import time
+
             started = time.time()
             result = await self._verifier.execute(self._commands)
             elapsed = time.time() - started
@@ -73,7 +74,11 @@ class RegressionGuard:
                     "regression_failed",
                     failed_commands=failed,
                     total_commands=total,
-                    output=result.failed_commands[0].get("stderr_tail", "")[:200] if result.failed_commands else "",
+                    output=(
+                        result.failed_commands[0].get("stderr_tail", "")[:200]
+                        if result.failed_commands
+                        else ""
+                    ),
                 )
 
             return RegressionResult(

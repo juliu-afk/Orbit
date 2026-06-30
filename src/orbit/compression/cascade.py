@@ -155,13 +155,15 @@ class CascadePruner:
             consumed = self._is_consumed(msg, messages, i)
             if consumed:
                 # 替换为摘要占位
-                result.append({
-                    **{k: v for k, v in msg.items() if k != "content"},
-                    "content": (
-                        f"[上下文裁剪] {len(content)} 字符的工具输出已被消费并移除。"
-                        f"关键内容: {content[:200]}..."
-                    ),
-                })
+                result.append(
+                    {
+                        **{k: v for k, v in msg.items() if k != "content"},
+                        "content": (
+                            f"[上下文裁剪] {len(content)} 字符的工具输出已被消费并移除。"
+                            f"关键内容: {content[:200]}..."
+                        ),
+                    }
+                )
                 logger.debug(
                     "cascade_stage1_stripped",
                     chars=len(content),
@@ -203,7 +205,7 @@ class CascadePruner:
                         consecutive_ineffectual += 1
                         if consecutive_ineffectual > max_ineffectual:
                             # 记录到失败方法
-                            if memory and hasattr(memory, 'record_failure'):
+                            if memory and hasattr(memory, "record_failure"):
                                 memory.record_failure(f"无效果推理: {content[:100]}")
                             continue  # 跳过此消息
                     else:
@@ -235,7 +237,7 @@ class CascadePruner:
         Ledger 层（目标/约束/架构决策）始终保留在 system prompt 前部——永不被压缩。
         旧消息替换为结构化进度摘要。
         """
-        if not memory or not hasattr(memory, 'to_progress_injection'):
+        if not memory or not hasattr(memory, "to_progress_injection"):
             return messages
 
         # 保留 system prompt + 最后 5 轮
@@ -275,14 +277,16 @@ class CascadePruner:
         # 注入结构化进度摘要——替代被移除的旧消息
         progress_text = memory.to_progress_injection()
         skipped = len(head_messages) - (1 if system_msg else 0)
-        result.append({
-            "role": "system",
-            "content": (
-                f"[结构化进度恢复] {skipped} 条早期消息已被级联裁剪。\n"
-                "以下为压缩前的结构化进度——请基于此继续，不重复已完成任务。\n\n"
-                f"{progress_text}"
-            ),
-        })
+        result.append(
+            {
+                "role": "system",
+                "content": (
+                    f"[结构化进度恢复] {skipped} 条早期消息已被级联裁剪。\n"
+                    "以下为压缩前的结构化进度——请基于此继续，不重复已完成任务。\n\n"
+                    f"{progress_text}"
+                ),
+            }
+        )
 
         # 保留尾部消息（最近 N 轮）
         result.extend(tail_messages)
@@ -305,9 +309,18 @@ class CascadePruner:
     def _is_error_output(content: str) -> bool:
         """检测是否为错误输出——始终保留。"""
         error_markers = [
-            "Traceback", "Error:", "FAILED", "FAIL:", "error:",
-            "Exception:", "assert", "Fatal:", "panic:",
-            "失败", "错误", "异常",
+            "Traceback",
+            "Error:",
+            "FAILED",
+            "FAIL:",
+            "error:",
+            "Exception:",
+            "assert",
+            "Fatal:",
+            "panic:",
+            "失败",
+            "错误",
+            "异常",
         ]
         content_head = content[:500].lower()
         return any(m.lower() in content_head for m in error_markers)
@@ -323,7 +336,9 @@ class CascadePruner:
         if not isinstance(tool_content, str) or not tool_content:
             return False
 
-        for j in range(tool_index + 1, min(tool_index + 1 + self._consumed_turns * 2, len(messages))):
+        for j in range(
+            tool_index + 1, min(tool_index + 1 + self._consumed_turns * 2, len(messages))
+        ):
             msg = messages[j]
             if msg.get("role") == "assistant":
                 content = msg.get("content", "")

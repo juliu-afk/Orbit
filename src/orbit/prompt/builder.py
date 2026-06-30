@@ -175,9 +175,7 @@ class PromptBuilder:
 
     # ── 各层构建 ────────────────────────────────────────
 
-    def _build_stable(
-        self, role: AgentRole, tools_schema: list[dict] | None = None
-    ) -> str:
+    def _build_stable(self, role: AgentRole, tools_schema: list[dict] | None = None) -> str:
         """stable 层——角色 + 工具列表（按角色裁剪） + 规则 + 输出格式."""
         parts = [
             ROLE_DESCRIPTIONS.get(role, ROLE_DESCRIPTIONS[AgentRole.DEVELOPER]),
@@ -187,9 +185,7 @@ class PromptBuilder:
         return "\n\n".join(parts)
 
     @staticmethod
-    def _build_tools_guide(
-        role: AgentRole, tools_schema: list[dict] | None
-    ) -> str:
+    def _build_tools_guide(role: AgentRole, tools_schema: list[dict] | None) -> str:
         """按角色生成工具使用指南——只列出该角色可用的工具.
 
         WHY 按角色裁剪: Clarifier 不应该看到 exec_command，

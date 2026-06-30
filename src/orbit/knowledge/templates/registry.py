@@ -36,7 +36,17 @@ _FALLBACK_TEMPLATES: list[dict] = [
     {
         "name": "crud_endpoint",
         "description": "FastAPI CRUD endpoint with SQLAlchemy session",
-        "keywords": ["crud", "endpoint", "api", "fastapi", "route", "create", "read", "update", "delete"],
+        "keywords": [
+            "crud",
+            "endpoint",
+            "api",
+            "fastapi",
+            "route",
+            "create",
+            "read",
+            "update",
+            "delete",
+        ],
         "parameters": ["model_name", "model_name_lower", "table_name", "schema_name"],
         "template_text": '''
 @router.get("/{{table_name}}/", response_model=list[{{schema_name}}])
@@ -266,9 +276,7 @@ class TemplateRegistry:
             result = result.replace("{{" + key + "}}", value)
         return result
 
-    def match_and_format(
-        self, keywords: list[str], threshold: float = 0.5
-    ) -> str:
+    def match_and_format(self, keywords: list[str], threshold: float = 0.5) -> str:
         """便捷方法：匹配模板并格式化为提示语片段.
 
         Args:

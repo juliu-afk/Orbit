@@ -104,7 +104,7 @@ class AlignmentCheck:
                     suggestion=data.get("suggestion"),
                 )
                 # 连续 2 次不对齐 → 暂停
-                goal.consecutive_misalignments = getattr(goal, 'consecutive_misalignments', 0) + 1
+                goal.consecutive_misalignments = getattr(goal, "consecutive_misalignments", 0) + 1
                 if goal.consecutive_misalignments >= 2:
                     should_pause = True
             else:

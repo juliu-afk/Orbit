@@ -14,8 +14,8 @@ if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
     from orbit.compression.budget import TokenBudgetTracker
     from orbit.compression.compressor import ContextCompressor
-    from orbit.goal.intake_router import IntakeRouter
     from orbit.gateway.client import LLMClient
+    from orbit.goal.intake_router import IntakeRouter
     from orbit.observability.audit import AuditLogger
     from orbit.tools.registry import ToolRegistry
 

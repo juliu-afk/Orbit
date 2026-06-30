@@ -13,8 +13,9 @@ WHY 代码级而非 prompt 级: MetaGPT 研究证明 prompt-only 约束
 
 from __future__ import annotations
 
-import structlog
 from typing import Any
+
+import structlog
 
 from orbit.api.schemas.task import TaskState
 

@@ -1,8 +1,13 @@
 """测试结果+覆盖率 API (Step 9 Phase 1.4)."""
 
 from __future__ import annotations
-import asyncio, json, os, tempfile
+
+import asyncio
+import json
+import os
+import tempfile
 from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 

@@ -14,14 +14,15 @@ WHY 三层: 显式最可靠，文件冲突最安全，隐式作为补充——
 from __future__ import annotations
 
 import json
-import structlog
 from typing import TYPE_CHECKING, Any
+
+import structlog
 
 from orbit.goal.models import DepEdge, DependencyConflict
 
 if TYPE_CHECKING:
-    from orbit.goal.models import GoalSession
     from orbit.gateway.client import LLMClient
+    from orbit.goal.models import GoalSession
     from orbit.graph.engines.code_graph import CodeGraphEngine
 
 logger = structlog.get_logger("orbit.goal")

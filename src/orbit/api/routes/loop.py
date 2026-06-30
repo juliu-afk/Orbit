@@ -1,6 +1,7 @@
 """Loop 模式 API 路由。"""
 
 from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 

@@ -1,7 +1,10 @@
 """集成终端 API (Step 9 Phase 2.5)——命令执行+输出流。"""
 
 from __future__ import annotations
-import asyncio, os
+
+import asyncio
+import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 

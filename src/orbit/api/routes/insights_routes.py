@@ -1,7 +1,9 @@
 """Phase 3 智能洞察 API——风险评分/影响分析/模块健康."""
 
 from __future__ import annotations
+
 from typing import Any, Literal
+
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 

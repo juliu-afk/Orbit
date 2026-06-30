@@ -1,9 +1,12 @@
 """诊断服务——运行 mypy 并解析输出。"""
 
 from __future__ import annotations
-import asyncio, re
+
+import asyncio
+import re
 from enum import Enum
 from pathlib import Path
+
 from pydantic import BaseModel
 
 

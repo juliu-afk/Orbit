@@ -18,8 +18,9 @@ WHY 级联而非一次性: 每一层破坏性递增——
 
 from __future__ import annotations
 
-import structlog
 from typing import Any
+
+import structlog
 
 from orbit.compression.models import CompressionAction
 

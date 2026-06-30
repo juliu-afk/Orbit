@@ -7,8 +7,9 @@ WHY 权重而非均分: 不同任务复杂度不同——
 
 from __future__ import annotations
 
-import structlog
 from typing import TYPE_CHECKING
+
+import structlog
 
 if TYPE_CHECKING:
     from orbit.compose.models import Task

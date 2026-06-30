@@ -8,8 +8,9 @@
 from __future__ import annotations
 
 import json
-import structlog
 from typing import Any
+
+import structlog
 
 logger = structlog.get_logger("orbit.goal")
 

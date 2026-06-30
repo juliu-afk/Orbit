@@ -1,7 +1,9 @@
 """文件服务 API 路由 (Step 9 Phase 1)."""
 
 from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException, Query
+
 from orbit.files.service import FileService
 
 router = APIRouter(prefix="/files", tags=["files"])

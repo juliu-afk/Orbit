@@ -1,7 +1,10 @@
 """代码导航 API (Step 9 Phase 1.3)——Go to Def / References / Outline / Hover."""
 
 from __future__ import annotations
-import asyncio, ast
+
+import ast
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 

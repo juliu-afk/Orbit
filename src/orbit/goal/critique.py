@@ -15,8 +15,9 @@ WHY 独立 Agent: 同模型自审遗漏率 ~40%，跨模型审查遗漏率 ~18%
 from __future__ import annotations
 
 import json
-import structlog
 from typing import TYPE_CHECKING, Any
+
+import structlog
 
 if TYPE_CHECKING:
     from orbit.compose.models import Task

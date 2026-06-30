@@ -1,8 +1,10 @@
 """Git Blame API (Step 9 Phase 2.1)——每行标注作者（Agent vs Human）."""
 
 from __future__ import annotations
+
 import asyncio
 from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Query
 
 # P1-1: Agent 邮箱后缀白名单——避免字符串包含误报

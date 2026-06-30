@@ -14,14 +14,15 @@ WHY 独立 Session 非协程: 独立 LLM 消息历史 = 独立上下文窗口。
 
 from __future__ import annotations
 
-import structlog
 from typing import TYPE_CHECKING, Any
+
+import structlog
 
 from orbit.api.schemas.task import TaskState
 from orbit.goal.models import GoalSession, SubTaskResult
 from orbit.goal.process_guard import (
-    FULL_PIPELINE_TRANSITIONS,
     FAST_LANE_TRANSITIONS,
+    FULL_PIPELINE_TRANSITIONS,
     TERMINAL_STATES,
     ProcessGuard,
 )
@@ -29,8 +30,8 @@ from orbit.goal.process_guard import (
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
     from orbit.checkpoint.manager import CheckpointManager
-    from orbit.compression.budget import TokenBudgetTracker
     from orbit.compose.models import Task
+    from orbit.compression.budget import TokenBudgetTracker
     from orbit.worktree.manager import WorktreeManager
 
 logger = structlog.get_logger("orbit.goal")

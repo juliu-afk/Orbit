@@ -1,7 +1,10 @@
 """实时诊断 WebSocket (Step 9 Phase 2.3)——L4 mypy 结果实时推送。"""
 
 from __future__ import annotations
-import asyncio, json
+
+import asyncio
+import json
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 # P1-7: WebSocketException 在 starlette 1.x 不可用，二进制消息会抛 RuntimeError/ValueError

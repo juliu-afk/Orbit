@@ -10,8 +10,9 @@ WHY 桥接而非直接调用: Goal 模式需要自动 Spec 生成（用户不给
 
 from __future__ import annotations
 
-import structlog
 from typing import TYPE_CHECKING, Any
+
+import structlog
 
 if TYPE_CHECKING:
     from orbit.compose.models import Spec, Task

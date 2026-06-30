@@ -1,9 +1,12 @@
 """文件服务——文件列表、读取、diff 生成。"""
 
 from __future__ import annotations
-import asyncio, os
+
+import asyncio
+import os
 from enum import Enum
 from pathlib import Path
+
 from pydantic import BaseModel
 
 MAX_READ_SIZE = 1_000_000  # 1MB 上限，超限拒绝读取 (P0-6)

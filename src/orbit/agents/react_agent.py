@@ -27,9 +27,9 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
-from orbit.memory.decision_log import DecisionLog, parse_decision_marker
 from orbit.events.schemas import DashboardEvent
 from orbit.gateway.schemas import LLMRequest
+from orbit.memory.decision_log import DecisionLog, parse_decision_marker
 from orbit.stream.cancellation import CancellationToken
 from orbit.stream.events import StreamEvent, StreamEventType
 from orbit.tools.registry import DoomLoopError, ToolRegistry

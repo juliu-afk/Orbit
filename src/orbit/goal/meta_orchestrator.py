@@ -11,14 +11,14 @@ v5 架构核心:
 from __future__ import annotations
 
 import asyncio
-import structlog
 import time
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
+import structlog
 
 from orbit.goal.intake_router import IntakeRouter
 from orbit.goal.memory_tiers import ThreeTierMemory
-from typing import TYPE_CHECKING, Any
-
 from orbit.goal.models import (
     GoalBatchReport,
     GoalResult,

@@ -24,10 +24,10 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.agents.base import AgentRole, BaseAgent
-from orbit.knowledge.templates import get_registry
 from orbit.agents.clarifier import ClarifierAgent
 from orbit.agents.dream_agent import DreamAgent
 from orbit.agents.react_agent import ReActAgent
+from orbit.knowledge.templates import get_registry
 
 logger = structlog.get_logger()
 

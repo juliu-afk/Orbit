@@ -20,8 +20,8 @@ from orbit.scheduler.orchestrator import (
     Scheduler,
 )
 from orbit.scheduler.task_runner import (
-    InvalidStateTransitionError,
     STATE_TRANSITIONS,
+    InvalidStateTransitionError,
 )
 
 # ── Mock Agent ──

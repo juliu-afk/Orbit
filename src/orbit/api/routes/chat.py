@@ -178,8 +178,9 @@ async def _handle_goal_command(ws: WebSocket, text: str) -> None:
         old = goal_route._active_task
         if old and not old.done():
             old.cancel()
-        from orbit.goal.models import GoalSession
         import asyncio
+
+        from orbit.goal.models import GoalSession
 
         goal = GoalSession(description=cmd)
         task = asyncio.create_task(orch.run(goal))

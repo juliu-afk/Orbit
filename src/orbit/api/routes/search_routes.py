@@ -1,8 +1,12 @@
 """全局搜索 API (Step 9 Phase 1.3)——文件名搜索+内容搜索（ripgrep）."""
 
 from __future__ import annotations
-import asyncio, os, fnmatch
+
+import asyncio
+import fnmatch
+import os
 from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 

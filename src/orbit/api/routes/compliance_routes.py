@@ -1,7 +1,10 @@
 """合规检查 API (Phase 3.2)——Diff 合规标注+审查清单自动生成."""
 
 from __future__ import annotations
-import ast, re
+
+import ast
+import re
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 

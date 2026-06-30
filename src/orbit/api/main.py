@@ -32,10 +32,10 @@ from orbit.api.routes import (
     git_routes,
     goal,
     health,
+    insights_routes,
     knowledge,
     loop,
     observability,
-    insights_routes,
     projects,
     review,
     search_routes,
@@ -236,14 +236,15 @@ _scheduler = Scheduler(
 _scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-defined]
 
 # Step 9: 审查模块——SQLAlchemy 2.0 ORM
-from sqlalchemy.ext.asyncio import (
-    async_sessionmaker,
+from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncSession,
+    async_sessionmaker,
     create_async_engine,
-)  # noqa: E402
-from orbit.review.service import ReviewService  # noqa: E402
-from orbit.review.models import ReviewBase  # noqa: E402
+)
+
 from orbit.files.service import FileService  # noqa: E402
+from orbit.review.models import ReviewBase  # noqa: E402
+from orbit.review.service import ReviewService  # noqa: E402
 
 _review_engine = create_async_engine(settings.DATABASE_URL, echo=False)
 _review_session_factory = async_sessionmaker(_review_engine, expire_on_commit=False)
@@ -293,11 +294,12 @@ async def _shutdown_review() -> None:
 app.state.compose_orchestrator = _compose_orchestrator
 app.state.dream_engine = _dream_engine
 
-# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler + CritiqueAgent + ModelEnsemble
-from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
 from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402
 from orbit.goal.critique import CritiqueAgent  # noqa: E402
 from orbit.goal.ensemble import ModelEnsemble  # noqa: E402
+
+# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler + CritiqueAgent + ModelEnsemble
+from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
 from orbit.loop.scheduler import LoopScheduler  # noqa: E402
 
 _critique_agent = CritiqueAgent(llm=_llm_flash, model_family="anthropic")

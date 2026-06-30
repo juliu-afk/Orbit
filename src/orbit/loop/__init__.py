@@ -6,9 +6,9 @@
 - parser: CronParser (间隔/cron 解析)
 """
 
-from orbit.loop.models import LoopSchedule, LoopRunner
-from orbit.loop.scheduler import LoopScheduler, LoopScheduler
+from orbit.loop.models import LoopRunner, LoopSchedule
 from orbit.loop.parser import CronParser
+from orbit.loop.scheduler import LoopScheduler
 
 __all__ = [
     "LoopSchedule",

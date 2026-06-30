@@ -1,8 +1,10 @@
 """审查模块 SQLAlchemy 2.0 ORM 模型。独立 Base，与 graph 模块隔离。"""
 
 from __future__ import annotations
+
 import uuid
 from datetime import datetime, timezone
+
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 

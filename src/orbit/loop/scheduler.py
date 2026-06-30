@@ -7,10 +7,11 @@
 from __future__ import annotations
 
 import asyncio
-import structlog
 from typing import Any
 
-from orbit.loop.models import LoopSchedule, LoopRunner
+import structlog
+
+from orbit.loop.models import LoopRunner, LoopSchedule
 from orbit.loop.parser import CronParser
 
 logger = structlog.get_logger("orbit.loop")

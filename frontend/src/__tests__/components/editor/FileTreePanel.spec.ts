@@ -45,7 +45,7 @@ describe('FileTreePanel', () => {
   it('emits select-file when child FileTreeNode emits select', () => {
     const wrapper = factory({ treeData: mockTreeData })
     const firstStub = wrapper.findAllComponents({ name: 'FileTreeNode' })[0]
-    firstStub.vm.$emit('select', '/src/app.ts')
+    firstStub.trigger('click')
     expect(wrapper.emitted('select-file')).toBeTruthy()
     expect(wrapper.emitted('select-file')![0]).toEqual(['/src/app.ts'])
   })

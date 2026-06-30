@@ -19,7 +19,7 @@ _DEFAULT_ENCODING = "o200k_base"
 class TokenCounter:
     CHARS_PER_TOKEN = 4
 
-    def __init__(self, encoding=None):
+    def __init__(self, encoding: str | None = None):
         self._encoding_name = encoding or _DEFAULT_ENCODING
         self._encoder = None
         if _TIKTOKEN_AVAILABLE:

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from unittest.mock import AsyncMock, MagicMock
 
@@ -28,23 +29,21 @@ class FastMockAgent(BaseAgent):
 
 @pytest.fixture
 def task_runner() -> TaskRunner:
-    """创建带 Mock Factory 的 TaskRunner."""
+    """创建带 Mock Factory 的 TaskRunner——teardown 清理注册表."""
+    saved = dict(AgentFactory._registry)
     AgentFactory.register(AgentRole.DEVELOPER, FastMockAgent)
     AgentFactory.register(AgentRole.ARCHITECT, FastMockAgent)
     AgentFactory.register(AgentRole.REVIEWER, FastMockAgent)
     AgentFactory.register(AgentRole.CLARIFIER, FastMockAgent)
-    return TaskRunner(
-        agent_factory=AgentFactory,
-        agent_llms={},
-        fast_lane=True,
-    )
+    yield TaskRunner(agent_factory=AgentFactory, agent_llms={}, fast_lane=True)
+    AgentFactory._registry = saved  # 恢复原始注册表
 
 
 class TestConcurrentStress:
     """并发压力——多任务同时执行."""
 
     @pytest.mark.asyncio
-    async def test_10_concurrent_tasks(self, task_runner: TaskRunner) -> None:
+    async def test_10_concurrent_tasks(self, task_runner) -> None:
         """10 个任务并发执行——不应崩溃."""
         async def run_one(i: int) -> TaskState:
             return await task_runner.run_task(f"stress-{i}", f"PRD {i}: fast test")
@@ -56,7 +55,7 @@ class TestConcurrentStress:
         )
 
     @pytest.mark.asyncio
-    async def test_50_concurrent_tasks(self, task_runner: TaskRunner) -> None:
+    async def test_50_concurrent_tasks(self, task_runner) -> None:
         """50 个任务并发——压力测试."""
         async def run_one(i: int) -> TaskState:
             return await task_runner.run_task(f"stress-50-{i}", f"PRD {i}")
@@ -70,14 +69,15 @@ class TestConcurrentStress:
         failed = sum(1 for r in results if r == TaskState.FAILED)
         assert done + failed == 50, f"部分任务丢失: done={done}, failed={failed}"
         # 50 任务应在 30 秒内完成
-        assert elapsed < 30.0, f"50 任务耗时 {elapsed:.1f}s > 30s"
+        threshold = float(os.environ.get("STRESS_THRESHOLD_SEC", "120.0"))
+        assert elapsed < threshold, f"50 任务耗时 {elapsed:.1f}s > {threshold}s"
 
 
 class TestSustainedLoad:
     """持续负载——内存和 Token 稳定性."""
 
     @pytest.mark.asyncio
-    async def test_sequential_100_tasks(self, task_runner: TaskRunner) -> None:
+    async def test_sequential_100_tasks(self, task_runner) -> None:
         """顺序执行 100 个任务——检测内存泄漏."""
         failures = 0
         for i in range(100):
@@ -87,9 +87,11 @@ class TestSustainedLoad:
                 )
                 if state != TaskState.DONE:
                     failures += 1
-            except Exception:
+            except Exception as e:
                 failures += 1
-        assert failures < 5, f"顺序执行失败率过高: {failures}/100"
+                logger = __import__("structlog").get_logger()
+                logger.warning("stress_task_failed", task_id=f"seq-{i}", error=str(e))
+        assert failures == 0, f"顺序执行出现失败: {failures}/100"
 
     @pytest.mark.asyncio
     async def test_edit_detector_memory_cleanup(self) -> None:

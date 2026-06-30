@@ -18,7 +18,7 @@ import pytest
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole
 from orbit.agents.react_agent import ReActAgent
 from orbit.memory.decision_log import DecisionLog
-from orbit.scheduler.task_runner import TaskRunner
+from orbit.scheduler.task_runner import TaskRunner  # noqa: F401
 
 
 @pytest.fixture

@@ -1,0 +1,31 @@
+---
+name: service_class
+description: Async service class with dependency injection
+keywords: service, dependency injection, async, business logic, class
+parameters: class_name, module_name, methods
+---
+"""{{module_name}}业务逻辑层.
+
+WHY 独立 Service 类: 路由层只做参数校验+响应格式化，
+业务逻辑统一在 Service 类中实现，便于测试与复用。
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+import structlog
+
+logger = structlog.get_logger()
+
+
+class {{class_name}}:
+    """{{module_name}}业务服务。"""
+
+    def __init__(self, db: AsyncSession) -> None:
+        self.db = db
+
+    {{methods}}

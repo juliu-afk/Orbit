@@ -1,0 +1,20 @@
+---
+name: fastapi_router
+description: FastAPI APIRouter with error handling
+keywords: fastapi, router, apirouter, endpoint, route, error, exception
+parameters: module_name, prefix, tags
+---
+"""{{module_name}}路由——CRUD 操作."""
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from backend.app.api import deps
+
+router = APIRouter(prefix="/{{prefix}}", tags=["{{tags}}"])
+
+
+@router.get("/health")
+async def health_check():
+    """健康检查端点。"""
+    return {"status": "ok", "module": "{{module_name}}"}

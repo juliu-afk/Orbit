@@ -1,0 +1,40 @@
+---
+name: test_unit
+description: pytest unit test with fixtures
+keywords: test, unit, pytest, fixture, unittest, mock
+parameters: module_name, class_name, method_name
+---
+"""{{class_name}}单元测试.
+
+WHY 单元测试: 隔离测试 {{module_name}} 中 {{class_name}} 的业务逻辑，
+不依赖数据库/外部服务。
+"""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+from {{module_name}} import {{class_name}}
+
+
+@pytest.fixture
+def {{module_name}}_fixture():
+    """Mock 依赖注入。"""
+    return {}
+
+
+class Test{{class_name}}:
+    """{{class_name}} 测试套件。"""
+
+    def test_{{method_name}}(self, {{module_name}}_fixture):
+        """测试 {{method_name}} 正常流程。"""
+        # 准备
+        ...
+
+        # 执行
+        ...
+
+        # 断言精确到逻辑结果
+        assert True

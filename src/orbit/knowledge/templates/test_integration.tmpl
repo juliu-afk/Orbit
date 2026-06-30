@@ -1,0 +1,31 @@
+---
+name: test_integration
+description: pytest integration test with async client
+keywords: test, integration, pytest, async, client, httpx, api
+parameters: module_name, endpoint, method_name
+---
+"""{{module_name}}集成测试.
+
+WHY 集成测试: 验证 {{endpoint}} 端点的完整请求-响应链路，
+含入参校验→业务逻辑→数据库读写→响应格式化。
+"""
+
+from __future__ import annotations
+
+import pytest
+from httpx import AsyncClient, ASGITransport
+
+
+@pytest.mark.asyncio
+async def test_{{method_name}}(async_client: AsyncClient):
+    """测试 {{endpoint}} —— 正常流程。"""
+    # 准备
+    payload = {}
+
+    # 执行
+    resp = await async_client.{{method_name}}("{{endpoint}}", json=payload)
+
+    # 断言
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["code"] == 0

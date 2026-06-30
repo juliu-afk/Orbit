@@ -1,0 +1,70 @@
+---
+name: crud_endpoint
+description: FastAPI CRUD endpoint with SQLAlchemy session
+keywords: crud, endpoint, api, fastapi, route, create, read, update, delete
+parameters: model_name, model_name_lower, table_name, schema_name
+---
+@router.get("/{{table_name}}/", response_model=list[{{schema_name}}])
+async def list_{{model_name_lower}}(
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+):
+    """查询所有{{model_name}}记录。"""
+    items = db.query({{model_name}}).offset(skip).limit(limit).all()
+    return items
+
+
+@router.get("/{{table_name}}/{id}", response_model={{schema_name}})
+async def get_{{model_name_lower}}(
+    id: int,
+    db: Session = Depends(get_db),
+):
+    """查询单条{{model_name}}记录。"""
+    item = db.query({{model_name}}).filter({{model_name}}.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="{{model_name}}不存在")
+    return item
+
+
+@router.post("/{{table_name}}/", response_model={{schema_name}}, status_code=201)
+async def create_{{model_name_lower}}(
+    data: {{schema_name}}Create,
+    db: Session = Depends(get_db),
+):
+    """创建{{model_name}}记录。"""
+    item = {{model_name}}(**data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.put("/{{table_name}}/{id}", response_model={{schema_name}})
+async def update_{{model_name_lower}}(
+    id: int,
+    data: {{schema_name}}Update,
+    db: Session = Depends(get_db),
+):
+    """更新{{model_name}}记录。"""
+    item = db.query({{model_name}}).filter({{model_name}}.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="{{model_name}}不存在")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/{{table_name}}/{id}", status_code=204)
+async def delete_{{model_name_lower}}(
+    id: int,
+    db: Session = Depends(get_db),
+):
+    """删除{{model_name}}记录。"""
+    item = db.query({{model_name}}).filter({{model_name}}.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="{{model_name}}不存在")
+    db.delete(item)
+    db.commit()

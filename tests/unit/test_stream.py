@@ -241,7 +241,7 @@ class TestSSEEndpoints:
         # 连接 SSE 流（带 mock LLM——但请求可能因缺少真实 llm 而失败）
         # 测试 SSE headers 设置
         resp = sse_client.get(
-            f"/api/v1/agent/dev/stream?task_id={task_id}&task=echo+hello",
+            f"/api/v1/agent/dev/stream?task_id={task_id}&task=echo+hello&token=orbit-local-stream",
         )
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers.get("content-type", "")

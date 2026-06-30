@@ -52,7 +52,7 @@ class TestOrchestratorRunAgent:
         from orbit.scheduler.orchestrator import Scheduler
 
         sched = Scheduler(agent_llms=None, agent_factory=FakeFactory)
-        output = await sched._run_agent("developer", "test-task", {"prd": "write add function"})
+        output = await sched._task_runner._run_agent("developer", "test-task", {"prd": "write add function"})
         assert "add" in output or "code" in output.lower() or "ok" in output.lower()
 
 
@@ -97,7 +97,7 @@ class TestRunAgentRealFactory:
         from orbit.scheduler.orchestrator import Scheduler
 
         sched = Scheduler(agent_llms=None, agent_factory=AgentFactory)
-        output = await sched._run_agent("developer", "test-real", {"prd": "write add function"})
+        output = await sched._task_runner._run_agent("developer", "test-real", {"prd": "write add function"})
         assert "mock" in output.lower() or "code" in output.lower()
 
     @pytest.mark.asyncio

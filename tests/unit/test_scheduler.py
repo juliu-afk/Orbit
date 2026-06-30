@@ -22,6 +22,8 @@ from orbit.scheduler.orchestrator import (
 from orbit.scheduler.task_runner import (
     STATE_TRANSITIONS,
     InvalidStateTransitionError,
+    _state_to_progress,
+    _transition,
 )
 
 # ── Mock Agent ──
@@ -89,16 +91,16 @@ def test_state_transitions_complete():
 def test_terminal_states_no_transition(scheduler):
     for state in (TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED):
         with pytest.raises(InvalidStateTransitionError):
-            scheduler._transition(state)
+            _transition(state)
 
 
 def test_state_sequence_correct(scheduler):
     seq = [
-        scheduler._transition(TaskState.IDLE),
-        scheduler._transition(TaskState.PARSING),
-        scheduler._transition(TaskState.PLANNING),
-        scheduler._transition(TaskState.CODING),
-        scheduler._transition(TaskState.VERIFYING),
+        _transition(TaskState.IDLE),
+        _transition(TaskState.PARSING),
+        _transition(TaskState.PLANNING),
+        _transition(TaskState.CODING),
+        _transition(TaskState.VERIFYING),
     ]
     assert seq == [
         TaskState.PARSING,
@@ -173,7 +175,7 @@ async def test_agent_cycle_through_factory():
 async def test_no_factory_raises():
     sched = Scheduler(agent_llms=None, agent_factory=None)
     with pytest.raises(RuntimeError, match="AgentFactory"):
-        await sched._agent_cycle("t1", TaskState.CODING, {"prd": "test"})
+        await sched._task_runner._agent_cycle("t1", TaskState.CODING, {"prd": "test"})
 
 
 @pytest.mark.asyncio
@@ -261,8 +263,8 @@ async def test_resume_mid_state_continues():
 
 
 def test_state_to_progress_mapping():
-    assert Scheduler._state_to_progress(TaskState.IDLE) == 0.0
-    assert Scheduler._state_to_progress(TaskState.DONE) == 1.0
+    assert _state_to_progress(TaskState.IDLE) == 0.0
+    assert _state_to_progress(TaskState.DONE) == 1.0
 
 
 # ── DAG ──

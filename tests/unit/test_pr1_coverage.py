@@ -64,7 +64,7 @@ class TestRunAgentInputConstruction:
         from orbit.scheduler.orchestrator import Scheduler
 
         sched = Scheduler(agent_factory=PrdFactory)
-        await sched._run_agent("developer", "t1", {"prd": "write add function"})
+        await sched._task_runner._run_agent("developer", "t1", {"prd": "write add function"})
         assert received["task"] == "write add function"
         assert received["role"] == AgentRole.DEVELOPER
 
@@ -88,7 +88,7 @@ class TestRunAgentInputConstruction:
 
         sched = Scheduler(agent_factory=CrashFactory)
         with pytest.raises(RuntimeError, match="boom"):
-            await sched._run_agent("developer", "t1", {"prd": "test"})
+            await sched._task_runner._run_agent("developer", "t1", {"prd": "test"})
 
 
 class TestMainSchedulerInit:

@@ -53,7 +53,7 @@ class TestSingleAgentStreaming:
 
         # 连接 SSE
         resp = sse_app.get(
-            f"/api/v1/agent/dev/stream?task_id={task_id}&task=hello+world",
+            f"/api/v1/agent/dev/stream?task_id={task_id}&task=hello+world&token=orbit-local-stream",
         )
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers.get("content-type", "")

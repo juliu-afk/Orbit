@@ -113,9 +113,7 @@ class LoopScheduler:
         WHY _load_all: 重启后自动恢复活跃 loop——持久化闭环。
         """
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM loop_schedules WHERE status != 'stopped'"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM loop_schedules WHERE status != 'stopped'").fetchall()
         for row in rows:
             schedule = LoopSchedule(
                 id=row["id"],
@@ -125,9 +123,9 @@ class LoopScheduler:
                 last_run_at=row["last_run_at"],
                 next_run_at=row["next_run_at"],
                 run_count=row["run_count"],
-                last_result=json.loads(row["last_result_json"])
-                if row["last_result_json"]
-                else None,
+                last_result=(
+                    json.loads(row["last_result_json"]) if row["last_result_json"] else None
+                ),
                 created_at=row["created_at"],
             )
             self._schedules[schedule.id] = schedule

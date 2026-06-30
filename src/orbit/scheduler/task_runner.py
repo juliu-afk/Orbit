@@ -163,12 +163,16 @@ class TaskRunner:
 
         agent_llm = self._agent_llms.get(role) if self._agent_llms else None
 
+        # 减熵闭环-1: 从 PRD 提取关键词 → 激活 B1/B3/B5
+        prd_text = context.get("prd", "")
+        task_keywords = self._extract_keywords(prd_text)
         try:
             agent = self._agent_factory.create(
                 role,
                 llm=agent_llm,
                 compressor=self._compressor,
                 budget_tracker=self._budget_tracker,  # P1-4: 传递 budget_tracker
+                task_keywords=task_keywords,  # 减熵闭环-1
             )
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
@@ -340,6 +344,53 @@ class TaskRunner:
             )
         )
 
+
+    @staticmethod
+    def _extract_keywords(prd_text: str) -> list[str]:
+        """从 PRD 文本提取技术关键词——减熵闭环-1.
+
+        简单分词 + 停用词过滤 + 标识符保留。零外部依赖。
+        供 B1(上下文裁剪)/B3(模板库)/B5(决策日志) 使用。
+        """
+        if not prd_text:
+            return []
+
+        # 中文停用词——高频虚词
+        _stop = {
+            "的", "是", "在", "和", "了", "有", "不", "我", "我们", "要", "可以",
+            "这个", "那个", "一个", "一些", "需要", "应该", "能够", "使用", "通过",
+            "进行", "实现", "添加", "修改", "删除", "支持", "提供", "包括", "用于",
+            "the", "a", "an", "is", "are", "be", "to", "of", "in", "for", "and",
+            "or", "not", "this", "that", "with", "from", "will", "can", "should",
+            "it", "we", "you", "as", "if", "but", "so", "all", "no", "on", "at",
+        }
+
+        # 技术关键词——CamelCase/snake_case/中文技术词
+        keywords: list[str] = []
+        # 1. 提取英文标识符（CamelCase/snake_case）
+        for word in prd_text.replace("\n", " ").split():
+            word = word.strip(".,;:()[]{}<>\"'`/\\|!@#$%^&*+-=~")
+            if len(word) < 2:
+                continue
+            # 标识符模式：含大写字母或下划线
+            if any(c.isupper() for c in word) or "_" in word:
+                if word.lower() not in _stop:
+                    keywords.append(word)
+        # 2. 提取中文技术词（2-6 个汉字）
+        import re as _re
+        cn_terms = _re.findall(r"[一-鿿]{2,6}", prd_text)
+        for t in cn_terms:
+            if t not in _stop and t not in keywords:
+                keywords.append(t)
+        # 去重 + 限制数量
+        seen: set[str] = set()
+        uniq = []
+        for k in keywords:
+            if k.lower() not in seen:
+                seen.add(k.lower())
+                uniq.append(k)
+        # 最多 20 个关键词，避免 prompt 膨胀
+        return uniq[:20]
 
 # ── 共享工具函数 ────────────────────────────────────────
 

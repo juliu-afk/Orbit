@@ -7,6 +7,7 @@ save_checkpoint / resume / _continue_from.
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -365,8 +366,7 @@ class TaskRunner:
             if any(c.isupper() for c in word) or "_" in word:
                 if word.lower() not in _stop:
                     keywords.append(word)
-        import re as _re
-        cn_terms = _re.findall(r"[一-鿿]{2,6}", prd_text)
+        cn_terms = re.findall(r"[一-鿿]{2,6}", prd_text)
         for t in cn_terms:
             if t not in _stop and t not in keywords:
                 keywords.append(t)

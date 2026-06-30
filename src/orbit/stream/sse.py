@@ -123,7 +123,8 @@ async def agent_stream(
             yield f"event: error\ndata: {error_data}\n\n"
 
         finally:
-            # 清理 token
+            # 客户端断连时确保取消令牌——与 execute_stream finally 双重保险
+            token.cancel()
             _TOKENS.pop(task_id, None)
 
     return StreamingResponse(

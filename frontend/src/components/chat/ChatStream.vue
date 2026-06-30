@@ -7,7 +7,7 @@
  * 流程: POST /api/v1/agent/{agentId}/run → taskId
  *      → EventSource(/api/v1/agent/{agentId}/stream?taskId=...)
  */
-import { ref, computed, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useEventSource } from '@/composables/useEventSource'
 import type { StreamEvent } from '@/types/stream'
 
@@ -182,6 +182,21 @@ async function cancel() {
   isStreaming.value = false
   isThinking.value = false
 }
+
+// 挂载时若 agentId + taskId 均已提供，自动启动流
+// WHY: ChatPanel PRD 确认后传入 lastTaskId，无需用户手动触发
+onMounted(() => {
+  if (props.agentId && props.taskId) {
+    startStream()
+  }
+})
+
+// taskId 从空变为有值时自动启动（ChatPanel 异步获得 lastTaskId 场景）
+watch(() => props.taskId, (newId) => {
+  if (newId && props.agentId && !isStreaming.value) {
+    startStream()
+  }
+})
 
 // 当 agentId 变化时自动重启
 watch(() => props.agentId, () => {

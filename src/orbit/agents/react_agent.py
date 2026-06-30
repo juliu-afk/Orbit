@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
+from orbit.memory.decision_log import DecisionLog, parse_decision_marker
 from orbit.events.schemas import DashboardEvent
 from orbit.gateway.schemas import LLMRequest
 from orbit.stream.cancellation import CancellationToken
@@ -89,6 +90,7 @@ class ReActAgent(BaseAgent):
         role: AgentRole | None = None,  # Issue #3: 消除 spawn.py type: ignore
         compressor: ContextCompressor | None = None,  # Phase 2 AC7: 上下文压缩
         budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7: Token 预算
+        task_keywords: list[str] | None = None,  # 模板匹配关键词（模板库减熵）
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
@@ -101,6 +103,10 @@ class ReActAgent(BaseAgent):
         # Phase 2 AC7: 注入压缩管线——每轮 turn 自动检查触发
         self._compressor = compressor
         self._budget_tracker = budget_tracker
+        # Phase 4: 模板库关键词（供 system_prompt 注入匹配模板）
+        self._task_keywords = task_keywords or []
+        # US-B5: 决策日志（懒初始化，fail-open）
+        self._decision_log: DecisionLog | None = None
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——向后兼容 wrapper。
@@ -183,20 +189,42 @@ class ReActAgent(BaseAgent):
         task_id = input_data.context.get("task_id", "react")
         agent_id = self.role.value
 
-        # 1. 构建 system prompt
+        # US-B5: 查询相关历史决策并注入 system prompt
+        decision_history_block = ""
+        try:
+            if self._task_keywords:
+                dlog = self._get_decision_log()
+                if dlog:
+                    past = dlog.query(self._task_keywords, max_results=5)
+                    if past:
+                        lines = ["## 相关历史决策"]
+                        for d in past:
+                            line = f"- Q: {d.question} → A: {d.answer}"
+                            if d.rationale:
+                                line += f" ({d.rationale[:120]})"
+                            lines.append(line)
+                        decision_history_block = "\n".join(lines)
+        except Exception:
+            pass  # fail-open：决策日志异常不阻塞 Agent
+
+        # 1. 构建 system prompt——按角色裁剪工具列表
+        # WHY list_for_role: Clarifier 不应看到 exec_command，缩小攻击面+减少 prompt 噪音
+        role_tools = self.tools.list_for_role(self.role.value)
         prompt_builder = PromptBuilder()
         system = prompt_builder.build(
             role=self.role,
             context=input_data.context,
-            tools_schema=self.tools.get_schemas(),
+            tools_schema=role_tools,
         )
+        if decision_history_block:
+            system += "\n\n" + decision_history_block
 
         # 2. 初始化消息历史
         messages: list[dict] = [
             {"role": "system", "content": system},
             {"role": "user", "content": input_data.task},
         ]
-        tools_schema = self.tools.get_schemas()
+        tools_schema = role_tools
         reasoning_chain: list[dict] = []
         tool_call_count = 0
 
@@ -458,11 +486,25 @@ class ReActAgent(BaseAgent):
 
                 # 3f. 无 tool_calls → 正常完成
                 if not has_tool_calls:
+                    output_text = "".join(content_parts)
+
+                    # US-B5: 检测 [DECISION] 标记并记录决策
+                    try:
+                        dlog = self._get_decision_log()
+                        if dlog:
+                            decision = parse_decision_marker(output_text)
+                            if decision:
+                                decision.agent = self.role.value
+                                decision.task_id = task_id
+                                dlog.record(decision)
+                    except Exception:
+                        pass  # fail-open
+
                     reasoning_chain.append(
                         {
                             "turn": turn,
                             "action": "finish",
-                            "reasoning": "".join(content_parts)[:500],
+                            "reasoning": output_text[:500],
                         }
                     )
                     yield StreamEvent(
@@ -471,7 +513,7 @@ class ReActAgent(BaseAgent):
                         task_id=task_id,
                         turn=turn,
                         data={
-                            "output": "".join(content_parts),
+                            "output": output_text,
                             "reasoning_chain": reasoning_chain,
                             "turns": turn + 1,
                             "tool_calls": tool_call_count,
@@ -501,6 +543,16 @@ class ReActAgent(BaseAgent):
                 cancel_token.cancel()
 
     # ── 内部 ─────────────────────────────────────────────
+
+    def _get_decision_log(self) -> DecisionLog | None:
+        """懒初始化决策日志——fail-open，异常不阻塞 Agent."""
+        if self._decision_log is not None:
+            return self._decision_log
+        try:
+            self._decision_log = DecisionLog()
+            return self._decision_log
+        except Exception:
+            return None
 
     async def _emit(self, task_id: str, event_type: str, data: dict) -> None:
         """推送事件到 EventBus——对标 OpenCode fullStream events。

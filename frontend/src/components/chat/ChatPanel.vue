@@ -89,9 +89,19 @@
       </div>
     </div>
 
-    <!-- 任务状态 -->
-    <div v-if="chatStore.lastTaskId" class="chat-panel__task">
-      任务已创建：{{ chatStore.lastTaskId }}
+    <!-- Agent 流式执行——PRD 确认后串联 ChatStream -->
+    <div v-if="chatStore.lastTaskId" class="chat-panel__execution">
+      <div class="execution-header">
+        <span class="execution-badge">执行中</span>
+        <span class="execution-task-id">任务: {{ chatStore.lastTaskId }}</span>
+      </div>
+      <ChatStream
+        :agent-id="'developer'"
+        :task-id="chatStore.lastTaskId"
+        class="chat-panel__stream"
+        @finish="onStreamFinish"
+        @error="onStreamError"
+      />
     </div>
 
     <!-- 错误提示 -->
@@ -126,6 +136,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useChatStore, type StructuredPRD } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
 import CandidateCard from './CandidateCard.vue'
+import ChatStream from './ChatStream.vue'
 
 // Agent 角色 → 展示名 + emoji + 颜色 映射
 const AGENT_META: Record<string, { label: string; emoji: string; color: string }> = {
@@ -221,6 +232,16 @@ function handleConfirmPrd() {
   )
 }
 
+// ChatStream 事件处理
+function onStreamFinish(result: Record<string, unknown>) {
+  // Agent 执行完成——可在驾驶舱展示完成通知
+  console.debug('ChatStream finished', result)
+}
+
+function onStreamError(message: string) {
+  chatStore.lastError = `执行错误: ${message}`
+}
+
 // 新消息到达时滚动到底部
 watch(() => chatStore.messages.length, () => {
   nextTick(() => {
@@ -311,6 +332,36 @@ watch(() => chatStore.messages.length, () => {
   padding: 6px 10px; margin-bottom: 8px;
   background: #0a2a0a; border: 1px solid #4caf50; border-radius: 4px;
   font-size: 12px; color: #c0e0c0;
+}
+
+/* ── ChatStream 串联 ── */
+.chat-panel__execution {
+  margin-bottom: 12px;
+  border: 1px solid #2a4a2a;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.execution-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px;
+  background: #0a1a0a; border-bottom: 1px solid #2a4a2a;
+}
+.execution-badge {
+  padding: 2px 8px; border-radius: 4px;
+  background: #4caf50; color: #000;
+  font-size: 11px; font-weight: 600;
+  animation: pulse-badge 2s infinite;
+}
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.execution-task-id {
+  font-size: 11px; color: #888;
+  font-family: monospace;
+}
+.chat-panel__stream {
+  max-height: 300px;
 }
 .chat-panel__error {
   padding: 6px 10px; margin-bottom: 8px;

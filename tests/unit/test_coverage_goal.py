@@ -785,6 +785,7 @@ class TestGoalModels:
 # =============================================================================
 
 
+# P2: asyncio_run 为兼容 sync 测试的 helper，后续应统一为 @pytest.mark.asyncio
 def asyncio_run(coro):
     """同步 wrapper 运行 async 协程——sync 测试中无 running loop，直接 asyncio.run 即可。"""
     import asyncio

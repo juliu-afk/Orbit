@@ -197,14 +197,16 @@ class TestRestorer:
         s = Snapshotter(backup_dir=tmpdir)
         meta = s.snapshot_file(snap_source, db_type="test")
 
-        # 恢复——应创建 target.backup
+        # 恢复——原数据被快照覆盖，.backup 成功后清理（P2-2 PR#133）
         r = Restorer()
         result = r.restore(meta, target_path=target)
         assert result.success is True
         backup_path = target + ".backup"
-        assert os.path.exists(backup_path)
-        with open(backup_path) as f:
-            assert f.read() == "existing data"
+        # P2-2: 成功恢复后清理 .backup——不残留临时文件
+        assert not os.path.exists(backup_path)
+        # 验证目标文件已是快照数据
+        with open(target) as f:
+            assert f.read() == "snapshot data"
 
     def test_end_to_end_snapshot_verify_restore(self) -> None:
         """全流程闭环: 创建快照 → 验证 → 修改 → 恢复 → 验证。"""

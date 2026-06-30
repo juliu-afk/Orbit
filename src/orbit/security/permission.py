@@ -23,6 +23,10 @@ logger = structlog.get_logger()
 _audit = AuditLogger(trace_id="permission-engine")
 
 
+# 5C.2: 工具分类——READ vs WRITE 权限粒度
+TOOL_CATEGORY_READ = {"read_file", "grep", "glob"}
+TOOL_CATEGORY_WRITE = {"write_file", "edit_file", "exec_command"}
+
 # 角色默认工具权限
 _ROLE_DEFAULTS: dict[str, dict[str, list[str]]] = {
     "architect": {

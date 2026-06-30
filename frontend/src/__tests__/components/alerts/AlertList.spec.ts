@@ -33,6 +33,8 @@ describe('AlertList', () => {
   it('shows empty state when no alerts', () => {
     const wrapper = shallowMount(AlertList, { global })
     expect(wrapper.exists()).toBe(true)
+    // 验证空状态：无告警时应有empty提示或wrapper正常渲染
+    expect(wrapper.text()).toBeTruthy()
   })
 
   it('renders alert items from store', () => {

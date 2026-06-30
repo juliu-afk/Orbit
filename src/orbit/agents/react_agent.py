@@ -210,6 +210,9 @@ class ReActAgent(BaseAgent):
         # 1. 构建 system prompt——按角色裁剪工具列表
         # WHY list_for_role: Clarifier 不应看到 exec_command，缩小攻击面+减少 prompt 噪音
         role_tools = self.tools.list_for_role(self.role.value)
+        # 减熵闭环-1: 注入 task_keywords → B1 上下文裁剪 + B3 模板库
+        if self._task_keywords:
+            input_data.context["keywords"] = self._task_keywords
         prompt_builder = PromptBuilder()
         system = prompt_builder.build(
             role=self.role,

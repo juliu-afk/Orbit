@@ -192,7 +192,7 @@ class ReActAgent(BaseAgent):
         # US-B5: 查询相关历史决策并注入 system prompt
         decision_history_block = ""
         try:
-            if self._task_keywords:
+            if getattr(self, "_task_keywords", None):
                 dlog = self._get_decision_log()
                 if dlog:
                     past = dlog.query(self._task_keywords, max_results=5)
@@ -211,7 +211,7 @@ class ReActAgent(BaseAgent):
         # WHY list_for_role: Clarifier 不应看到 exec_command，缩小攻击面+减少 prompt 噪音
         role_tools = self.tools.list_for_role(self.role.value)
         # 减熵闭环-1: 注入 task_keywords → B1 上下文裁剪 + B3 模板库
-        if self._task_keywords:
+        if getattr(self, "_task_keywords", None):
             input_data.context["keywords"] = self._task_keywords
         prompt_builder = PromptBuilder()
         system = prompt_builder.build(

@@ -120,6 +120,16 @@ class QAAgent(ReActAgent):
     role = AgentRole.QA
     MAX_TURNS = 15  # 测试生成可能需要更多轮
 
+    async def system_prompt(self) -> str:
+        prompt = await super().system_prompt()
+        # 减熵闭环-3 B7: 测试覆盖空洞检测
+        prompt += (
+            "\n## 测试覆盖空洞分析\n"
+            "生成测试前，先分析目标函数的参数类型与已有测试的输入值组合，"
+            "找出未覆盖的边界条件（如 None/空值/负数/超限值），优先补洞。\n"
+        )
+        return prompt
+
 
 class ConfigManagerAgent(BaseAgent):
     """配置管理员 Agent：环境配置管理.

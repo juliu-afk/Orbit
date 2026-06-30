@@ -141,6 +141,16 @@ class MetaOrchestrator:
         started_at = time.time()
         goal.started_at = datetime.now(UTC).isoformat()
 
+        # 减熵闭环-3 B8: 自动生成 CLAUDE.md
+        try:
+            from orbit.knowledge.claude_md_generator import ClaudeMdGenerator
+            gen = ClaudeMdGenerator()
+            md_content = await gen.generate()
+            if md_content:
+                logger.info("claude_md_generated", length=len(md_content))
+        except Exception:
+            pass  # fail-open: 生成失败不影响任务执行
+
         try:
             # 阶段0: Intake Router
             decision = await self.intake_router.route(goal)

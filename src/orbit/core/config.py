@@ -7,6 +7,7 @@ MVP 阶段不强制校验：真实 key 校验留待 Step 2.1（LiteLLM 网关）
 """
 
 import os
+import secrets
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -97,6 +98,16 @@ class Settings:
     RESOURCE_GUARD_TOKEN_CAPACITY: int = _get_int("RESOURCE_GUARD_TOKEN_CAPACITY", 100000)
     RESOURCE_GUARD_TOKEN_RATE: int = _get_int("RESOURCE_GUARD_TOKEN_RATE", 5000)
     RESOURCE_GUARD_BUDGET_MULTIPLIER: float = float(_get("RESOURCE_GUARD_BUDGET_MULTIPLIER", "1.5"))
+
+    # ---- 安全：认证与 CORS ----
+    # WHY 随机默认值：本地桌面工具每次启动生成新 token，防止跨站请求
+    ORBIT_AUTH_TOKEN: str = _get("ORBIT_AUTH_TOKEN", secrets.token_urlsafe(32))
+    # WHY 显式设置才启用鉴权：未设置环境变量时保持向后兼容（测试/开发）
+    # P2-3 (PR#130): 类定义时求值 os.environ——仅影响动态设置环境变量后
+    # 不重载模块的场景。生产环境变量在进程启动时已确定，无实际风险。
+    AUTH_ENABLED: bool = _get_bool("ORBIT_AUTH_ENABLED", "ORBIT_AUTH_TOKEN" in os.environ)
+    # WHY tauri://localhost：Tauri 桌面壳通过自定义协议加载前端
+    CORS_ORIGINS: str = _get("CORS_ORIGINS", "http://localhost:*,tauri://localhost")
 
     # ---- Phase 2: 上下文压缩 + /dream ----
     COMPRESSION_SUMMARY_MODEL: str = _get(

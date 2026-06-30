@@ -2,11 +2,17 @@
 
 管理所有活跃 Loop 的创建/运行/停止/持久化。
 每个 Loop 在独立 asyncio 协程中运行。
+Phase 3 收尾: SQLite 持久化——重启后自动恢复活跃 loop。
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
+import sqlite3
+from collections.abc import Generator
+from contextlib import contextmanager, suppress
+from pathlib import Path
 from typing import Any
 
 import structlog
@@ -15,6 +21,8 @@ from orbit.loop.models import LoopRunner, LoopSchedule
 from orbit.loop.parser import CronParser
 
 logger = structlog.get_logger("orbit.loop")
+
+DB_PATH = Path("data/loop_schedules.db")
 
 
 class LoopScheduler:
@@ -26,6 +34,9 @@ class LoopScheduler:
         await scheduler.start(loop.id)
         # ...
         await scheduler.stop(loop.id)
+
+    SQLite 持久化: loop_schedules 表保存所有 loop 配置+运行时状态。
+    重启时 _load_all() 自动恢复未停止的 loop。
     """
 
     MAX_LOOPS = 5
@@ -36,6 +47,98 @@ class LoopScheduler:
         self._loops: dict[str, LoopRunner] = {}
         self._schedules: dict[str, LoopSchedule] = {}
         self._tasks: dict[str, asyncio.Task] = {}  # P1-NEW2/3: Task 引用用于取消
+        self._db_path = DB_PATH
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+        self._load_all()
+
+    # ── DB 层 ──────────────────────────────────────
+
+    def _init_db(self) -> None:
+        """创建 loop_schedules 表（幂等）。"""
+        with self._conn() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS loop_schedules (
+                    id TEXT PRIMARY KEY,
+                    interval_seconds INTEGER NOT NULL,
+                    command TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    last_run_at TEXT,
+                    next_run_at TEXT DEFAULT '',
+                    run_count INTEGER DEFAULT 0,
+                    last_result_json TEXT,
+                    created_at TEXT NOT NULL
+                )
+            """)
+
+    @contextmanager
+    def _conn(self) -> Generator[sqlite3.Connection]:
+        """获取 SQLite 连接上下文管理器——WAL 模式。"""
+        conn = sqlite3.connect(str(self._db_path))
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    def _save(self, schedule: LoopSchedule) -> None:
+        """持久化 LoopSchedule 到 SQLite（upsert）。"""
+        with self._conn() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO loop_schedules
+                   (id, interval_seconds, command, status, last_run_at,
+                    next_run_at, run_count, last_result_json, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    schedule.id,
+                    schedule.interval_seconds,
+                    schedule.command,
+                    schedule.status,
+                    schedule.last_run_at,
+                    schedule.next_run_at,
+                    schedule.run_count,
+                    json.dumps(schedule.last_result) if schedule.last_result else None,
+                    schedule.created_at,
+                ),
+            )
+
+    def _delete(self, loop_id: str) -> None:
+        """从 DB 删除 loop。"""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM loop_schedules WHERE id = ?", (loop_id,))
+
+    def _load_all(self) -> None:
+        """从 SQLite 恢复所有未停止的 loop 配置。
+        WHY _load_all: 重启后自动恢复活跃 loop——持久化闭环。
+        """
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM loop_schedules WHERE status != 'stopped'"
+            ).fetchall()
+        for row in rows:
+            schedule = LoopSchedule(
+                id=row["id"],
+                interval_seconds=row["interval_seconds"],
+                command=row["command"],
+                status=row["status"],
+                last_run_at=row["last_run_at"],
+                next_run_at=row["next_run_at"],
+                run_count=row["run_count"],
+                last_result=json.loads(row["last_result_json"])
+                if row["last_result_json"]
+                else None,
+                created_at=row["created_at"],
+            )
+            self._schedules[schedule.id] = schedule
+            logger.info(
+                "loop_restored",
+                loop_id=schedule.id,
+                command=schedule.command,
+                status=schedule.status,
+            )
+
+    # ── CRUD ───────────────────────────────────────
 
     async def create(self, interval: str, command: str) -> LoopSchedule:
         """创建 Loop。
@@ -50,12 +153,13 @@ class LoopScheduler:
         Raises:
             ValueError: Loop 数量达上限
         """
-        if len(self._loops) >= self.MAX_LOOPS:
+        if len(self._schedules) >= self.MAX_LOOPS:
             raise ValueError(f"Loop 数量已达上限 ({self.MAX_LOOPS})")
 
         seconds = self._parser.parse(interval)
         loop = LoopSchedule(interval_seconds=seconds, command=command)
         self._schedules[loop.id] = loop
+        self._save(loop)
 
         logger.info("loop_created", loop_id=loop.id, interval=seconds, command=command)
         return loop
@@ -66,8 +170,15 @@ class LoopScheduler:
             raise ValueError(f"Loop {loop_id} 不存在")
 
         loop = self._schedules[loop_id]
-        runner = LoopRunner(loop, self._executor or self._mock_executor)
+        # WHY 注入 _persist: LoopRunner 每次执行后回调持久化 run_count
+        runner = LoopRunner(
+            loop,
+            self._executor or self._mock_executor,
+            _persist=lambda: self._save(loop),
+        )
         self._loops[loop_id] = runner
+        loop.status = "active"
+        self._save(loop)
 
         # P1-5/P1-NEW2: 后台运行，存 Task 引用用于取消
         task = asyncio.create_task(runner.run())
@@ -94,17 +205,20 @@ class LoopScheduler:
             logger.info("loop_stopped", loop_id=loop_id)
         if loop_id in self._schedules:
             self._schedules[loop_id].status = "stopped"
+            self._save(self._schedules[loop_id])
 
     async def pause(self, loop_id: str) -> None:
         """暂停 Loop。"""
         if loop_id in self._schedules:
             self._schedules[loop_id].status = "paused"
+            self._save(self._schedules[loop_id])
             logger.info("loop_paused", loop_id=loop_id)
 
     async def resume(self, loop_id: str) -> None:
         """恢复 Loop。"""
         if loop_id in self._schedules:
             self._schedules[loop_id].status = "active"
+            self._save(self._schedules[loop_id])
             logger.info("loop_resumed", loop_id=loop_id)
 
     def list_all(self) -> list[LoopSchedule]:

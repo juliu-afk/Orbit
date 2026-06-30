@@ -90,11 +90,11 @@ class TestGatewayConstants:
     def test_circuit_breaker_constants(self) -> None:
         """熔断器阈值常量."""
         from orbit.gateway.circuit_breaker import (
-            DEFAULT_COoldown,
+            DEFAULT_COOLDOWN,
             DEFAULT_FAILURE_THRESHOLD,
             HALF_OPEN_PROBE_LIMIT,
         )
 
         assert DEFAULT_FAILURE_THRESHOLD > 0
-        assert DEFAULT_COoldown > 0
+        assert DEFAULT_COOLDOWN > 0
         assert HALF_OPEN_PROBE_LIMIT > 0

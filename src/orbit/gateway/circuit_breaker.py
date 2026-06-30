@@ -26,7 +26,7 @@ logger = structlog.get_logger()
 
 # 熔断器默认阈值（PRD Step 2.1 SC2/SC3）
 DEFAULT_FAILURE_THRESHOLD = 5  # 连续失败 5 次触发
-DEFAULT_COoldown = 60  # 冷却 60s（CIRCUIT_BREAKER_TIMEOUT 可覆盖）
+DEFAULT_COOLDOWN = 60  # 冷却 60s（CIRCUIT_BREAKER_TIMEOUT 可覆盖）
 DEFAULT_ERROR_RATE_WINDOW = 60  # 错误率统计窗口（秒）
 DEFAULT_ERROR_RATE_THRESHOLD = 0.30  # 窗口内错误率 > 30% 触发
 DEFAULT_ERROR_RATE_MIN_CALLS = 5  # 窗口内至少 5 次调用才统计错误率（避免样本太少）
@@ -46,7 +46,7 @@ class CircuitBreaker:
     def __init__(
         self,
         failure_threshold: int = DEFAULT_FAILURE_THRESHOLD,
-        cooldown: int = DEFAULT_COoldown,
+        cooldown: int = DEFAULT_COOLDOWN,
         error_rate_window: int = DEFAULT_ERROR_RATE_WINDOW,
         error_rate_threshold: float = DEFAULT_ERROR_RATE_THRESHOLD,
         error_rate_min_calls: int = DEFAULT_ERROR_RATE_MIN_CALLS,

@@ -147,7 +147,6 @@ class IntakeRouter:
             import os
 
             if os.path.exists(desc) or "/" in desc or "\\" in desc:
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
                 return "single_file"
 
         # 技术方案——含 TaskDAG 关键词

@@ -106,7 +106,7 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     # goal/loop 路由文件已自带 /api/v1/goal 前缀，不重复加 API_V1_STR
     app.include_router(goal.router)
     app.include_router(loop.router)
-# Step 9: IDE 功能追赶——审查 + 文件 + Git
+    # Step 9: IDE 功能追赶——审查 + 文件 + Git
     app.include_router(review.router, prefix=settings.API_V1_STR)
     app.include_router(files_routes.router, prefix=settings.API_V1_STR)
     app.include_router(git_routes.router, prefix=settings.API_V1_STR)
@@ -236,7 +236,11 @@ _scheduler = Scheduler(
 _scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-defined]
 
 # Step 9: 审查模块——SQLAlchemy 2.0 ORM
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession, create_async_engine  # noqa: E402
+from sqlalchemy.ext.asyncio import (
+    async_sessionmaker,
+    AsyncSession,
+    create_async_engine,
+)  # noqa: E402
 from orbit.review.service import ReviewService  # noqa: E402
 from orbit.review.models import ReviewBase  # noqa: E402
 from orbit.files.service import FileService  # noqa: E402
@@ -252,6 +256,7 @@ files_routes.set_file_service(_file_service)
 git_routes.set_workspace_dir(_ws_dir)
 # Step 9 Phase 1.3: CodeGraph 引擎——复用 graph 数据库连接
 from orbit.graph.engines.code_graph import CodeGraphEngine  # noqa: E402
+
 _code_graph_engine = CodeGraphEngine(_review_session_factory)
 
 codegraph_routes.set_code_graph(_code_graph_engine)
@@ -263,6 +268,7 @@ search_routes.set_workspace(_ws_dir)
 tests_routes.set_workspace(_ws_dir)
 # Step 9 Phase 2: 诊断服务
 from orbit.lsp.service import DiagnosticService  # noqa: E402
+
 _diagnostic_service = DiagnosticService(_ws_dir)
 
 blame_routes.set_workspace(_ws_dir)
@@ -271,14 +277,17 @@ diagnostics_ws.set_diagnostic_service(_diagnostic_service)
 
 app = create_app(_event_bus)
 
+
 @app.on_event("startup")
 async def _init_review_tables() -> None:
     async with _review_engine.begin() as conn:
         await conn.run_sync(ReviewBase.metadata.create_all)
 
+
 @app.on_event("shutdown")
 async def _shutdown_review() -> None:
     await _review_engine.dispose()  # P0-8: 释放连接池
+
 
 # Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
 app.state.compose_orchestrator = _compose_orchestrator
@@ -292,7 +301,9 @@ from orbit.goal.ensemble import ModelEnsemble  # noqa: E402
 from orbit.loop.scheduler import LoopScheduler  # noqa: E402
 
 _critique_agent = CritiqueAgent(llm=_llm_flash, model_family="anthropic")
-_model_ensemble = ModelEnsemble(agent_factory=AgentFactory, judge_llm=_llm_flash, ensemble_models=["claude-opus", "gpt-4o"])
+_model_ensemble = ModelEnsemble(
+    agent_factory=AgentFactory, judge_llm=_llm_flash, ensemble_models=["claude-opus", "gpt-4o"]
+)
 _meta_orchestrator = MetaOrchestrator(
     compose_bridge=GoalComposeBridge(llm=_llm_flash),
     critique_agent=_critique_agent,

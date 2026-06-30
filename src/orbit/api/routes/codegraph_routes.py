@@ -1,4 +1,5 @@
 """代码导航 API (Step 9 Phase 1.3)——Go to Def / References / Outline / Hover."""
+
 from __future__ import annotations
 import asyncio, ast
 from fastapi import APIRouter, HTTPException, Query
@@ -9,17 +10,29 @@ router = APIRouter(prefix="/codegraph", tags=["codegraph"])
 _code_graph = None
 _file_service = None
 
+
 def set_code_graph(engine) -> None:
-    global _code_graph; _code_graph = engine
+    global _code_graph
+    _code_graph = engine
+
 
 def set_file_service(svc) -> None:
-    global _file_service; _file_service = svc
+    global _file_service
+    _file_service = svc
+
 
 class SymbolRef(BaseModel):
-    name: str; file: str; line: int; kind: str
+    name: str
+    file: str
+    line: int
+    kind: str
+
 
 class OutlineNode(BaseModel):
-    name: str; kind: str; line: int; children: list[OutlineNode] = []
+    name: str
+    kind: str
+    line: int
+    children: list[OutlineNode] = []
 
 
 @router.get("/definition")
@@ -73,7 +86,9 @@ async def get_outline(file: str = Query(...)):
                     if isinstance(n, ast.FunctionDef):
                         class_methods.add(n.name)
                         children.append(OutlineNode(name=n.name, kind="method", line=n.lineno))
-                items.append(OutlineNode(name=node.name, kind="class", line=node.lineno, children=children))
+                items.append(
+                    OutlineNode(name=node.name, kind="class", line=node.lineno, children=children)
+                )
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, ast.FunctionDef) and node.name not in class_methods:
                 items.append(OutlineNode(name=node.name, kind="function", line=node.lineno))

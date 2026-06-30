@@ -51,7 +51,7 @@ class EditStabilityDetector:
     PING_PONG_THRESHOLD = 2
     AGENT_CONFLICT_THRESHOLD = 3
     LOOKBACK_DAYS = 7
-# P2-2: 全局历史文件硬上限——防止长期运行内存泄漏
+    # P2-2: 全局历史文件硬上限——防止长期运行内存泄漏
     MAX_HISTORY_FILES = 5000
     # P2: 超限 cooldown——每 CLEANUP_COOLDOWN 次 edit 才清一次
     CLEANUP_COOLDOWN = 50

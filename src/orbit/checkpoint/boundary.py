@@ -11,6 +11,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from orbit.compression.token_counter import count_tokens  # 5B.1
+
 import structlog
 
 logger = structlog.get_logger("orbit.checkpoint.boundary")
@@ -74,7 +76,7 @@ def compute_checkpoint_boundary(
     for msg in reversed(messages):
         role = msg.get("role", "")
         content = str(msg.get("content", ""))
-        msg_tokens = len(content) // 4
+        msg_tokens = count_tokens(content)
 
         # 检查文本保护
         if should_protect(content):
@@ -86,7 +88,7 @@ def compute_checkpoint_boundary(
             cleaned, erased = erase_compressible(content)
             msg_copy["content"] = cleaned
             total_erased += erased
-            msg_tokens = len(cleaned) // 4
+            msg_tokens = count_tokens(cleaned)
 
         kept.insert(0, msg_copy)
         total_tokens += msg_tokens

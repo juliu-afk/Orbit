@@ -1,15 +1,17 @@
-"""CJK 分词器 (Phase 2 AC9).
+"""CJK 分词器 (Phase 2 AC9 + 5B.2 jieba 增强).
 
-纯 Python bigram 实现——零依赖，零配置。
-中文/日文/韩文无空格分隔，用 bigram (2-gram) 切割。
-英文保留原词边界。
-
-WHY bigram 而非 jieba: jieba 需要额外依赖和词典，bigram 对 FTS5 snippet 搜索精度足够。
+5B.2: jieba 精确分词优先，bigram 回退。
 """
 
 from __future__ import annotations
 
 import re
+
+try:
+    import jieba
+    _JIEBA_AVAILABLE = True
+except ImportError:
+    _JIEBA_AVAILABLE = False
 
 # Unicode CJK 范围
 CJK_RANGES = [
@@ -87,16 +89,16 @@ def tokenize_for_fts(text: str) -> str:
     return " ".join(tokens)
 
 
+def _tokenize_cjk_jieba(text: str) -> str:
+    """jieba 精确分词 (5B.2)."""
+    if not text:
+        return ""
+    if _JIEBA_AVAILABLE:
+        tokens = jieba.lcut(text)
+        return " ".join(t for t in tokens if t.strip())
+    return tokenize_for_fts(text)
+
+
 def build_fts_query(raw_query: str) -> str:
-    """构建 FTS5 MATCH 查询字符串.
-
-    将用户输入转成 FTS5 兼容的 token 序列。
-    对 CJK 查询做 bigram 展开。
-
-    Args:
-        raw_query: 用户原始查询字符串
-
-    Returns:
-        FTS5 MATCH 参数——token 用空格连接
-    """
-    return tokenize_for_fts(raw_query)
+    """构建 FTS5 MATCH 查询——jieba 优先，bigram 回退."""
+    return _tokenize_cjk_jieba(raw_query)

@@ -294,11 +294,10 @@ async def _shutdown_review() -> None:
 app.state.compose_orchestrator = _compose_orchestrator
 app.state.dream_engine = _dream_engine
 
+# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler + CritiqueAgent + ModelEnsemble
 from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402
 from orbit.goal.critique import CritiqueAgent  # noqa: E402
 from orbit.goal.ensemble import ModelEnsemble  # noqa: E402
-
-# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler + CritiqueAgent + ModelEnsemble
 from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
 from orbit.loop.scheduler import LoopScheduler  # noqa: E402
 

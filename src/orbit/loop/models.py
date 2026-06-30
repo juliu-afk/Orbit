@@ -57,7 +57,6 @@ class LoopRunner:
                 }
 
             # 计算下次触发时间
-            import time
 
             await asyncio.sleep(self.schedule.interval_seconds)
             self.schedule.next_run_at = datetime.now(UTC).isoformat()

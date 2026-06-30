@@ -30,7 +30,7 @@ from orbit.events.schemas import DashboardEvent, TaskUpdatePayload, TokenUpdateP
 from orbit.gateway.client import LLMClient
 from orbit.scheduler.dag_runner import DagRunner
 from orbit.scheduler.graph import NodeStatus, TaskGraph
-from orbit.scheduler.task_runner import TaskRunner, _transition
+from orbit.scheduler.task_runner import TaskRunner
 
 logger = structlog.get_logger()
 

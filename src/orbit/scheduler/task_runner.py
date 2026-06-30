@@ -30,6 +30,7 @@ from orbit.events.schemas import DashboardEvent, TaskUpdatePayload, TokenUpdateP
 from orbit.memory.models import MemoryFileType
 from orbit.memory.store import MemoryStore
 from orbit.scheduler.complexity import ComplexityScorer
+from orbit.scheduler.edit_stability import EditStabilityDetector
 
 logger = structlog.get_logger()
 
@@ -79,6 +80,8 @@ class TaskRunner:
         self._audit_logger = audit_logger
         self.router = router
         self._fast_lane = fast_lane
+        # 减熵闭环-2: 编辑摇摆检测器（全局单例）
+        self._edit_detector = EditStabilityDetector()
 
     # ── 公共入口 ────────────────────────────────────────
 
@@ -87,6 +90,16 @@ class TaskRunner:
         state = TaskState.IDLE
         await self._save_checkpoint(task_id, state, {"prd": prd})
         context: dict[str, Any] = {"prd": prd, "artifacts": {}, "mode": "auto"}
+        # 减熵闭环-2 B4: 检查目标文件编辑稳定性
+        try:
+            target_file = context.get("target_file", "")
+            if target_file:
+                report = self._edit_detector.check(target_file)
+                if report.is_high_entropy:
+                    logger.warning("high_entropy_file_detected", file=target_file, suggestion=report.suggestion)
+                    context["entropy_warning"] = report.suggestion
+        except Exception:
+            pass  # fail-open
 
         # 复杂度评估→决定快车道
         if context.get("mode") == "auto":
@@ -220,6 +233,14 @@ class TaskRunner:
                     "orchestrator", "agent_run_error", task_id=task_id, role=role, error=str(e)
                 )
             raise
+
+        # 减熵闭环-2 B4: 记录文件编辑
+        try:
+            target_file = context.get("target_file", "")
+            if target_file and role:
+                self._edit_detector.record_edit(target_file, agent_id=role)
+        except Exception:
+            pass  # fail-open
 
         return str(output)
 

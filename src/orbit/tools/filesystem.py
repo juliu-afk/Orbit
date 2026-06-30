@@ -56,7 +56,8 @@ async def read_file(path: str, offset: int = 0, limit: int = 200) -> str:
         offset: 起始行号 (0-indexed)
         limit: 最大行数
     """
-    p = _guard_path(path, allow_outside=True)  # 只读工具允许工作区外
+    # P0-10 (Issue#126): 禁止工作区外读取——可读 /etc/passwd、~/.ssh/id_rsa 等敏感文件
+    p = _guard_path(path, allow_outside=False)
     if not p.exists():
         return f"文件不存在: {path}"
     if p.is_dir():

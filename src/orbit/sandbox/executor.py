@@ -137,12 +137,20 @@ class Sandbox:
                 mounts.append(f"{docker_path}:/readonly/{name}:ro")
 
         # 外部引用路径 → 只读
+        # P0-11 (Issue#126): 校验外部路径不穿越 workspace 边界
         ext_paths = external_paths or []
         for i, ep in enumerate(ext_paths[:MAX_READONLY_MOUNTS]):
-            if os.path.isdir(ep) and ep not in self.readonly_paths:
-                name = Path(ep).name or f"ext_{i}"
-                docker_path = _to_docker_path(ep)
-                mounts.append(f"{docker_path}:/readonly/ext/{name}:ro")
+            _resolved = os.path.realpath(ep)
+            if not os.path.isdir(_resolved) or _resolved in self.readonly_paths:
+                continue
+            # 路径遍历检测——禁止 ../ 和符号链接逃逸
+            _workspace = os.path.realpath(self.project_path) if self.project_path else None
+            if _workspace and os.path.commonpath([_workspace, _resolved]) != _workspace:
+                logger.warning("sandbox_external_path_blocked", path=ep, resolved=_resolved)
+                continue
+            name = Path(_resolved).name or f"ext_{i}"
+            docker_path = _to_docker_path(_resolved)
+            mounts.append(f"{docker_path}:/readonly/ext/{name}:ro")
 
         return mounts
 

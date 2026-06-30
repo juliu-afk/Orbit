@@ -163,12 +163,16 @@ class TaskRunner:
 
         agent_llm = self._agent_llms.get(role) if self._agent_llms else None
 
+        # 减熵闭环-1: 从 PRD 提取关键词 → 激活 B1/B3/B5
+        prd_text = context.get("prd", "")
+        task_keywords = self._extract_keywords(prd_text)
         try:
             agent = self._agent_factory.create(
                 role,
                 llm=agent_llm,
                 compressor=self._compressor,
-                budget_tracker=self._budget_tracker,  # P1-4: 传递 budget_tracker
+                budget_tracker=self._budget_tracker,
+                task_keywords=task_keywords,
             )
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
@@ -339,6 +343,40 @@ class TaskRunner:
                 ).model_dump(),
             )
         )
+
+    @staticmethod
+    def _extract_keywords(prd_text: str) -> list[str]:
+        """从 PRD 文本提取技术关键词——减熵闭环-1."""
+        if not prd_text:
+            return []
+        _stop = {
+            "的", "是", "在", "和", "了", "有", "不", "要", "可以",
+            "需要", "应该", "能够", "使用", "通过", "进行", "实现",
+            "添加", "修改", "删除", "支持", "提供", "包括", "用于",
+            "the", "a", "an", "is", "are", "be", "to", "of", "in",
+            "for", "and", "or", "not", "this", "that", "with", "from",
+            "it", "we", "you", "as", "if", "but", "so", "all", "no",
+        }
+        keywords: list[str] = []
+        for word in prd_text.replace("\n", " ").split():
+            word = word.strip(".,;:()[]{}<>\"'`/\\|!@#$%^&*+-=~")
+            if len(word) < 2:
+                continue
+            if any(c.isupper() for c in word) or "_" in word:
+                if word.lower() not in _stop:
+                    keywords.append(word)
+        import re as _re
+        cn_terms = _re.findall(r"[一-鿿]{2,6}", prd_text)
+        for t in cn_terms:
+            if t not in _stop and t not in keywords:
+                keywords.append(t)
+        seen: set[str] = set()
+        uniq = []
+        for k in keywords:
+            if k.lower() not in seen:
+                seen.add(k.lower())
+                uniq.append(k)
+        return uniq[:20]
 
 
 # ── 共享工具函数 ────────────────────────────────────────

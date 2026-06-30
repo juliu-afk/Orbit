@@ -2,7 +2,7 @@
 from __future__ import annotations
 import asyncio, json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from starlette.websockets import WebSocketException  # P1-7: 处理二进制消息
+# P1-7: WebSocketException 在 starlette 1.x 不可用，二进制消息会抛 RuntimeError/ValueError
 from orbit.lsp.service import DiagnosticService
 
 router = APIRouter()
@@ -25,7 +25,7 @@ async def diagnostics_ws(ws: WebSocket, task_id: str):
         while True:
             try:
                 data = await ws.receive_text()
-            except WebSocketException:
+            except Exception:
                 continue  # P1-7: 忽略二进制/非文本消息
             try:
                 msg = json.loads(data)

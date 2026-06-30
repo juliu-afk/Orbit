@@ -77,11 +77,8 @@ class MetaOrchestrator:
         budget_allocator: BudgetAllocator | None = None,
         verifier: ExecutorVerifier | None = None,
         critique_agent: CritiqueAgent | None = None,
-<<<<<<< HEAD
-=======
         compose_orchestrator: Any = None,  # ComposeOrchestrator
         ensemble: Any = None,  # ModelEnsemble
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         worktree_manager: WorktreeManager | None = None,
         agent_factory: Any = None,       # AgentFactory
         max_parallel_tasks: int = 5,
@@ -98,11 +95,8 @@ class MetaOrchestrator:
         self.budget_allocator = budget_allocator
         self.verifier = verifier
         self.critique_agent = critique_agent
-<<<<<<< HEAD
-=======
         self.compose_orchestrator = compose_orchestrator
         self.ensemble = ensemble
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         self._worktree = worktree_manager
         self._agent_factory = agent_factory
         self._max_parallel = max_parallel_tasks
@@ -146,8 +140,6 @@ class MetaOrchestrator:
                 return await self._run_single_task(goal)
 
             spec = self._deserialize_spec(spec_data)
-<<<<<<< HEAD
-=======
 
             # Goal→Compose: delegate to ComposeOrchestrator when available
             if self.compose_orchestrator:
@@ -157,7 +149,6 @@ class MetaOrchestrator:
                 ok = compose_result.get("status") == "ok"
                 return GoalResult(status="done" if ok else "partial", total_time_seconds=elapsed)
 
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
             layers = self._topological_layers(spec.tasks)
             previous_merge_shas: dict[str, str] = {}
 
@@ -311,19 +302,12 @@ class MetaOrchestrator:
         # P0-1: 逐层执行——Semaphore 包裹每个协程
         results: list[GoalResult] = []
         sem = asyncio.Semaphore(self._max_parallel)
-<<<<<<< HEAD
-        for layer in layers:
-            async def _run_one(g):
-                async with sem:
-                    return await self.run(g)
-=======
 
         async def _run_one(g):
             async with sem:
                 return await self.run(g)
 
         for layer in layers:
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
             layer_results = await asyncio.gather(*[_run_one(g) for g in layer])
             results.extend(layer_results)
 
@@ -354,11 +338,6 @@ class MetaOrchestrator:
             # 记录到 Ledger
             self.memory.goal_description = goal.description
             self.memory.constraints = goal.constraints
-<<<<<<< HEAD
-        except asyncio.CancelledError:
-            raise
-=======
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         except Exception as e:
             logger.warning("clarifier_failed", error=str(e))
         return goal
@@ -381,21 +360,11 @@ class MetaOrchestrator:
             logger.warning("goal_budget_exhausted", budget=goal.total_token_budget, consumed=goal.token_consumed)
             return True
         if goal.max_runtime_seconds > 0 and goal.started_at:
-<<<<<<< HEAD
-            # P1-NEW5: 更稳健的 ISO 解析
-            try:
-                started_str = goal.started_at.replace("Z", "+00:00")
-                started_dt = datetime.fromisoformat(started_str)
-                elapsed = time.time() - started_dt.timestamp()
-            except (ValueError, TypeError):
-                logger.warning("goal_time_parse_failed", started_at=goal.started_at)
-=======
             # P1-3: 防御 None/空字符串
             try:
                 started_str = goal.started_at.replace("Z", "+00:00")
                 elapsed = time.time() - datetime.fromisoformat(started_str).timestamp()
             except (ValueError, TypeError, AttributeError):
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
                 return False
             if elapsed >= goal.max_runtime_seconds:
                 logger.warning("goal_time_exhausted", max=goal.max_runtime_seconds, elapsed=int(elapsed))
@@ -461,20 +430,12 @@ class MetaOrchestrator:
 
     @staticmethod
     def _deserialize_spec(spec_data: dict) -> Any:
-<<<<<<< HEAD
-        """反序列化 Spec——兼容 dict 和 pydantic。"""
-        try:
-            from orbit.compose.models import Spec, Task
-            return Spec(**spec_data)
-        except Exception:
-=======
         """反序列化 Spec——兼容 dict 和 pydantic。P1-4: 日志记录。"""
         try:
             from orbit.compose.models import Spec, Task
             return Spec(**spec_data)
         except Exception as e:
             logger.warning("spec_deserialize_failed", error=str(e)[:200])
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
             return spec_data
 
     @staticmethod

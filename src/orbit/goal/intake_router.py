@@ -142,16 +142,10 @@ class IntakeRouter:
         if "--from" in desc or goal.three_tier_memory.get("batch_goals"):
             return "batch"
 
-<<<<<<< HEAD
-        # P1-3: 文件路径——路径分隔符检测避免误判 (P1-NEW1: 去掉阻塞 os.path.exists)
-        if desc.endswith(".md") and not desc.startswith("--"):
-            if "/" in desc or "\\" in desc:
-=======
-        # P1-3: 文件路径——结合 os.path.exists 避免误判
+        # P1-3: 文件路径——路径分隔符 + os.path.exists 双重检测避免误判
         if desc.endswith(".md") and not desc.startswith("--"):
             import os
             if os.path.exists(desc) or "/" in desc or "\\" in desc:
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
                 return "single_file"
 
         # 技术方案——含 TaskDAG 关键词

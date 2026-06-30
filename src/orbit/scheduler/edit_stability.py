@@ -1,24 +1,14 @@
 """编辑摇摆检测——业务层减熵 P1.
 
-<<<<<<< HEAD
 追踪文件变更历史 → 检测高熵模式 → 触发需求重确认。
-=======
-追踪文件变更历史 → 检测高熵模式 → 触发需求重确认.
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
 """
 
 from __future__ import annotations
 
-<<<<<<< HEAD
 import threading
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-=======
-from collections import Counter
-from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
 
 import structlog
 
@@ -31,12 +21,8 @@ class FileEditRecord:
 
     file_path: str
     agent_id: str = ""
-<<<<<<< HEAD
-    # P0: 统一用 naive datetime 避免 aware/naive 比较 TypeError
-    timestamp: datetime = field(default_factory=datetime.now)
-=======
+    # P0: 统一用 UTC-aware datetime，避免 aware/naive 比较 TypeError
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
     changed_functions: list[str] = field(default_factory=list)
 
 
@@ -56,23 +42,16 @@ class EditStabilityDetector:
     """编辑摇摆检测器——基于内存记录的轻量实现.
 
     阈值:
-<<<<<<< HEAD
-    - HIGH_ENTROPY_THRESHOLD = 4  (7天内 >=4 次编辑)
-    - PING_PONG_THRESHOLD = 2     (同样逻辑改回 >=2 次)
-    - AGENT_CONFLICT_THRESHOLD = 3  (>=3 个 Agent 编辑同一文件)
-=======
     - HIGH_ENTROPY_THRESHOLD = 4  (7天内 ≥4 次编辑)
     - PING_PONG_THRESHOLD = 2     (同样逻辑改回 ≥2 次)
     - AGENT_CONFLICT_THRESHOLD = 3  (≥3 个 Agent 编辑同一文件)
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
     """
 
     HIGH_ENTROPY_THRESHOLD = 4
     PING_PONG_THRESHOLD = 2
     AGENT_CONFLICT_THRESHOLD = 3
     LOOKBACK_DAYS = 7
-<<<<<<< HEAD
-    # P2-2: 全局历史文件硬上限——防止长期运行内存泄漏
+# P2-2: 全局历史文件硬上限——防止长期运行内存泄漏
     MAX_HISTORY_FILES = 5000
     # P2: 超限 cooldown——每 CLEANUP_COOLDOWN 次 edit 才清一次
     CLEANUP_COOLDOWN = 50
@@ -82,34 +61,23 @@ class EditStabilityDetector:
         # P1: threading.Lock——保护 record_edit + cleanup 并发，保持 sync 签名
         self._lock = threading.Lock()
         self._edit_since_cleanup = 0
-=======
-
-    def __init__(self) -> None:
-        # 内存记录——{file_path: [FileEditRecord, ...]}
-        self._history: dict[str, list[FileEditRecord]] = {}
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
 
     def record_edit(
         self, file_path: str, agent_id: str = "", changed_functions: list[str] | None = None
     ) -> None:
-<<<<<<< HEAD
         """记录一次文件编辑——线程安全."""
-=======
-        """记录一次文件编辑."""
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         record = FileEditRecord(
             file_path=file_path,
             agent_id=agent_id,
             changed_functions=changed_functions or [],
         )
-<<<<<<< HEAD
         with self._lock:
             if file_path not in self._history:
                 self._history[file_path] = []
             self._history[file_path].append(record)
 
             # 裁剪——只保留 LOOKBACK_DAYS 内的记录
-            cutoff = datetime.now() - timedelta(days=self.LOOKBACK_DAYS)
+            cutoff = datetime.now(UTC) - timedelta(days=self.LOOKBACK_DAYS)
             self._history[file_path] = [r for r in self._history[file_path] if r.timestamp > cutoff]
 
             # P2-2: 全局清理——cooldown + 缓冲
@@ -120,16 +88,6 @@ class EditStabilityDetector:
             ):
                 self._cleanup_stale()
                 self._edit_since_cleanup = 0
-=======
-        if file_path not in self._history:
-            self._history[file_path] = []
-        self._history[file_path].append(record)
-
-        # 裁剪——只保留 LOOKBACK_DAYS 内的记录
-        # P0: cutoff 用 UTC 保持与 timestamp 一致，避免 aware/naive 比较 TypeError
-        cutoff = datetime.now(UTC) - timedelta(days=self.LOOKBACK_DAYS)
-        self._history[file_path] = [r for r in self._history[file_path] if r.timestamp > cutoff]
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
 
     def check(self, file_path: str) -> StabilityReport:
         """检查文件的编辑稳定性."""
@@ -142,15 +100,10 @@ class EditStabilityDetector:
         report.is_high_entropy = True
         issues: list[str] = []
 
-<<<<<<< HEAD
-        issues.append(f"近 {self.LOOKBACK_DAYS} 天编辑 {len(records)} 次")
-
-=======
         # 检测 1: 编辑次数过多
         issues.append(f"近 {self.LOOKBACK_DAYS} 天编辑 {len(records)} 次")
 
         # 检测 2: 回弹模式——同样函数反复修改
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         func_edits: dict[str, list[str]] = {}
         for r in records:
             for func in r.changed_functions:
@@ -163,10 +116,7 @@ class EditStabilityDetector:
                 report.has_ping_pong = True
                 issues.append(f"函数 {func_name} 存在回弹模式")
 
-<<<<<<< HEAD
-=======
         # 检测 3: 多 Agent 竞争
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         agent_counts = Counter(r.agent_id for r in records if r.agent_id)
         if len(agent_counts) >= self.AGENT_CONFLICT_THRESHOLD:
             report.conflicting_agents = list(agent_counts.keys())
@@ -185,7 +135,6 @@ class EditStabilityDetector:
             if report.is_high_entropy:
                 reports.append(report)
         return reports
-<<<<<<< HEAD
 
     # ── 内部 ────────────────────────────────────────────
 
@@ -200,10 +149,11 @@ class EditStabilityDetector:
         if len(self._history) > self.MAX_HISTORY_FILES:
             sorted_files = sorted(
                 self._history.items(),
-                key=lambda kv: max((r.timestamp for r in kv[1]), default=datetime(2000, 1, 1)),
+                key=lambda kv: max(
+                    (r.timestamp for r in kv[1]),
+                    default=datetime(2000, 1, 1, tzinfo=UTC),
+                ),
             )
             remove_count = len(sorted_files) - target
             for k, _ in sorted_files[:remove_count]:
                 del self._history[k]
-=======
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313

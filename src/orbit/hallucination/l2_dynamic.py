@@ -16,6 +16,7 @@ from __future__ import annotations
 import structlog
 
 from orbit.graph.engines.code_graph import CodeGraphEngine
+from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import HallucinationLevel, ValidationResult
 from orbit.sandbox.executor import Sandbox
 
@@ -70,6 +71,7 @@ class L2DynamicTracer:
         self._sandbox = sandbox
         self._engine = code_engine
 
+    @skip_if_empty
     async def validate(self, code: str) -> ValidationResult:
         """在沙箱中执行带追踪包装的代码，验证所有函数调用是否在代码图谱中。
 
@@ -79,12 +81,6 @@ class L2DynamicTracer:
         Returns:
             ValidationResult：passed=True 所有调用均在图谱中
         """
-        if not code.strip():
-            return ValidationResult(
-                passed=True,
-                level=HallucinationLevel.L2_DYNAMIC,
-                warnings=["empty code, skipped"],
-            )
 
         # 检查沙箱可用性
         if not await self._sandbox.is_available():

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import structlog
 
+from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import HallucinationLevel, ValidationResult
 from orbit.sandbox.executor import Sandbox, SandboxExecutionError
 
@@ -30,6 +31,7 @@ class L7RuntimeValidator:
     def __init__(self, sandbox: Sandbox):
         self._sandbox = sandbox
 
+    @skip_if_empty
     async def validate(self, code: str, assertions: list[str] | None = None) -> ValidationResult:
         """在沙箱中执行代码 + assert 语句。
 
@@ -40,12 +42,6 @@ class L7RuntimeValidator:
         Returns:
             ValidationResult(passed=False) 若 assert 失败或执行异常
         """
-        if not code.strip():
-            return ValidationResult(
-                passed=True,
-                level=HallucinationLevel.L7_RUNTIME,
-                warnings=["empty code, skipped"],
-            )
 
         if not await self._sandbox.is_available():
             return ValidationResult(

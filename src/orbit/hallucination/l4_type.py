@@ -18,6 +18,7 @@ from pathlib import Path
 
 import structlog
 
+from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import (
     HallucinationLevel,
     ValidationResult,
@@ -43,6 +44,7 @@ class L4TypeValidator:
         self._mypy_path = mypy_path
         self._available: bool | None = None  # 缓存 mypy 可用性
 
+    @skip_if_empty
     async def validate(self, code: str) -> ValidationResult:
         """对代码片段运行 mypy 静态类型检查。
 
@@ -52,13 +54,6 @@ class L4TypeValidator:
         Returns:
             ValidationResult：passed=True 无类型错误，passed=False 含错误列表
         """
-        # 边缘情况：空代码跳过
-        if not code.strip():
-            return ValidationResult(
-                passed=True,
-                level=HallucinationLevel.L4_TYPE,
-                warnings=["empty code, skipped"],
-            )
 
         # 检查 mypy 是否可用（缓存结果）
         available = await self._check_available()

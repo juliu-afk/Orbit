@@ -85,6 +85,6 @@ async def exec_command(req: ExecRequest):
             stderr=stderr.decode("utf-8", errors="replace")[-10000:],
             duration_ms=(time.monotonic() - start) * 1000,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         raise HTTPException(status_code=504, detail=f"Command timed out ({req.timeout}s)")

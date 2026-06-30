@@ -45,7 +45,7 @@ class DiagnosticService:
             )
             stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30.0)
             return self._parse_mypy_output(stdout.decode("utf-8", errors="replace"))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return [
                 Diagnostic(
                     file_path=file_path,

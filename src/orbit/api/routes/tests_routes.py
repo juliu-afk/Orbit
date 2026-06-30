@@ -102,7 +102,7 @@ async def get_test_results(task_id: str | None = Query(None)):
         return TestResults(
             passed=passed, failed=failed, skipped=skipped, total=len(cases), cases=cases
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise HTTPException(status_code=504, detail="pytest timed out (>120s)")
     except FileNotFoundError:
         raise HTTPException(status_code=503, detail="pytest not found")

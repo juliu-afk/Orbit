@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import UTC
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -66,7 +66,7 @@ class ReviewSummaryResponse(BaseModel):
 
 def _ts(dt) -> float:
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt.timestamp()
 
 

@@ -468,8 +468,8 @@ class MetaOrchestrator:
                         nxt.append(task_map[neighbor])
             current = nxt
 
-        if sum(len(l) for l in layers) != len(tasks):
-            remaining = {t.id for t in tasks} - {t.id for l in layers for t in l}
+        if sum(len(ly) for ly in layers) != len(tasks):
+            remaining = {t.id for t in tasks} - {t.id for ly in layers for t in ly}
             raise ValueError(f"环形依赖或不可达节点: {remaining}")
         return layers
 

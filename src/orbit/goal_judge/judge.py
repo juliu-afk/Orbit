@@ -170,20 +170,43 @@ class GoalJudge:
 
         try:
             content = response.content.strip()
-            # P0-6 (Issue#126): Markdown 剥离缺陷修复——
-            # 原逻辑仅处理以 ``` 开头的情况，可被 "```json\n{...}\n```" 之外的格式绕过
-            # 用正则提取 JSON 块：匹配 ```json ... ``` 或无包裹的纯 JSON
-            _md_json = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
-            if _md_json:
-                content = _md_json.group(1)
-            else:
-                # 无 markdown 包裹时提取第一个 JSON 对象
+            # P0-6 (Issue#126): 栈计数匹配完整 JSON——
+            # 非贪婪正则/简单 strip 会截断嵌套 JSON
+            _md_block = re.search(r"```(?:json)?\s*", content)
+            if _md_block:
+                _json_start = _md_block.end()
+                _json_end = content.find("```", _json_start)
+                if _json_end >= 0:
+                    _candidate = content[_json_start:_json_end].strip()
+                    if _candidate.startswith("{"):
+                        depth = 0
+                        end_idx = 0
+                        for i, ch in enumerate(_candidate):
+                            if ch == "{":
+                                depth += 1
+                            elif ch == "}":
+                                depth -= 1
+                                if depth == 0:
+                                    end_idx = i + 1
+                                    break
+                        if end_idx > 0:
+                            content = _candidate[:end_idx]
+            # 回退: 无 markdown 包裹时找第一个 { 到匹配的 }
+            if not content or not content.startswith("{"):
                 _json_start = content.find("{")
                 if _json_start >= 0:
-                    content = content[_json_start:]
-                    _json_end = content.rfind("}") + 1
-                    if _json_end > 0:
-                        content = content[:_json_end]
+                    depth = 0
+                    end_idx = 0
+                    for i, ch in enumerate(content[_json_start:], _json_start):
+                        if ch == "{":
+                            depth += 1
+                        elif ch == "}":
+                            depth -= 1
+                            if depth == 0:
+                                end_idx = i + 1
+                                break
+                    if end_idx > 0:
+                        content = content[_json_start:end_idx]
             data = json.loads(content)
             return Verdict(
                 ok=data.get("ok", True),  # 默认 fail-open

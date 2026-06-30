@@ -8,15 +8,18 @@ services:
     container_name: orbit-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: orbit
+      POSTGRES_USER: ${POSTGRES_USER:-orbit}
+      # P0-15 (Issue#126): 密码从环境变量读取，禁止硬编码
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orbit_dev_请修改}
+      POSTGRES_DB: ${POSTGRES_DB:-orbit}
     ports:
       - "5432:5432"
     volumes:
       - orbit-pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d orbit"]
+      # P0-1 (PR#131): $$ 转义使 Compose 将变量传给容器——之前硬编码 -U postgres
+      # 与 POSTGRES_USER=orbit 不匹配导致 healthcheck 永远失败
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-orbit} -d $${POSTGRES_DB:-orbit}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -40,7 +43,10 @@ services:
     container_name: orbit-litellm
     restart: unless-stopped
     environment:
-      LITELLM_MASTER_KEY: sk-123456
+      # P0-15 (Issue#126): 密钥从环境变量读取——禁止硬编码
+      # P1-3 (PR#131): REPLACE_WITH_YOUR_KEY 无 sk- 前缀, 避免 truffleHog 误报
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-REPLACE_WITH_YOUR_KEY}
+      # P1-4 (PR#131): ZAI = 智谱 AI (Zhipu AI) 缩写
       ZAI_API_KEY: ${ZAI_API_KEY:-sk-dummy}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-sk-dummy}
     ports:

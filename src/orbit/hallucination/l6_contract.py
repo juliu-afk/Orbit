@@ -18,6 +18,7 @@ from typing import Any
 
 import structlog
 
+from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import (
     HallucinationLevel,
     L6ContractMatch,
@@ -42,6 +43,7 @@ class L6ContractValidator:
         self._spec_path = Path(openapi_path)
         self._spec: dict[str, Any] | None = None  # 缓存解析结果
 
+    @skip_if_empty
     async def validate(self, code: str) -> ValidationResult:
         """比对代码实现与 OpenAPI 规格。
 
@@ -51,12 +53,6 @@ class L6ContractValidator:
         Returns:
             ValidationResult：passed=False 存在不一致
         """
-        if not code.strip():
-            return ValidationResult(
-                passed=True,
-                level=HallucinationLevel.L6_CONTRACT,
-                warnings=["empty code, skipped"],
-            )
 
         # 解析 OpenAPI spec
         spec = await self._load_spec()

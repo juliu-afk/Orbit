@@ -17,6 +17,7 @@ import ast
 import structlog
 
 from orbit.graph.engines.code_graph import CodeGraphEngine
+from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import (
     HallucinationLevel,
     ValidationResult,
@@ -102,6 +103,7 @@ class L1GraphValidator:
     def __init__(self, code_engine: CodeGraphEngine):
         self._engine = code_engine
 
+    @skip_if_empty
     async def validate(self, code: str) -> ValidationResult:
         """验证代码中所有静态符号引用是否存在于图谱中。
 
@@ -112,13 +114,6 @@ class L1GraphValidator:
             ValidationResult(passed=True) 全部存在；
             ValidationResult(passed=False) 含缺失符号列表
         """
-        # 边缘情况：空代码跳过
-        if not code.strip():
-            return ValidationResult(
-                passed=True,
-                level=HallucinationLevel.L1_GRAPH,
-                warnings=["empty code, skipped"],
-            )
 
         # 提取符号
         try:

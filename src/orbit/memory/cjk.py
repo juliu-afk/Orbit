@@ -9,6 +9,7 @@ import re
 
 try:
     import jieba
+
     _JIEBA_AVAILABLE = True
 except ImportError:
     _JIEBA_AVAILABLE = False

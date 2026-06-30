@@ -47,7 +47,7 @@ class RateLimiter:
         if request.client and request.client.host:
             client_ip = request.client.host
         else:
-            # P2-1 (PR#131): "unknown" IP 用独立桶+更大窗口——
+            # P2-1 (PR#131): "unknown" IP 使用独立桶——
             # 避免所有无 client 请求共享一个限流桶形成 DoS 条件
             client_ip = "unknown"
         key = f"{client_ip}:{request.url.path}"

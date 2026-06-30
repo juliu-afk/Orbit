@@ -169,11 +169,43 @@ class GoalJudge:
 
         try:
             content = response.content.strip()
-            # 去除可能的 markdown code block
-            if content.startswith("```"):
-                content = content.strip("`")
-                if content.startswith("json"):
-                    content = content[4:]
+            # P0-NEW-1: 栈计数匹配完整JSON——非贪婪/简单strip会截断嵌套JSON
+            import re as _re
+            _md_block = _re.search(r"```(?:json)?\s*", content)
+            if _md_block:
+                _json_start = _md_block.end()
+                _json_end = content.find("```", _json_start)
+                if _json_end >= 0:
+                    _candidate = content[_json_start:_json_end].strip()
+                    if _candidate.startswith("{"):
+                        depth = 0
+                        end_idx = 0
+                        for i, ch in enumerate(_candidate):
+                            if ch == "{":
+                                depth += 1
+                            elif ch == "}":
+                                depth -= 1
+                                if depth == 0:
+                                    end_idx = i + 1
+                                    break
+                        if end_idx > 0:
+                            content = _candidate[:end_idx]
+            # 回退: 无markdown包裹时找第一个{...}对象
+            if not content or not content.startswith("{"):
+                _json_start = content.find("{")
+                if _json_start >= 0:
+                    depth = 0
+                    end_idx = 0
+                    for i, ch in enumerate(content[_json_start:], _json_start):
+                        if ch == "{":
+                            depth += 1
+                        elif ch == "}":
+                            depth -= 1
+                            if depth == 0:
+                                end_idx = i + 1
+                                break
+                    if end_idx > 0:
+                        content = content[_json_start:end_idx]
             data = json.loads(content)
             return Verdict(
                 ok=data.get("ok", True),  # 默认 fail-open

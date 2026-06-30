@@ -100,7 +100,8 @@ describe('TestPanel', () => {
     const wrapper = shallowMount(TestPanel, { global: { stubs } })
     await wrapper.find('.el-button-stub').trigger('click')
     await flushPromises()
-    // 组件应展示错误文字或保留之前状态（不崩溃）
-    expect(wrapper.find('.test-error').exists() || true).toBe(true)
+    // R2-1 (PR#131): 验证组件在 API 错误时不崩溃
+    // 不期待特定 CSS class——仅验证组件仍然挂载可用
+    expect(wrapper.find('.el-button-stub').exists()).toBe(true)
   })
 })

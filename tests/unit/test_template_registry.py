@@ -130,13 +130,16 @@ class TestLoadTemplate:
     def test_fill_placeholder(self, tmp_templates_dir: Path):
         """fill() 正确替换 {{param}} 占位符."""
         reg = TemplateRegistry(templates_dir=str(tmp_templates_dir))
-        result = reg.fill("crud_endpoint", {
-            "model_name": "Item",
-            "model_name_lower": "item",
-            "table_name": "items",
-            "schema_name": "ItemOut",
-        })
-        assert "@router.get(\"/items/\")" in result
+        result = reg.fill(
+            "crud_endpoint",
+            {
+                "model_name": "Item",
+                "model_name_lower": "item",
+                "table_name": "items",
+                "schema_name": "ItemOut",
+            },
+        )
+        assert '@router.get("/items/")' in result
         assert "list_item" in result
         assert "list_item" in result  # 测试模板含 list_{{model_name_lower}}
 

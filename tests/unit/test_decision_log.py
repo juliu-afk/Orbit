@@ -1,4 +1,5 @@
 """决策日志单元测试——US-B5 业务层减熵."""
+
 # ruff: noqa: S101  # 允许 plain assert
 
 from __future__ import annotations

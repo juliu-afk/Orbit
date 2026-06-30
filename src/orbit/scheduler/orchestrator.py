@@ -30,7 +30,7 @@ from orbit.events.schemas import DashboardEvent, TaskUpdatePayload, TokenUpdateP
 from orbit.gateway.client import LLMClient
 from orbit.scheduler.dag_runner import DagRunner
 from orbit.scheduler.graph import NodeStatus, TaskGraph
-from orbit.scheduler.task_runner import TaskRunner
+from orbit.scheduler.task_runner import TaskRunner, _transition
 
 logger = structlog.get_logger()
 
@@ -118,11 +118,6 @@ class Scheduler:
             logger.info("golden_route_match", why=why, route=route)
             return route
         return ["developer"]
-
-    def _transition(self, current: TaskState) -> TaskState:
-        from orbit.scheduler.task_runner import _transition as _do
-
-        return _do(current, self._fast_lane)
 
     def _publish_task_update(
         self,

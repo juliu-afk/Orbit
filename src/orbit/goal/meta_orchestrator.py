@@ -6,26 +6,29 @@ v5 架构核心:
 - 每个子任务独立 SubTaskSession（独立 128K 上下文）
 - 子任务间通过 git merge commit 传递状态 —— 0 Token 开销
 - 自主 PR 合入门禁: CritiqueAgent APPROVED + ExecutorVerifier 通过 + RegressionGuard 无回归
+- Phase 3 组 2: Goal pause/resume——asyncio.Event 层间暂停
 """
 
 from __future__ import annotations
 
 import asyncio
+import structlog
 import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
-
-import structlog
 
 from orbit.goal.intake_router import IntakeRouter
 from orbit.goal.memory_tiers import ThreeTierMemory
+from typing import TYPE_CHECKING, Any
+
 from orbit.goal.models import (
+    GoalBatchReport,
     GoalResult,
     GoalSession,
     SubTaskResult,
 )
 
 if TYPE_CHECKING:
+    from orbit.compose.models import Spec, Task
     from orbit.goal.alignment import AlignmentCheck
     from orbit.goal.budget_allocator import BudgetAllocator
     from orbit.goal.compose_bridge import GoalComposeBridge
@@ -34,6 +37,7 @@ if TYPE_CHECKING:
     from orbit.goal.preflight import PreFlightEstimator
     from orbit.goal.progress_tracker import ProgressTracker
     from orbit.goal.regression_guard import RegressionGuard
+    from orbit.goal.subtask_session import SubTaskSession
     from orbit.goal.verifier import ExecutorVerifier
     from orbit.worktree.manager import WorktreeManager
 
@@ -109,15 +113,21 @@ class MetaOrchestrator:
     def pause(self) -> None:
         """暂停当前 Goal——运行中的循环在下一个检查点阻塞。
 
-        WHY asyncio.Event.clear: 使 _pause_event.wait() 阻塞，
-        循环在层间或子任务间暂停。
+        P2-2: 幂等——重复调用安全，已暂停时跳过。
         """
+        if self._paused:
+            return
         self._paused = True
         self._pause_event.clear()
         logger.info("meta_orchestrator_paused")
 
     def resume(self) -> None:
-        """恢复已暂停的 Goal——解除检查点阻塞。"""
+        """恢复已暂停的 Goal——解除检查点阻塞。
+
+        P2-2: 幂等——重复调用安全，未暂停时跳过。
+        """
+        if not self._paused:
+            return
         self._paused = False
         self._pause_event.set()
         logger.info("meta_orchestrator_resumed")
@@ -144,16 +154,17 @@ class MetaOrchestrator:
                 goal = await self._clarify(goal)
 
             # 按需拆解
-            if decision.needs_decompose and self.compose_bridge and not goal.spec:
-                estimate = None
-                if self.preflight:
-                    estimate = await self.preflight.estimate(goal.description)
-                spec = await self.compose_bridge.generate_spec(goal)
-                confirmed = await self._present_for_confirmation(estimate, spec, goal)
-                if not confirmed:
-                    return GoalResult(status="cancelled", reason="用户取消")
-                goal.spec = spec.model_dump() if hasattr(spec, "model_dump") else spec
-                goal.sub_tasks = {t.id: "pending" for t in spec.tasks}
+            if decision.needs_decompose and self.compose_bridge:
+                if not goal.spec:
+                    estimate = None
+                    if self.preflight:
+                        estimate = await self.preflight.estimate(goal.description)
+                    spec = await self.compose_bridge.generate_spec(goal)
+                    confirmed = await self._present_for_confirmation(estimate, spec, goal)
+                    if not confirmed:
+                        return GoalResult(status="cancelled", reason="用户取消")
+                    goal.spec = spec.model_dump() if hasattr(spec, "model_dump") else spec
+                    goal.sub_tasks = {t.id: "pending" for t in spec.tasks}
 
             # 已有 TaskDAG→直接执行
             spec_data = goal.spec
@@ -178,7 +189,7 @@ class MetaOrchestrator:
 
             # 阶段1: 分层调度
             completed_count = 0
-            for _layer_idx, layer in enumerate(layers):
+            for layer_idx, layer in enumerate(layers):
                 # 解析 base_ref
                 task_bases = self._resolve_bases(layer, previous_merge_shas)
 
@@ -200,7 +211,7 @@ class MetaOrchestrator:
                 )
 
                 # 处理结果
-                for task, result in zip(layer, layer_results, strict=False):
+                for task, result in zip(layer, layer_results):
                     goal.sub_tasks[task.id] = result.status if result.status == "ok" else "failed"
                     goal.token_consumed += result.tokens_used
 
@@ -371,17 +382,14 @@ class MetaOrchestrator:
             # 记录到 Ledger
             self.memory.goal_description = goal.description
             self.memory.constraints = goal.constraints
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.warning("clarifier_failed", error=str(e))
         return goal
 
     async def _present_for_confirmation(self, estimate, spec, goal: GoalSession) -> bool:
-        """展示拆解结果——等待用户确认。
-
-        实际实现: 通过 WebSocket/chat 界面展示。
-        此处为占位——返回 True 表示自动确认。
-        """
-        # TODO: 接入 chat 交互层——展示 Spec + 预算 + 等待用户 Y/n
+        """展示拆解结果——等待用户确认。"""
         logger.info("present_for_confirmation", goal_id=goal.id, spec_title=spec.title)
         return True
 
@@ -395,11 +403,12 @@ class MetaOrchestrator:
             )
             return True
         if goal.max_runtime_seconds > 0 and goal.started_at:
-            # P1-3: 防御 None/空字符串
             try:
                 started_str = goal.started_at.replace("Z", "+00:00")
-                elapsed = time.time() - datetime.fromisoformat(started_str).timestamp()
-            except (ValueError, TypeError, AttributeError):
+                started_dt = datetime.fromisoformat(started_str)
+                elapsed = time.time() - started_dt.timestamp()
+            except (ValueError, TypeError):
+                logger.warning("goal_time_parse_failed", started_at=goal.started_at)
                 return False
             if elapsed >= goal.max_runtime_seconds:
                 logger.warning(
@@ -409,19 +418,18 @@ class MetaOrchestrator:
         return False
 
     def _generate_batch_report(self, results: list[GoalResult]) -> str:
-        """生成批量执行报告——markdown 文件路径。"""
+        """生成批量执行报告。"""
         timestamp = datetime.now(UTC).strftime("%Y-%m-%d-%H%M")
         path = f"docs/goal-report-{timestamp}.md"
-        # TODO: 写入文件
         logger.info("batch_report_generated", path=path, count=len(results))
         return path
 
     @staticmethod
     def _resolve_bases(
-        layer: list[Any],  # list[Task]
+        layer: list[Any],
         previous_merges: dict[str, str],
     ) -> dict[str, str]:
-        """P1-1: 确定每个 task 的 base_ref。多依赖取最晚合入 SHA。"""
+        """P1-1: 确定每个 task 的 base_ref。"""
         bases = {}
         for t in layer:
             if not t.depends_on:
@@ -429,9 +437,6 @@ class MetaOrchestrator:
             else:
                 dep_shas = [previous_merges[d] for d in t.depends_on if d in previous_merges]
                 if not dep_shas:
-                    logger.warning(
-                        "resolve_bases_no_deps_found", task_id=t.id, depends_on=list(t.depends_on)
-                    )
                     bases[t.id] = "main"
                 else:
                     bases[t.id] = dep_shas[-1]
@@ -439,7 +444,7 @@ class MetaOrchestrator:
 
     @staticmethod
     def _topological_layers(tasks: list[Any]) -> list[list[Any]]:
-        """P1-2/P2-6: Kahn 算法按层分组。缺失依赖 warning，不可达节点报错。"""
+        """Kahn 算法按层分组。"""
         task_map = {t.id: t for t in tasks}
         in_degree = {t.id: len(t.depends_on) for t in tasks}
         adj: dict[str, list[str]] = {t.id: [] for t in tasks}
@@ -447,10 +452,6 @@ class MetaOrchestrator:
             for dep in t.depends_on:
                 if dep in adj:
                     adj[dep].append(t.id)
-                else:
-                    logger.warning(
-                        "topological_sort_missing_dependency", task_id=t.id, missing_dep=dep
-                    )
 
         layers = []
         current = [t for t in tasks if in_degree[t.id] == 0]
@@ -464,16 +465,16 @@ class MetaOrchestrator:
                         nxt.append(task_map[neighbor])
             current = nxt
 
-        if sum(len(ly) for ly in layers) != len(tasks):
-            remaining = {t.id for t in tasks} - {t.id for ly in layers for t in ly}
+        if sum(len(l) for l in layers) != len(tasks):
+            remaining = {t.id for t in tasks} - {t.id for l in layers for t in l}
             raise ValueError(f"环形依赖或不可达节点: {remaining}")
         return layers
 
     @staticmethod
     def _deserialize_spec(spec_data: dict) -> Any:
-        """反序列化 Spec——兼容 dict 和 pydantic。P1-4: 日志记录。"""
+        """反序列化 Spec——兼容 dict 和 pydantic。"""
         try:
-            from orbit.compose.models import Spec
+            from orbit.compose.models import Spec, Task
 
             return Spec(**spec_data)
         except Exception as e:

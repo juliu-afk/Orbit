@@ -1,7 +1,6 @@
-"""Token 预算跟踪器 (Phase 2 AC8).
+"""Token 预算跟踪器 (Phase 2 AC8 + 5B.1 tiktoken 升级).
 
-跟踪每个 Session 的 token 使用量，判断是否触发压缩。
-WHY chars/4 而非 tiktoken: 零依赖零延迟，±20% 误差在 128K 窗口下安全。
+5B.1: 用 TokenCounter (tiktoken→chars/4 回退) 替代裸 chars/4。
 """
 
 from __future__ import annotations
@@ -9,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from orbit.compression.models import CompressionAction, CompressionThreshold, TokenBudget
+from orbit.compression.token_counter import count_tokens
 
 
 class TokenBudgetTracker:
@@ -35,22 +35,22 @@ class TokenBudgetTracker:
     # ── 公共 API ──────────────────────────────────────
 
     def estimate_tokens(self, messages: list[dict[str, Any]]) -> int:
-        """估算消息列表的 token 数.
+        """估算消息列表的 token 数——tiktoken 精确计数.
 
-        WHY chars/4: GPT tokenizer 大约 1 token = 4 英文字符。
+        5B.1: tiktoken 大约 1 token = 4 英文字符。
         中文字符约 1.5-2 token/字，chars/4 对中文略微低估，但在 128K 窗口下安全。
         """
         total = 0
         for msg in messages:
             content = msg.get("content", "")
             if isinstance(content, str) and content:
-                total += len(content) // 4
+                total += count_tokens(content)
                 # per-message overhead: role 标记 + 格式化
                 total += 20
             # tool_calls 也消耗 token
             tool_calls = msg.get("tool_calls")
             if tool_calls:
-                total += len(str(tool_calls)) // 4
+                total += count_tokens(str(tool_calls))
         return max(1, total)
 
     def record_usage(self, estimated_tokens: int) -> None:

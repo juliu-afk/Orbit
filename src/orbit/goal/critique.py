@@ -20,9 +20,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
-    from orbit.compose.models import Task
-    from orbit.gateway.client import LLMClient
-    from orbit.gateway.schemas import LLMRequest
+    pass
 
 logger = structlog.get_logger("orbit.goal")
 

@@ -21,6 +21,7 @@ class DreamStatus(StrEnum):
     COMPLETE = "complete"
     FAILED = "failed"
     REJECTED = "rejected"
+    SKIPPED = "skipped"  # 5B.3
 
 
 class DreamConfig(BaseModel):
@@ -39,4 +40,5 @@ class DreamResult(BaseModel):
     lines: int = 0
     bytes: int = 0
     errors: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)  # 5B.3
     verification_message: str = ""

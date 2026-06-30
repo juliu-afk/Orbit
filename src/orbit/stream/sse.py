@@ -12,11 +12,12 @@ import json
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from orbit.agents.factory import AgentFactory
+from orbit.api.dependencies import verify_stream_token  # 5C.1
 from orbit.stream.cancellation import CancellationToken
 
 logger = structlog.get_logger()
@@ -68,6 +69,7 @@ async def agent_stream(
     request: Request,
     llm: Any = None,
     tools: Any = None,
+    _token: str = Depends(verify_stream_token),  # 5C.1
 ) -> StreamingResponse:
     """SSE 端点——流式推送 Agent 执行事件。
 

@@ -27,9 +27,15 @@ class LoopSchedule(BaseModel):
 class LoopRunner:
     """Loop 运行器——asyncio 协程。"""
 
-    def __init__(self, schedule: LoopSchedule, callback: callable) -> None:
+    def __init__(
+        self,
+        schedule: LoopSchedule,
+        callback: callable,
+        _persist: callable | None = None,
+    ) -> None:
         self.schedule = schedule
         self._callback = callback
+        self._persist = _persist  # Phase 3: 每次运行后持久化 run_count
         self._running = False
         self._task = None
 
@@ -56,8 +62,14 @@ class LoopRunner:
                     "run_at": datetime.now(UTC).isoformat(),
                 }
 
+            # WHY _persist: 每次运行后保存 run_count 到 SQLite——重启不丢计数
+            if self._persist:
+                try:
+                    self._persist()
+                except Exception:
+                    pass  # fail-safe: 持久化失败不中断循环
+
             # 计算下次触发时间
-            import time
 
             await asyncio.sleep(self.schedule.interval_seconds)
             self.schedule.next_run_at = datetime.now(UTC).isoformat()

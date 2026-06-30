@@ -53,11 +53,11 @@ async def test_l7_empty_code(validator, mock_sandbox):
 
 @pytest.mark.asyncio
 async def test_l7_sandbox_unavailable(validator, mock_sandbox):
-    """沙箱不可用 → skipped。"""
+    """沙箱不可用 → fail-closed (P0-7: 无法验证=不应信任)。"""
     mock_sandbox.is_available.return_value = False
     result = await validator.validate("x = 1")
-    assert result.passed is True
-    assert any("unavailable" in w.lower() for w in result.warnings)
+    assert result.passed is False
+    assert any("sandbox" in e.lower() for e in result.errors)
 
 
 @pytest.mark.asyncio

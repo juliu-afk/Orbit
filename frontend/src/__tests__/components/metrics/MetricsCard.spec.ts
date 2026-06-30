@@ -19,7 +19,7 @@ describe('MetricsCard', () => {
     expect(wrapper.find('.metrics-card__unit').text()).toBe('ms')
   })
 
-  it('shows trend indicator with arrow and percentage', () => {
+  it('shows trend indicator with arrow and percentage (P2-3: 后续拆分为up/down独立测试)', () => {
     const wrapper = shallowMount(MetricsCard, {
       props: { title: '错误率', value: 5, trend: 12 },
     })

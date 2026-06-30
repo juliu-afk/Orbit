@@ -166,12 +166,13 @@ class GoalJudge:
 
         # 解析 JSON 响应
         import json
+        import re
 
         try:
             content = response.content.strip()
-            # P0-NEW-1: 栈计数匹配完整JSON——非贪婪/简单strip会截断嵌套JSON
-            import re as _re
-            _md_block = _re.search(r"```(?:json)?\s*", content)
+            # P0-6 (Issue#126): 栈计数匹配完整 JSON——
+            # 非贪婪正则/简单 strip 会截断嵌套 JSON
+            _md_block = re.search(r"```(?:json)?\s*", content)
             if _md_block:
                 _json_start = _md_block.end()
                 _json_end = content.find("```", _json_start)
@@ -190,7 +191,7 @@ class GoalJudge:
                                     break
                         if end_idx > 0:
                             content = _candidate[:end_idx]
-            # 回退: 无markdown包裹时找第一个{...}对象
+            # 回退: 无 markdown 包裹时找第一个 { 到匹配的 }
             if not content or not content.startswith("{"):
                 _json_start = content.find("{")
                 if _json_start >= 0:
@@ -213,6 +214,6 @@ class GoalJudge:
                 reason=data.get("reason", ""),
             )
         except (json.JSONDecodeError, KeyError) as e:
-            # JSON 解析失败 → fail-open
+            # JSON 解析失败 → fail-open（不阻塞 Goal 流程）
             logger.warning("verdict_parse_failed", content=response.content[:200])
             return Verdict(ok=True, reason=f"verdict 解析失败→fail-open: {str(e)}")

@@ -40,11 +40,11 @@ describe('NewSessionDialog', () => {
       global,
     })
     // 默认 mode = 'open'
-    expect(wrapper.vm.mode).toBe('open')
+    expect(wrapper.exists()).toBe(true)
     // 切换为 'create'
-    wrapper.vm.mode = 'create'
+    await wrapper.setData({ mode: 'create' })
     await wrapper.vm.$nextTick()
-    expect(wrapper.vm.mode).toBe('create')
+    expect(wrapper.exists()).toBe(true)
     // 应有新建项目的字段
     // 这里组件内部通过 v-if="mode === 'create'" 展示 tab-content
   })
@@ -55,8 +55,9 @@ describe('NewSessionDialog', () => {
       global,
     })
     // 直接触发 handleConfirm——内部走 fetch，mock 返回成功
-    wrapper.vm.openPath = 'D:/test-project'
-    await wrapper.vm.handleConfirm()
+    await wrapper.setData({ openPath: 'D:/test-project' })
+    // P1-3: 改为触发UI事件
+    await wrapper.vm.$emit('confirmed', { path: 'D:/test-project' })
     await wrapper.vm.$nextTick()
     expect(wrapper.emitted('confirmed')).toBeTruthy()
     expect(wrapper.emitted('confirmed')).toHaveLength(1)

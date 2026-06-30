@@ -36,7 +36,7 @@ describe('EmptyState', () => {
     expect(wrapper.find('.action-btn').text()).toBe('New')
   })
 
-  it('applies min-height and flex layout styles', () => {
+  it('renders with proper layout structure', () => {
     const wrapper = mount(EmptyState, {
       props: { description: 'x' },
       global: { stubs: { 'el-empty': true } },

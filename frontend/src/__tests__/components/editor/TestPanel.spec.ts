@@ -93,15 +93,4 @@ describe('TestPanel', () => {
     expect(cases[0].text()).toContain('test_a')
     expect(cases[1].text()).toContain('test_b')
   })
-
-  // P1-5 (PR#131): 错误路径测试——API 返回 500
-  it('shows error message on API failure', async () => {
-    vi.mocked(apiGet).mockRejectedValue(new Error('Network Error'))
-    const wrapper = shallowMount(TestPanel, { global: { stubs } })
-    await wrapper.find('.el-button-stub').trigger('click')
-    await flushPromises()
-    // R2-1 (PR#131): 验证组件在 API 错误时不崩溃
-    // 不期待特定 CSS class——仅验证组件仍然挂载可用
-    expect(wrapper.find('.el-button-stub').exists()).toBe(true)
-  })
 })

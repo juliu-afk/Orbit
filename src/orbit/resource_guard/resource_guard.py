@@ -23,7 +23,7 @@ import structlog
 from orbit.gateway.circuit_breaker import (
     DEFAULT_FAILURE_THRESHOLD,
     HALF_OPEN_PROBE_LIMIT,
-    DEFAULT_COoldown,
+    DEFAULT_COOLDOWN,
 )
 from orbit.gateway.schemas import CircuitBreakerState as GatewayCircuitState
 from orbit.observability.metrics import orbit_circuit_breaker_state
@@ -50,7 +50,7 @@ class ResourceGuard:
     """资源熔断守护——全局 + 单任务双层保护。
 
     消重 P0: 熔断状态机改用 gateway CircuitBreakerState 模型 + 阈值常量
-    (DEFAULT_FAILURE_THRESHOLD=5 / DEFAULT_COoldown=60)。
+    (DEFAULT_FAILURE_THRESHOLD=5 / DEFAULT_COOLDOWN=60)。
     不再维护独立的 _state / _failure_count / _open_at / _last_failure_time 散字段。
 
     用法:
@@ -80,7 +80,7 @@ class ResourceGuard:
         # 熔断状态——复用 gateway CircuitBreakerState 模型，消重
         self._circuit: GatewayCircuitState = GatewayCircuitState()
         self._failure_threshold = DEFAULT_FAILURE_THRESHOLD
-        self._cooldown_seconds = DEFAULT_COoldown
+        self._cooldown_seconds = DEFAULT_COOLDOWN
         self._half_open_probes: int = 0
         # 减熵闭环-2 B6: 依赖膨胀拦截
         self._dep_guard = DependencyGuard()

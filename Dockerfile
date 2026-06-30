@@ -13,10 +13,17 @@ RUN poetry config virtualenvs.create false \
     && poetry install --only main --no-root --no-interaction \
     && pip uninstall poetry -y  # 生产镜像不需要 poetry
 
-# 复制源代码
+# 复制源代码 + 安装项目包
 COPY src/ ./src/
+# P1-2 (PR#131): --no-root 安装依赖后需单独装项目包——
+# 否则 uvicorn orbit.api.main:app 找不到 orbit 模块
+RUN poetry install --only-root --no-interaction 2>/dev/null || \
+    pip install -e . 2>/dev/null || \
+    true  # fallback: pyproject 未配置 packages 时由 PYTHONPATH 兜底
 
 # P0-14 (Issue#126): 非 root 用户运行——容器逃逸后限制攻击面
+# P1-2 (PR#131): PYTHONPATH 确保 src/ 下 orbit 包可被导入
+ENV PYTHONPATH=/app/src
 RUN useradd -m -s /bin/bash orbit && chown -R orbit:orbit /app
 USER orbit
 

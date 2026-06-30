@@ -30,7 +30,8 @@ describe('AlertList', () => {
     setActivePinia(createPinia())
   })
 
-  it.skip('shows empty state when no alerts', () => {
+  // P0-3 (PR#131): 移除 .skip——空状态测试应正常验证
+  it('shows empty state when no alerts', () => {
     const wrapper = shallowMount(AlertList, { global })
     const empty = wrapper.find('.el-stub-empty')
     expect(empty.exists()).toBe(true)

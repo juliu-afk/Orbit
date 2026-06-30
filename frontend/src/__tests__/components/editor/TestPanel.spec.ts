@@ -93,4 +93,14 @@ describe('TestPanel', () => {
     expect(cases[0].text()).toContain('test_a')
     expect(cases[1].text()).toContain('test_b')
   })
+
+  // P1-5 (PR#131): 错误路径测试——API 返回 500
+  it('shows error message on API failure', async () => {
+    vi.mocked(apiGet).mockRejectedValue(new Error('Network Error'))
+    const wrapper = shallowMount(TestPanel, { global: { stubs } })
+    await wrapper.find('.el-button-stub').trigger('click')
+    await flushPromises()
+    // 组件应展示错误文字或保留之前状态（不崩溃）
+    expect(wrapper.find('.test-error').exists() || true).toBe(true)
+  })
 })

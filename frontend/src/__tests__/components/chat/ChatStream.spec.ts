@@ -19,11 +19,11 @@ describe('ChatStream', () => {
     expect(badge.text()).toContain('空闲')
   })
 
-  it('displays streaming text via currentText', async () => {
+  // P2-4 (PR#131): 通过 props 设置 streaming text 而非 vm 直接修改
+  it('displays streaming text via streamText prop', async () => {
     const wrapper = shallowMount(ChatStream, {
-      props: { agentId: 'developer' },
+      props: { agentId: 'developer', streamText: '正在生成代码...' },
     })
-    wrapper.vm.currentText = '正在生成代码...'
     await wrapper.vm.$nextTick()
     const streamBlock = wrapper.find('.streaming')
     expect(streamBlock.exists()).toBe(true)

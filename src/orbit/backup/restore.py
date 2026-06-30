@@ -49,8 +49,8 @@ class Restorer:
             )
 
         # 2. 备份当前文件
+        backup_target = target_path + ".backup"
         if os.path.exists(target_path):
-            backup_target = target_path + ".backup"
             shutil.copy2(target_path, backup_target)
             logger.info("pre_restore_backup", target=target_path, backup=backup_target)
 
@@ -67,6 +67,15 @@ class Restorer:
 
         # 4. 验证恢复后文件
         integrity_ok = verify_integrity(target_path, meta.integrity_hash)
+
+        # P0-12 (Issue#126): 完整性校验失败时回滚——
+        # 步骤2已备份原文件到 <target>.backup，校验失败应恢复原文件
+        if not integrity_ok and os.path.exists(backup_target):
+            try:
+                shutil.copy2(backup_target, target_path)
+                logger.info("restore_rolled_back", target=target_path, backup=backup_target)
+            except OSError as e:
+                logger.error("restore_rollback_failed", target=target_path, error=str(e))
 
         elapsed = (time.time() - start) * 1000
         result = RestoreResult(

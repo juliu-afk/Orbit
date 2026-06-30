@@ -166,14 +166,24 @@ class GoalJudge:
 
         # 解析 JSON 响应
         import json
+        import re
 
         try:
             content = response.content.strip()
-            # 去除可能的 markdown code block
-            if content.startswith("```"):
-                content = content.strip("`")
-                if content.startswith("json"):
-                    content = content[4:]
+            # P0-6 (Issue#126): Markdown 剥离缺陷修复——
+            # 原逻辑仅处理以 ``` 开头的情况，可被 "```json\n{...}\n```" 之外的格式绕过
+            # 用正则提取 JSON 块：匹配 ```json ... ``` 或无包裹的纯 JSON
+            _md_json = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+            if _md_json:
+                content = _md_json.group(1)
+            else:
+                # 无 markdown 包裹时提取第一个 JSON 对象
+                _json_start = content.find("{")
+                if _json_start >= 0:
+                    content = content[_json_start:]
+                    _json_end = content.rfind("}") + 1
+                    if _json_end > 0:
+                        content = content[:_json_end]
             data = json.loads(content)
             return Verdict(
                 ok=data.get("ok", True),  # 默认 fail-open
@@ -181,6 +191,6 @@ class GoalJudge:
                 reason=data.get("reason", ""),
             )
         except (json.JSONDecodeError, KeyError) as e:
-            # JSON 解析失败 → fail-open
+            # JSON 解析失败 → fail-open（不阻塞 Goal 流程）
             logger.warning("verdict_parse_failed", content=response.content[:200])
             return Verdict(ok=True, reason=f"verdict 解析失败→fail-open: {str(e)}")

@@ -9,6 +9,7 @@ SSE 比 WebSocket 更简单——零握手帧、自动重连、浏览器原生 E
 from __future__ import annotations
 
 import json
+import time as _time_module
 from typing import Any
 
 import structlog
@@ -24,9 +25,24 @@ logger = structlog.get_logger()
 
 router = APIRouter()
 
-# 全局 token 注册表——task_id → CancellationToken
+# 全局 token 注册表——task_id → (CancellationToken, created_at)
 # WHY 全局: FastAPI 无状态，token 需要跨请求存活
-_TOKENS: dict[str, CancellationToken] = {}
+# P0-13 (Issue#126): 加 created_at 时间戳支持 TTL 过期清理
+_TOKENS: dict[str, tuple[CancellationToken, float]] = {}
+_TOKEN_TTL_SECONDS: float = 300.0  # 5 分钟——未连接的 token 自动过期
+
+
+def _cleanup_expired_tokens() -> int:
+    """清理超过 TTL 的 token——返回清理数量。"""
+    now = _time_module.time()
+    expired = [
+        tid for tid, (_, ts) in _TOKENS.items() if now - ts > _TOKEN_TTL_SECONDS
+    ]
+    for tid in expired:
+        _TOKENS.pop(tid, None)
+    if expired:
+        logger.info("sse_tokens_cleaned", count=len(expired))
+    return len(expired)
 
 
 class AgentRunRequest(BaseModel):
@@ -52,8 +68,10 @@ async def agent_run(agent_id: str, body: AgentRunRequest) -> dict[str, Any]:
     import uuid
 
     task_id = uuid.uuid4().hex[:12]
-    # 预注册 token（Agent 尚未启动，客户端可提前取消）
-    _TOKENS[task_id] = CancellationToken()
+    # P0-13 (Issue#126): 新建 token 前清理过期条目，防内存泄漏
+    _cleanup_expired_tokens()
+    # 预注册 token + 时间戳（Agent 尚未启动，客户端可提前取消）
+    _TOKENS[task_id] = (CancellationToken(), _time_module.time())
 
     return {
         "code": 0,
@@ -78,9 +96,11 @@ async def agent_stream(
     """
     from orbit.agents.base import AgentInput, AgentRole
 
-    # 获取或创建取消令牌
-    token = _TOKENS.get(task_id, CancellationToken())
-    _TOKENS[task_id] = token
+    # 获取或创建取消令牌（P0-13: 解包 (token, timestamp) 元组）
+    _entry = _TOKENS.get(task_id)
+    token = _entry[0] if _entry else CancellationToken()
+    if task_id not in _TOKENS:
+        _TOKENS[task_id] = (token, _time_module.time())
 
     async def event_generator():
         try:
@@ -147,13 +167,14 @@ async def agent_cancel(agent_id: str, body: AgentCancelRequest) -> dict[str, Any
     WHY POST 而非 SSE 反向通道: SSE 是单向协议，
     取消走独立 endpoint 更简单可靠。
     """
-    token = _TOKENS.get(body.task_id)
-    if token is None:
+    _entry = _TOKENS.get(body.task_id)
+    if _entry is None:
         return {
             "code": 404,
             "data": None,
             "message": f"task {body.task_id} 不存在或已完成",
         }
+    token, _ = _entry  # P0-13: 解包 (CancellationToken, timestamp)
     token.cancel()
     return {
         "code": 0,

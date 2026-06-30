@@ -44,10 +44,12 @@ class L7RuntimeValidator:
         """
 
         if not await self._sandbox.is_available():
+            # P0-7 (Issue#126): sandbox 不可用时不应 fail-open——
+            # 无法验证 = 不应信任，返回 passed=False 触发人工审查
             return ValidationResult(
-                passed=True,
+                passed=False,
                 level=HallucinationLevel.L7_RUNTIME,
-                warnings=["sandbox unavailable, L7 skipped"],
+                errors=["Sandbox 不可用——无法执行 L7 运行时验证"],
             )
 
         # 构造包装脚本
@@ -67,11 +69,13 @@ class L7RuntimeValidator:
                 metadata={"assertions": assertions or []},
             )
         except Exception as e:
-            logger.info("l7_sandbox_error", error=str(e))
+            # P0-7 (Issue#126): 非 SandboxExecutionError 的异常也应 fail-closed——
+            # 无法区分是代码 bug 还是沙箱基础设施问题时，不应静默通过
+            logger.warning("l7_sandbox_error", error=str(e))
             return ValidationResult(
-                passed=True,
+                passed=False,
                 level=HallucinationLevel.L7_RUNTIME,
-                warnings=[f"Sandbox execution failed (L7 cannot verify): {e}"],
+                errors=[f"L7 执行异常: {e}"],
                 metadata={"execution_error": str(e)},
             )
 

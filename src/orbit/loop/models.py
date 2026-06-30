@@ -74,7 +74,7 @@ class LoopRunner:
                     "run_at": datetime.now(UTC).isoformat(),
                 }
 
-            # P1-9: next_run_at 在 sleep 之前设置——语义是"下次触发时间"
+            # P1-9: next_run_at 在 sleep 之前设置
             self.schedule.next_run_at = (
                 datetime.now(UTC) + timedelta(seconds=self.schedule.interval_seconds)
             ).isoformat()

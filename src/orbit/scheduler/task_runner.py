@@ -7,6 +7,7 @@ save_checkpoint / resume / _continue_from.
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
@@ -188,7 +189,7 @@ class TaskRunner:
                 role,
                 llm=agent_llm,
                 compressor=self._compressor,
-                budget_tracker=self._budget_tracker,  # P1-4: 传递 budget_tracker
+                budget_tracker=self._budget_tracker,
                 task_keywords=task_keywords,  # 减熵闭环-1
             )
         except Exception as e:
@@ -362,6 +363,39 @@ class TaskRunner:
                 ).model_dump(),
             )
         )
+
+    @staticmethod
+    def _extract_keywords(prd_text: str) -> list[str]:
+        """从 PRD 文本提取技术关键词——减熵闭环-1."""
+        if not prd_text:
+            return []
+        _stop = {
+            "的", "是", "在", "和", "了", "有", "不", "要", "可以",
+            "需要", "应该", "能够", "使用", "通过", "进行", "实现",
+            "添加", "修改", "删除", "支持", "提供", "包括", "用于",
+            "the", "a", "an", "is", "are", "be", "to", "of", "in",
+            "for", "and", "or", "not", "this", "that", "with", "from",
+            "it", "we", "you", "as", "if", "but", "so", "all", "no",
+        }
+        keywords: list[str] = []
+        for word in prd_text.replace("\n", " ").split():
+            word = word.strip(".,;:()[]{}<>\"'`/\\|!@#$%^&*+-=~")
+            if len(word) < 2:
+                continue
+            if any(c.isupper() for c in word) or "_" in word:
+                if word.lower() not in _stop:
+                    keywords.append(word)
+        cn_terms = re.findall(r"[一-鿿]{2,6}", prd_text)
+        for t in cn_terms:
+            if t not in _stop and t not in keywords:
+                keywords.append(t)
+        seen: set[str] = set()
+        uniq = []
+        for k in keywords:
+            if k.lower() not in seen:
+                seen.add(k.lower())
+                uniq.append(k)
+        return uniq[:20]
 
 
     @staticmethod

@@ -252,7 +252,8 @@ class ToolRegistry:
 
         WHY: 按角色裁剪工具列表——关闭不该有的门。
         """
-        allowed = self.ROLE_TOOLS.get(role_value, self.ROLE_TOOLS["developer"])
+        # 未知角色回退空集——最小权限原则：新角色默认无工具
+        allowed = self.ROLE_TOOLS.get(role_value, set())
         schemas: list[dict] = []
         seen: set[str] = set()
 

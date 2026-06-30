@@ -195,8 +195,11 @@ class PromptBuilder:
         WHY 按角色裁剪: Clarifier 不应该看到 exec_command，
         Reviewer 不需要 write_file——减少 prompt 噪音 + 缩小攻击面。
         """
+        if tools_schema is None:
+            return TOOLS_GUIDE_BLOCK  # 未传 schema → 显示默认全部
         if not tools_schema:
-            return TOOLS_GUIDE_BLOCK  # 无 schema → 显示默认全部
+            # 空列表 = 角色无工具（如 Clarifier）→ 不显示工具段
+            return "## 可用工具\n\n当前角色无可用工具。"
 
         names = [
             s.get("function", {}).get("name", "")

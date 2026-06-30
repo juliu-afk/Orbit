@@ -191,9 +191,15 @@ onMounted(() => {
   }
 })
 
-// taskId 从空变为有值时自动启动（ChatPanel 异步获得 lastTaskId 场景）
-watch(() => props.taskId, (newId) => {
-  if (newId && props.agentId && !isStreaming.value) {
+// taskId 变更时自动切换流——先 cancel 旧流再启动新流
+// WHY: 与 agentId watcher 一致——taskId 变化等同于任务变更
+watch(() => props.taskId, (newId, oldId) => {
+  if (oldId && oldId !== newId && isStreaming.value) {
+    cancel()  // 中断旧流
+  }
+  if (newId && props.agentId) {
+    currentText.value = ''
+    messages.value = []
     startStream()
   }
 })

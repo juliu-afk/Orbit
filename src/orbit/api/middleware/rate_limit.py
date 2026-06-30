@@ -38,14 +38,13 @@ class RateLimiter:
 
     async def __call__(self, request: Request) -> None:
         """FastAPI Depends callable——每次请求触发限流检查."""
-        # 客户端标识——X-Forwarded-For 优先（反向代理后真实 IP）。
-        # P2-1: X-Forwarded-For 可能是 "client, proxy1, proxy2" 格式，
-        # 只取第一个（最靠近客户端的）IP 作为限流 key。
-        forwarded = request.headers.get("X-Forwarded-For", "")
-        if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
+        # P0-19 (Issue#126): X-Forwarded-For 可被伪造——
+        # 仅在受信任的反向代理后使用，否则用 request.client.host
+        # 本地桌面工具无反向代理，直接用直连 IP
+        if request.client and request.client.host:
+            client_ip = request.client.host
         else:
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = "unknown"
         key = f"{client_ip}:{request.url.path}"
 
         now = time.time()

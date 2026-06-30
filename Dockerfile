@@ -16,6 +16,10 @@ RUN poetry config virtualenvs.create false \
 # 复制源代码
 COPY src/ ./src/
 
+# P0-14 (Issue#126): 非 root 用户运行——容器逃逸后限制攻击面
+RUN useradd -m -s /bin/bash orbit && chown -R orbit:orbit /app
+USER orbit
+
 # Prometheus 指标端口
 EXPOSE 18888
 

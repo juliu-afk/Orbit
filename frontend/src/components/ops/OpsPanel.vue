@@ -56,8 +56,12 @@ function eventLabel(type: string): string {
 }
 
 // 简单 Markdown 渲染 (标题/bold 支持)
+// P0-17 (Issue#126): 先转义 HTML 实体防 XSS，再应用 Markdown 替换
 const renderedSop = computed(() => {
   let html = opsStore.sopContent
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
     .replace(/^### (.+)$/gm, '<h4>$1</h4>')
     .replace(/^## (.+)$/gm, '<h3>$1</h3>')
     .replace(/^# (.+)$/gm, '<h2>$1</h2>')

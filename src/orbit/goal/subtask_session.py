@@ -14,18 +14,15 @@ WHY 独立 Session 非协程: 独立 LLM 消息历史 = 独立上下文窗口。
 
 from __future__ import annotations
 
-<<<<<<< HEAD
-import asyncio
-=======
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
-import structlog
 from typing import TYPE_CHECKING, Any
+
+import structlog
 
 from orbit.api.schemas.task import TaskState
 from orbit.goal.models import GoalSession, SubTaskResult
 from orbit.goal.process_guard import (
-    FULL_PIPELINE_TRANSITIONS,
     FAST_LANE_TRANSITIONS,
+    FULL_PIPELINE_TRANSITIONS,
     TERMINAL_STATES,
     ProcessGuard,
 )
@@ -33,8 +30,8 @@ from orbit.goal.process_guard import (
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
     from orbit.checkpoint.manager import CheckpointManager
-    from orbit.compression.budget import TokenBudgetTracker
     from orbit.compose.models import Task
+    from orbit.compression.budget import TokenBudgetTracker
     from orbit.worktree.manager import WorktreeManager
 
 logger = structlog.get_logger("orbit.goal")
@@ -75,8 +72,8 @@ class SubTaskSession:
         worktree_manager: WorktreeManager | None = None,
         checkpoint_manager: CheckpointManager | None = None,
         budget_tracker: TokenBudgetTracker | None = None,
-        critique_agent: Any = None,   # CritiqueAgent——延迟导入避免循环
-        verifier: Any = None,          # ExecutorVerifier
+        critique_agent: Any = None,  # CritiqueAgent——延迟导入避免循环
+        verifier: Any = None,  # ExecutorVerifier
     ) -> None:
         self.task = task
         self.base_ref = base_ref
@@ -170,11 +167,6 @@ class SubTaskSession:
                 )
                 state = next_state
 
-<<<<<<< HEAD
-        except asyncio.CancelledError:
-            raise
-=======
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         except Exception as e:
             logger.error(
                 "subtask_pipeline_failed",
@@ -221,11 +213,7 @@ class SubTaskSession:
         agent_llm = None  # AgentFactory 内部路由模型
         try:
             agent = self._agent_factory.create(role, llm=agent_llm)
-<<<<<<< HEAD
-        except asyncio.CancelledError:
-            raise
-=======
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
+
         except Exception as e:
             logger.error("agent_create_failed", role=role, error=str(e))
             raise RuntimeError(f"Agent {role} 创建失败: {e}") from e
@@ -291,16 +279,8 @@ class SubTaskSession:
                     max_severity=result.max_severity,
                 )
             return result.approved
-<<<<<<< HEAD
-        except asyncio.CancelledError:
-            raise
         except Exception as e:
             logger.warning("critique_failed_fail_open", error=str(e))
-        except Exception as e:
-=======
-        except Exception as e:
-            logger.warning("critique_failed_fail_open", error=str(e))
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
             return True  # 批判失败 → fail-open——不阻塞流程
 
     # ── 内部: 状态转换 ─────────────────────────────────
@@ -344,12 +324,5 @@ class SubTaskSession:
                 context=safe_context,
             )
             await self._checkpoint.save(task_id, data)
-<<<<<<< HEAD
-        except asyncio.CancelledError:
-            raise
         except Exception as e:
             logger.warning("checkpoint_save_failed", task_id=task_id, error=str(e))
-=======
-        except Exception as e:
-            logger.warning("checkpoint_save_failed", task_id=task_id, error=str(e))
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313

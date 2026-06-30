@@ -1,0 +1,28 @@
+---
+name: pydantic_schema
+description: Pydantic v2 request/response models
+keywords: pydantic, schema, request, response, validation, model, serializer
+parameters: model_name, schema_name, fields
+---
+from pydantic import BaseModel, Field
+
+
+class {{schema_name}}Create(BaseModel):
+    """创建{{model_name}}请求体。"""
+
+    {{fields}}
+
+
+class {{schema_name}}Update(BaseModel):
+    """更新{{model_name}}请求体（部分更新）。"""
+
+    {{fields}}
+
+
+class {{schema_name}}Out(BaseModel):
+    """{{model_name}}响应体。"""
+
+    id: int
+    {{fields}}
+
+    model_config = {"from_attributes": True}

@@ -28,17 +28,14 @@ from orbit.api.routes import (
     compose,
     diagnostics_ws,
     dream,
-    goal,
-<<<<<<< HEAD
-=======
     files_routes,
     git_routes,
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
+    goal,
     health,
+    insights_routes,
     knowledge,
     loop,
     observability,
-    insights_routes,
     projects,
     review,
     search_routes,
@@ -46,7 +43,6 @@ from orbit.api.routes import (
     tasks,
     terminal_routes,
     tests_routes,
-    loop,
     versioning,
 )
 from orbit.checkpoint.manager import CheckpointManager
@@ -107,10 +103,9 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(compose.router, prefix=settings.API_V1_STR)
     # Phase 2: /dream 记忆合并自循环端点
     app.include_router(dream.router, prefix=settings.API_V1_STR)
+    # goal/loop 路由文件已自带 /api/v1/goal 前缀，不重复加 API_V1_STR
     app.include_router(goal.router)
     app.include_router(loop.router)
-<<<<<<< HEAD
-=======
     # Step 9: IDE 功能追赶——审查 + 文件 + Git
     app.include_router(review.router, prefix=settings.API_V1_STR)
     app.include_router(files_routes.router, prefix=settings.API_V1_STR)
@@ -129,7 +124,6 @@ def create_app(event_bus: EventBus | None = None) -> FastAPI:
     app.include_router(terminal_routes.router, prefix=settings.API_V1_STR)
     # Phase 2: 实时诊断 WebSocket——不加 API_V1_STR 前缀
     app.include_router(diagnostics_ws.router)
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
     # /health 不加 API_V1_STR 前缀——符合 K8s 探针惯例
     app.include_router(health.router)
     # Phase 4 AC-A1: SSE 流式端点
@@ -240,35 +234,17 @@ _scheduler = Scheduler(
 )
 # Phase 4: 注入 Compose + ActorSpawn
 _scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-defined]
-<<<<<<< HEAD
 
-# Goal+Loop: MetaOrchestrator + LoopScheduler (P1-1)
-from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
-from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402
-from orbit.loop.scheduler import LoopScheduler  # noqa: E402
-
-_meta_orchestrator = MetaOrchestrator(
-    compose_bridge=GoalComposeBridge(llm=_llm_flash),
-    agent_factory=AgentFactory,
-    max_parallel_tasks=5,
+# Step 9: 审查模块——SQLAlchemy 2.0 ORM
+from sqlalchemy.ext.asyncio import (  # noqa: E402
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
 )
-_loop_scheduler = LoopScheduler()
 
-# Step 9: 审查模块——SQLAlchemy 2.0 ORM
-
-
-
-
-
-app = create_app(_event_bus)
-
-# Phase 4: 注入 ComposeOrchestrator 到 app state
-=======
-# Step 9: 审查模块——SQLAlchemy 2.0 ORM
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession, create_async_engine  # noqa: E402
-from orbit.review.service import ReviewService  # noqa: E402
-from orbit.review.models import ReviewBase  # noqa: E402
 from orbit.files.service import FileService  # noqa: E402
+from orbit.review.models import ReviewBase  # noqa: E402
+from orbit.review.service import ReviewService  # noqa: E402
 
 _review_engine = create_async_engine(settings.DATABASE_URL, echo=False)
 _review_session_factory = async_sessionmaker(_review_engine, expire_on_commit=False)
@@ -281,6 +257,7 @@ files_routes.set_file_service(_file_service)
 git_routes.set_workspace_dir(_ws_dir)
 # Step 9 Phase 1.3: CodeGraph 引擎——复用 graph 数据库连接
 from orbit.graph.engines.code_graph import CodeGraphEngine  # noqa: E402
+
 _code_graph_engine = CodeGraphEngine(_review_session_factory)
 
 codegraph_routes.set_code_graph(_code_graph_engine)
@@ -292,6 +269,7 @@ search_routes.set_workspace(_ws_dir)
 tests_routes.set_workspace(_ws_dir)
 # Step 9 Phase 2: 诊断服务
 from orbit.lsp.service import DiagnosticService  # noqa: E402
+
 _diagnostic_service = DiagnosticService(_ws_dir)
 
 blame_routes.set_workspace(_ws_dir)
@@ -300,31 +278,34 @@ diagnostics_ws.set_diagnostic_service(_diagnostic_service)
 
 app = create_app(_event_bus)
 
+
 @app.on_event("startup")
 async def _init_review_tables() -> None:
     async with _review_engine.begin() as conn:
         await conn.run_sync(ReviewBase.metadata.create_all)
 
+
 @app.on_event("shutdown")
 async def _shutdown_review() -> None:
     await _review_engine.dispose()  # P0-8: 释放连接池
 
+
 # Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
 app.state.compose_orchestrator = _compose_orchestrator
 app.state.dream_engine = _dream_engine
-<<<<<<< HEAD
-# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler (P1-1, P0-1/2 fixed)
-=======
-# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler + CritiqueAgent + ModelEnsemble
-from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
+
 from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402
 from orbit.goal.critique import CritiqueAgent  # noqa: E402
 from orbit.goal.ensemble import ModelEnsemble  # noqa: E402
+
+# Goal+Loop: 注入 MetaOrchestrator + LoopScheduler + CritiqueAgent + ModelEnsemble
+from orbit.goal.meta_orchestrator import MetaOrchestrator  # noqa: E402
 from orbit.loop.scheduler import LoopScheduler  # noqa: E402
 
 _critique_agent = CritiqueAgent(llm=_llm_flash, model_family="anthropic")
-_model_ensemble = ModelEnsemble(agent_factory=AgentFactory, judge_llm=_llm_flash, ensemble_models=["claude-opus", "gpt-4o"])
+_model_ensemble = ModelEnsemble(
+    agent_factory=AgentFactory, judge_llm=_llm_flash, ensemble_models=["claude-opus", "gpt-4o"]
+)
 _meta_orchestrator = MetaOrchestrator(
     compose_bridge=GoalComposeBridge(llm=_llm_flash),
     critique_agent=_critique_agent,
@@ -334,6 +315,5 @@ _meta_orchestrator = MetaOrchestrator(
     max_parallel_tasks=5,
 )
 _loop_scheduler = LoopScheduler(command_executor=_meta_orchestrator.run)
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
 app.state.meta_orchestrator = _meta_orchestrator
 app.state.loop_scheduler = _loop_scheduler

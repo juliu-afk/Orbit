@@ -233,6 +233,49 @@ class ToolRegistry:
                             )
                         break  # 一个文件只需导入一次
 
+    # ── 角色→工具映射 ───────────────────────────────
+
+    # 每个角色可调用的工具——缩小攻击面，减少 prompt 噪音
+    # WHY: Clarifier 不需要 shell，Reviewer 不需要 write_file
+    ROLE_TOOLS: dict[str, set[str]] = {
+        "architect": {"read_file", "grep", "glob"},
+        "developer": {"read_file", "write_file", "edit_file", "exec_command", "grep", "glob"},
+        "reviewer": {"read_file", "grep", "glob"},
+        "qa": {"read_file", "exec_command", "grep", "glob"},
+        "config_manager": {"read_file", "write_file", "grep", "glob"},
+        "clarifier": set(),  # 纯文本交互，无需工具
+        "dream": {"read_file", "grep", "glob"},
+    }
+
+    def list_for_role(self, role_value: str) -> list[dict]:
+        """返回指定角色可用的工具 JSON Schema.
+
+        WHY: 按角色裁剪工具列表——关闭不该有的门。
+        """
+        # 未知角色回退空集——最小权限原则：新角色默认无工具
+        allowed = self.ROLE_TOOLS.get(role_value, set())
+        schemas: list[dict] = []
+        seen: set[str] = set()
+
+        for name, entry in self._entries.items():
+            if name in allowed:
+                schemas.append(entry.schema)
+                seen.add(name)
+
+        # 旧 API 工具（向后兼容）——也按角色过滤
+        for name in self._tools:
+            if name in seen:
+                continue
+            if name in allowed:
+                entries = self._tools[name]
+                entries.sort(key=lambda e: _version_key(e[0]), reverse=True)
+                schema = entries[0][1]
+                if schema.parameters:
+                    schemas.append(schema.parameters)
+                seen.add(name)
+
+        return schemas
+
     # ── LLM 工具 Schema 导出 ─────────────────────────────
 
     def get_schemas(self) -> list[dict]:

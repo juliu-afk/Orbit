@@ -8,11 +8,15 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
+    from orbit.compression.budget import TokenBudgetTracker
     from orbit.compression.compressor import ContextCompressor
+    from orbit.goal.intake_router import IntakeRouter
+    from orbit.gateway.client import LLMClient
+    from orbit.observability.audit import AuditLogger
     from orbit.tools.registry import ToolRegistry
 
 import structlog
@@ -50,14 +54,14 @@ class TaskRunner:
         self,
         *,
         agent_factory: type[AgentFactory] | None = None,
-        agent_llms: dict[str, Any] | None = None,
+        agent_llms: dict[str, LLMClient] | None = None,
         checkpoint: CheckpointManager | None = None,
         event_bus: EventBus | None = None,
         compressor: ContextCompressor | None = None,
-        budget_tracker: Any = None,  # P1-4: budget_tracker 注入
+        budget_tracker: TokenBudgetTracker | None = None,  # P1-4: budget_tracker 注入
         tool_registry: ToolRegistry | None = None,
-        audit_logger: Any = None,
-        router: Any = None,
+        audit_logger: AuditLogger | None = None,
+        router: IntakeRouter | None = None,
         fast_lane: bool = False,
     ) -> None:
         self._agent_factory = agent_factory

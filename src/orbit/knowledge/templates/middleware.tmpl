@@ -1,0 +1,45 @@
+---
+name: middleware
+description: FastAPI middleware pattern
+keywords: middleware, fastapi, middleware, request, response, interceptor, hook
+parameters: middleware_name, description
+---
+"""{{middleware_name}}中间件.
+
+WHY 中间件: {{description}}。
+在请求进入路由前/响应返回客户端前执行横切逻辑。
+"""
+
+from __future__ import annotations
+
+from typing import Awaitable, Callable
+
+from fastapi import FastAPI, Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
+
+
+class {{middleware_name}}Middleware(BaseHTTPMiddleware):
+    """{{middleware_name}}拦截器.
+
+    在请求处理前后注入 {{description}} 逻辑。
+    """
+
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        """请求前处理."""
+        # TODO: 前置逻辑（鉴权/日志/计时等）
+
+        response = await call_next(request)
+
+        """响应后处理."""
+        # TODO: 后置逻辑（审计/缓存/Header 注入等）
+
+        return response
+
+
+def register_{{middleware_name}}_middleware(app: FastAPI) -> None:
+    """注册中间件到应用实例。"""
+    app.add_middleware({{middleware_name}}Middleware)

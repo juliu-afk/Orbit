@@ -78,12 +78,8 @@ RULES_BLOCK = """## 强制规则
    - 优先复用标准库和已有函数，不要自己重复造轮子
    - 写完检查：有能删掉的行吗？有能合并的变量吗？
    - 如果单个文件超过 200 行，重新审视——是不是做了太多事？
-<<<<<<< HEAD
    - P2-5: 本规则为新增代码的质量约束，与规则 1-8 无优先级冲突——
      规则 5（写注释）和规则 8（不添加未要求功能）优先于代码行数目标
-=======
-   - P2-5: 本规则为新增代码的质量约束，规则 5（写注释）和规则 8（不添加未要求功能）优先于行数目标
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
 
 ## 输出格式
 
@@ -124,43 +120,112 @@ class PromptBuilder:
     volatile = 当前任务 + 约束 + token 预算 (不缓存，每次不同)
     """
 
+    # Anthropic cache_control 断点——stable+context 可缓存，volatile 不可
+    # WHY: stable/context 在单次会话中不变，标记为 ephemeral 让 API 缓存
+    # 对标 Claude Code 的 SYSTEM_PROMPT_DYNAMIC_BOUNDARY
+    ANTHROPIC_CACHE_BOUNDARY = True
+
     def build(
         self,
         role: AgentRole,
         context: dict[str, Any] | None = None,
         tools_schema: list[dict] | None = None,
     ) -> str:
-        """构建完整的 system prompt.
-
-        Args:
-            role: Agent 角色
-            context: 任务上下文 (project, task, code_context, env 等)
-            tools_schema: 可用工具列表 (供 LLM 选择)
-        """
+        """构建完整 system prompt（纯文本，向后兼容）."""
         ctx = context or {}
         sections: list[str] = []
 
-        # ── stable 层 ──
-        sections.append(self._build_stable(role))
-
-        # ── context 层 ──
+        sections.append(self._build_stable(role, tools_schema))
         sections.append(self._build_context(ctx))
-
-        # ── volatile 层 ──
         sections.append(self._build_volatile(ctx))
 
         return "\n\n".join(sections)
 
+    def build_for_anthropic(
+        self,
+        role: AgentRole,
+        context: dict[str, Any] | None = None,
+        tools_schema: list[dict] | None = None,
+    ) -> list[dict]:
+        """构建带 cache_control 断点的结构化 system prompt.
+
+        WHY 独立方法: 返回 Anthropic content blocks 格式，
+        stable+context 块末尾标记 cache_control，volatile 不标记。
+        对标 Claude Code SYSTEM_PROMPT_DYNAMIC_BOUNDARY。
+        """
+        ctx = context or {}
+
+        stable_text = self._build_stable(role, tools_schema)
+        context_text = self._build_context(ctx)
+        volatile_text = self._build_volatile(ctx)
+
+        cached_block = stable_text + "\n\n" + context_text
+
+        return [
+            {
+                "type": "text",
+                "text": cached_block,
+                "cache_control": {"type": "ephemeral"},
+            },
+            {
+                "type": "text",
+                "text": volatile_text,
+            },
+        ]
+
     # ── 各层构建 ────────────────────────────────────────
 
-    def _build_stable(self, role: AgentRole) -> str:
-        """stable 层——角色 + 规则 + 输出格式."""
+    def _build_stable(self, role: AgentRole, tools_schema: list[dict] | None = None) -> str:
+        """stable 层——角色 + 工具列表（按角色裁剪） + 规则 + 输出格式."""
         parts = [
             ROLE_DESCRIPTIONS.get(role, ROLE_DESCRIPTIONS[AgentRole.DEVELOPER]),
-            TOOLS_GUIDE_BLOCK,
+            self._build_tools_guide(role, tools_schema),
             RULES_BLOCK,
         ]
         return "\n\n".join(parts)
+
+    @staticmethod
+    def _build_tools_guide(role: AgentRole, tools_schema: list[dict] | None) -> str:
+        """按角色生成工具使用指南——只列出该角色可用的工具.
+
+        WHY 按角色裁剪: Clarifier 不应该看到 exec_command，
+        Reviewer 不需要 write_file——减少 prompt 噪音 + 缩小攻击面。
+        """
+        if tools_schema is None:
+            return TOOLS_GUIDE_BLOCK  # 未传 schema → 显示默认全部
+        if not tools_schema:
+            # 空列表 = 角色无工具（如 Clarifier）→ 不显示工具段
+            return "## 可用工具\n\n当前角色无可用工具。"
+
+        names = [
+            s.get("function", {}).get("name", "")
+            for s in tools_schema
+            if s.get("function", {}).get("name")
+        ]
+        if not names:
+            return TOOLS_GUIDE_BLOCK
+
+        # 并发安全标记——与 ToolRegistry 常量保持一致
+        SERIAL_TOOLS = {"exec_command", "edit_file"}
+        SAFE_TOOLS = {"read_file", "grep", "glob", "write_file"}
+
+        lines = ["## 可用工具", "", f"当前角色 {role.value} 可用工具：", ""]
+        lines.append("| 工具 | 并发 |")
+        lines.append("|------|------|")
+        for name in names:
+            if name in SERIAL_TOOLS:
+                lines.append(f"| `{name}` | 串行 |")
+            elif name in SAFE_TOOLS:
+                lines.append(f"| `{name}` | 可并发 |")
+            else:
+                lines.append(f"| `{name}` | — |")
+
+        lines.append("")
+        lines.append(
+            "**使用原则**：先 `grep`/`glob` 定位 → `read_file` 读取 → `edit_file` 修改。"
+            " 不要连续 3 次用同样的工具和参数——会被检测为死循环。"
+        )
+        return "\n".join(lines)
 
     def _build_context(self, ctx: dict[str, Any]) -> str:
         """context 层——项目信息 + 技术栈."""

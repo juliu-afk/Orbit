@@ -5,14 +5,15 @@ from __future__ import annotations
 import os
 import sys
 
+import orbit.api.routes.files_routes  # noqa: F401
+import orbit.api.routes.git_routes  # noqa: F401
+import orbit.api.routes.review  # noqa: F401
+import orbit.files.service  # noqa: F401
+import orbit.lsp.service  # noqa: F401
+
 # Step 9: 强制 PyInstaller 打包新增模块
 import orbit.review.models  # noqa: F401
 import orbit.review.service  # noqa: F401
-import orbit.files.service  # noqa: F401
-import orbit.lsp.service  # noqa: F401
-import orbit.api.routes.review  # noqa: F401
-import orbit.api.routes.files_routes  # noqa: F401
-import orbit.api.routes.git_routes  # noqa: F401
 
 
 def main() -> None:

@@ -14,14 +14,15 @@ WHY 三层: 显式最可靠，文件冲突最安全，隐式作为补充——
 from __future__ import annotations
 
 import json
-import structlog
 from typing import TYPE_CHECKING, Any
+
+import structlog
 
 from orbit.goal.models import DepEdge, DependencyConflict
 
 if TYPE_CHECKING:
-    from orbit.goal.models import GoalSession
     from orbit.gateway.client import LLMClient
+    from orbit.goal.models import GoalSession
     from orbit.graph.engines.code_graph import CodeGraphEngine
 
 logger = structlog.get_logger("orbit.goal")
@@ -39,8 +40,8 @@ class DependencyAnalyzer:
 
     def __init__(
         self,
-        codegraph: Any = None,    # CodeGraphEngine
-        cheap_llm: Any = None,    # LLMClient (廉价模型，仅隐式推断用)
+        codegraph: Any = None,  # CodeGraphEngine
+        cheap_llm: Any = None,  # LLMClient (廉价模型，仅隐式推断用)
     ) -> None:
         self._codegraph = codegraph
         self._cheap_llm = cheap_llm
@@ -111,39 +112,47 @@ class DependencyAnalyzer:
             if "depends_on" in desc or "depends-on" in desc.lower():
                 # 简化的启发式提取——找引号中的依赖名
                 import re
-                deps = re.findall(r'depends_on:\s*\[(.*?)\]', desc, re.IGNORECASE)
+
+                deps = re.findall(r"depends_on:\s*\[(.*?)\]", desc, re.IGNORECASE)
                 if not deps:
-                    deps = re.findall(r'depends[_\\-]on:\s*\[(.*?)\]', desc, re.IGNORECASE)
+                    deps = re.findall(r"depends[_\\-]on:\s*\[(.*?)\]", desc, re.IGNORECASE)
                 for dep_group in deps:
                     # 解析 JSON 数组
                     try:
-                        dep_names = json.loads(dep_group if dep_group.startswith("[") else f"[{dep_group}]")
+                        dep_names = json.loads(
+                            dep_group if dep_group.startswith("[") else f"[{dep_group}]"
+                        )
                     except json.JSONDecodeError:
                         # 非 JSON——逗号分隔
                         dep_names = [d.strip().strip("\"'") for d in dep_group.split(",")]
                     for dep_name in dep_names:
                         dep_goal = self._find_goal_by_name(goals, dep_name)
                         if dep_goal and dep_goal.id != goal.id:
-                            edges.append(DepEdge(
-                                from_id=dep_goal.id,
-                                to_id=goal.id,
-                                type="explicit",
-                                source=f"frontmatter: depends_on={dep_name}",
-                            ))
+                            edges.append(
+                                DepEdge(
+                                    from_id=dep_goal.id,
+                                    to_id=goal.id,
+                                    type="explicit",
+                                    source=f"frontmatter: depends_on={dep_name}",
+                                )
+                            )
 
             # 方法2: "@depends-on" 注释
             if "@depends-on" in desc.lower():
                 import re
-                refs = re.findall(r'@depends-on\s+(\S+)', desc, re.IGNORECASE)
+
+                refs = re.findall(r"@depends-on\s+(\S+)", desc, re.IGNORECASE)
                 for ref in refs:
                     dep_goal = self._find_goal_by_name(goals, ref)
                     if dep_goal and dep_goal.id != goal.id:
-                        edges.append(DepEdge(
-                            from_id=dep_goal.id,
-                            to_id=goal.id,
-                            type="explicit",
-                            source=f"@depends-on {ref}",
-                        ))
+                        edges.append(
+                            DepEdge(
+                                from_id=dep_goal.id,
+                                to_id=goal.id,
+                                type="explicit",
+                                source=f"@depends-on {ref}",
+                            )
+                        )
 
         return edges
 
@@ -185,12 +194,14 @@ class DependencyAnalyzer:
                 overlap = goal_files[a.id] & goal_files[b.id]
                 if overlap:
                     overlap_str = ", ".join(sorted(overlap)[:5])
-                    edges.append(DepEdge(
-                        from_id=a.id,  # 先登记的/a 先执行
-                        to_id=b.id,
-                        type="file_conflict",
-                        source=f"共享文件: {overlap_str}",
-                    ))
+                    edges.append(
+                        DepEdge(
+                            from_id=a.id,  # 先登记的/a 先执行
+                            to_id=b.id,
+                            type="file_conflict",
+                            source=f"共享文件: {overlap_str}",
+                        )
+                    )
 
         return edges
 
@@ -212,15 +223,12 @@ class DependencyAnalyzer:
             return []
 
         # 构建检测 prompt
-        desc_list = "\n---\n".join(
-            f"PRD {i+1}: {g.description[:200]}"
-            for i, g in enumerate(goals)
-        )
+        desc_list = "\n---\n".join(f"PRD {i+1}: {g.description[:200]}" for i, g in enumerate(goals))
         prompt = (
             "检测以下 PRD 之间是否存在未声明的依赖关系。"
             "只输出确实存在的依赖——不确定就不要输出。\n\n"
             f"{desc_list}\n\n"
-            "输出 JSON: [{\"from\": N, \"to\": M, \"reason\": \"...\"}]"
+            '输出 JSON: [{"from": N, "to": M, "reason": "..."}]'
             "其中 N 和 M 是 PRD 序号（1-based）。"
         )
 
@@ -261,13 +269,15 @@ class DependencyAnalyzer:
                 from_idx = int(dep.get("from", 0)) - 1
                 to_idx = int(dep.get("to", 0)) - 1
                 if 0 <= from_idx < len(goals) and 0 <= to_idx < len(goals):
-                    edges.append(DepEdge(
-                        from_id=goals[from_idx].id,
-                        to_id=goals[to_idx].id,
-                        type="implicit",
-                        source=dep.get("reason", ""),
-                        confidence=0.6,  # 隐式推断置信度低于显式
-                    ))
+                    edges.append(
+                        DepEdge(
+                            from_id=goals[from_idx].id,
+                            to_id=goals[to_idx].id,
+                            type="implicit",
+                            source=dep.get("reason", ""),
+                            confidence=0.6,  # 隐式推断置信度低于显式
+                        )
+                    )
             except (ValueError, IndexError):
                 continue
         return edges
@@ -320,20 +330,24 @@ class DependencyAnalyzer:
         # 环形依赖检测
         cycles = self._find_cycles(edges)
         for cycle in cycles:
-            conflicts.append(DependencyConflict(
-                type="cycle",
-                goals=cycle,
-                suggestion="请拆分或合并这些 PRD 中涉及循环的部分",
-            ))
+            conflicts.append(
+                DependencyConflict(
+                    type="cycle",
+                    goals=cycle,
+                    suggestion="请拆分或合并这些 PRD 中涉及循环的部分",
+                )
+            )
 
         # 自依赖检测
         for edge in edges:
             if edge.from_id == edge.to_id:
-                conflicts.append(DependencyConflict(
-                    type="self_ref",
-                    goals=[edge.from_id],
-                    suggestion="PRD 不应依赖自身",
-                ))
+                conflicts.append(
+                    DependencyConflict(
+                        type="self_ref",
+                        goals=[edge.from_id],
+                        suggestion="PRD 不应依赖自身",
+                    )
+                )
 
         return conflicts
 
@@ -376,12 +390,13 @@ class DependencyAnalyzer:
     def _find_goal_by_name(goals: list[GoalSession], name: str) -> GoalSession | None:
         """按名称/ID 匹配 Goal。P0-3: word-boundary 避免子串误判。"""
         import re
+
         name_lower = name.strip().lower()
         for g in goals:
             if g.id.lower() == name_lower or g.description.strip().lower() == name_lower:
                 return g
         try:
-            pattern = re.compile(r'\b' + re.escape(name_lower) + r'\b', re.IGNORECASE)
+            pattern = re.compile(r"\b" + re.escape(name_lower) + r"\b", re.IGNORECASE)
         except re.error:
             return None
         best, best_len = None, float("inf")
@@ -397,10 +412,11 @@ class DependencyAnalyzer:
         keywords = []
         # 驼峰/蛇形识别
         import re
+
         # 提取英文技术名词
-        tech_words = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]{2,}\b', description)
+        tech_words = re.findall(r"\b[a-zA-Z_][a-zA-Z0-9_]{2,}\b", description)
         keywords.extend(tech_words[:5])
         # 提取中文技术名词（简化——取 2-4 字词）
-        chinese_words = re.findall(r'[一-鿿]{2,4}', description)
+        chinese_words = re.findall(r"[一-鿿]{2,4}", description)
         keywords.extend(chinese_words[:5])
         return keywords[:8]

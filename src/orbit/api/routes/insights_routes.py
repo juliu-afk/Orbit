@@ -1,6 +1,9 @@
 """Phase 3 智能洞察 API——风险评分/影响分析/模块健康."""
+
 from __future__ import annotations
+
 from typing import Any, Literal
+
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
@@ -10,8 +13,15 @@ router = APIRouter(prefix="/insights", tags=["insights"])
 _code_graph: Any = None
 _review_service: Any = None
 
-def set_code_graph(engine: Any) -> None: global _code_graph; _code_graph = engine
-def set_review_service(svc: Any) -> None: global _review_service; _review_service = svc
+
+def set_code_graph(engine: Any) -> None:
+    global _code_graph
+    _code_graph = engine
+
+
+def set_review_service(svc: Any) -> None:
+    global _review_service
+    _review_service = svc
 
 
 class RiskScore(BaseModel):
@@ -24,7 +34,8 @@ class RiskScore(BaseModel):
 
 
 class ImpactNode(BaseModel):
-    name: str; file: str
+    name: str
+    file: str
     # P2-2: Literal 约束避免无效 CSS class
     level: Literal["direct", "indirect"]
     callers: list[str]
@@ -57,6 +68,7 @@ async def risk_scores(task_id: str = Query(...)):
     except (ValueError, RuntimeError) as e:
         # P1-1: 精确异常捕获 + 日志
         import structlog
+
         structlog.get_logger().warning("risk_score_failed", error=str(e))
         return []
 
@@ -70,12 +82,12 @@ async def impact_analysis(symbol: str = Query(...)):
         callers = await _code_graph.get_callers(symbol)
         # 区分 direct vs indirect
         nodes: list[ImpactNode] = [
-            ImpactNode(name=c, file="", level="direct", callers=[])
-            for c in callers[:10]
+            ImpactNode(name=c, file="", level="direct", callers=[]) for c in callers[:10]
         ]
         return nodes
     except (RuntimeError, ValueError) as e:
         import structlog
+
         structlog.get_logger().warning("impact_analysis_failed", error=str(e))
         return []
 

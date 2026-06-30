@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
+    from orbit.communication.message_bus import AgentMessageBus
     from orbit.compression.budget import TokenBudgetTracker
     from orbit.compression.compressor import ContextCompressor
+    from orbit.goal.intake_router import IntakeRouter
     from orbit.observability.audit import AuditLogger
     from orbit.tools.registry import ToolRegistry
 
@@ -60,9 +62,9 @@ class Scheduler:
         agent_factory: type[AgentFactory] | None = None,
         compressor: ContextCompressor | None = None,
         budget_tracker: TokenBudgetTracker | None = None,
-        message_bus: Any = None,
+        message_bus: AgentMessageBus | None = None,
         tool_registry: ToolRegistry | None = None,
-        router: Any = None,
+        router: IntakeRouter | None = None,
         audit_logger: AuditLogger | None = None,
     ):
         self._agent_llms = agent_llms or {}

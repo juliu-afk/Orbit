@@ -17,9 +17,11 @@ from orbit.agents.factory import AgentFactory
 from orbit.api.schemas.task import TaskState
 from orbit.scheduler.graph import GraphNode, NodeStatus, TaskGraph
 from orbit.scheduler.orchestrator import (
+    Scheduler,
+)
+from orbit.scheduler.task_runner import (
     STATE_TRANSITIONS,
     InvalidStateTransitionError,
-    Scheduler,
 )
 
 # ── Mock Agent ──

@@ -22,6 +22,7 @@ from orbit.sessions.registry import SessionRegistry
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 import asyncio as _asyncio
+
 _goal_lock = _asyncio.Lock()
 
 _registry = ProjectRegistry()
@@ -111,18 +112,22 @@ async def chat_endpoint(ws: WebSocket) -> None:
         pass  # 客户端正常断开
 
 
-
 # P1-2: Goal 后台任务异常回调
 def _on_goal_task_done(goal_id: str, task) -> None:
     try:
         task.result()
     except Exception:
         import structlog
-        structlog.get_logger("orbit.chat").error("goal_background_failed", goal_id=goal_id, exc_info=True)
+
+        structlog.get_logger("orbit.chat").error(
+            "goal_background_failed", goal_id=goal_id, exc_info=True
+        )
+
 
 async def _handle_goal_command(ws: WebSocket, text: str) -> None:
     """/goal <desc> | /goal status | /goal clear."""
     from orbit.api.routes import goal as goal_route
+
     orch = getattr(ws.app.state, "meta_orchestrator", None)
     if orch is None:
         await _send(ws, 503, None, "MetaOrchestrator 未初始化")
@@ -133,8 +138,29 @@ async def _handle_goal_command(ws: WebSocket, text: str) -> None:
         return
     if cmd == "status":
         t = goal_route._active_task
-        detail = "idle" if t is None else ("cancelled" if t.cancelled() else ("done" if t.done() and not t.exception() else ("failed" if t.done() else "running")))
-        await _send(ws, 0, {"active": t is not None and not t.done(), "goal_id": goal_route._active_goal_id, "status": detail}, "Goal 状态")
+        detail = (
+            "idle"
+            if t is None
+            else (
+                "cancelled"
+                if t.cancelled()
+                else (
+                    "done"
+                    if t.done() and not t.exception()
+                    else ("failed" if t.done() else "running")
+                )
+            )
+        )
+        await _send(
+            ws,
+            0,
+            {
+                "active": t is not None and not t.done(),
+                "goal_id": goal_route._active_goal_id,
+                "status": detail,
+            },
+            "Goal 状态",
+        )
         return
     if cmd == "clear":
         t = goal_route._active_task
@@ -152,8 +178,10 @@ async def _handle_goal_command(ws: WebSocket, text: str) -> None:
         old = goal_route._active_task
         if old and not old.done():
             old.cancel()
-        from orbit.goal.models import GoalSession
         import asyncio
+
+        from orbit.goal.models import GoalSession
+
         goal = GoalSession(description=cmd)
         task = asyncio.create_task(orch.run(goal))
         task.add_done_callback(lambda t, gid=goal.id: _on_goal_task_done(gid, t))
@@ -167,7 +195,10 @@ def _on_goal_task_done(goal_id: str, task) -> None:
         task.result()
     except Exception:
         import structlog
-        structlog.get_logger("orbit.chat").error("goal_background_failed", goal_id=goal_id, exc_info=True)
+
+        structlog.get_logger("orbit.chat").error(
+            "goal_background_failed", goal_id=goal_id, exc_info=True
+        )
 
 
 async def _handle_chat(

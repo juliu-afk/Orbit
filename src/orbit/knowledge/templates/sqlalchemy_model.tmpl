@@ -1,0 +1,22 @@
+---
+name: sqlalchemy_model
+description: SQLAlchemy 2.0 Mapped model
+keywords: sqlalchemy, model, orm, database, table, mapped, column
+parameters: model_name, table_name, fields
+---
+from sqlalchemy import String, Integer
+from sqlalchemy.orm import Mapped, mapped_column
+
+from backend.app.models.base import Base
+
+
+class {{model_name}}(Base):
+    """{{model_name}}数据模型。"""
+
+    __tablename__ = "{{table_name}}"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    {{fields}}
+
+    def __repr__(self) -> str:
+        return f"<{{model_name}} id={self.id}>"

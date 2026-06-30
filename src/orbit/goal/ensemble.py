@@ -13,8 +13,9 @@
 
 from __future__ import annotations
 
-import structlog
 from typing import Any
+
+import structlog
 
 logger = structlog.get_logger("orbit.goal")
 
@@ -79,8 +80,8 @@ class ModelEnsemble:
 
     def __init__(
         self,
-        agent_factory: Any = None,   # AgentFactory
-        judge_llm: Any = None,       # LLMClient (judge)
+        agent_factory: Any = None,  # AgentFactory
+        judge_llm: Any = None,  # LLMClient (judge)
         ensemble_models: list[str] | None = None,
         weight_threshold: float = ENSEMBLE_WEIGHT_THRESHOLD,
     ) -> None:
@@ -103,7 +104,9 @@ class ModelEnsemble:
         """
         if weight <= self._threshold or len(self._models) < 2:
             # 单模型
-            result = await self._run_single(task, context, self._models[0] if self._models else None)
+            result = await self._run_single(
+                task, context, self._models[0] if self._models else None
+            )
             return EnsembleResult(selected=result, method="single", candidates=[result])
 
         # 多模型并行
@@ -131,7 +134,10 @@ class ModelEnsemble:
         method = "selection"
         if len(scores) >= 2:
             sorted_indices = sorted(range(len(scores)), key=lambda i: scores[i].total, reverse=True)
-            if scores[sorted_indices[0]].total - scores[sorted_indices[1]].total < FUSION_DELTA_THRESHOLD:
+            if (
+                scores[sorted_indices[0]].total - scores[sorted_indices[1]].total
+                < FUSION_DELTA_THRESHOLD
+            ):
                 method = "fusion"
                 candidate = self._fuse(candidates, scores)
             else:
@@ -141,33 +147,34 @@ class ModelEnsemble:
 
         logger.info(
             "ensemble_complete",
-            task_id=getattr(task, 'id', '?'),
+            task_id=getattr(task, "id", "?"),
             candidates=len(candidates),
             method=method,
             best_score=round(scores[best_idx].total, 3),
         )
-        return EnsembleResult(selected=candidate, candidates=candidates, scores=scores, method=method)
+        return EnsembleResult(
+            selected=candidate, candidates=candidates, scores=scores, method=method
+        )
 
     # ── 内部 ──────────────────────────────────────────
 
-    async def _run_single(
-        self, task: Any, context: dict, model: str | None
-    ) -> Any:
+    async def _run_single(self, task: Any, context: dict, model: str | None) -> Any:
         """单模型执行——通过 AgentFactory。"""
         if not self._agent_factory:
             return f"[mock] 完成 {task.description[:100]}"
         agent = self._agent_factory.create("developer")
         from orbit.agents.base import AgentInput
-        output = await agent.execute(AgentInput(
-            task=getattr(task, 'description', str(task)),
-            context=context,
-            role="developer",
-        ))
+
+        output = await agent.execute(
+            AgentInput(
+                task=getattr(task, "description", str(task)),
+                context=context,
+                role="developer",
+            )
+        )
         return output.result if output.status == "ok" else str(output.error)
 
-    async def _judge_candidates(
-        self, task: Any, candidates: list[dict]
-    ) -> list[JudgeScore]:
+    async def _judge_candidates(self, task: Any, candidates: list[dict]) -> list[JudgeScore]:
         """Judge 评分——三维度评估。"""
         if not self._judge:
             # 无 Judge → 选第一个（默认最新）
@@ -180,16 +187,16 @@ class ModelEnsemble:
         scores = []
         for c in candidates:
             output_len = len(str(c.get("output", "")))
-            scores.append(JudgeScore(
-                correctness=0.7 + min(output_len / 10000, 0.2),
-                performance=0.7,
-                maintainability=0.7,
-            ))
+            scores.append(
+                JudgeScore(
+                    correctness=0.7 + min(output_len / 10000, 0.2),
+                    performance=0.7,
+                    maintainability=0.7,
+                )
+            )
         return scores
 
-    def _fuse(
-        self, candidates: list[dict], scores: list[JudgeScore]
-    ) -> Any:
+    def _fuse(self, candidates: list[dict], scores: list[JudgeScore]) -> Any:
         """融合多个候选方案的最佳部分。"""
         # TODO: 真正的融合逻辑——取各方案中得分最高的部分
         best_idx = max(range(len(scores)), key=lambda i: scores[i].total)

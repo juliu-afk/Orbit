@@ -11,14 +11,14 @@ v5 架构核心:
 from __future__ import annotations
 
 import asyncio
-import structlog
 import time
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
+import structlog
 
 from orbit.goal.intake_router import IntakeRouter
 from orbit.goal.memory_tiers import ThreeTierMemory
-from typing import TYPE_CHECKING, Any
-
 from orbit.goal.models import (
     GoalBatchReport,
     GoalResult,
@@ -45,6 +45,7 @@ logger = structlog.get_logger("orbit.goal")
 
 class AutoMergeRejected(Exception):
     """自主合入被拒绝——门禁未通过。"""
+
     def __init__(self, pr_id: str, reason: str) -> None:
         self.pr_id = pr_id
         self.reason = reason
@@ -68,7 +69,7 @@ class MetaOrchestrator:
         intake_router: IntakeRouter | None = None,
         dependency_analyzer: DependencyAnalyzer | None = None,
         compose_bridge: GoalComposeBridge | None = None,
-        clarifier: Any = None,          # ClarifierAgent
+        clarifier: Any = None,  # ClarifierAgent
         progress_tracker: ProgressTracker | None = None,
         alignment_check: AlignmentCheck | None = None,
         regression_guard: RegressionGuard | None = None,
@@ -77,13 +78,10 @@ class MetaOrchestrator:
         budget_allocator: BudgetAllocator | None = None,
         verifier: ExecutorVerifier | None = None,
         critique_agent: CritiqueAgent | None = None,
-<<<<<<< HEAD
-=======
         compose_orchestrator: Any = None,  # ComposeOrchestrator
         ensemble: Any = None,  # ModelEnsemble
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         worktree_manager: WorktreeManager | None = None,
-        agent_factory: Any = None,       # AgentFactory
+        agent_factory: Any = None,  # AgentFactory
         max_parallel_tasks: int = 5,
     ) -> None:
         self.intake_router = intake_router or IntakeRouter()
@@ -98,16 +96,38 @@ class MetaOrchestrator:
         self.budget_allocator = budget_allocator
         self.verifier = verifier
         self.critique_agent = critique_agent
-<<<<<<< HEAD
-=======
         self.compose_orchestrator = compose_orchestrator
         self.ensemble = ensemble
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         self._worktree = worktree_manager
         self._agent_factory = agent_factory
         self._max_parallel = max_parallel_tasks
+        # Goal pause/resume——asyncio.Event 控制流暂停
+        # WHY Event: set()=不阻塞(正常运行), clear()=阻塞(暂停中)
+        self._pause_event = asyncio.Event()
+        self._pause_event.set()  # 初始: 不暂停
+        self._paused = False
 
     # ── 公共 API ──────────────────────────────────────
+
+    def pause(self) -> None:
+        """暂停当前 Goal——运行中的循环在下一个检查点阻塞。
+
+        WHY asyncio.Event.clear: 使 _pause_event.wait() 阻塞，
+        循环在层间或子任务间暂停。
+        """
+        self._paused = True
+        self._pause_event.clear()
+        logger.info("meta_orchestrator_paused")
+
+    def resume(self) -> None:
+        """恢复已暂停的 Goal——解除检查点阻塞。"""
+        self._paused = False
+        self._pause_event.set()
+        logger.info("meta_orchestrator_resumed")
+
+    @property
+    def is_paused(self) -> bool:
+        return self._paused
 
     async def run(self, goal: GoalSession) -> GoalResult:
         """执行完整 Goal 生命周期。"""
@@ -136,7 +156,7 @@ class MetaOrchestrator:
                     confirmed = await self._present_for_confirmation(estimate, spec, goal)
                     if not confirmed:
                         return GoalResult(status="cancelled", reason="用户取消")
-                    goal.spec = spec.model_dump() if hasattr(spec, 'model_dump') else spec
+                    goal.spec = spec.model_dump() if hasattr(spec, "model_dump") else spec
                     goal.sub_tasks = {t.id: "pending" for t in spec.tasks}
 
             # 已有 TaskDAG→直接执行
@@ -146,18 +166,17 @@ class MetaOrchestrator:
                 return await self._run_single_task(goal)
 
             spec = self._deserialize_spec(spec_data)
-<<<<<<< HEAD
-=======
 
             # Goal→Compose: delegate to ComposeOrchestrator when available
             if self.compose_orchestrator:
                 logger.info("goal_delegating_to_compose", goal_id=goal.id)
-                compose_result = await self.compose_orchestrator.run_spec(goal.description, parent_task_id=goal.id)
+                compose_result = await self.compose_orchestrator.run_spec(
+                    goal.description, parent_task_id=goal.id
+                )
                 elapsed = time.time() - started_at
                 ok = compose_result.get("status") == "ok"
                 return GoalResult(status="done" if ok else "partial", total_time_seconds=elapsed)
 
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
             layers = self._topological_layers(spec.tasks)
             previous_merge_shas: dict[str, str] = {}
 
@@ -175,10 +194,14 @@ class MetaOrchestrator:
                     )
 
                 # 层内并行
-                layer_results = await asyncio.gather(*[
-                    self._run_subtask(t, task_bases.get(t.id, "main"), goal, budgets.get(t.id, 0))
-                    for t in layer
-                ])
+                layer_results = await asyncio.gather(
+                    *[
+                        self._run_subtask(
+                            t, task_bases.get(t.id, "main"), goal, budgets.get(t.id, 0)
+                        )
+                        for t in layer
+                    ]
+                )
 
                 # 处理结果
                 for task, result in zip(layer, layer_results):
@@ -204,6 +227,9 @@ class MetaOrchestrator:
                                 reason=f"连续 {goal.consecutive_failures} 个子任务失败",
                             )
 
+                # 暂停检查点——在层间检查暂停信号
+                await self._pause_event.wait()
+
                 # 进度更新
                 if self.progress_tracker:
                     await self.progress_tracker.update(goal)
@@ -221,7 +247,8 @@ class MetaOrchestrator:
                 # 预算检查
                 if self._budget_exhausted(goal):
                     return GoalResult(
-                        status="done", reason="预算耗尽",
+                        status="done",
+                        reason="预算耗尽",
                         tasks_completed=completed_count,
                     )
 
@@ -274,6 +301,7 @@ class MetaOrchestrator:
         """单任务模式——无拆解，直接执行。"""
         # 创建虚拟 Task
         from orbit.compose.models import Task as ComposeTask
+
         task = ComposeTask(id="task-0", description=goal.description)
         result = await self._run_subtask(task, "main", goal, goal.total_token_budget)
         return GoalResult(
@@ -311,19 +339,12 @@ class MetaOrchestrator:
         # P0-1: 逐层执行——Semaphore 包裹每个协程
         results: list[GoalResult] = []
         sem = asyncio.Semaphore(self._max_parallel)
-<<<<<<< HEAD
-        for layer in layers:
-            async def _run_one(g):
-                async with sem:
-                    return await self.run(g)
-=======
 
         async def _run_one(g):
             async with sem:
                 return await self.run(g)
 
         for layer in layers:
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
             layer_results = await asyncio.gather(*[_run_one(g) for g in layer])
             results.extend(layer_results)
 
@@ -354,18 +375,11 @@ class MetaOrchestrator:
             # 记录到 Ledger
             self.memory.goal_description = goal.description
             self.memory.constraints = goal.constraints
-<<<<<<< HEAD
-        except asyncio.CancelledError:
-            raise
-=======
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
         except Exception as e:
             logger.warning("clarifier_failed", error=str(e))
         return goal
 
-    async def _present_for_confirmation(
-        self, estimate, spec, goal: GoalSession
-    ) -> bool:
+    async def _present_for_confirmation(self, estimate, spec, goal: GoalSession) -> bool:
         """展示拆解结果——等待用户确认。
 
         实际实现: 通过 WebSocket/chat 界面展示。
@@ -378,27 +392,23 @@ class MetaOrchestrator:
     def _budget_exhausted(self, goal: GoalSession) -> bool:
         """检查预算是否耗尽。"""
         if goal.total_token_budget > 0 and goal.token_consumed >= goal.total_token_budget:
-            logger.warning("goal_budget_exhausted", budget=goal.total_token_budget, consumed=goal.token_consumed)
+            logger.warning(
+                "goal_budget_exhausted",
+                budget=goal.total_token_budget,
+                consumed=goal.token_consumed,
+            )
             return True
         if goal.max_runtime_seconds > 0 and goal.started_at:
-<<<<<<< HEAD
-            # P1-NEW5: 更稳健的 ISO 解析
-            try:
-                started_str = goal.started_at.replace("Z", "+00:00")
-                started_dt = datetime.fromisoformat(started_str)
-                elapsed = time.time() - started_dt.timestamp()
-            except (ValueError, TypeError):
-                logger.warning("goal_time_parse_failed", started_at=goal.started_at)
-=======
             # P1-3: 防御 None/空字符串
             try:
                 started_str = goal.started_at.replace("Z", "+00:00")
                 elapsed = time.time() - datetime.fromisoformat(started_str).timestamp()
             except (ValueError, TypeError, AttributeError):
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
                 return False
             if elapsed >= goal.max_runtime_seconds:
-                logger.warning("goal_time_exhausted", max=goal.max_runtime_seconds, elapsed=int(elapsed))
+                logger.warning(
+                    "goal_time_exhausted", max=goal.max_runtime_seconds, elapsed=int(elapsed)
+                )
                 return True
         return False
 
@@ -423,7 +433,9 @@ class MetaOrchestrator:
             else:
                 dep_shas = [previous_merges[d] for d in t.depends_on if d in previous_merges]
                 if not dep_shas:
-                    logger.warning("resolve_bases_no_deps_found", task_id=t.id, depends_on=list(t.depends_on))
+                    logger.warning(
+                        "resolve_bases_no_deps_found", task_id=t.id, depends_on=list(t.depends_on)
+                    )
                     bases[t.id] = "main"
                 else:
                     bases[t.id] = dep_shas[-1]
@@ -440,7 +452,9 @@ class MetaOrchestrator:
                 if dep in adj:
                     adj[dep].append(t.id)
                 else:
-                    logger.warning("topological_sort_missing_dependency", task_id=t.id, missing_dep=dep)
+                    logger.warning(
+                        "topological_sort_missing_dependency", task_id=t.id, missing_dep=dep
+                    )
 
         layers = []
         current = [t for t in tasks if in_degree[t.id] == 0]
@@ -454,27 +468,20 @@ class MetaOrchestrator:
                         nxt.append(task_map[neighbor])
             current = nxt
 
-        if sum(len(l) for l in layers) != len(tasks):
-            remaining = {t.id for t in tasks} - {t.id for l in layers for t in l}
+        if sum(len(ly) for ly in layers) != len(tasks):
+            remaining = {t.id for t in tasks} - {t.id for ly in layers for t in ly}
             raise ValueError(f"环形依赖或不可达节点: {remaining}")
         return layers
 
     @staticmethod
     def _deserialize_spec(spec_data: dict) -> Any:
-<<<<<<< HEAD
-        """反序列化 Spec——兼容 dict 和 pydantic。"""
-        try:
-            from orbit.compose.models import Spec, Task
-            return Spec(**spec_data)
-        except Exception:
-=======
         """反序列化 Spec——兼容 dict 和 pydantic。P1-4: 日志记录。"""
         try:
             from orbit.compose.models import Spec, Task
+
             return Spec(**spec_data)
         except Exception as e:
             logger.warning("spec_deserialize_failed", error=str(e)[:200])
->>>>>>> 1cdddeacb9fe2b301c27aaa7e82c7080c6549313
             return spec_data
 
     @staticmethod

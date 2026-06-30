@@ -10,8 +10,9 @@ WHY 桥接而非直接调用: Goal 模式需要自动 Spec 生成（用户不给
 
 from __future__ import annotations
 
-import structlog
 from typing import TYPE_CHECKING, Any
+
+import structlog
 
 if TYPE_CHECKING:
     from orbit.compose.models import Spec, Task
@@ -73,9 +74,9 @@ class GoalComposeBridge:
             logger.info("compose_bridge_mock_mode")
             return self._mock_spec(goal)
 
-        constraints_text = "\n".join(f"- {c}" for c in getattr(goal, 'constraints', []))
+        constraints_text = "\n".join(f"- {c}" for c in getattr(goal, "constraints", []))
         prompt = SPEC_GENERATION_PROMPT.format(
-            description=getattr(goal, 'description', str(goal)),
+            description=getattr(goal, "description", str(goal)),
             constraints=constraints_text or "无",
         )
 
@@ -106,21 +107,15 @@ class GoalComposeBridge:
 
         if isinstance(spec, dict):
             tasks_dicts = spec.get("tasks", [])
-            pending = [
-                t for t in tasks_dicts
-                if progress.get(t.get("id", "")) != "done"
-            ]
+            pending = [t for t in tasks_dicts if progress.get(t.get("id", "")) != "done"]
             return {**spec, "tasks": pending}
-        elif hasattr(spec, 'tasks'):
-            pending = [
-                t for t in spec.tasks
-                if progress.get(t.id) != "done"
-            ]
+        elif hasattr(spec, "tasks"):
+            pending = [t for t in spec.tasks if progress.get(t.id) != "done"]
             return Spec(
                 title=spec.title,
                 description=spec.description,
                 tasks=pending,
-                constraints=spec.constraints if hasattr(spec, 'constraints') else [],
+                constraints=spec.constraints if hasattr(spec, "constraints") else [],
             )
         return spec
 
@@ -139,6 +134,7 @@ class GoalComposeBridge:
             data = json.loads(clean)
 
             from orbit.compose.models import Spec, Task
+
             tasks = [
                 Task(
                     id=t.get("id", f"task-{i}"),
@@ -149,7 +145,7 @@ class GoalComposeBridge:
                 for i, t in enumerate(data.get("tasks", []))
             ]
             return Spec(
-                title=data.get("title", getattr(goal, 'description', str(goal))[:50]),
+                title=data.get("title", getattr(goal, "description", str(goal))[:50]),
                 description=data.get("description", ""),
                 tasks=tasks,
             )
@@ -161,7 +157,7 @@ class GoalComposeBridge:
         """Mock Spec——无 LLM 时的回退。"""
         from orbit.compose.models import Spec, Task
 
-        desc = getattr(goal, 'description', str(goal))
+        desc = getattr(goal, "description", str(goal))
         return Spec(
             title=desc[:50],
             description=desc,

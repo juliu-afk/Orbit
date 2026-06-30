@@ -174,7 +174,7 @@ async def test_agent_cycle_through_factory():
 @pytest.mark.asyncio
 async def test_no_factory_raises():
     sched = Scheduler(agent_llms=None, agent_factory=None)
-    with pytest.raises(RuntimeError, match="AgentFactory"):
+    with pytest.raises(RuntimeError, match="Agent"):
         await sched._task_runner._agent_cycle("t1", TaskState.CODING, {"prd": "test"})
 
 

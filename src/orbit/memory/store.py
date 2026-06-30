@@ -216,7 +216,9 @@ class MemoryStore:
 
         # 简单 grep 匹配——每个 ## 段检查关键词命中
         sections = mem.body.split("\n## ")
-        for section in sections[1:]:  # 跳过第一个空段
+        # 如果 body 以 ## 开头，split 的第一个元素就是第一个 section（无空段前缀）
+        start = 0 if mem.body.startswith("##") else 1
+        for section in sections[start:]:
             score = sum(1 for kw in keywords if kw.lower() in section.lower())
             if score > 0:
                 # P1-2/P1-3: 完整解析 markdown 列表项
@@ -237,7 +239,7 @@ class MemoryStore:
                         parsed["timestamp"] = ln.replace("- **时间**:", "").strip()
                 results.append(
                     DR(
-                        id=lines[0] if lines else "",
+                        id=lines[0].lstrip("# ") if lines else "",
                         choice=parsed.get("choice", ""),
                         why=parsed.get("why", ""),
                         constraints=[

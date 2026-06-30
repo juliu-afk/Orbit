@@ -28,6 +28,7 @@ import BootView from '@/views/BootView.vue'
 describe('BootView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()  // P1-5: 确保fake timers不泄漏
     mockStatus.value = 'booting'
   })
 

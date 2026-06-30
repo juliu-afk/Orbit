@@ -9,6 +9,8 @@ import shlex
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from orbit.core.security_constants import SHELL_METACHARACTERS
+
 router = APIRouter(prefix="/terminal", tags=["terminal"])
 
 _workspace_dir: str | None = None
@@ -83,9 +85,8 @@ async def exec_command(req: ExecRequest):
     if cmd_parts[0] == "python" and any(a == "-c" for a in cmd_parts[1:]):
         raise HTTPException(status_code=403, detail="python -c 已禁用——安全基线")
     # P0-2: 阻止 shell 元字符注入（; | && $() ``）
-    _SHELL_META = {"|", ";", "&", "&&", "||", "$(", "`"}
     for arg in cmd_parts[1:]:
-        if any(m in arg for m in _SHELL_META):
+        if any(m in arg for m in SHELL_METACHARACTERS):
             raise HTTPException(
                 status_code=403, detail=f"Shell 元字符已禁用: {arg}"
             )

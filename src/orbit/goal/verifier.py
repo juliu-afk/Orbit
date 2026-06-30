@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from orbit.core.security_constants import SHELL_METACHARACTERS
+
 if TYPE_CHECKING:
     pass
 
@@ -169,16 +171,13 @@ class ExecutorVerifier:
         WHY 双重验证: Issue #126 P0-5——仅检查命令名不足以防止注入，
         `python -c "import os; os.system('rm -rf /')"` 通过白名单但可执行任意代码。
         """
-        # shell 元字符——禁止命令拼接和代码注入
-        _SHELL_META = frozenset({";", "|", "&&", "||", "$(", "`", ">"})
-
         for cmd in commands:
             cmd_stripped = cmd.strip()
             if not cmd_stripped:
                 continue
 
-            # 检测 shell 元字符
-            for meta in _SHELL_META:
+            # 检测 shell 元字符（共享常量 orbit.core.security_constants）
+            for meta in SHELL_METACHARACTERS:
                 if meta in cmd_stripped:
                     raise CommandNotAllowedError(
                         f"验证命令包含禁止的 shell 元字符 '{meta}': {cmd_stripped[:80]}"

@@ -112,18 +112,6 @@ async def chat_endpoint(ws: WebSocket) -> None:
         pass  # 客户端正常断开
 
 
-# P1-2: Goal 后台任务异常回调
-def _on_goal_task_done(goal_id: str, task) -> None:
-    try:
-        task.result()
-    except Exception:
-        import structlog
-
-        structlog.get_logger("orbit.chat").error(
-            "goal_background_failed", goal_id=goal_id, exc_info=True
-        )
-
-
 async def _handle_goal_command(ws: WebSocket, text: str) -> None:
     """/goal <desc> | /goal status | /goal clear."""
     from orbit.api.routes import goal as goal_route

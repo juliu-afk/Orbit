@@ -56,6 +56,7 @@ _MODEL_QUALITY: dict[str, int] = {
 def select_model(
     strategy: RoutingStrategy,
     available_models: list[str] | None = None,
+    price_multiplier: float = 1.0,  # D13: 当前时段价格倍数——低峰 <1.0
 ) -> RoutingDecision:
     """纯函数——按策略选最佳模型。
 
@@ -77,13 +78,17 @@ def select_model(
         )
 
     if strategy == RoutingStrategy.CHEAPEST:
-        # 按成本升序，选第一个
-        sorted_models = sorted(models, key=lambda m: _MODEL_COSTS.get(m, 999.0))
+        # D13: 按有效成本（基础价格 × 时段倍数）升序
+        sorted_models = sorted(
+            models,
+            key=lambda m: _MODEL_COSTS.get(m, 999.0) * price_multiplier,
+        )
         chosen = sorted_models[0]
+        effective_cost = _MODEL_COSTS.get(chosen, 0) * price_multiplier
         return RoutingDecision(
             strategy=strategy,
             model=chosen,
-            reason=f"cheapest_model_cost_{_MODEL_COSTS.get(chosen, 0):.6f}_per_1k",
+            reason=f"cheapest_model_effective_cost_{effective_cost:.6f}_per_1k",
         )
 
     if strategy == RoutingStrategy.FASTEST:

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { apiPost, apiGet } from '@/services/api'
 
 export interface ReviewDecision { id: string; filePath: string; hunkIndex: number; decision: 'approved'|'rejected'|'comment'; comment: string|null; decidedBy: string }

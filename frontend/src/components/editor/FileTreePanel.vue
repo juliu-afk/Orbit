@@ -18,12 +18,12 @@ export interface FileNode {
   reviewStatus?: 'approved' | 'rejected' | 'pending' | null; coveragePct?: number
 }
 
-defineProps<{ treeData: FileNode[]; selectedFile: string | null }>()
+const props = defineProps<{ treeData: FileNode[]; selectedFile: string | null }>()
 defineEmits<{ (e: 'select-file', path: string): void }>()
 
 const fileCount = computed(() => {
   function c(nodes: FileNode[]): number { let n = 0; for (const x of nodes) { if (!x.isDir) n++; if (x.children) n += c(x.children) } return n }
-  return c((arguments as any)[0]?.treeData || [])
+  return c(props.treeData || [])
 })
 </script>
 

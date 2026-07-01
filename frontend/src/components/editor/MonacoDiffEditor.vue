@@ -78,7 +78,7 @@ function registerLanguageProviders() {
           const data = await apiGet<{ file: string; line: number; column: number }>(
             `/api/v1/codegraph/definition?symbol=${encodeURIComponent(word.word)}`
           )
-          if (token.isCancellationRequested) return null  // P1-2
+          if ((token as any).isCancellationRequested) return null  // P1-2
           if (data?.file) {
             const col = data.column || 1
             return { uri: monaco.Uri.file(data.file), range: { startLineNumber: data.line || 1, startColumn: col, endLineNumber: data.line || 1, endColumn: col + word.word.length } }
@@ -96,7 +96,7 @@ function registerLanguageProviders() {
           const data = await apiGet<{ references: { name: string; file?: string; line?: number }[] }>(
             `/api/v1/codegraph/references?symbol=${encodeURIComponent(word.word)}`
           )
-          if (token.isCancellationRequested) return []  // P1-2
+          if ((token as any).isCancellationRequested) return []  // P1-2
           return (data?.references || []).map(ref => ({
             uri: monaco.Uri.file(ref.file || ''),
             range: { startLineNumber: ref.line || 1, startColumn: 1, endLineNumber: ref.line || 1, endColumn: 1 },
@@ -113,7 +113,7 @@ function registerLanguageProviders() {
           const data = await apiGet<{ info: string }>(
             `/api/v1/codegraph/hover?symbol=${encodeURIComponent(word.word)}`
           )
-          if (token.isCancellationRequested) return null  // P1-2
+          if ((token as any).isCancellationRequested) return null  // P1-2
           if (data?.info) {
             return { contents: [{ value: data.info, isTrusted: false }] }  // P1-3
           }

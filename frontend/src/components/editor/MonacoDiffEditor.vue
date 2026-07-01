@@ -30,12 +30,9 @@ const containerRef = ref<HTMLDivElement>()
 const diffEditor = shallowRef<monaco.editor.IStandaloneDiffEditor>()
 const currentHunk = ref(0)
 const hunks = ref<monaco.editor.ILineChange[]>([])
-<<<<<<< HEAD
-=======
 const _hunkTimer = ref<ReturnType<typeof setTimeout>>()  // P1-1
 const _oldModel = { o: null as monaco.editor.ITextModel | null, m: null as monaco.editor.ITextModel | null }  // P2-1
 const _providerDisposables: monaco.IDisposable[] = []  // P1-1
->>>>>>> c986a79 (fix(security): Issue#126-P1 资源泄漏+错误处理 (8 items))
 
 // 从 Monaco diff 中提取 hunk 列表
 function updateHunks() {
@@ -134,10 +131,6 @@ function updateModel() {
 }
 watch(() => [props.original, props.modified, props.language], updateModel)
 // 模型变更后重新计算 hunk 列表
-<<<<<<< HEAD
-watch(() => [props.original, props.modified], () => setTimeout(updateHunks, 100))
-onBeforeUnmount(() => _providerDisposables.forEach(d => d.dispose()); _providerDisposables.length = 0; diffEditor.value?.dispose())
-=======
 watch(() => [props.original, props.modified], () => {
   if (_hunkTimer.value) clearTimeout(_hunkTimer.value)
   _hunkTimer.value = setTimeout(updateHunks, 100)
@@ -148,7 +141,6 @@ onBeforeUnmount(() => {
   _providerDisposables.length = 0
   diffEditor.value?.dispose()
 })
->>>>>>> c986a79 (fix(security): Issue#126-P1 资源泄漏+错误处理 (8 items))
 </script>
 
 <style scoped>

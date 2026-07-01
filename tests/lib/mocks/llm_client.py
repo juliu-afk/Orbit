@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import asyncio
-import time
 from typing import Any
 
 import structlog
@@ -52,16 +51,6 @@ class MockLLMClient:
         latency_ms: int = 0,
         entropy: float = 0.0,
     ) -> None:
-        """初始化 Mock LLM 客户端。
-
-        Args:
-            fixed_response: 固定返回内容（str→自动包装为 LLMResponse）
-            fail_count: 前 N 次调用抛出 LLMError（模拟 5xx）
-            stream_chunks: 流式输出分块列表（用于 generate_stream_with_tools）
-            tool_calls: LLM 请求调用工具列表（OpenAI 格式）
-            latency_ms: 模拟延迟（毫秒）
-            entropy: L3 熵监控触发值（0.0-1.0，>0.75 触发告警）
-        """
         self._fixed_response = self._normalize_response(fixed_response)
         self._fail_count = fail_count
         self._stream_chunks = stream_chunks or []
@@ -69,40 +58,30 @@ class MockLLMClient:
         self._latency_ms = latency_ms
         self.entropy = entropy
 
-        # 调用追踪
         self.call_count: int = 0
         self.stream_call_count: int = 0
         self.calls: list[LLMRequest] = []
         self.stream_calls: list[LLMRequest] = []
 
-    # ── 链式配置方法 ──────────────────────────────────────
-
     def with_response(self, response: LLMResponse | str) -> "MockLLMClient":
-        """设置固定响应并返回 self（链式调用）。"""
         self._fixed_response = self._normalize_response(response)
         return self
 
     def with_failures(self, count: int) -> "MockLLMClient":
-        """设置前 count 次调用失败。"""
         self._fail_count = count
         return self
 
     def with_stream(self, chunks: list[str]) -> "MockLLMClient":
-        """设置流式输出分块。"""
         self._stream_chunks = chunks
         return self
 
     def with_tool_calls(self, calls: list[dict[str, Any]]) -> "MockLLMClient":
-        """设置工具调用列表。"""
         self._tool_calls = calls
         return self
 
     def with_latency(self, ms: int) -> "MockLLMClient":
-        """设置模拟延迟（毫秒）。"""
         self._latency_ms = ms
         return self
-
-    # ── 生产接口兼容方法 ──────────────────────────────────
 
     async def generate(
         self,
@@ -112,11 +91,6 @@ class MockLLMClient:
         router_decision: Any = None,
         routing_strategy: Any = None,
     ) -> LLMResponse:
-        """Mock LLM 调用——100% 兼容 LLMClient.generate() 签名。
-
-        Raises:
-            LLMError: 前 fail_count 次调用时抛出
-        """
         if self._latency_ms > 0:
             await asyncio.sleep(self._latency_ms / 1000.0)
 
@@ -129,37 +103,19 @@ class MockLLMClient:
         if self._fixed_response is not None:
             return self._fixed_response
 
-        # 无预设响应 → 构造默认响应
         tool_calls = self._tool_calls
         return LLMResponse(
             content="[mock] CODE_GENERATED_OK",
             model="mock-model",
-            usage=LLMUsage(
-                prompt_tokens=10,
-                completion_tokens=20,
-                total_tokens=30,
-                cost_usd=0.0,
-            ),
+            usage=LLMUsage(prompt_tokens=10, completion_tokens=20, total_tokens=30, cost_usd=0.0),
             tool_calls=tool_calls,
             stop_reason="tool_calls" if tool_calls else "end_turn",
             degraded=False,
         )
 
     async def generate_stream_with_tools(
-        self,
-        req: LLMRequest,
-        task_id: str = "",
-        agent_name: str = "",
+        self, req: LLMRequest, task_id: str = "", agent_name: str = ""
     ):
-        """Mock 流式调用——兼容 LLMClient.generate_stream_with_tools()。
-
-        Yields:
-            (StreamEventType, dict) 元组，模拟逐 token 推送 + 工具调用。
-            - TEXT_DELTA: {"delta": "word "}
-            - TOOL_CALL: {"tool": "read_file", "args": {...}}
-            - FINISH_STEP: {"output": "...", "turns": 1, "tool_calls": 0}
-            - ERROR: {"message": "...", "code": "..."}
-        """
         from orbit.stream.events import StreamEventType
 
         if self._latency_ms > 0:
@@ -168,39 +124,27 @@ class MockLLMClient:
         self.stream_call_count += 1
         self.stream_calls.append(req)
 
-        # 失败模拟
         if self.stream_call_count <= self._fail_count:
-            yield (
-                StreamEventType.ERROR,
-                {
-                    "message": f"Mock LLM internal error (stream call #{self.stream_call_count})",
-                    "code": "MOCK_ERROR",
-                },
-            )
+            yield (StreamEventType.ERROR, {
+                "message": f"Mock LLM internal error (stream call #{self.stream_call_count})",
+                "code": "MOCK_ERROR",
+            })
             return
 
-        # 工具调用模拟（LLM 请求执行工具而非返回文本）
         if self._tool_calls:
-            yield (
-                StreamEventType.THINKING,
-                {"content": "I need to read the file first."},
-            )
+            yield (StreamEventType.THINKING, {"content": "I need to read the file first."})
             for tc in self._tool_calls:
-                yield (
-                    StreamEventType.TOOL_CALL,
-                    {"tool": tc.get("name", "unknown"), "args": tc.get("args", {})},
-                )
+                yield (StreamEventType.TOOL_CALL, {
+                    "tool": tc.get("name", "unknown"),
+                    "args": tc.get("args", {}),
+                })
             return
 
-        # 流式文本模拟（逐 chunk 推送）
-        chunks = self._stream_chunks or [self._fixed_response.content] if self._fixed_response else ["[mock] OK"]
+        chunks = self._stream_chunks or ([self._fixed_response.content] if self._fixed_response else ["[mock] OK"])
         for chunk in chunks:
             yield (StreamEventType.TEXT_DELTA, {"delta": chunk})
 
-    # ── 辅助方法 ──────────────────────────────────────────
-
     def reset(self) -> None:
-        """重置调用追踪状态。"""
         self.call_count = 0
         self.stream_call_count = 0
         self.calls.clear()
@@ -208,7 +152,6 @@ class MockLLMClient:
 
     @staticmethod
     def _normalize_response(response: LLMResponse | str | None) -> LLMResponse | None:
-        """str → LLMResponse 自动包装，None 保持 None。"""
         if response is None:
             return None
         if isinstance(response, str):

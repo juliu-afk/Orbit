@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 import structlog
@@ -58,7 +59,6 @@ class TaskChain:
             mocks: Mock 组件字典
             task_id: 任务 ID（None=自动生成）。避免并发测试 ID 碰撞。
         """
-        import uuid
         mocks = mocks or {}
         self.task_id: str = task_id or uuid.uuid4().hex[:12]
 
@@ -320,9 +320,10 @@ class TaskChain:
         }
         self.checkpoints.append(cp)
 
-        from tests.lib.factories.checkpoint import create_checkpoint as _create_ck
-        ck_data = _create_ck(state=state, context={"output": cp["output"], "error": error})
-        self.checkpoint._store[f"{self.task_id}:{state}"] = ck_data
+        # 使用工厂创建检查点数据，通过公开方法同步保存
+        from tests.lib.factories.checkpoint import create_checkpoint as _make_ck
+        ck_data = _make_ck(state=state, context={"output": cp["output"], "error": error})
+        self.checkpoint.save_sync(self.task_id, state, ck_data)
 
     # ── 断言方法 ──────────────────────────────────────────
 

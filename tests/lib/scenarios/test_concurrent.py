@@ -34,7 +34,7 @@ async def test_dag_independent_nodes_parallel(scenario_mocks: dict) -> None:
 
 
 @pytest.mark.scenario_concurrent
-async def test_dag_fail_fast_stops_downstream(scenario_mocks: dict) -> None:
+async def test_dag_all_nodes_succeed(scenario_mocks: dict) -> None:
     """无预设失败→所有节点正常完成。"""
     chain = DagChain(mocks=scenario_mocks)
     await chain.with_nodes(3).with_dependencies({2: [1], 3: [2]}).run()
@@ -49,6 +49,7 @@ async def test_dag_preset_node_failure(scenario_mocks: dict) -> None:
     chain._node_results["node_2"] = {"status": "failed", "output": "mock failure"}
     chain._node_results["node_1"] = {"status": "ok", "output": "node 1 done"}
     await chain.with_nodes(3).with_dependencies({2: [1], 3: [2]}).run()
+    chain.assert_node_order()
     chain.assert_node_failed("node_2")
     chain.assert_node_skipped("node_3")
 

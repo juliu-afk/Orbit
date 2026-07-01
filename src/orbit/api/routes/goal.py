@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import structlog
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -30,8 +31,6 @@ def _on_goal_done(task: asyncio.Task) -> None:
     except asyncio.CancelledError:
         pass
     except Exception:
-        import structlog
-
         structlog.get_logger("orbit.goal").error("goal_background_task_failed", exc_info=True)
     finally:
         _active_task = None

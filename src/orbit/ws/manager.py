@@ -28,8 +28,7 @@ class ConnectionManager:
         self._rooms: dict[str, set[WebSocket]] = {}
         self._total_connections = 0
         # P1-2 (PR#139): 只对已接受的连接递减——超限拒绝不计数
-        # P2-1 (PR#139 R2): 直接用 WebSocket 引用而非 id()——防 GC 复用
-        self._counted: set[WebSocket] = set()
+        self._counted: set[int] = set()
 
     async def connect(self, ws: WebSocket) -> None:
         """接受连接。不做认证（PRD Non-Goal：生产由反向代理处理）。"""
@@ -38,7 +37,7 @@ class ConnectionManager:
             logger.warning("ws_connection_limit_reached", max=self.MAX_CONNECTIONS)
             return
         self._total_connections += 1
-        self._counted.add(ws)
+        self._counted.add(id(ws))
         await ws.accept()
 
     async def disconnect(self, ws: WebSocket) -> None:
@@ -48,8 +47,9 @@ class ConnectionManager:
         先快照 keys 避免 RuntimeError。
         """
         # P1-2 (PR#139): 只递减已计数的连接——超限被拒的连接不计数
-        if ws in self._counted:
-            self._counted.discard(ws)
+        _ws_id = id(ws)
+        if _ws_id in self._counted:
+            self._counted.discard(_ws_id)
             self._total_connections = max(0, self._total_connections - 1)
         initial_rooms = len(self._rooms)
         for task_id in list(self._rooms):

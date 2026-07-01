@@ -103,9 +103,6 @@ const statusTagType = computed(() => ({ pending:'info', in_review:'', changes_re
 function onSelectFile(path: string) { editor.openFile(path, 'HEAD', null) }
 
 // P1-3: 恢复 TestPanel @show-error 事件处理
-function onTestError(error: { message: string; file?: string; line?: number }) {
-  console.error("[ReviewView] test error:", error.message)
-}
 onMounted(async () => {
   const tid = route.params.taskId as string
   await review.createReview(tid); git.fetchGpgKeys(); diag.fetchDiagnostics(tid)

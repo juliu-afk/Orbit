@@ -15,7 +15,7 @@
     <div class="review-body">
       <div class="review-sidebar">
         <FileTreePanel :tree-data="fileTree" :selected-file="editor.currentFile" @select-file="onSelectFile" />
-        <ReviewCommentPanel v-if="review.taskId && editor.currentFile" :review-id="review.taskId" :file="editor.currentFile" :line="0" />
+        <ReviewCommentPanel v-if="review.taskId && editor.currentFile" :review-id="review.taskId" :file="editor.currentFile" :line="editor.currentLine" />
       </div>
       <div class="review-main">
         <div v-if="!editor.currentFile" class="no-file"><el-empty description="Select a file to review" :image-size="80" /></div>
@@ -36,8 +36,9 @@
         </el-tab-pane>
         <el-tab-pane label="Outline" name="outline"><OutlinePanel :items="outlineItems" @select="onOutlineNavigate" /></el-tab-pane>
         <el-tab-pane label="Search" name="search"><SearchPanel /></el-tab-pane>
-        <el-tab-pane label="Tests" name="tests"><TestPanel /></el-tab-pane>
+        <el-tab-pane label="Tests" name="tests"><TestPanel @show-error="onTestError" /></el-tab-pane>
         <el-tab-pane label="Terminal" name="terminal"><TerminalPanel /></el-tab-pane>
+        <el-tab-pane label="Conflicts" name="conflicts"><MergeConflictPanel @select-file="onSelectFile" /></el-tab-pane>
       </el-tabs>
     </div>
     <el-dialog v-model="showCommitDialog" title="Commit" width="500px">
@@ -68,6 +69,7 @@ import OutlinePanel from '@/components/editor/OutlinePanel.vue'
 import SearchPanel from '@/components/editor/SearchPanel.vue'
 import TestPanel from '@/components/editor/TestPanel.vue'
 import TerminalPanel from '@/components/editor/TerminalPanel.vue'
+import MergeConflictPanel from "@/components/editor/MergeConflictPanel.vue"
 import ReviewCommentPanel from '@/components/editor/ReviewCommentPanel.vue'
 import { useReviewStore } from '@/stores/review'
 import { useEditorStore } from '@/stores/editor'
@@ -93,7 +95,7 @@ const activeBottomTab = ref('problems')
 function focusTab(name: string) { activeBottomTab.value = name }
 
 // 大纲条目点击——由 MonacoDiffEditor 内部实现跳转
-function onOutlineNavigate(_line: number) { activeBottomTab.value = 'outline' }
+function onOutlineNavigate(line: number) { activeBottomTab.value = 'problems' }  // P1-3: 切回diff视图
 
 const statusLabel = computed(() => ({ pending:'Pending', in_review:'In Review', changes_requested:'Rejected', approved:'Approved', merged:'Merged' }[review.status] ?? review.status))
 const statusTagType = computed(() => ({ pending:'info', in_review:'', changes_requested:'danger', approved:'success', merged:'info' }[review.status] ?? ''))

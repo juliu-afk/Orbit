@@ -367,8 +367,9 @@ class TaskRunner:
         )
 
     @staticmethod
+    @staticmethod
     def _extract_keywords(prd_text: str) -> list[str]:
-        """从 PRD 文本提取技术关键词——减熵闭环-1."""
+        """从 PRD 文本提取技术关键词——减熵闭环-1. P2-PRE-1: +@staticmethod."""
         if not prd_text:
             return []
         _stop = {

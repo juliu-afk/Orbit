@@ -52,7 +52,13 @@ class MockEventBus:
         return len(self.published)
 
     def get_events_by_type(self, event_type: str) -> list[Any]:
-        return [e for e in self.published if getattr(e, "type", None) == event_type]
+        """按事件类型过滤。兼容 dict 和对象类型事件。"""
+        result = []
+        for e in self.published:
+            t = e.get("type") if isinstance(e, dict) else getattr(e, "type", None)
+            if t == event_type:
+                result.append(e)
+        return result
 
     def reset(self) -> None:
         self.published.clear()

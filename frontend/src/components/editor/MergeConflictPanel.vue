@@ -7,7 +7,7 @@
     </div>
     <div v-else class="conflict-list">
       <div v-for="(f, i) in conflicts" :key="f" class="conflict-item"
-        :class="{ active: i === selected && selected >= 0 }" @click="$emit('select-file', f); selected = i">
+        :class="{ active: i === selected && selected >= 0 }" @click="selectConflict(i, f)">
         <el-icon><WarningFilled /></el-icon>
         <span class="conflict-path">{{ f }}</span>
       </div>
@@ -23,6 +23,8 @@ import { ref, onMounted, watch } from 'vue'
 import { WarningFilled } from '@element-plus/icons-vue'
 import { apiGet } from '@/services/api'
 
+const emit = defineEmits<{ (e: 'select-file', path: string): void }>()
+
 const conflicts = ref<string[]>([])
 const loading = ref(false)
 const selected = ref(-1)  // -1 = 未选中
@@ -35,6 +37,11 @@ async function refresh() {
     conflicts.value = data?.conflicts ?? []
   } catch { conflicts.value = [] }
   finally { loading.value = false }
+}
+
+function selectConflict(i: number, file: string) {
+  selected.value = i
+  emit('select-file', file)
 }
 
 onMounted(refresh)

@@ -47,3 +47,4 @@ class SecurityPolicy(BaseModel):
     allowed_paths: list[str] = Field(default_factory=list)  # glob patterns
     denied_paths: list[str] = Field(default_factory=list)  # glob patterns
     require_sandbox: bool = True  # shell 命令必须经沙箱
+    sandbox_verified: bool = False  # P1-3: 调用方确认已走沙箱隔离（用于 exec_command 检查）

@@ -123,24 +123,11 @@ class MockToolRegistry:
         agent_name: str,
         version: str | None = None,
     ) -> Any:
-        """调用工具（旧 API）——兼容 ToolRegistry.invoke()。"""
-        # 委托给 dispatch，返回字符串（invoke 返回任意类型）
-        import asyncio
+        """调用工具（旧 API）——兼容 ToolRegistry.invoke()。
 
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # 在已有 event loop 中用 create_task 不够优雅，简化为同步返回
-                if name in self._tool_results:
-                    return self._tool_results[name]
-                # 检查限流
-                if self.rate_limited:
-                    raise RateLimitError(f"Tool '{name}' rate limit exceeded")
-                return f"[mock] Tool '{name}' executed (sync)"
-        except RuntimeError:
-            pass
-
-        # 无 event loop → 同步返回
+        WHY 纯同步: 生产 ToolRegistry.invoke() 是同步方法，Mock 保持一致。
+        不依赖 event loop 检测（Python 3.12+ deprecated asyncio.get_event_loop()）。
+        """
         if name in self._tool_results:
             return self._tool_results[name]
         if self.rate_limited:

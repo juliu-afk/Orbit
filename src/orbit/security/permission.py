@@ -66,8 +66,13 @@ class PermissionEngine:
         path: str = "",
         command: str = "",
         policy: SecurityPolicy | None = None,
+        strict_mode: bool = False,
     ) -> bool:
         """逐层检查权限——任一层 deny → False。
+
+        Args:
+            strict_mode: True→fail-closed（未知工具默认拒绝）；False→fail-open（向后兼容）。
+                         渐进迁移：先在测试/CI 中启用 strict_mode=True，验证无 break 后生产启用。
 
         Returns:
             True = 允许执行
@@ -90,12 +95,27 @@ class PermissionEngine:
             return False
 
         # Layer 4: sandbox（shell 必须隔离）
-        # P1-3: 不仅记录，还拒绝——除非调用方显式绕过沙箱（仅测试用）
+        # P1-3: exec_command 需沙箱验证——调用方必须传入 sandbox_verified=True
         if tool_name == "exec_command":
             if policy and not policy.require_sandbox:
-                pass  # 显式绕过沙箱（仅限测试）
+                pass  # 显式绕过沙箱（仅限测试/Mock 环境）
+            elif not policy or not policy.sandbox_verified:
+                logger.warning(
+                    "permission_denied",
+                    layer=PermissionLayer.SANDBOX.value,
+                    agent=agent_role,
+                    tool=tool_name,
+                    reason="exec_command requires sandbox isolation",
+                )
+                _audit.log(
+                    "permission_engine",
+                    "deny_sandbox",
+                    status="denied",
+                    agent=agent_role,
+                    tool=tool_name,
+                )
+                return False
             else:
-                # 沙箱执行——由调用方保证（PermissionEngine 返回 True 但标记需要沙箱）
                 logger.info(
                     "permission_sandbox_required",
                     agent=agent_role,
@@ -170,19 +190,30 @@ class PermissionEngine:
             )
             return True
 
-        # 无匹配——默认拒绝（P1 SEC-1: fail-closed——未知工具不应放行）
-        logger.warning(
-            "permission_denied",
-            layer="default",
+        # 无匹配
+        # strict_mode → fail-closed（P1 SEC-1：未知工具不应放行）
+        # 非 strict_mode → fail-open（向后兼容：渐进迁移）
+        if strict_mode:
+            logger.warning(
+                "permission_denied",
+                layer="default",
+                agent=agent_role,
+                tool=tool_name,
+            )
+            _audit.log(
+                "permission_engine", "deny_default", status="denied",
+                agent=agent_role, tool=tool_name,
+                reason="no matching permission policy (strict_mode)",
+            )
+            return False
+
+        # fail-open：未知工具默认允许（向后兼容）
+        logger.info(
+            "permission_default_allow",
             agent=agent_role,
             tool=tool_name,
         )
-        _audit.log(
-            "permission_engine", "deny_default", status="denied",
-            agent=agent_role, tool=tool_name,
-            reason="no matching permission policy",
-        )
-        return False
+        return True
 
     # ── 内部 ─────────────────────────────────────
 

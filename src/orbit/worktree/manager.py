@@ -53,6 +53,11 @@ class WorktreeManager:
         # P1-4: 确保父目录存在
         wt_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # P1 SEC-7: 校验 base_branch——禁止 shell 特殊字符防止注入
+        import re as _re
+        if not _re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._/-]*$', base_branch):
+            raise ValueError(f"base_branch 包含非法字符: {base_branch}")
+
         record = WorktreeRecord(
             worktree_id=worktree_id,
             branch_name=branch_name,

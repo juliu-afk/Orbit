@@ -225,6 +225,12 @@ class TaskRunner:
             else:
                 raise RuntimeError(f"Agent {role} 返回错误: {output_obj.error}")
         except TimeoutError:  # P1-6: 兼容 Python <3.11
+            # P1 RSCK-8: 超时后 agent.execute 被 cancel——
+            # 确保子任务也被传播取消（fire-and-forget task 手动 cancel）
+            if hasattr(agent, "_active_subtasks"):
+                for st in getattr(agent, "_active_subtasks", []):
+                    if not st.done():
+                        st.cancel()
             logger.warning("agent_timeout", role=role, task_id=task_id)
             raise
         except asyncio.CancelledError:

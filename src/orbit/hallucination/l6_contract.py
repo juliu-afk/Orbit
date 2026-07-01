@@ -19,6 +19,8 @@ from typing import Any
 import structlog
 
 from orbit.hallucination.base import skip_if_empty
+
+logger = structlog.get_logger("orbit.hallucination.l6")
 from orbit.hallucination.schemas import (
     HallucinationLevel,
     L6ContractMatch,
@@ -78,6 +80,13 @@ class L6ContractValidator:
                 matches = self._compare_endpoint(ep, code_ep)
                 violations.extend([m for m in matches if not m.matched])
             # NOTE: spec 中定义但代码未实现的端点不报错（可能是其他文件定义）
+            # P1 LOG-6: 记录假阴性——spec-only 端点可能是不完整实现
+            else:
+                logger.info(
+                    "l6_spec_only_skipped",
+                    endpoint=f"{ep['method']} {ep['path']}",
+                    reason="代码中未找到匹配端点",
+                )
 
         if violations:
             return ValidationResult(

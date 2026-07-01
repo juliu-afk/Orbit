@@ -95,12 +95,15 @@ class PermissionEngine:
             if policy and not policy.require_sandbox:
                 pass  # 显式绕过沙箱（仅限测试）
             else:
-                # 沙箱执行——由调用方保证（PermissionEngine 返回 True 但标记需要沙箱）
-                logger.info(
-                    "permission_sandbox_required",
+                # P1 SEC-2: sandbox 层 fail-closed——
+                # 无沙箱保护的 exec_command 应拒绝而非依赖调用方自觉
+                logger.warning(
+                    "permission_denied",
+                    layer="sandbox",
+                    reason="exec_command 需要沙箱保护",
                     agent=agent_role,
-                    command=command[:100],
                 )
+                return False
 
         # Layer 3: path_scope（workspace guard）
         if path and self._guard:

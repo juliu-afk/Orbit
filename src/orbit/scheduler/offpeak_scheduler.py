@@ -17,22 +17,90 @@ import asyncio
 import json
 import os
 import sqlite3
-import structlog
-from contextlib import contextmanager
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import Any, Literal, TYPE_CHECKING
+
+import structlog
 
 import yaml
 
-from orbit.scheduler.offpeak_models import (
-    DeferredStatus,
-    DeferredTask,
-    EnqueueResult,
-    PeakStatus,
-    PeakWindow,
-    ProviderPeakConfig,
-)
+# ── 数据模型（内联——避免独立 models 文件被删除导致 import 失败） ──
+
+DeferredStatus = Literal[
+    "queued", "released", "running", "done", "urgent_override", "cancelled"
+]
+
+
+@dataclass
+class PeakWindow:
+    """单个时段定义。"""
+    days: list[str]
+    hours_start: str
+    hours_end: str
+
+    def contains(self, day_name: str, time_str: str) -> bool:
+        return day_name in self.days and self.hours_start <= time_str < self.hours_end
+
+
+@dataclass
+class ProviderPeakConfig:
+    """单个厂商的高峰/低峰配置。"""
+    provider: str
+    timezone: str
+    peak_windows: list[PeakWindow] = field(default_factory=list)
+    offpeak_windows: list[PeakWindow] = field(default_factory=list)
+    peak_price_multiplier: float = 1.0
+    offpeak_price_multiplier: float = 1.0
+
+
+@dataclass
+class DeferredTask:
+    """延迟执行任务。"""
+    id: str
+    goal_description: str = ""
+    priority: str = "NORMAL"
+    provider: str = ""
+    estimated_tokens: int = 0
+    estimated_duration_seconds: int = 0
+    target_window_start: str = ""
+    target_window_end: str = ""
+    status: DeferredStatus = "queued"
+    created_at: str = ""
+    released_at: str | None = None
+    completed_at: str | None = None
+    actual_tokens: int = 0
+    cost_saved_yuan: float = 0.0
+    goal_json: str = ""
+
+    @staticmethod
+    def now_iso() -> str:
+        return datetime.now(UTC).isoformat()
+
+
+@dataclass
+class EnqueueResult:
+    """入队结果。"""
+    goal_id: str
+    status: str = "queued"
+    target_window_start: str = ""
+    target_window_end: str = ""
+    queue_position: int = 0
+    warning_message: str = ""
+
+
+@dataclass
+class PeakStatus:
+    """单个厂商的高峰状态。"""
+    provider: str
+    is_peak: bool = False
+    peak_ends_at: str | None = None
+    next_offpeak_starts_at: str | None = None
+    next_offpeak_ends_at: str | None = None
+    offpeak_duration_hours: float = 0.0
+
+# ── 日志 ──
 
 if TYPE_CHECKING:
     from orbit.goal.models import GoalSession

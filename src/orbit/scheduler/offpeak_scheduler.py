@@ -254,7 +254,7 @@ class PeakWindowManager:
         providers_raw = raw.get("providers", {})
         for name, cfg in providers_raw.items():
             peak_windows = [
-                PeakWindow(**{**w, "hours_start": w["hours"].split("-")[0], "hours_end": w["hours"].split("-")[1]})
+                PeakWindow(days=w.get("days", ["Mon","Tue","Wed","Thu","Fri"]), hours_start=w["hours"].split("-")[0], hours_end=w["hours"].split("-")[1])
                 for w in cfg.get("peak_windows", [])
             ]
             offpeak_windows_raw = cfg.get("offpeak_windows", [])
@@ -262,7 +262,7 @@ class PeakWindowManager:
                 # 从 peak_windows 推导——高峰之外就是低峰
                 offpeak_windows_raw = cfg.get("peak_windows", [])
             offpeak_windows = [
-                PeakWindow(**{**w, "hours_start": w["hours"].split("-")[0], "hours_end": w["hours"].split("-")[1]})
+                PeakWindow(days=w.get("days", ["Mon","Tue","Wed","Thu","Fri"]), hours_start=w["hours"].split("-")[0], hours_end=w["hours"].split("-")[1])
                 for w in offpeak_windows_raw
             ]
             self._configs[name] = ProviderPeakConfig(

@@ -108,6 +108,20 @@ class CheckpointManager:
         # 3. 降级内存
         if key in self._memory_store:
             return self._deserialize(self._memory_store[key], task_id)
+        # 4. 降级磁盘（P1-1 PR#139: 进程重启后内存丢失，磁盘兜底恢复）
+        import os
+        import tempfile
+
+        _dir = os.path.join(tempfile.gettempdir(), "orbit_checkpoints")
+        _path = os.path.join(_dir, f"{key.replace(':', '_')}.ckpt")
+        if os.path.exists(_path):
+            try:
+                with open(_path, "rb") as f:
+                    _data = f.read()
+                logger.info("checkpoint_disk_load", key=key)
+                return self._deserialize(_data, task_id)
+            except OSError as e:
+                logger.warning("checkpoint_disk_load_failed", key=key, error=str(e))
         return None
 
     async def cleanup_old_checkpoints(self, days: int = 7) -> int:
@@ -136,9 +150,10 @@ class CheckpointManager:
             try:
                 await self.redis.setex(key, CHECKPOINT_TTL, serialized)
             except Exception as e2:
-                # 降级内存
+                # 降级内存，写磁盘备份（P1 ERR-7: 进程重启后内存丢失）
                 logger.error("redis_save_fallback_memory", key=key, error=str(e2))
                 self._memory_store[key] = serialized
+                self._save_to_disk_fallback(key, serialized)
 
     async def _load_from_redis(self, key: str) -> bytes | None:
         if self.redis is None:
@@ -148,6 +163,22 @@ class CheckpointManager:
         except Exception as e:
             logger.warning("redis_load_failed", key=key, error=str(e))
             return self._memory_store.get(key)
+
+    # P1 ERR-7: 磁盘兜底——Redis + PG 都不可用时写入临时文件
+    def _save_to_disk_fallback(self, key: str, serialized: bytes) -> None:
+        """写入磁盘文件兜底——Redis/PG 不可用时的最后防线。"""
+        import os
+        import tempfile
+
+        try:
+            _dir = os.path.join(tempfile.gettempdir(), "orbit_checkpoints")
+            os.makedirs(_dir, exist_ok=True)
+            _path = os.path.join(_dir, f"{key.replace(':', '_')}.ckpt")
+            with open(_path, "wb") as f:
+                f.write(serialized)
+            logger.info("checkpoint_disk_fallback_saved", key=key, path=_path)
+        except OSError as e:
+            logger.error("checkpoint_disk_fallback_failed", key=key, error=str(e))
 
     # ---- PG 层 ----
 

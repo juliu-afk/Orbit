@@ -139,9 +139,14 @@ class AgentModelResolver:
             return result
 
         # 5. 系统默认
+        # P1 LOG-11: 优先读 settings 避免硬编码 FALLBACK_MODEL
         default_model = os.getenv("DEFAULT_LLM_MODEL", "")
         if not default_model:
-            default_model = TIER_MODEL_MAP.get(ModelTier.TIER_3.value, FALLBACK_MODEL)
+            try:
+                from orbit.core.config import settings
+                default_model = settings.COMPRESSION_SUMMARY_MODEL
+            except (ImportError, AttributeError):
+                default_model = TIER_MODEL_MAP.get(ModelTier.TIER_3.value, FALLBACK_MODEL)
 
         result = ResolvedModel(
             model=default_model,

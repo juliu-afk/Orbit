@@ -1,0 +1,56 @@
+# LLM 厂商高峰时段配置
+# 可通过环境变量 ORBIT_OFFPEAK_CONFIG_PATH 覆盖路径
+# 手动编辑后调用 POST /api/v1/schedule/reload-config 热重载
+
+providers:
+  deepseek:
+    timezone: Asia/Shanghai
+    peak_windows:
+      - days: [Mon, Tue, Wed, Thu, Fri]
+        hours: "09:00-23:00"
+    offpeak_windows:
+      - days: [Mon, Tue, Wed, Thu, Fri]
+        hours: "23:00-09:00"
+      - days: [Sat, Sun]
+        hours: "00:00-24:00"
+    peak_price_multiplier: 1.0
+    offpeak_price_multiplier: 0.7
+
+  anthropic:
+    timezone: America/Los_Angeles
+    peak_windows:
+      - days: [Mon, Tue, Wed, Thu, Fri]
+        hours: "08:00-18:00"
+    offpeak_windows:
+      - days: [Mon, Tue, Wed, Thu, Fri]
+        hours: "18:00-08:00"
+      - days: [Sat, Sun]
+        hours: "00:00-24:00"
+    peak_price_multiplier: 1.0
+    offpeak_price_multiplier: 0.85
+
+  openai:
+    timezone: America/Los_Angeles
+    peak_windows:
+      - days: [Mon, Tue, Wed, Thu, Fri]
+        hours: "08:00-18:00"
+    offpeak_windows:
+      - days: [Mon, Tue, Wed, Thu, Fri]
+        hours: "18:00-08:00"
+      - days: [Sat, Sun]
+        hours: "00:00-24:00"
+    peak_price_multiplier: 1.0
+    offpeak_price_multiplier: 1.0   # OpenAI 暂无分时定价
+
+  glm:
+    timezone: Asia/Shanghai
+    peak_windows:
+      - days: [Mon, Tue, Wed, Thu, Fri]
+        hours: "09:00-23:00"
+    offpeak_windows:
+      - days: [Mon, Tue, Wed, Thu, Fri]
+        hours: "23:00-09:00"
+      - days: [Sat, Sun]
+        hours: "00:00-24:00"
+    peak_price_multiplier: 1.0
+    offpeak_price_multiplier: 1.0   # GLM Coding Plan 免费，不分峰

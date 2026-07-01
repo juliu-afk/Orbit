@@ -47,6 +47,11 @@ class CreateGoalRequest(BaseModel):
     max_runtime_seconds: int = Field(0)
     max_parallel_tasks: int = Field(5)
     max_react: int = Field(12)
+    # D13: 高峰避让延迟调度
+    defer_to_offpeak: bool = Field(False, description="延迟到低峰执行")
+    urgent: bool = Field(False, description="紧急任务——忽略高峰限制立即执行")
+    target_provider: str = Field("", description="目标 LLM 厂商（deepseek/anthropic/openai/glm）")
+    max_price_multiplier: float = Field(0.0, ge=0.0, description="最高价格倍数，0=不限")
 
 
 def _get_orch(request: Request):
@@ -81,8 +86,43 @@ async def create_goal(request: Request, req: CreateGoalRequest):
         max_runtime_seconds=req.max_runtime_seconds,
         max_parallel_tasks=req.max_parallel_tasks,
         max_react=req.max_react,
+        # D13: 高峰避让
+        defer_to_offpeak=req.defer_to_offpeak,
+        urgent=req.urgent,
+        target_provider=req.target_provider,
+        max_price_multiplier=req.max_price_multiplier,
     )
-    # P1-2: fire-and-forget + 异常回调
+
+    # D13: 延迟执行分支——OffPeakScheduler 拦截
+    if req.defer_to_offpeak and not req.urgent:
+        offpeak = getattr(request.app.state, "offpeak_scheduler", None)
+        if offpeak is None:
+            raise HTTPException(status_code=503, detail="OffPeakScheduler 未初始化")
+        enqueue_result = await offpeak.enqueue(goal)
+        if enqueue_result.status == "peak_warning":
+            # ORBIT_OFFPEAK_ONLY + 高峰 → 警告用户确认紧急
+            return {
+                "code": 409,
+                "data": {
+                    "goal_id": goal.id,
+                    "status": "peak_warning",
+                    "warning": enqueue_result.warning_message,
+                },
+                "message": enqueue_result.warning_message,
+            }
+        return {
+            "code": 0,
+            "data": {
+                "goal_id": goal.id,
+                "status": "queued",
+                "target_window_start": enqueue_result.target_window_start,
+                "target_window_end": enqueue_result.target_window_end,
+                "queue_position": enqueue_result.queue_position,
+            },
+            "message": "任务已排队到低峰窗口",
+        }
+
+    # P1-2: fire-and-forget + 异常回调（现有路径——立即执行）
     task = asyncio.create_task(orch.run(goal))
     task.add_done_callback(_on_goal_done)
     _active_task = task

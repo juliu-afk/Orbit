@@ -38,7 +38,8 @@ h1 { font-size: 36px; font-weight: 700; color: #4caf50; letter-spacing: 3px; mar
 </div>
 <script>
 const PROBE = 'http://127.0.0.1:18888/api/v1/observability/startup-probe';
-const DASHBOARD = 'http://127.0.0.1:18888';
+// 直接进 dashboard，跳过 Vue router 的 /boot 二次检查
+const DASHBOARD = 'http://127.0.0.1:18888/#/dashboard';
 var delay = 1000;
 var started = Date.now();
 

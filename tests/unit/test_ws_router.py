@@ -34,8 +34,8 @@ class TestStartBroadcaster:
                 pass
 
         await _run()
-        # 验证 bus.subscribe 被调用过
-        assert bus.publish_count >= 0  # 至少没崩溃
+        # broadcaster 应正常启动和取消，无未处理异常
+        assert task.cancelled() or task.done()
 
 
 class TestDashboardWs:

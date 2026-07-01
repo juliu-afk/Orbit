@@ -32,7 +32,7 @@ async function refresh() {
   try {
     // 后端直接返回 string[]，非 {files: string[]}
     const data = await apiGet<string[]>('/api/v1/git/merge-conflicts')
-    conflicts.value = Array.isArray(data) ? data : []
+    conflicts.value = data?.conflicts ?? []
   } catch { conflicts.value = [] }
   finally { loading.value = false }
 }

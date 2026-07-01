@@ -61,8 +61,14 @@ async def create_goal(request: Request, req: CreateGoalRequest):
     """创建 Goal——统一入口。后台异步执行。
 
     P1 ERR-2: 校验 workspace 存在——未初始化时下游子任务静默失败。
+    P1-1 (#152): 并发冲突保护——已存在活跃 Goal 时返回 409。
     """
     global _active_task, _active_goal_id
+    if _active_task and not _active_task.done():
+        raise HTTPException(
+            status_code=409,
+            detail=f"已有活跃 Goal ({_active_goal_id})，请先取消再创建",
+        )
     _ws = settings.WORKSPACE_DIR or os.getcwd()
     if not os.path.isdir(_ws):
         raise HTTPException(status_code=400, detail=f"工作目录不存在: {_ws}")

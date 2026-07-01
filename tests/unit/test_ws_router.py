@@ -32,10 +32,10 @@ class TestStartBroadcaster:
                 await task
             except asyncio.CancelledError:
                 pass
+            # broadcaster 应正常取消，无未处理异常
+            assert task.cancelled() or task.done()
 
         await _run()
-        # 验证 bus.subscribe 被调用过
-        assert bus.publish_count >= 0  # 至少没崩溃
 
 
 class TestDashboardWs:

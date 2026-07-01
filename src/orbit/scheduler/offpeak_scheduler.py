@@ -439,20 +439,19 @@ class DeferredQueue:
             )
             conn.commit()
 
-        # 计算同窗口内的位置
-        count_row = conn.execute(
-            "SELECT COUNT(*) as cnt FROM deferred_tasks WHERE status='queued'"
-            " AND target_window_start = ?",
-            (task.target_window_start,),
-        ).fetchone()
-        return count_row["cnt"] if count_row else 0
+            # 计算同窗口内的位置——同一连接内查询，保证一致性
+            count_row = conn.execute(
+                "SELECT COUNT(*) as cnt FROM deferred_tasks WHERE status='queued'"
+                " AND target_window_start = ?",
+                (task.target_window_start,),
+            ).fetchone()
+            return count_row["cnt"] if count_row else 0
 
     def _pop_for_window_sync(
         self, window_start: str, window_end: str, limit: int
     ) -> list[DeferredTask]:
         with self._connect() as conn:
             # 按优先级排序: CRITICAL < HIGH < NORMAL < LOW，同优先级按预估耗时升序
-            priority_order = {"CRITICAL": 0, "HIGH": 1, "NORMAL": 2, "LOW": 3}
             rows = conn.execute(
                 """SELECT * FROM deferred_tasks
                    WHERE status = 'queued'
@@ -703,22 +702,18 @@ class OffPeakScheduler:
         avg_duration = (estimate.time_low_seconds + estimate.time_high_seconds) // 2
 
         # ── 确定目标窗口 ──
-        if self._peak.is_peak(provider, now):
-            window = self._peak.next_offpeak_window(provider, now)
-        else:
-            # 当前已是低峰——下一个 watcher tick 立即释放
-            window = self._peak.next_offpeak_window(provider, now)
-            if window is None:
-                # 极端情况: 无低峰窗口定义 → 立即执行
-                logger.warning("no_offpeak_window_found", provider=provider, goal_id=goal.id)
-                task = asyncio.create_task(self._orch.run(goal))
-                return EnqueueResult(
-                    goal_id=goal.id,
-                    status="released",
-                    target_window_start="now",
-                    target_window_end="now",
-                    queue_position=0,
-                )
+        window = self._peak.next_offpeak_window(provider, now)
+        if window is None:
+            # 极端情况: 无低峰窗口定义 → 立即执行
+            logger.warning("no_offpeak_window_found", provider=provider, goal_id=goal.id)
+            task = asyncio.create_task(self._orch.run(goal))
+            return EnqueueResult(
+                goal_id=goal.id,
+                status="released",
+                target_window_start="now",
+                target_window_end="now",
+                queue_position=0,
+            )
 
         # 构造 DeferredTask
         task = DeferredTask(
@@ -798,10 +793,14 @@ class OffPeakScheduler:
         """检查所有活跃厂商的低峰窗口——释放到期任务。"""
         now = datetime.now(UTC)
 
+        # 一次查询全量 queued 任务——按 provider 分桶
+        all_queued = await self._queue.list_all("queued")
+        by_provider: dict[str, list[DeferredTask]] = {}
+        for t in all_queued:
+            by_provider.setdefault(t.provider, []).append(t)
+
         for provider in self._peak.providers:
-            # 查找所有 queued 任务的目标窗口
-            all_queued = await self._queue.list_all("queued")
-            provider_tasks = [t for t in all_queued if t.provider == provider]
+            provider_tasks = by_provider.get(provider, [])
             if not provider_tasks:
                 continue
 
@@ -911,8 +910,9 @@ class OffPeakScheduler:
             # 简化: 用 1K tokens 基础价格 × 倍数 × tokens
             from orbit.gateway.routing import _MODEL_COSTS
             base_price = _MODEL_COSTS.get(provider, 0.001)
-            peak_cost = deferred_task.estimated_tokens / 1000 * base_price * peak_price
-            offpeak_cost = deferred_task.estimated_tokens / 1000 * base_price * offpeak_price
+            actual_tokens = getattr(result, "total_tokens", deferred_task.estimated_tokens)
+            peak_cost = actual_tokens / 1000 * base_price * peak_price
+            offpeak_cost = actual_tokens / 1000 * base_price * offpeak_price
             saved = round(max(0, peak_cost - offpeak_cost), 4)
 
             await self._queue.mark_done(

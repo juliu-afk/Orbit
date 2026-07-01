@@ -171,6 +171,9 @@ class ContextCompressor:
             return messages
 
         # 构建摘要请求
+        # P1 SEC-8: conversation 未经敏感信息过滤即发送给 LLM——
+        # 轻量缓解：截断每条消息到 300 字符（减少密钥/密码泄露面）
+        # 长期方案：正则过滤 API key/密码模式后再发送
         conversation_text = "\n".join(
             f"[{m.get('role','?')}] {str(m.get('content',''))[:300]}"
             for m in old_messages

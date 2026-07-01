@@ -59,6 +59,16 @@ def _get_orch(request: Request):
 async def create_goal(request: Request, req: CreateGoalRequest):
     """创建 Goal——统一入口。后台异步执行。"""
     global _active_task, _active_goal_id
+    # P1 ERR-2: 校验 workspace 存在——未初始化时下游子任务静默失败
+    import os as _os
+    from orbit.core.config import settings
+
+    _ws = settings.WORKSPACE_DIR or _os.getcwd()
+    if not _os.path.isdir(_ws):
+        raise HTTPException(
+            status_code=400,
+            detail=f"工作目录不存在: {_ws}——请先初始化 workspace",
+        )
     orch = _get_orch(request)
     goal = GoalSession(
         description=req.description or req.source_file or req.source_dir,

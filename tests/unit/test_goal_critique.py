@@ -1,6 +1,6 @@
 """Goal critique 单元测试。"""
 from orbit.goal.critique import CritiqueAgent
 
-def test_init():
+def test_agent_init():
     c = CritiqueAgent()
     assert c is not None

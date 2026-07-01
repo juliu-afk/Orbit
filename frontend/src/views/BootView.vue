@@ -29,7 +29,7 @@ watch(
         c => c.status === 'passed' || c.status === 'repaired'
       )
       if (s === 'passed' || allCriticalOk) {
-        setTimeout(() => router.push({ name: 'dashboard' }), 600)
+        setTimeout(() => router.push({ name: 'app' }), 600)  // Step 10: 预检通过 → /app (TerminalShell)
       }
     }
   }

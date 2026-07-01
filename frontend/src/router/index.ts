@@ -1,6 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { usePreFlightStore } from '@/stores/preflight'
-import DashboardView from '@/views/DashboardView.vue'
 
 const router = createRouter({
   // WHY hash history：生产部署时 FastAPI 托管静态文件，
@@ -16,10 +15,18 @@ const router = createRouter({
       name: 'boot',
       component: () => import('@/views/BootView.vue'),
     },
+    // Step 10 新路由——单页面板 TerminalShell
+    {
+      path: '/app',
+      name: 'app',
+      component: () => import('@/views/TerminalShell.vue'),
+      meta: { requiresProbe: true },
+    },
+    // WHY 旧路由保留至 Phase G：开发期间可回退验证
     {
       path: '/dashboard',
       name: 'dashboard',
-      component: DashboardView,
+      component: () => import('@/views/DashboardView.vue'),
       meta: { requiresProbe: true },
     },
     {
@@ -43,7 +50,7 @@ router.beforeEach((to, _from, next) => {
   // /boot 始终允许
   if (to.name === 'boot') {
     if (preflight.status === 'passed') {
-      return next({ name: 'dashboard' })
+      return next({ name: 'app' })  // Step 10: 预检通过 → /app
     }
     return next()
   }

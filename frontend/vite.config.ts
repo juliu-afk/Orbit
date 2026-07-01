@@ -1,12 +1,14 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import monacoPlugin from 'vite-plugin-monaco-editor'
+import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
 
 const monacoEditorPlugin = (monacoPlugin as any).default || monacoPlugin
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),  // Step 10: Tailwind CSS v4 替代手写 scoped CSS
     vue(),
     monacoEditorPlugin({ languageWorkers: ['editorWorkerService', 'typescript', 'json'] }),
   ],
@@ -27,8 +29,6 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    // WHY chunk 策略：vis-network 和 echarts 体积大，
-    // 拆分到独立 chunk 避免首屏加载全部 vendor
     rollupOptions: {
       output: {
         manualChunks: {

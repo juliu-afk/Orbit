@@ -1,6 +1,5 @@
-"""Goal ensemble 单元测试。"""
+"""Goal module unit test."""
 from orbit.goal.ensemble import ModelEnsemble
-
 def test_init():
-    e = ModelEnsemble()
-    assert e is not None
+    i = ModelEnsemble()
+    assert i is not None

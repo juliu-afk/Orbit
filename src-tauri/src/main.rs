@@ -122,6 +122,7 @@ fn main() {
             .inner_size(1400.0, 900.0)
             .resizable(true)
             .decorations(false)  // 去掉 Windows 原生标题栏，用前端自绘
+            .transparent(true)  // Step 10: 半透明玻璃窗口
             .build()?;
 
             Ok(())

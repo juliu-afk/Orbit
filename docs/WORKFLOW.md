@@ -143,7 +143,16 @@ LLM 输出错误       → 检查 LiteLLM 网关日志 → 检查防幻觉层 L1
 
 ### 6.2 创建 PR
 
-PR 标题 Conventional Commits，CI 自动触发。禁止 force-push。
+PR 标题 Conventional Commits，CI 自动触发。
+
+**⚠️ 绝对禁止以下操作——强制规则，无例外：**
+- **禁止 `git push --force` / `git push --force-with-lease` / `git push +branch`**
+  原因：可能覆盖他人 PR 分支、丢失他人代码、污染仓库历史。
+  如需更新 PR 分支，仅允许普通 `git push`（fast-forward）。
+- **禁止向已有开放 PR 的远程分支推送**
+  原因：覆盖他人工作。建分支前必须 `gh pr list --head <branch>` 确认无冲突。
+- **禁止 `git push --delete` 远程分支后重建同名分支**
+  原因：GitHub 自动关闭原 PR，丢失所有 review 历史。
 
 ### 6.3 门禁检查（9 项，全绿才能合并）
 

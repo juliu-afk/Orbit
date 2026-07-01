@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import re
+
 
 class CronParseError(ValueError):
     """Cron 解析错误。"""
@@ -70,8 +72,6 @@ class CronParser:
             return self.SHORTHAND_MAP[expr]
 
         # 纯数字+单位?
-        import re
-
         match = re.match(r"^(\d+)\s*([a-zA-Z]+)$", expr)
         if match:
             num = int(match.group(1))

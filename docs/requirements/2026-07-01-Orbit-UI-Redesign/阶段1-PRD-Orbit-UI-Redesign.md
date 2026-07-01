@@ -207,6 +207,6 @@ App.vue
 
 1. ~~xterm.js vs DOM + 终端 CSS~~ → **已确认：DOM + 终端 CSS**
 2. ~~半透明窗口~~ → **已确认：Tauri transparent + Mica 毛玻璃**
-3. Tailwind CSS vs UnoCSS？→ **用户未表态，默认 Tailwind CSS（生态最大）**
-4. 现有 BootView 的预检动画是否保留？→ **保留但去掉 Element Plus 依赖**
-5. 颜色主题方案？（当前暗色 #0a0a14，是否保持？）→ **保持暗色调，增加设计 token**
+3. ~~Tailwind CSS vs UnoCSS~~ → **已确认：Tailwind CSS**
+4. 现有 BootView 的预检动画是否保留？→ **未确认**
+5. 颜色主题方案？（当前暗色 #0a0a14，是否保持？）→ **未确认，建议保持暗色调+设计 token 体系**

@@ -17,7 +17,7 @@ import structlog
 logger = structlog.get_logger("orbit.probes")
 
 # 单个探针超时。沙箱探针需等 Docker 冷启动(~40s), 其余 <1s。
-PROBE_TIMEOUT_SECONDS = 60
+PROBE_TIMEOUT_SECONDS = 15  # 单探针超时——快探针 <1s，慢探针(sandbox) ~5-10s
 
 
 @dataclass
@@ -77,15 +77,18 @@ class StartupProbeEngine:
         self._auto_repairs = 0
 
     async def start(self) -> None:
-        """运行全部探针。幂等——已运行则跳过。"""
+        """运行全部探针——并行化，慢探针不阻塞快探针。幂等——已运行则跳过。"""
         async with self._lock:
             if self._status in ("running", "passed"):
                 return
             self._status = "running"
             self._started_at = time.time()
 
-        for check in self._checks:
-            await self._run_probe(check)
+        # 并行运行——sandbox 可能慢（Docker 检测/降级），不阻塞其他探针
+        await asyncio.gather(
+            *[self._run_probe(check) for check in self._checks],
+            return_exceptions=True,
+        )
 
         async with self._lock:
             self._completed_at = time.time()
@@ -327,7 +330,7 @@ async def _repair_sandbox() -> str:
     """沙箱自愈：已安装→尝试启动服务, 未安装→降级 ProcessSandbox。"""
     if _docker_is_installed():
         _start_docker_service()
-        for _ in range(15):
+        for _ in range(3):  # 最多等 6s——避免 boot 页长时间等待
             await asyncio.sleep(2)
             if await _check_docker_running():
                 return "Docker服务已启动，沙箱就绪"

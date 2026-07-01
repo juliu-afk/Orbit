@@ -11,6 +11,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from orbit.core.config import settings
 from orbit.goal.models import GoalSession
 
 router = APIRouter(prefix="/api/v1/goal", tags=["goal"])
@@ -57,8 +58,14 @@ def _get_orch(request: Request):
 
 @router.post("")
 async def create_goal(request: Request, req: CreateGoalRequest):
-    """创建 Goal——统一入口。后台异步执行。"""
+    """创建 Goal——统一入口。后台异步执行。
+
+    P1 ERR-2: 校验 workspace 存在——未初始化时下游子任务静默失败。
+    """
     global _active_task, _active_goal_id
+    _ws = settings.WORKSPACE_DIR or os.getcwd()
+    if not os.path.isdir(_ws):
+        raise HTTPException(status_code=400, detail=f"工作目录不存在: {_ws}")
     orch = _get_orch(request)
     goal = GoalSession(
         description=req.description or req.source_file or req.source_dir,

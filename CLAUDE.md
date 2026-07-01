@@ -142,7 +142,7 @@ Orbit/
 | `git add -A` | ⛔ 禁止——精确指定文件 |
 | 展示 diff 后 | 等用户说"commit"，不自动 commit |
 | 新增 dep | 先问用户 |
-| `git push --force` / `--no-verify` | ⛔ 禁止 |
+| `git push --force` / `+branch` / `push --delete 后重建` | ⛔ 禁止——详见 `@docs/WORKFLOW.md` §6.2 |
 | LLM 生成代码直接执行 | ⛔ 禁止——必须经沙箱 Docker 隔离 |
 | 调度器状态机改动 | 审查全生命周期 + 检查点回滚路径 |
 | 防幻觉层判定逻辑改动 | 审查 L1-L8 全链路影响 |

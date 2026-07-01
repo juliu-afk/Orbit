@@ -1,8 +1,8 @@
 # Code-Insight-Financial — Codex Context (AGENTS.md)
 
-> 自动生成于 2026-06-26 09:44 UTC
-> 源文件: CLAUDE.md (sha256:d9c61bc6)
->          WORKFLOW.md (sha256:afddc476)
+> 自动生成于 2026-07-01 13:45 UTC
+> 源文件: CLAUDE.md (sha256:96576ae4)
+>          WORKFLOW.md (sha256:b55dba58)
 >          accounting-rules.md (sha256:MISSING)
 
 > [WARN] 本文件由 scripts/build_codex_context.py 自动生成。
@@ -144,7 +144,7 @@ Orbit/
 | 冒烟测试 | `pytest tests/e2e/ -q --tb=short -k "smoke"` | ≤2min |
 | 回归测试 | `pytest tests/e2e/ -q --tb=short` | ≤10min |
 
-覆盖率目标：调度器/防幻觉纯函数 100%，Service 模块 ≥80%，CI 门禁 ≥80%。
+覆盖率目标：调度器/防幻觉纯函数 100%，Service 模块 ≥95%，CI 门禁 ≥95%。
 
 ## 行为拦截清单
 
@@ -154,7 +154,7 @@ Orbit/
 | `git add -A` | ⛔ 禁止——精确指定文件 |
 | 展示 diff 后 | 等用户说"commit"，不自动 commit |
 | 新增 dep | 先问用户 |
-| `git push --force` / `--no-verify` | ⛔ 禁止 |
+| `git push --force` / `+branch` / `push --delete 后重建` | ⛔ 禁止——详见 `@docs/WORKFLOW.md` §6.2 |
 | LLM 生成代码直接执行 | ⛔ 禁止——必须经沙箱 Docker 隔离 |
 | 调度器状态机改动 | 审查全生命周期 + 检查点回滚路径 |
 | 防幻觉层判定逻辑改动 | 审查 L1-L8 全链路影响 |
@@ -329,7 +329,16 @@ LLM 输出错误       → 检查 LiteLLM 网关日志 → 检查防幻觉层 L1
 
 ### 6.2 创建 PR
 
-PR 标题 Conventional Commits，CI 自动触发。禁止 force-push。
+PR 标题 Conventional Commits，CI 自动触发。
+
+**⚠️ 绝对禁止以下操作——强制规则，无例外：**
+- **禁止 `git push --force` / `git push --force-with-lease` / `git push +branch`**
+  原因：可能覆盖他人 PR 分支、丢失他人代码、污染仓库历史。
+  如需更新 PR 分支，仅允许普通 `git push`（fast-forward）。
+- **禁止向已有开放 PR 的远程分支推送**
+  原因：覆盖他人工作。建分支前必须 `gh pr list --head <branch>` 确认无冲突。
+- **禁止 `git push --delete` 远程分支后重建同名分支**
+  原因：GitHub 自动关闭原 PR，丢失所有 review 历史。
 
 ### 6.3 门禁检查（9 项，全绿才能合并）
 
@@ -379,4 +388,4 @@ bash scripts/build-desktop.sh
 
 ---
 
-*Generated at 2026-06-26 09:44 UTC | Source hashes: CLAUDE.md=d9c61bc6, WORKFLOW.md=afddc476, accounting-rules.md=MISSING*
+*Generated at 2026-07-01 13:45 UTC | Source hashes: CLAUDE.md=96576ae4, WORKFLOW.md=b55dba58, accounting-rules.md=MISSING*

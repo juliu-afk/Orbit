@@ -238,7 +238,7 @@ async def _probe_llm_gateway() -> str:
 
 
 async def _probe_sandbox() -> str:
-    """检测沙箱可用——快速降级不阻塞，后台拉起 Docker。"""
+    """检测沙箱可用——非关键路径，快速降级不阻塞。"""
     # 快速检查 Docker（1s 超时）
     try:
         if await asyncio.wait_for(_check_docker_running(), timeout=1.0):
@@ -246,27 +246,13 @@ async def _probe_sandbox() -> str:
     except asyncio.TimeoutError:
         pass
 
-    # 后台拉起 Docker（fire-and-forget，不阻塞探针）
-    if _docker_is_installed():
-        asyncio.create_task(_async_start_docker())
-
-    # 立即降级 ProcessSandbox
+    # 不尝试启动——直接降级 ProcessSandbox
     from orbit.sandbox.sandbox_factory import create_sandbox
     try:
         sandbox = await asyncio.wait_for(create_sandbox(), timeout=5.0)
         return f"沙箱就绪：{sandbox.__class__.__name__}"
     except asyncio.TimeoutError:
         return "沙箱降级：ProcessSandbox（超时fallback）"
-
-
-async def _async_start_docker() -> None:
-    """后台异步启动 Docker——不阻塞探针。"""
-    import asyncio as _asyncio
-    _start_docker_service()
-    for _ in range(10):
-        await _asyncio.sleep(2)
-        if await _check_docker_running():
-            return
 
 
 async def _probe_knowledge_engine() -> str:

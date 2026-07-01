@@ -101,7 +101,8 @@ def _tokenize_cjk_jieba(text: str) -> str:
 
 
 # P1 LOG-8: FTS5 特殊字符——需转义防止查询语法注入
-_FTS5_SPECIAL = re.compile(r'([*"()~&|!^])')
+# P2-1 (PR#139): 补遗漏的 " (phrase) 和 : (column filter)
+_FTS5_SPECIAL = re.compile(r'([*"():~&|!^])')
 
 
 def _escape_fts5(text: str) -> str:

@@ -147,9 +147,10 @@ class DreamEngine:
             )
             resp = await self._llm.generate(req, task_id="dream_merge")
             return resp.content or content
-        except (ConnectionError, TimeoutError, ValueError) as e:
-            # P1 ERR-4: LLM 合并失败应记录错误级别——静默跳过会让用户不知情
-            logger.error("dream_merge_failed_skip", error=str(e))
+        # P1-3 (PR#139): litellm/httpx 抛出的网络异常不继承 ConnectionError/TimeoutError
+        # 用 Exception 兜底——单个 merge 失败不应导致整个 dream cycle 崩溃
+        except Exception as e:
+            logger.error("dream_merge_failed_skip", error=str(e), error_type=type(e).__name__)
             return content
 
     def _stage_dedup(self, content: str) -> str:

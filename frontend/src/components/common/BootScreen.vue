@@ -1,47 +1,78 @@
-<!-- BootScreen.vue: 启动预检界面——Step 10 终端风格重绘（去 el-progress/el-icon/el-button） -->
+<!-- BootScreen.vue: 启动预检全屏界面——进度条+逐项检查+自愈提示 -->
 <template>
-  <div class="boot-screen glass flex justify-center" style="padding-top: 12vh;">
-    <div style="width: 520px; max-width: 90vw;">
-      <div class="text-center mb-6">
-        <h1 class="text-3xl font-bold m-0 tracking-wider" style="color: var(--color-orbit-accent); font-family: var(--font-mono);">Orbit</h1>
-        <p class="text-xs mt-1" style="color: var(--color-orbit-text-muted); font-family: var(--font-mono);">Multi-Agent Development System</p>
+  <div class="boot-screen">
+    <div class="boot-card">
+      <!-- 标题 -->
+      <div class="boot-header">
+        <h1 class="boot-title">Orbit</h1>
+        <p class="boot-subtitle">Multi-Agent Development System</p>
       </div>
-      <p class="text-center text-sm mb-4" style="font-family: var(--font-mono); color: var(--color-orbit-text-secondary);">
-        <template v-if="preflight.status === 'booting'">$ connecting to backend...</template>
-        <template v-else-if="preflight.status === 'running'">$ running system checks...</template>
-        <template v-else-if="preflight.status === 'passed'">OK all checks passed</template>
-        <template v-else>FAIL checks failed</template>
+
+      <!-- 状态文字 -->
+      <p class="boot-status">
+        <template v-if="preflight.status === 'booting'">正在连接后端...</template>
+        <template v-else-if="preflight.status === 'running'">正在检查系统组件...</template>
+        <template v-else-if="preflight.status === 'passed'">✅ 所有检查通过</template>
+        <template v-else>⚠️ 检查未通过</template>
       </p>
-      <div class="mb-6">
-        <div style="height: 6px; background: var(--color-orbit-border-light); border-radius: 3px; overflow: hidden;">
-          <div :style="{ width: preflight.progress + '%', height: '100%', background: preflight.status === 'failed' ? 'var(--color-orbit-error)' : preflight.status === 'passed' ? 'var(--color-orbit-accent)' : 'var(--color-orbit-info)', transition: 'width 0.3s ease' }" />
-        </div>
-        <div class="text-right text-[10px] mt-1" style="color: var(--color-orbit-text-muted); font-family: var(--font-mono);">{{ preflight.progress }}%</div>
-      </div>
-      <div class="mb-4" v-if="preflight.checks.length > 0" style="font-family: var(--font-mono);">
-        <div v-for="c in preflight.checks" :key="c.name" class="flex items-center gap-2 py-1.5 text-xs" :style="{ color: checkColor(c.status) }">
-          <span class="w-5 text-center shrink-0">
-            <template v-if="c.status === 'pending'">.</template>
-            <template v-else-if="c.status === 'running'"><span style="animation: spin 1s linear infinite; display: inline-block;">O</span></template>
-            <template v-else-if="c.status === 'passed'">OK</template>
-            <template v-else-if="c.status === 'failed'">FAIL</template>
-            <template v-else-if="c.status === 'repaired'">FIX</template>
-            <template v-else-if="c.status === 'skipped'">SKIP</template>
+
+      <!-- 进度条 -->
+      <el-progress
+        :percentage="preflight.progress"
+        :status="preflight.status === 'failed' ? 'exception' : preflight.status === 'passed' ? 'success' : undefined"
+        :stroke-width="8"
+        :show-text="false"
+        class="boot-progress"
+      />
+
+      <!-- 检查列表 -->
+      <div class="check-list" v-if="preflight.checks.length > 0">
+        <div
+          v-for="c in preflight.checks"
+          :key="c.name"
+          class="check-item"
+          :class="`check-item--${c.status}`"
+        >
+          <span class="check-icon">
+            <template v-if="c.status === 'pending'">◌</template>
+            <template v-else-if="c.status === 'running'">
+              <el-icon class="is-loading"><Loading /></el-icon>
+            </template>
+            <template v-else-if="c.status === 'passed'">✓</template>
+            <template v-else-if="c.status === 'failed'">✗</template>
+            <template v-else-if="c.status === 'repaired'">🔧</template>
+            <template v-else-if="c.status === 'skipped'">→</template>
           </span>
-          <span class="shrink-0" style="width: 100px;">{{ c.label }}</span>
-          <span class="flex-1 text-[11px] truncate" style="opacity: 0.7;">{{ c.message }}</span>
-          <span v-if="c.duration_ms > 0" class="shrink-0 text-[10px]" style="color: var(--color-orbit-text-muted);">{{ c.duration_ms }}ms</span>
+          <span class="check-label">{{ c.label }}</span>
+          <span class="check-msg">{{ c.message }}</span>
+          <span v-if="c.duration_ms > 0" class="check-time">{{ c.duration_ms }}ms</span>
         </div>
       </div>
-      <div v-if="preflight.repairedItems.length > 0" class="mb-3 p-2.5 rounded text-xs leading-relaxed" style="background: rgba(255,152,0,0.1); border-left: 3px solid var(--color-orbit-warn); color: var(--color-orbit-warn); font-family: var(--font-mono);">
-        auto-repaired {{ preflight.autoRepairs }}: <template v-for="(r, i) in preflight.repairedItems" :key="r.name">{{ r.label }}({{ r.message }}){{ i < preflight.repairedItems.length - 1 ? ', ' : '' }}</template>
+
+      <!-- 自愈提示 -->
+      <div v-if="preflight.repairedItems.length > 0" class="repaired-notice">
+        已自动修复 {{ preflight.autoRepairs }} 项：
+        <template v-for="(r, i) in preflight.repairedItems" :key="r.name">
+          {{ r.label }}（{{ r.message }}）{{ i < preflight.repairedItems.length - 1 ? '、' : '' }}
+        </template>
       </div>
-      <div v-if="preflight.hasFailed" class="text-center mt-3">
-        <p class="text-xs mb-3" style="color: var(--color-orbit-error); font-family: var(--font-mono);">{{ preflight.errorMessage }}</p>
-        <div class="flex justify-center gap-2">
-          <button class="terminal-btn" style="background: var(--color-orbit-accent-dim); border: 1px solid var(--color-orbit-accent); color: var(--color-orbit-text);" @click="preflight.retry()">retry</button>
+
+      <!-- 失败 + 重试 -->
+      <div v-if="preflight.hasFailed" class="failed-section">
+        <p class="failed-msg">{{ preflight.errorMessage }}</p>
+        <div class="failed-actions">
+          <el-button type="primary" @click="preflight.retry()">
+            重新检测
+          </el-button>
           <template v-for="c in preflight.checks" :key="'btn-' + c.name">
-            <button v-if="c.status === 'failed' && c.install_action" class="terminal-btn" :disabled="installing[c.name]" style="background: rgba(255,152,0,0.15); border: 1px solid var(--color-orbit-warn); color: var(--color-orbit-warn);" @click="handleInstall(c.name, c.install_action)">{{ installing[c.name] ? 'installing...' : 'install ' + c.label }}</button>
+            <el-button
+              v-if="c.status === 'failed' && c.install_action"
+              type="warning"
+              :loading="installing[c.name]"
+              @click="handleInstall(c.name, c.install_action)"
+            >
+              安装 {{ c.label }}
+            </el-button>
           </template>
         </div>
       </div>
@@ -56,19 +87,10 @@ import { usePreFlightStore } from '@/stores/preflight'
 const preflight = usePreFlightStore()
 const installing = reactive<Record<string, boolean>>({})
 
-function checkColor(status: string): string {
-  switch (status) {
-    case 'running': return 'var(--color-orbit-info)'
-    case 'passed': return 'var(--color-orbit-accent)'
-    case 'failed': return 'var(--color-orbit-error)'
-    case 'repaired': return 'var(--color-orbit-warn)'
-    default: return 'var(--color-orbit-text-secondary)'
-  }
-}
-
 async function handleInstall(name: string, action: string) {
   installing[name] = true
   preflight.stopPolling()
+  // action 如 "install_docker" → 取 "docker" 拼 URL
   const component = action.replace('install_', '')
   await preflight.installComponent(component)
   installing[name] = false
@@ -78,9 +100,108 @@ defineExpose({ preflight })
 </script>
 
 <style scoped>
-.boot-screen { min-height: 100vh; background: var(--color-orbit-bg); }
-.terminal-btn { font-family: var(--font-mono); font-size: 12px; padding: 6px 16px; border-radius: 4px; cursor: pointer; transition: opacity 0.15s; }
-.terminal-btn:hover:not(:disabled) { opacity: 0.85; }
-.terminal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.boot-screen {
+  min-height: 100vh;
+  background: #0a0a14;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+.boot-card {
+  width: 520px;
+  max-width: 90vw;
+}
+.boot-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.boot-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: #4caf50;
+  margin: 0;
+  letter-spacing: 2px;
+}
+.boot-subtitle {
+  font-size: 13px;
+  color: #666;
+  margin: 4px 0 0;
+}
+.boot-status {
+  text-align: center;
+  font-size: 14px;
+  color: #888;
+  margin-bottom: 16px;
+}
+.boot-progress {
+  margin-bottom: 24px;
+}
+.boot-progress :deep(.el-progress-bar__outer) {
+  background: #1a1a2e;
+}
+
+.check-list {
+  margin-bottom: 16px;
+}
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: #888;
+}
+.check-item--running { color: #409eff; }
+.check-item--passed { color: #4caf50; }
+.check-item--failed { color: #f44336; }
+.check-item--repaired { color: #ff9800; }
+.check-icon {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.check-label {
+  width: 100px;
+  flex-shrink: 0;
+}
+.check-msg {
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.check-time {
+  font-size: 11px;
+  color: #555;
+  flex-shrink: 0;
+}
+
+.repaired-notice {
+  padding: 10px 14px;
+  background: rgba(255, 152, 0, 0.1);
+  border-left: 3px solid #ff9800;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #ff9800;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.failed-section {
+  text-align: center;
+  margin-top: 12px;
+}
+.failed-msg {
+  font-size: 13px;
+  color: #f44336;
+  margin-bottom: 12px;
+}
+.failed-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
 </style>

@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAgentOpsStore } from '@/stores/agentops'
+import { apiGet } from '@/services/api'
 interface Row { name: string; model: string; source: string; sourceLabel: string; isForced: boolean }
 const agentops = useAgentOpsStore()
 const rows = ref<Row[]>([])
 const ccActive = ref(false)
-// P2-3 fix: 统一使用 apiGet，继承超时/AbortController/统一错误处理
-import { apiGet } from '@/services/api'
 async function fetchLLM(name: string): Promise<Row | null> {
   try {
     const data = await apiGet<{ name?: string; model?: string; source?: string; source_label?: string; is_forced?: boolean; cc_switch_active?: boolean }>(`/api/v1/agents/${name}/llm`)

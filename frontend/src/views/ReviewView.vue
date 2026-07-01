@@ -95,7 +95,7 @@ const activeBottomTab = ref('problems')
 function focusTab(name: string) { activeBottomTab.value = name }
 
 // 大纲条目点击——由 MonacoDiffEditor 内部实现跳转
-function onOutlineNavigate(line: number) { activeBottomTab.value = 'problems' }  // P1-3: 切回diff视图
+function onOutlineNavigate(_line: number) { activeBottomTab.value = 'problems' }  // P1-3: 切回diff视图
 
 const statusLabel = computed(() => ({ pending:'Pending', in_review:'In Review', changes_requested:'Rejected', approved:'Approved', merged:'Merged' }[review.status] ?? review.status))
 const statusTagType = computed(() => ({ pending:'info', in_review:'', changes_requested:'danger', approved:'success', merged:'info' }[review.status] ?? ''))

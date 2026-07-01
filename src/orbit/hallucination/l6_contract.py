@@ -25,7 +25,7 @@ from orbit.hallucination.schemas import (
     ValidationResult,
 )
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.hallucination.l6")
 
 
 class L6ContractValidator:

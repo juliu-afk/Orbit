@@ -139,7 +139,14 @@ class AgentModelResolver:
             return result
 
         # 5. 系统默认
+        # P1 LOG-11/P1-1: env DEFAULT_LLM_MODEL > settings 兜底 > TIER_MAP
         default_model = os.getenv("DEFAULT_LLM_MODEL", "")
+        if not default_model:
+            try:
+                from orbit.core.config import settings
+                default_model = os.getenv("DEFAULT_LLM_MODEL") or settings.COMPRESSION_SUMMARY_MODEL
+            except (ImportError, AttributeError):
+                pass
         if not default_model:
             default_model = TIER_MODEL_MAP.get(ModelTier.TIER_3.value, FALLBACK_MODEL)
 

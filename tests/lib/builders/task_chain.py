@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 import structlog
@@ -51,14 +52,15 @@ class TaskChain:
     链式 API 风格，每步可覆盖默认 Mock。
     """
 
-    def __init__(self, mocks: dict[str, Any] | None = None) -> None:
+    def __init__(self, mocks: dict[str, Any] | None = None, task_id: str | None = None) -> None:
         """初始化 TaskChain。
 
         Args:
-            mocks: Mock 组件字典，键为 "llm"/"sandbox"/"checkpoint"/"circuit_breaker"/"event_bus"/"tool_registry"
-                   未提供的组件使用默认 Mock
+            mocks: Mock 组件字典
+            task_id: 任务 ID（None=自动生成）。避免并发测试 ID 碰撞。
         """
         mocks = mocks or {}
+        self.task_id: str = task_id or uuid.uuid4().hex[:12]
 
         self.llm: MockLLMClient = mocks.get("llm", MockLLMClient())
         self.sandbox: MockSandbox = mocks.get("sandbox", MockSandbox())
@@ -313,6 +315,11 @@ class TaskChain:
             "tool_calls": output.result.get("tool_calls", 0) if output.result else 0,
         }
         self.checkpoints.append(cp)
+
+        # 同步更新 MockCheckpointManager 供场景测试断言
+        from tests.lib.factories.checkpoint import create_checkpoint as _make_ck
+        ck_data = _make_ck(state=state, context={"output": cp["output"], "error": error})
+        self.checkpoint.save_sync(self.task_id, state, ck_data)
 
     # ── 断言方法 ──────────────────────────────────────────
 

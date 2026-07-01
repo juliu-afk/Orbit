@@ -139,15 +139,9 @@ class AgentModelResolver:
             return result
 
         # 5. 系统默认
-        # P1 LOG-11: DEFAULT_LLM_MODEL 环境变量优先，TIER_MAP 次之，
-        # 最终 fallback 到 settings 配置避免硬编码
         default_model = os.getenv("DEFAULT_LLM_MODEL", "")
         if not default_model:
-            try:
-                from orbit.core.config import settings
-                default_model = settings.COMPRESSION_SUMMARY_MODEL
-            except Exception:
-                default_model = TIER_MODEL_MAP.get(ModelTier.TIER_3.value, FALLBACK_MODEL)
+            default_model = TIER_MODEL_MAP.get(ModelTier.TIER_3.value, FALLBACK_MODEL)
 
         result = ResolvedModel(
             model=default_model,

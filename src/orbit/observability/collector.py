@@ -30,28 +30,13 @@ class ComponentHealth:
 class HealthCollector:
     """健康指标聚合器——注册组件 + 采集 + 汇总。"""
 
-    # P1 RSCK-7: 最大组件数——防止无界注册导致内存泄漏
-    _MAX_COMPONENTS = 500
-
     def __init__(self) -> None:
         self._components: dict[str, ComponentHealth] = {}
-        self._registration_order: list[str] = []
 
     def register(self, name: str) -> ComponentHealth:
-        """注册组件（初始状态 UNKNOWN）。
-
-        P1 RSCK-7: 超限时淘汰最旧注册——防止长时间运行 OOM。
-        """
-        # 已注册则更新
-        if name in self._components:
-            return self._components[name]
-        # 超限淘汰——FIFO 移除最旧
-        while len(self._components) >= self._MAX_COMPONENTS and self._registration_order:
-            _old = self._registration_order.pop(0)
-            self._components.pop(_old, None)
+        """注册组件（初始状态 UNKNOWN）。"""
         h = ComponentHealth(name=name)
         self._components[name] = h
-        self._registration_order.append(name)
         return h
 
     def update(

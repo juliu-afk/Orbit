@@ -36,8 +36,9 @@
         </el-tab-pane>
         <el-tab-pane label="Outline" name="outline"><OutlinePanel :items="outlineItems" @select="onOutlineNavigate" /></el-tab-pane>
         <el-tab-pane label="Search" name="search"><SearchPanel /></el-tab-pane>
-        <el-tab-pane label="Tests" name="tests"><TestPanel /></el-tab-pane>
+        <el-tab-pane label="Tests" name="tests"><TestPanel @show-error="onTestError" /></el-tab-pane>
         <el-tab-pane label="Terminal" name="terminal"><TerminalPanel /></el-tab-pane>
+        <el-tab-pane label="Conflicts" name="conflicts"><MergeConflictPanel @select-file="onSelectFile" /></el-tab-pane>
       </el-tabs>
     </div>
     <el-dialog v-model="showCommitDialog" title="Commit" width="500px">
@@ -68,6 +69,7 @@ import OutlinePanel from '@/components/editor/OutlinePanel.vue'
 import SearchPanel from '@/components/editor/SearchPanel.vue'
 import TestPanel from '@/components/editor/TestPanel.vue'
 import TerminalPanel from '@/components/editor/TerminalPanel.vue'
+import MergeConflictPanel from "@/components/editor/MergeConflictPanel.vue"
 import ReviewCommentPanel from '@/components/editor/ReviewCommentPanel.vue'
 import { useReviewStore } from '@/stores/review'
 import { useEditorStore } from '@/stores/editor'

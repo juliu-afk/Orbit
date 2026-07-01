@@ -16,12 +16,21 @@ onMounted(() => {
   preflight.startPolling()
 })
 
-// 通过后自动跳转
+// 通过后自动跳转；降级(sandbox等非关键失败)也允许进入
 watch(
   () => preflight.status,
   (s) => {
-    if (s === 'passed') {
-      setTimeout(() => router.push({ name: 'dashboard' }), 600)
+    if (s === 'passed' || s === 'failed') {
+      // 检查关键探针——env/db/agent 全部通过即可进入
+      const critical = preflight.checks.filter(
+        c => ['environment', 'database', 'agent'].includes(c.name)
+      )
+      const allCriticalOk = critical.length > 0 && critical.every(
+        c => c.status === 'passed' || c.status === 'repaired'
+      )
+      if (s === 'passed' || allCriticalOk) {
+        setTimeout(() => router.push({ name: 'dashboard' }), 600)
+      }
     }
   }
 )

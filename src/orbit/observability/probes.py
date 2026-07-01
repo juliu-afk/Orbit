@@ -238,26 +238,24 @@ async def _probe_llm_gateway() -> str:
 
 
 async def _probe_sandbox() -> str:
-    """检测沙箱可用。Docker已运行→直接过, 已安装未运行→尝试启动, 未安装→提示。"""
-    # 快速检测——Docker 在运行就直接过
+    """检测沙箱可用——非关键路径，降级不阻塞启动。
+
+    Docker已运行→直接过, 已安装→尝试启动, 未安装→降级ProcessSandbox仍pass。
+    """
     if await _check_docker_running():
         return "Docker沙箱已就绪"
 
     if _docker_is_installed():
-        # 已安装未运行——尝试启动服务，最多等 40s
         _start_docker_service()
-        for _ in range(20):
+        for _ in range(3):  # 最多 6s
             await asyncio.sleep(2)
             if await _check_docker_running():
                 return "Docker已启动，沙箱就绪"
 
-    # 降级 ProcessSandbox
     from orbit.sandbox.sandbox_factory import create_sandbox
 
     sandbox = await create_sandbox()
-    if not _docker_is_installed():
-        raise RuntimeError("未检测到Docker。建议安装Docker Desktop以获得完整沙箱隔离。")
-    return f"Docker未运行，已降级 {sandbox.__class__.__name__}"
+    return f"沙箱就绪：{sandbox.__class__.__name__}"
 
 
 async def _probe_knowledge_engine() -> str:

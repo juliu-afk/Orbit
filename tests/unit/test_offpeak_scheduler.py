@@ -13,15 +13,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orbit.scheduler.offpeak_scheduler import (
-    DeferredQueue,
+from orbit.scheduler.offpeak_models import (
     DeferredTask,
     EnqueueResult,
-    OffPeakScheduler,
-    PeakStatus,
     PeakWindow,
-    PeakWindowManager,
     ProviderPeakConfig,
+)
+from orbit.scheduler.offpeak_scheduler import (
+    DeferredQueue,
+    OffPeakScheduler,
+    PeakWindowManager,
     estimate_window_capacity,
 )
 

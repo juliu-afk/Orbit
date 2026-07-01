@@ -70,6 +70,7 @@ a = Analysis(
         "orbit.loop.scheduler",
         "orbit.compression.cascade",
         "orbit.observability.alerts",
+        "aiosqlite",  # P0: PyInstaller 漏打包——SQLAlchemy async SQLite 依赖
     ],
     hookspath=[],
     hooksconfig={},

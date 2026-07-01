@@ -73,6 +73,13 @@ markers = [
     "e2e: 端到端集成测试（需 Docker 或 ProcessSandbox）",
     "perf: 性能基准测试（非阻塞 CI 检查）",
     "slow: 耗时较长的测试",
+    "scenario_normal: 正常流程场景",
+    "scenario_circuit_breaker: 熔断器场景",
+    "scenario_checkpoint: 检查点恢复场景",
+    "scenario_hallucination: 防幻觉场景",
+    "scenario_sandbox: 沙箱隔离场景",
+    "scenario_concurrent: 并发执行场景",
+    "scenario_edge: 边界情况场景",
 ]
 
 [tool.coverage.run]

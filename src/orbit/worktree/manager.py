@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -54,8 +55,7 @@ class WorktreeManager:
         wt_path.parent.mkdir(parents=True, exist_ok=True)
 
         # P1 SEC-7: 校验 base_branch——禁止 shell 特殊字符防止注入
-        import re as _re
-        if not _re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._/-]*$', base_branch):
+        if not re.match(r'^[a-zA-Z0-9][a-zA-Z0-9._/-]*$', base_branch):
             raise ValueError(f"base_branch 包含非法字符: {base_branch}")
 
         record = WorktreeRecord(

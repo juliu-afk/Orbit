@@ -27,8 +27,6 @@ from orbit.hallucination.schemas import (
     ValidationResult,
 )
 
-logger = structlog.get_logger()
-
 
 class L6ContractValidator:
     """L6 OpenAPI 合约双向验证器。

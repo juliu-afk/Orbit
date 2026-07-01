@@ -66,6 +66,12 @@ class MockCheckpointManager:
         self._store.pop(task_id, None)
         self._save_count.pop(task_id, None)
 
+    def save_sync(self, task_id: str, state: str, data: CheckpointData) -> None:
+        """同步保存检查点——供 Builder 测试断言使用。"""
+        key = f"{task_id}:{state}"
+        self._store[key] = data
+        self.saved.append((key, data))
+
     @property
     def checkpoint_count(self) -> int:
         return len(self._store)

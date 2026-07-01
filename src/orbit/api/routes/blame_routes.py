@@ -7,6 +7,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 
+from orbit.api.routes._workspace import _ws, set_workspace
+
 # P1-1: Agent 邮箱后缀白名单——避免字符串包含误报
 AGENT_EMAIL_SUFFIXES = ("@anthropic.com", "noreply.github.com", "copilot.github.com", "@openai.com")
 
@@ -21,8 +23,6 @@ def _is_agent_author(author: str) -> bool:
 def _is_agent_email(email: str) -> bool:
     return any(email.lower().endswith(s) for s in AGENT_EMAIL_SUFFIXES)
 
-
-from orbit.api.routes._workspace import _ws, set_workspace  # noqa: E402
 
 router = APIRouter(prefix="/git", tags=["blame"])
 

@@ -7,11 +7,11 @@ Phase 3 组 2: pause/resume 实现——asyncio.Event 控制流暂停。
 from __future__ import annotations
 
 import asyncio
-import os
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from orbit.core.config import settings
 from orbit.goal.models import GoalSession
 
 router = APIRouter(prefix="/api/v1/goal", tags=["goal"])
@@ -63,7 +63,6 @@ async def create_goal(request: Request, req: CreateGoalRequest):
     P1 ERR-2: 校验 workspace 存在——未初始化时下游子任务静默失败。
     """
     global _active_task, _active_goal_id
-    from orbit.core.config import settings
     _ws = settings.WORKSPACE_DIR or os.getcwd()
     if not os.path.isdir(_ws):
         raise HTTPException(status_code=400, detail=f"工作目录不存在: {_ws}")

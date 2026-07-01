@@ -172,13 +172,14 @@ class ContextCompressor:
             return messages
 
         # 构建摘要请求
-        # P1 SEC-8: 脱敏——发送 LLM 前过滤 API key/密码/私钥
+        # P1 SEC-8/P2-2: 脱敏 API key/密码/私钥 (IGNORECASE+PEM 完整块)
         _SENSITIVE = re.compile(
             r'(sk-[A-Za-z0-9_-]{10,})'
             r'|(Bearer\s+[A-Za-z0-9._\-=]+)'
             r'|(api_?key\s*[:=]\s*["\']?\S+["\']?)'
             r'|(password\s*[:=]\s*["\']?\S+["\']?)'
-            r'|(-----BEGIN\s+\w+\s+PRIVATE\s+KEY-----)'
+            r'|(-----BEGIN\s+\w+\s+PRIVATE\s+KEY-----.*?-----END\s+\w+\s+PRIVATE\s+KEY-----)',
+            re.IGNORECASE | re.DOTALL,
         )
         conversation_text = "\n".join(
             _SENSITIVE.sub(

@@ -100,16 +100,10 @@ async def create_goal(request: Request, req: CreateGoalRequest):
             raise HTTPException(status_code=503, detail="OffPeakScheduler 未初始化")
         enqueue_result = await offpeak.enqueue(goal)
         if enqueue_result.status == "peak_warning":
-            # ORBIT_OFFPEAK_ONLY + 高峰 → 警告用户确认紧急
-            return {
-                "code": 409,
-                "data": {
-                    "goal_id": goal.id,
-                    "status": "peak_warning",
-                    "warning": enqueue_result.warning_message,
-                },
-                "message": enqueue_result.warning_message,
-            }
+            raise HTTPException(
+                status_code=409,
+                detail=enqueue_result.warning_message,
+            )
         return {
             "code": 0,
             "data": {

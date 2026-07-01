@@ -24,9 +24,12 @@ class PeakWindow:
     遵循 SessionRecord/ProjectRecord 的 dataclass 惯例。
     """
 
-    days: list[str]  # ["Mon", "Tue", "Wed", "Thu", "Fri"]
-    hours_start: str  # "09:00"
-    hours_end: str  # "23:00"
+    days: list[str]
+    hours_start: str
+    hours_end: str
+    # 由 next_offpeak_window() 填充——具体时段的 UTC ISO 时间
+    starts_at_iso: str = ""
+    ends_at_iso: str = ""
 
     def contains(self, day_name: str, time_str: str) -> bool:
         """判定给定星期和时间是否在此窗口内。"""

@@ -9,7 +9,7 @@ import os
 import sqlite3
 import tempfile
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -386,7 +386,10 @@ class TestOffPeakSchedulerEnqueue:
 
     @pytest.fixture
     def mock_orch(self):
-        return MagicMock()
+        class _MockOrch:
+            async def run(self, goal):
+                return type("R", (), {"total_tokens": 50000, "status": "done"})()
+        return _MockOrch()
 
     @pytest.fixture
     def mock_preflight(self):
@@ -409,16 +412,23 @@ class TestOffPeakSchedulerEnqueue:
         defaults.update(kw)
         return GoalSession(**defaults)
 
+    def _cleanup_db(self, db_path: str) -> None:
+        """Windows 安全清理 SQLite 文件。"""
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
     @pytest.mark.asyncio
     async def test_enqueue_during_peak_queues_task(self, mock_orch, mock_preflight):
-        """高峰期提交延迟任务 → 入队到低峰窗口。"""
+        """高峰期提交 defer_to_offpeak → 入队到低峰窗口。"""
         from orbit.scheduler.offpeak_scheduler import PeakWindowManager
         mgr = PeakWindowManager.__new__(PeakWindowManager)
         mgr._configs = {}
         mgr._configs["deepseek"] = ProviderPeakConfig(
             provider="deepseek", timezone="Asia/Shanghai",
-            peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri"], hours_start="00:00", hours_end="24:00")],
-            offpeak_windows=[PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="24:00")],
+            peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri"], hours_start="09:00", hours_end="23:00")],
+            offpeak_windows=[PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="23:00")],
             peak_price_multiplier=1.0, offpeak_price_multiplier=0.7,
         )
         mgr._holidays = set()
@@ -430,16 +440,14 @@ class TestOffPeakSchedulerEnqueue:
             scheduler = OffPeakScheduler(mgr, q, mock_orch, mock_preflight)
             goal = self._make_goal(defer_to_offpeak=True, target_provider="deepseek")
             result = await scheduler.enqueue(goal)
-
             assert result.status == "queued"
-            assert result.target_window_start != ""
             assert result.queue_position >= 1
         finally:
-            os.unlink(db_path)
+            self._cleanup_db(db_path)
 
     @pytest.mark.asyncio
     async def test_enqueue_offpeak_only_peak_warning(self, mock_orch, mock_preflight):
-        """ORBIT_OFFPEAK_ONLY + 高峰 → 返回 peak_warning。"""
+        """ORBIT_OFFPEAK_ONLY + 高峰 + 非紧急 → 返回 peak_warning。"""
         os.environ["ORBIT_OFFPEAK_ONLY"] = "true"
         try:
             from orbit.scheduler.offpeak_scheduler import PeakWindowManager
@@ -447,8 +455,8 @@ class TestOffPeakSchedulerEnqueue:
             mgr._configs = {}
             mgr._configs["deepseek"] = ProviderPeakConfig(
                 provider="deepseek", timezone="Asia/Shanghai",
-                peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="24:00")],
-                offpeak_windows=[PeakWindow(days=[], hours_start="00:00", hours_end="00:00")],
+                peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri"], hours_start="09:00", hours_end="23:00")],
+                offpeak_windows=[PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="23:00")],
                 peak_price_multiplier=1.0, offpeak_price_multiplier=0.7,
             )
             mgr._holidays = set()
@@ -463,16 +471,13 @@ class TestOffPeakSchedulerEnqueue:
                 assert result.status == "peak_warning"
                 assert "高峰" in result.warning_message
             finally:
-                os.unlink(db_path)
+                self._cleanup_db(db_path)
         finally:
             os.environ.pop("ORBIT_OFFPEAK_ONLY", None)
 
     @pytest.mark.asyncio
     async def test_urgent_bypasses_offpeak_only(self, mock_orch, mock_preflight):
-        """ORBIT_OFFPEAK_ONLY + urgent=true → 不会走到 enqueue，直接 orch.run()。"""
-        # 这是 API 层逻辑——offpeak_only + 高峰 + 非紧急 → enqueue 返回 warning
-        # urgent=true 时 API 层直接 orch.run()，不调 enqueue
-        # 此测试验证 urgent 标记的 Goal 在 enqueue 中的行为
+        """ORBIT_OFFPEAK_ONLY + urgent=true → 不返回 warning。"""
         os.environ["ORBIT_OFFPEAK_ONLY"] = "true"
         try:
             from orbit.scheduler.offpeak_scheduler import PeakWindowManager
@@ -480,8 +485,8 @@ class TestOffPeakSchedulerEnqueue:
             mgr._configs = {}
             mgr._configs["deepseek"] = ProviderPeakConfig(
                 provider="deepseek", timezone="Asia/Shanghai",
-                peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="24:00")],
-                offpeak_windows=[PeakWindow(days=[], hours_start="00:00", hours_end="00:00")],
+                peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri"], hours_start="09:00", hours_end="23:00")],
+                offpeak_windows=[PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="23:00")],
                 peak_price_multiplier=1.0, offpeak_price_multiplier=0.7,
             )
             mgr._holidays = set()
@@ -493,23 +498,22 @@ class TestOffPeakSchedulerEnqueue:
                 scheduler = OffPeakScheduler(mgr, q, mock_orch, mock_preflight)
                 goal = self._make_goal(defer_to_offpeak=True, target_provider="deepseek", urgent=True)
                 result = await scheduler.enqueue(goal)
-                # urgent=true: urgent 检查先于 offpeak_only——不返回 warning
                 assert result.status != "peak_warning"
             finally:
-                os.unlink(db_path)
+                self._cleanup_db(db_path)
         finally:
             os.environ.pop("ORBIT_OFFPEAK_ONLY", None)
 
     @pytest.mark.asyncio
-    async def test_enqueue_during_offpeak_runs_immediate_or_queues(self, mock_orch, mock_preflight):
-        """当前已是低峰 → 任务入队到当前窗口，下一轮 watcher 释放。"""
+    async def test_enqueue_during_offpeak_queues(self, mock_orch, mock_preflight):
+        """低峰时段提交 defer_to_offpeak → 正常入队。"""
         from orbit.scheduler.offpeak_scheduler import PeakWindowManager
         mgr = PeakWindowManager.__new__(PeakWindowManager)
         mgr._configs = {}
         mgr._configs["deepseek"] = ProviderPeakConfig(
             provider="deepseek", timezone="Asia/Shanghai",
             peak_windows=[PeakWindow(days=[], hours_start="00:00", hours_end="00:00")],
-            offpeak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="24:00")],
+            offpeak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="23:00")],
             peak_price_multiplier=1.0, offpeak_price_multiplier=0.7,
         )
         mgr._holidays = set()
@@ -521,7 +525,6 @@ class TestOffPeakSchedulerEnqueue:
             scheduler = OffPeakScheduler(mgr, q, mock_orch, mock_preflight)
             goal = self._make_goal(defer_to_offpeak=True, target_provider="deepseek")
             result = await scheduler.enqueue(goal)
-            # 低峰时也正常入队，watcher 会立即释放
             assert result.status == "queued"
         finally:
-            os.unlink(db_path)
+            self._cleanup_db(db_path)

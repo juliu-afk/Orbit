@@ -332,7 +332,10 @@ _loop_scheduler = LoopScheduler(command_executor=_meta_orchestrator.run)
 app.state.meta_orchestrator = _meta_orchestrator
 app.state.loop_scheduler = _loop_scheduler
 
-# D13: 高峰避让延迟调度器
+# D13: 高峰避让延迟调度器——延迟初始化，避免 import 时创建 SQLite/YAML
+app.state.offpeak_scheduler = None
+app.state.peak_window_manager = None
+
 if settings.OFFPEAK_ENABLED:
     from orbit.goal.preflight import PreFlightEstimator  # noqa: E402
     from orbit.scheduler.offpeak_scheduler import (  # noqa: E402
@@ -341,22 +344,20 @@ if settings.OFFPEAK_ENABLED:
         PeakWindowManager,
     )
 
-    _peak_manager = PeakWindowManager(config_path=settings.OFFPEAK_CONFIG_PATH)
-    _offpeak_queue = DeferredQueue(db_path=settings.OFFPEAK_DB_PATH)
-    _offpeak_scheduler = OffPeakScheduler(
-        peak_manager=_peak_manager,
-        queue=_offpeak_queue,
-        orchestrator=_meta_orchestrator,
-        preflight=PreFlightEstimator(),
-    )
-    app.state.offpeak_scheduler = _offpeak_scheduler
-    app.state.peak_window_manager = _peak_manager
-
-    @app.on_event("startup")
-    async def _start_offpeak() -> None:
+    async def _init_offpeak() -> None:
+        """延迟初始化 OffPeakScheduler——在 startup 事件中调用。"""
+        _peak_manager = PeakWindowManager(config_path=settings.OFFPEAK_CONFIG_PATH)
+        _offpeak_queue = DeferredQueue(db_path=settings.OFFPEAK_DB_PATH)
+        _offpeak_scheduler = OffPeakScheduler(
+            peak_manager=_peak_manager,
+            queue=_offpeak_queue,
+            orchestrator=_meta_orchestrator,
+            preflight=PreFlightEstimator(),
+        )
         await _offpeak_scheduler.start()
+        app.state.offpeak_scheduler = _offpeak_scheduler
+        app.state.peak_window_manager = _peak_manager
+        logger.info("offpeak_scheduler_initialized", config_path=settings.OFFPEAK_CONFIG_PATH)
 
-    logger.info("offpeak_scheduler_initialized", config_path=settings.OFFPEAK_CONFIG_PATH)
-else:
-    app.state.offpeak_scheduler = None
-    app.state.peak_window_manager = None
+    # 注册到 startup 事件——与现有后台任务并排
+    app.add_event_handler("startup", _init_offpeak)

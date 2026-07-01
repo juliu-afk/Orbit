@@ -662,6 +662,20 @@ class OffPeakScheduler:
         self._force_offpeak_only = os.getenv("ORBIT_OFFPEAK_ONLY", "") == "true"
         self._watcher_interval = int(os.getenv("ORBIT_OFFPEAK_WATCHER_INTERVAL", "60"))
 
+    # ── 公共属性（供 schedule.py API 路由使用） ──
+
+    @property
+    def peak_manager(self) -> PeakWindowManager:
+        return self._peak
+
+    @property
+    def queue(self) -> DeferredQueue:
+        return self._queue
+
+    @property
+    def orchestrator(self):
+        return self._orch
+
     # ── 公共 API ──
 
     async def enqueue(self, goal: GoalSession) -> EnqueueResult:
@@ -848,14 +862,6 @@ class OffPeakScheduler:
                             try:
                                 from orbit.goal.models import GoalSession
                                 goal = GoalSession.model_validate_json(task.goal_json)
-                                # 注册 done 回调——执行完毕后记录
-                                async def _on_complete(t: asyncio.Task, dt=task) -> None:
-                                    try:
-                                        t.result()
-                                        await self._queue.mark_done(dt.id, dt.actual_tokens, dt.cost_saved_yuan)
-                                    except Exception:
-                                        logger.exception("offpeak_task_failed", goal_id=dt.id)
-
                                 bg = asyncio.create_task(self._orch.run(goal))
                                 bg.add_done_callback(
                                     lambda t, dt=task: asyncio.ensure_future(

@@ -120,7 +120,7 @@ class Settings:
     MEMORY_MAX_FILE_SIZE: int = _get_int("MEMORY_MAX_FILE_SIZE", 50_000)
 
     # ---- D13: 高峰避让延迟调度 ----
-    OFFPEAK_ENABLED: bool = _get_bool("ORBIT_OFFPEAK_ENABLED", True)
+    OFFPEAK_ENABLED: bool = _get_bool("ORBIT_OFFPEAK_ENABLED", False)
     OFFPEAK_ONLY: bool = _get_bool("ORBIT_OFFPEAK_ONLY", False)
     OFFPEAK_CONFIG_PATH: str = _get("ORBIT_OFFPEAK_CONFIG_PATH", "configs/peak_windows.yaml")
     OFFPEAK_HOLIDAYS_URL: str = _get("ORBIT_HOLIDAYS_URL", "")

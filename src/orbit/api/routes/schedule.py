@@ -36,8 +36,8 @@ async def get_peak_status(request: Request):
     offpeak = _get_offpeak(request)
     from orbit.scheduler.offpeak_scheduler import PeakWindowManager
 
-    peak_mgr: PeakWindowManager = offpeak._peak
-    queue = offpeak._queue
+    peak_mgr: PeakWindowManager = offpeak.peak_manager
+    queue = offpeak.queue
 
     provider_status = peak_mgr.get_all_status()
     queued = await queue.list_all("queued")
@@ -80,7 +80,7 @@ async def get_peak_status(request: Request):
 async def get_queue(request: Request):
     """查询当前延迟队列。"""
     offpeak = _get_offpeak(request)
-    queue = offpeak._queue
+    queue = offpeak.queue
     tasks = await queue.list_all("queued")
     return {
         "code": 0,
@@ -111,7 +111,7 @@ async def promote_to_urgent(request: Request, goal_id: str):
     返回 404 如果任务不在队列，409 如果任务已在执行。
     """
     offpeak = _get_offpeak(request)
-    queue = offpeak._queue
+    queue = offpeak.queue
 
     task = await queue.promote_to_urgent(goal_id)
     if task is None:
@@ -122,8 +122,7 @@ async def promote_to_urgent(request: Request, goal_id: str):
     goal = GoalSession.model_validate_json(task.goal_json)
 
     import asyncio
-    orch = offpeak._orch
-    bg = asyncio.create_task(orch.run(goal))
+    bg = asyncio.create_task(offpeak.orchestrator.run(goal))
 
     return {
         "code": 0,
@@ -141,7 +140,7 @@ async def promote_to_urgent(request: Request, goal_id: str):
 async def get_savings_report(request: Request):
     """成本节省报告。"""
     offpeak = _get_offpeak(request)
-    queue = offpeak._queue
+    queue = offpeak.queue
     report = await queue.get_savings_report()
     return {"code": 0, "data": report}
 
@@ -157,7 +156,7 @@ class ReloadConfigResponse(BaseModel):
 async def reload_config(request: Request) -> dict[str, Any]:
     """热重载高峰时段配置 + 节假日数据。"""
     offpeak = _get_offpeak(request)
-    peak_mgr = offpeak._peak
+    peak_mgr = offpeak.peak_manager
     peak_mgr.reload()
     return {
         "code": 0,

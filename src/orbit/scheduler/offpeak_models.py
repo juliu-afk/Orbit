@@ -27,6 +27,9 @@ class PeakWindow:
     days: list[str]  # ["Mon", "Tue", "Wed", "Thu", "Fri"]
     hours_start: str  # "09:00"
     hours_end: str  # "23:00"
+    # 由 next_offpeak_window() 在运行时填充——具体时段的 ISO 时间
+    starts_at_iso: str = ""
+    ends_at_iso: str = ""
 
     def contains(self, day_name: str, time_str: str) -> bool:
         """判定给定星期和时间是否在此窗口内。"""

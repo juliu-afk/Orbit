@@ -5,8 +5,14 @@ interface Row { name: string; model: string; source: string; sourceLabel: string
 const agentops = useAgentOpsStore()
 const rows = ref<Row[]>([])
 const ccActive = ref(false)
+// P2-3 fix: 统一使用 apiGet，继承超时/AbortController/统一错误处理
+import { apiGet } from '@/services/api'
 async function fetchLLM(name: string): Promise<Row | null> {
-  try { const r = await fetch(`/api/v1/agents/${name}/llm`); const j = await r.json(); if (j.code === 0 && j.data) { if (j.data.cc_switch_active) ccActive.value = true; return { name: j.data.name || name, model: j.data.model || '', source: j.data.source || 'default', sourceLabel: j.data.source_label || 'default', isForced: j.data.is_forced || false } } } catch { /* offline */ } return null
+  try {
+    const data = await apiGet<{ name?: string; model?: string; source?: string; source_label?: string; is_forced?: boolean; cc_switch_active?: boolean }>(`/api/v1/agents/${name}/llm`)
+    if (data.cc_switch_active) ccActive.value = true
+    return { name: data.name || name, model: data.model || '', source: data.source || 'default', sourceLabel: data.source_label || 'default', isForced: data.is_forced || false }
+  } catch { return null }
 }
 onMounted(async () => { const results = await Promise.all(['ArchitectAgent','DeveloperAgent','ReviewerAgent','QAAgent','ConfigAgent','ClarifierAgent'].map(fetchLLM)); rows.value = results.filter((r): r is Row => r !== null) })
 </script>

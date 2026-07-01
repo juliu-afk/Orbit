@@ -15,6 +15,8 @@ async function doSearch() { if (!query.value.trim()) return; searching.value = t
       <input v-model="query" class="flex-1 px-3 py-1.5 rounded text-xs outline-none" style="background:var(--color-orbit-surface);border:1px solid var(--color-orbit-border);color:var(--color-orbit-text);font-family:var(--font-mono)" placeholder="search..." @keydown.enter="doSearch" />
       <button class="px-3 py-1.5 rounded text-xs cursor-pointer" style="background:var(--color-orbit-accent-dim);border:none;color:var(--color-orbit-text);font-family:var(--font-mono)" @click="doSearch">{{ searching ? '...' : 'go' }}</button>
     </div>
+    <!-- P2-6 fix: 空状态提示 -->
+    <div v-if="!searching && results.length === 0" class="text-xs text-center py-8" style="color:var(--color-orbit-text-muted)">输入关键词搜索文件</div>
     <div v-for="r in results" :key="r.path" class="px-2 py-1 rounded cursor-pointer flex justify-between text-xs" style="border-bottom:1px solid var(--color-orbit-border-light)" @click="emit('open-file', r.path)">
       <span style="color:var(--color-orbit-info)">{{ r.path }}</span>
       <span v-if="r.line" style="color:var(--color-orbit-text-muted)">:{{ r.line }}</span>

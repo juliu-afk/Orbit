@@ -53,6 +53,7 @@ onUnmounted(() => {
 <template>
 <div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" @contextmenu.prevent>
   <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto">
+    <!-- P2-7: TODO 接入 FileTreePanel 组件——当前为占位。文件树数据来自 /api/v1/files/tree -->
     <div class="p-3 text-xs" style="color:var(--color-orbit-text-muted);font-family:var(--font-mono)">FILES</div>
   </aside>
   <main class="panel-center flex flex-col overflow-hidden"><TerminalChat /></main>

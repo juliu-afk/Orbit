@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useShellStore } from '@/stores/shell'
-import { useAgentOpsStore } from '@/stores/agentops'
 import type { ConnectionStatus } from '@/composables/useWebSocket'
 
 const props = defineProps<{ connectionStatus: ConnectionStatus; budgetLabel?: string }>()
 const emit = defineEmits<{ (e: 'toggle-dag'): void; (e: 'toggle-chart'): void; (e: 'toggle-search'): void }>()
 const shell = useShellStore()
-const agentops = useAgentOpsStore()
 
 const connectionLabel = computed(() => {
   switch (props.connectionStatus) {

@@ -83,4 +83,9 @@ defineExpose({ preflight })
 .terminal-btn:hover:not(:disabled) { opacity: 0.85; }
 .terminal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+/* P2-4 fix: 尊重用户 reduced-motion 偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .terminal-btn { transition: none; }
+  [style*="animation: spin"] { animation: none !important; }
+}
 </style>

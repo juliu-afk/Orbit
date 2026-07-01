@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted } from 'vue'
+import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
 import { useShellStore } from '@/stores/shell'
@@ -36,7 +36,8 @@ function onSend(text: string) {
   scrollBottom()
 }
 
-function onNavHistory(d: -1 | 1) { /* TODO */ }
+// TODO: 实现历史导航——从 historyBuf 恢复输入
+function onNavHistory(_d: -1 | 1) { /* TODO */ }
 
 function openCtx(e: MouseEvent, msg: ChatMessage) { ctxPos.value = { x: e.clientX, y: e.clientY }; ctxMsg.value = msg; ctxVisible.value = true }
 function closeCtx() { ctxVisible.value = false; ctxMsg.value = null }
@@ -52,7 +53,8 @@ function onCtxAct(action: string) {
   closeCtx()
 }
 
-function visibleMsgs(): ChatMessage[] { if (!enableVS.value) return chat.messages; const s = Math.max(0, chat.messages.length - 100); return chat.messages.slice(s) }
+// P2-5 fix: computed 缓存切片结果，避免每次渲染重新 slice
+const visibleMsgs = computed<ChatMessage[]>(() => { if (!enableVS.value) return chat.messages; const s = Math.max(0, chat.messages.length - 100); return chat.messages.slice(s) })
 
 onMounted(() => scrollBottom())
 </script>
@@ -61,7 +63,7 @@ onMounted(() => scrollBottom())
 <div class="terminal-chat flex flex-col h-full" style="font-family:var(--font-mono)">
   <div ref="messageListRef" class="message-list flex-1 overflow-y-auto" style="scroll-behavior:smooth">
     <div v-if="enableVS" :style="{ height: Math.max(0, chat.messages.length - 100) * 28 + 'px' }" />
-    <MessageItem v-for="msg in visibleMsgs()" :key="msg.id" :message="msg" @contextmenu="(e:MouseEvent) => openCtx(e, msg)" />
+    <MessageItem v-for="msg in visibleMsgs" :key="msg.id" :message="msg" @contextmenu="(e:MouseEvent) => openCtx(e, msg)" />
     <div v-if="chat.connecting" class="px-4 py-1 text-xs flex items-center gap-2" style="color:var(--color-orbit-warn)"><span class="status-dot connecting"/>connecting...</div>
     <div v-if="chat.lastError" class="px-4 py-1 text-xs" style="color:var(--color-orbit-error)">x {{ chat.lastError }}</div>
   </div>

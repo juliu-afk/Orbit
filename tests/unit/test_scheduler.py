@@ -381,3 +381,11 @@ async def test_dag_fail_fast_abort():
     )
     results = await sched.run_dag(graph)
     assert results["A"] == NodeStatus.FAILED
+
+
+# P1: DAG 空图验证——0节点应为合法DAG
+def test_dag_empty_graph_is_valid() -> None:
+    from orbit.scheduler.graph import TaskGraph
+
+    graph = TaskGraph(task_id="e", nodes=[], edges=[])
+    graph.validate_dag()  # 不抛异常

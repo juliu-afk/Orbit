@@ -10,10 +10,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+
 
 router = APIRouter(prefix="/api/v1/schedule", tags=["schedule"])
 
@@ -34,8 +35,6 @@ def _get_offpeak(request: Request):
 async def get_peak_status(request: Request):
     """查询所有厂商的当前高峰状态 + 队列摘要。"""
     offpeak = _get_offpeak(request)
-    from orbit.scheduler.offpeak_scheduler import PeakWindowManager
-
     peak_mgr: PeakWindowManager = offpeak.peak_manager
     queue = offpeak.queue
 
@@ -121,8 +120,12 @@ async def promote_to_urgent(request: Request, goal_id: str):
     from orbit.goal.models import GoalSession
     goal = GoalSession.model_validate_json(task.goal_json)
 
-    import asyncio
+    async def _on_urgent_done(t: asyncio.Task) -> None:
+        try: t.result()
+        except Exception: pass
+
     bg = asyncio.create_task(offpeak.orchestrator.run(goal))
+    bg.add_done_callback(lambda t: asyncio.ensure_future(_on_urgent_done(t)))
 
     return {
         "code": 0,
@@ -146,11 +149,6 @@ async def get_savings_report(request: Request):
 
 
 # ── POST /reload-config ────────────────────────────────────────
-
-class ReloadConfigResponse(BaseModel):
-    status: str = Field("ok")
-    providers: list[str] = Field(default_factory=list)
-
 
 @router.post("/reload-config")
 async def reload_config(request: Request) -> dict[str, Any]:

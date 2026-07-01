@@ -163,11 +163,13 @@ class PeakWindowManager:
                 if window_end <= window_start:
                     window_end += timedelta(days=1)
 
-                # 如果当前时间在窗口内 → 返回当前窗口
+                # 赋值具体 ISO 时间到返回的 PeakWindow
+                window.starts_at_iso = window_start.astimezone(UTC).isoformat()
+                window.ends_at_iso = window_end.astimezone(UTC).isoformat()
+
                 if after is None and window_start <= now <= window_end:
                     return window
 
-                # 如果窗口在未来 → 返回这个窗口
                 if window_start > (after or now):
                     return window
 
@@ -207,8 +209,8 @@ class PeakWindowManager:
                             break
 
             if next_offpeak:
-                status.next_offpeak_starts_at = next_offpeak.starts_at_iso  # type: ignore[attr-defined]
-                status.next_offpeak_ends_at = next_offpeak.ends_at_iso  # type: ignore[attr-defined]
+                status.next_offpeak_starts_at = next_offpeak.starts_at_iso
+                status.next_offpeak_ends_at = next_offpeak.ends_at_iso
 
             result[provider] = status
         return result
@@ -699,7 +701,7 @@ class OffPeakScheduler:
                 next_window = self._peak.next_offpeak_window(provider, now)
                 next_start = ""
                 if next_window:
-                    next_start = next_window.starts_at_iso if hasattr(next_window, 'starts_at_iso') else ""
+                    next_start = next_window.starts_at_iso
                 return EnqueueResult(
                     goal_id=goal.id,
                     status="peak_warning",
@@ -737,8 +739,8 @@ class OffPeakScheduler:
             provider=provider,
             estimated_tokens=avg_tokens,
             estimated_duration_seconds=avg_duration,
-            target_window_start=window.starts_at_iso if hasattr(window, 'starts_at_iso') else "",
-            target_window_end=window.ends_at_iso if hasattr(window, 'ends_at_iso') else "",
+            target_window_start=window.starts_at_iso,
+            target_window_end=window.ends_at_iso,
             status="queued",
             created_at=now.isoformat(),
             goal_json=goal.model_dump_json(),
@@ -890,8 +892,8 @@ class OffPeakScheduler:
                             for task in overflow:
                                 await self._queue.reschedule(
                                     task.id,
-                                    next_window.starts_at_iso if hasattr(next_window, 'starts_at_iso') else "",
-                                    next_window.ends_at_iso if hasattr(next_window, 'ends_at_iso') else "",
+                                    next_window.starts_at_iso,
+                                    next_window.ends_at_iso,
                                 )
                             logger.warning(
                                 "window_overflow_rescheduled",

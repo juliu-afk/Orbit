@@ -10,7 +10,7 @@
     "beforeBuildCommand": "echo 'Skipping frontend build — already built by Makefile/pyinstaller flow'"
   },
   "app": {
-    "windows": [],
+    "windows": [{"transparent": true}],
     "security": {
       "csp": null
     }

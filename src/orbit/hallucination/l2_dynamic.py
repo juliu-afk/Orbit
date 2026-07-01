@@ -20,7 +20,7 @@ from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import HallucinationLevel, ValidationResult
 from orbit.sandbox.executor import Sandbox
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.hallucination.l2")
 
 # 注入 sys.settrace 的包装模板
 # WHY 在代码中内联 settrace：沙箱是 Docker 进程，无法从外部注入 Python hook，

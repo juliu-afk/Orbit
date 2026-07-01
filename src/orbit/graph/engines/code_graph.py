@@ -17,7 +17,7 @@ import structlog
 from orbit.graph.engines.base import GraphEngineBase
 from orbit.graph.models.nodes import CodeNode
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.graph.code")
 
 
 class CodeGraphError(Exception):

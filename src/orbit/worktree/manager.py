@@ -16,7 +16,7 @@ import structlog
 
 from orbit.worktree.models import WorktreeRecord, WorktreeState, WorktreeStrategy
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.worktree")
 
 
 class WorktreeManager:

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import structlog
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.knowledge.templates")
 
 
 @dataclass

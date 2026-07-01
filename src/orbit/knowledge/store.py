@@ -14,7 +14,7 @@ import structlog
 
 from orbit.knowledge.ontology.accounting import ACCOUNTING_CONCEPTS
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.knowledge.store")
 
 # DB 文件路径（项目根目录下）
 DEFAULT_DB_PATH = Path(__file__).parent.parent.parent.parent / "knowledge.db"

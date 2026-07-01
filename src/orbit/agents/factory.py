@@ -29,7 +29,7 @@ from orbit.agents.dream_agent import DreamAgent
 from orbit.agents.react_agent import ReActAgent
 from orbit.knowledge.templates import get_registry
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.agents.factory")
 
 
 def _build_templates_prompt(task_keywords: list[str] | None) -> str:

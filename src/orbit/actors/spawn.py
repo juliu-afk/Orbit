@@ -26,7 +26,7 @@ from orbit.actors.models import ActorOutcome, ActorRecord, ActorStatus
 from orbit.agents.base import AgentInput, AgentRole, BaseAgent
 from orbit.stream.cancellation import CancellationToken
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.actors.spawn")
 
 
 class DeferredActor:

@@ -12,7 +12,7 @@ import structlog
 
 from orbit.actors.registry import ActorRegistry
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.actors.watchdog")
 
 STALE_SECONDS = 300  # 5 分钟——对标 MiMo
 SCAN_INTERVAL = 60  # 60 秒扫描间隔

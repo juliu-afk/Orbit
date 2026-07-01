@@ -16,7 +16,7 @@ import structlog
 
 from orbit.scheduler.orchestrator import Scheduler
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.sharding")
 
 # 单个任务最大字符数——超过此阈值触发分片
 MAX_CHARS_PER_TASK = 8000

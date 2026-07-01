@@ -29,7 +29,7 @@ from orbit.sandbox.executor import (
     SandboxTimeoutError,
 )
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.sandbox.process")
 
 
 class ProcessSandbox:

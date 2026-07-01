@@ -23,7 +23,7 @@ from orbit.hallucination.schemas import (
     ValidationResult,
 )
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.hallucination.l1")
 
 # Python 内置名称（PRD 范围外：不验证 builtins，避免假阳性）
 _BUILTINS = frozenset(

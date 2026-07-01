@@ -15,7 +15,7 @@ import structlog
 
 from orbit.knowledge.store import KnowledgeStore
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.knowledge.vector")
 
 
 def _tokenize(text: str) -> list[str]:

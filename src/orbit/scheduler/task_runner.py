@@ -33,7 +33,7 @@ from orbit.memory.store import MemoryStore
 from orbit.scheduler.complexity import ComplexityScorer
 from orbit.scheduler.edit_stability import EditStabilityDetector
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.scheduler.runner")
 
 # 状态→角色映射（从 Scheduler._agent_cycle 移出）
 ROLE_MAP: dict[TaskState, str] = {

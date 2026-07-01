@@ -23,7 +23,7 @@ from orbit.hallucination.schemas import (
     ValidationResult,
 )
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.hallucination.l8")
 
 # 支持扫描的配置文件名模式
 _CONFIG_PATTERNS = ["*.env", "*.yaml", "*.yml", "*.json", "*.toml", "*.ini", "*.conf"]

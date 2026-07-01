@@ -34,7 +34,7 @@ from orbit.stream.cancellation import CancellationToken
 from orbit.stream.events import StreamEvent, StreamEventType
 from orbit.tools.registry import DoomLoopError, ToolRegistry
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.agents.react")
 
 # 最大 tool call 结果长度（截断前）
 MAX_RESULT_CHARS = 10000

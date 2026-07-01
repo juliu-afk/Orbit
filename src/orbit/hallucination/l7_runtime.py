@@ -15,7 +15,7 @@ from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import HallucinationLevel, ValidationResult
 from orbit.sandbox.executor import Sandbox, SandboxExecutionError
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.hallucination.l7")
 
 
 class L7RuntimeValidator:

@@ -15,7 +15,7 @@ import structlog
 from orbit.knowledge.store import KnowledgeStore
 from orbit.knowledge.vector import VectorStore
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.knowledge.engine")
 
 QueryMode = Literal["exact", "semantic", "hybrid"]
 

@@ -18,7 +18,7 @@ import structlog
 
 from orbit.actors.models import ActorOutcome, ActorRecord, ActorStatus
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.actors.registry")
 
 DB_PATH = Path("data/actor_registry.db")
 

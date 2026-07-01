@@ -11,7 +11,7 @@ from typing import Any
 import structlog
 from fastapi import WebSocket
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.ws")
 
 
 class ConnectionManager:

@@ -4,8 +4,14 @@
 一行代码走通全链路。支持链式配置 + 断言方法。
 """
 
+from tests.lib.builders.chat_chain import ChatChain
+from tests.lib.builders.dag_chain import DagChain
+from tests.lib.builders.goal_chain import GoalChain
 from tests.lib.builders.task_chain import TaskChain
 
 __all__ = [
     "TaskChain",
+    "DagChain",
+    "GoalChain",
+    "ChatChain",
 ]

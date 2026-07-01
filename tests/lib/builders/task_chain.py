@@ -51,14 +51,16 @@ class TaskChain:
     链式 API 风格，每步可覆盖默认 Mock。
     """
 
-    def __init__(self, mocks: dict[str, Any] | None = None) -> None:
+    def __init__(self, mocks: dict[str, Any] | None = None, task_id: str | None = None) -> None:
         """初始化 TaskChain。
 
         Args:
-            mocks: Mock 组件字典，键为 "llm"/"sandbox"/"checkpoint"/"circuit_breaker"/"event_bus"/"tool_registry"
-                   未提供的组件使用默认 Mock
+            mocks: Mock 组件字典
+            task_id: 任务 ID（None=自动生成）。避免并发测试 ID 碰撞。
         """
+        import uuid
         mocks = mocks or {}
+        self.task_id: str = task_id or uuid.uuid4().hex[:12]
 
         self.llm: MockLLMClient = mocks.get("llm", MockLLMClient())
         self.sandbox: MockSandbox = mocks.get("sandbox", MockSandbox())
@@ -303,7 +305,11 @@ class TaskChain:
         output: AgentOutput,
         error: str | None = None,
     ) -> None:
-        """记录检查点（内存追踪，不调用真实 CheckpointManager）。"""
+        """记录检查点（内存追踪 + MockCheckpointManager 同步更新）。
+
+        WHY 同步更新: 场景测试通过 checkpoint_count 断言，Mock 无真实 I/O，
+        直接更新 _store 供测试断言。
+        """
         cp = {
             "state": state,
             "status": output.status,
@@ -313,6 +319,10 @@ class TaskChain:
             "tool_calls": output.result.get("tool_calls", 0) if output.result else 0,
         }
         self.checkpoints.append(cp)
+
+        from tests.lib.factories.checkpoint import create_checkpoint as _create_ck
+        ck_data = _create_ck(state=state, context={"output": cp["output"], "error": error})
+        self.checkpoint._store[f"{self.task_id}:{state}"] = ck_data
 
     # ── 断言方法 ──────────────────────────────────────────
 

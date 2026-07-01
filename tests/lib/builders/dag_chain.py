@@ -138,9 +138,13 @@ class DagChain:
         """执行单个节点——调用 Mock LLM + 沙箱。"""
         node = self._nodes.get(nid, {})
 
-        # 使用预设结果
+        # 使用预设结果（dict含status=用作结果；其他=包裹为ok）
         if nid in self._node_results:
             result = self._node_results[nid]
+            if isinstance(result, dict) and "status" in result:
+                result.setdefault("node_id", nid)
+                result.setdefault("layer", layer)
+                return result
             return {"node_id": nid, "status": "ok", "output": str(result), "layer": layer}
 
         # 模拟 Agent 执行

@@ -35,16 +35,22 @@ async def test_dag_independent_nodes_parallel(scenario_mocks: dict) -> None:
 
 @pytest.mark.scenario_concurrent
 async def test_dag_fail_fast_stops_downstream(scenario_mocks: dict) -> None:
-    """上游节点失败→fail_fast 模式下游跳过。"""
+    """无预设失败→所有节点正常完成。"""
     chain = DagChain(mocks=scenario_mocks)
-    # 预设节点 2 失败
-    chain.with_node_results({"node_2": "FAILED"})  # 这个键只是标记，实际通过 Mock 控制
-    # 实际：直接用依赖链 + 修改 node_2 预设状态
-    chain._node_results["node_2"] = {"status": "failed", "output": "mock failure"}
     await chain.with_nodes(3).with_dependencies({2: [1], 3: [2]}).run()
+    chain.assert_node_order()
+    assert len(chain.results) == 3
 
-    # 修复：需要让 node_2 真正失败。用预设覆盖 execute 逻辑
-    # node_1 → ok, node_2 → failed, node_3 → skipped (fail_fast)
+
+@pytest.mark.scenario_concurrent
+async def test_dag_preset_node_failure(scenario_mocks: dict) -> None:
+    """预设节点失败→fail_fast 跳过下游。"""
+    chain = DagChain(mocks=scenario_mocks)
+    chain._node_results["node_2"] = {"status": "failed", "output": "mock failure"}
+    chain._node_results["node_1"] = {"status": "ok", "output": "node 1 done"}
+    await chain.with_nodes(3).with_dependencies({2: [1], 3: [2]}).run()
+    chain.assert_node_failed("node_2")
+    chain.assert_node_skipped("node_3")
 
 
 @pytest.mark.scenario_concurrent

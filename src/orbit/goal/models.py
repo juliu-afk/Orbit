@@ -59,6 +59,11 @@ class GoalSession(BaseModel):
     estimated_time_range: dict | None = Field(None)
     # D12: 三层记忆
     three_tier_memory: dict = Field(default_factory=dict)
+    # D13: 高峰避让延迟调度
+    defer_to_offpeak: bool = Field(False, description="延迟到低峰执行")
+    urgent: bool = Field(False, description="紧急任务——忽略高峰限制")
+    target_provider: str = Field("", description="目标 LLM 厂商")
+    max_price_multiplier: float = Field(0.0, ge=0.0, description="最高价格倍数，0=不限")
 
 
 class IntakeDecision(BaseModel):

@@ -119,5 +119,13 @@ class Settings:
     DREAM_AUTO_TRIGGER_DAYS: int = _get_int("DREAM_AUTO_TRIGGER_DAYS", 7)
     MEMORY_MAX_FILE_SIZE: int = _get_int("MEMORY_MAX_FILE_SIZE", 50_000)
 
+    # ---- D13: 高峰避让延迟调度 ----
+    OFFPEAK_ENABLED: bool = _get_bool("ORBIT_OFFPEAK_ENABLED", False)
+    OFFPEAK_ONLY: bool = _get_bool("ORBIT_OFFPEAK_ONLY", False)
+    OFFPEAK_CONFIG_PATH: str = _get("ORBIT_OFFPEAK_CONFIG_PATH", "configs/peak_windows.yaml")
+    OFFPEAK_HOLIDAYS_URL: str = _get("ORBIT_HOLIDAYS_URL", "")
+    OFFPEAK_DB_PATH: str = _get("ORBIT_OFFPEAK_DB_PATH", "data/offpeak.db")
+    OFFPEAK_WATCHER_INTERVAL: int = _get_int("ORBIT_OFFPEAK_WATCHER_INTERVAL", 60)
+
 
 settings = Settings()

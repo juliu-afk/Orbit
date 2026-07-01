@@ -39,6 +39,7 @@ from orbit.api.routes import (
     observability,
     projects,
     review,
+    schedule,
     search_routes,
     sessions,
     tasks,
@@ -130,6 +131,8 @@ def create_app(
     app.include_router(tests_routes.router, prefix=settings.API_V1_STR)
     # Step 9 Phase 2: Git Blame
     app.include_router(blame_routes.router, prefix=settings.API_V1_STR)
+    # D13: 高峰避让延迟调度
+    app.include_router(schedule.router)
     # Step 9 Phase 3: 智能洞察
     app.include_router(insights_routes.router, prefix=settings.API_V1_STR)
     app.include_router(compliance_routes.router, prefix=settings.API_V1_STR)
@@ -328,3 +331,31 @@ _meta_orchestrator = MetaOrchestrator(
 _loop_scheduler = LoopScheduler(command_executor=_meta_orchestrator.run)
 app.state.meta_orchestrator = _meta_orchestrator
 app.state.loop_scheduler = _loop_scheduler
+
+# D13: 高峰避让延迟调度器——延迟初始化，避免 import 时创建 SQLite/YAML
+app.state.offpeak_scheduler = None
+app.state.peak_window_manager = None
+
+if settings.OFFPEAK_ENABLED:
+    from orbit.goal.preflight import PreFlightEstimator  # noqa: E402
+    from orbit.scheduler.offpeak_scheduler import (  # noqa: E402
+        DeferredQueue,
+        OffPeakScheduler,
+        PeakWindowManager,
+    )
+
+    async def _init_offpeak() -> None:
+        _peak_manager = PeakWindowManager(config_path=settings.OFFPEAK_CONFIG_PATH)
+        _offpeak_queue = DeferredQueue(db_path=settings.OFFPEAK_DB_PATH)
+        _offpeak_scheduler = OffPeakScheduler(
+            peak_manager=_peak_manager,
+            queue=_offpeak_queue,
+            orchestrator=_meta_orchestrator,
+            preflight=PreFlightEstimator(),
+        )
+        await _offpeak_scheduler.start()
+        app.state.offpeak_scheduler = _offpeak_scheduler
+        app.state.peak_window_manager = _peak_manager
+        logger.info("offpeak_scheduler_initialized", config_path=settings.OFFPEAK_CONFIG_PATH)
+
+    app.add_event_handler("startup", _init_offpeak)

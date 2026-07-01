@@ -48,6 +48,16 @@ SUMMARY_PROMPT = (
     "对话历史：\n{conversation}"
 )
 
+# P1 SEC-8/P2-2: 模块级正则——避免每次摘要调用重复编译
+_SENSITIVE_PATTERN = re.compile(
+    r'(sk-[A-Za-z0-9_-]{10,})'
+    r'|(Bearer\s+[A-Za-z0-9._\-=]+)'
+    r'|(api_?key\s*[:=]\s*["\']?\S+["\']?)'
+    r'|(password\s*[:=]\s*["\']?\S+["\']?)'
+    r'|(-----BEGIN\s+\w+\s+PRIVATE\s+KEY-----.*?-----END\s+\w+\s+PRIVATE\s+KEY-----)',
+    re.IGNORECASE | re.DOTALL,
+)
+
 
 class ContextCompressor:
     """8 步上下文压缩器——ReActAgent 每轮调用前运行.
@@ -171,18 +181,9 @@ class ContextCompressor:
         if not old_messages:
             return messages
 
-        # 构建摘要请求
-        # P1 SEC-8/P2-2: 脱敏 API key/密码/私钥 (IGNORECASE+PEM 完整块)
-        _SENSITIVE = re.compile(
-            r'(sk-[A-Za-z0-9_-]{10,})'
-            r'|(Bearer\s+[A-Za-z0-9._\-=]+)'
-            r'|(api_?key\s*[:=]\s*["\']?\S+["\']?)'
-            r'|(password\s*[:=]\s*["\']?\S+["\']?)'
-            r'|(-----BEGIN\s+\w+\s+PRIVATE\s+KEY-----.*?-----END\s+\w+\s+PRIVATE\s+KEY-----)',
-            re.IGNORECASE | re.DOTALL,
-        )
+        # 构建摘要请求——P1 SEC-8: 脱敏 API key/密码/私钥
         conversation_text = "\n".join(
-            _SENSITIVE.sub(
+            _SENSITIVE_PATTERN.sub(
                 '***REDACTED***',
                 f"[{m.get('role','?')}] {str(m.get('content',''))[:300]}",
             )

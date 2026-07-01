@@ -7,6 +7,7 @@ Phase 3 组 2: pause/resume 实现——asyncio.Event 控制流暂停。
 from __future__ import annotations
 
 import asyncio
+import os
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field

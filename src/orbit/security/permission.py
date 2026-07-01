@@ -20,8 +20,6 @@ from orbit.observability.audit import AuditLogger
 from orbit.security.models import PermissionLayer, SecurityPolicy
 
 logger = structlog.get_logger("orbit.security")
-
-logger = structlog.get_logger()
 _audit = AuditLogger(trace_id="permission-engine")
 
 

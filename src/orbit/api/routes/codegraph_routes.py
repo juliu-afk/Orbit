@@ -102,10 +102,19 @@ async def get_outline(file: str = Query(...)):
 
 @router.get("/hover")
 async def get_hover_info(symbol: str = Query(...)):
-    """悬停信息——从 CodeGraph meta 取类型签名。"""
+    """悬停信息——从 CodeGraph meta 取类型签名+文档。"""
     if _code_graph is None:
         return None
     try:
+        # P2: 返回类型签名+docstring，不再只返回符号名
+        meta = await _code_graph.get_symbol_meta(symbol)
+        if meta:
+            parts = [f"**{symbol}**"]
+            if meta.get("type"):
+                parts.append(f"`{meta['type']}`")
+            if meta.get("doc"):
+                parts.append(f"\n\n{meta['doc'][:300]}")
+            return "  \n".join(parts)
         exists = await _code_graph.exists(symbol)
         return f"**{symbol}**" if exists else None
     except (RuntimeError, ValueError):

@@ -125,11 +125,15 @@ function registerLanguageProviders() {
 
 function updateModel() {
   if (!diffEditor.value) return
+  if (_oldModel.o) _oldModel.o.dispose()
+  if (_oldModel.m) _oldModel.m.dispose()
   const om = monaco.editor.createModel(props.original, props.language)
   const mm = monaco.editor.createModel(props.modified, props.language)
+  _oldModel.o = om; _oldModel.m = mm
   diffEditor.value.setModel({ original: om, modified: mm })
 }
 watch(() => [props.original, props.modified, props.language], updateModel)
+watch(() => props.language, () => registerLanguageProviders())  // P2-1
 // 模型变更后重新计算 hunk 列表
 watch(() => [props.original, props.modified], () => {
   if (_hunkTimer.value) clearTimeout(_hunkTimer.value)

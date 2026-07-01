@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 import structlog
-
 from fastapi import APIRouter
 
 from orbit.api.schemas.task import HealthResponse
+from orbit.core.config import settings
+
+# P2-1 (PR#138): redis 可选依赖提到模块顶部
+try:
+    import redis.asyncio as aioredis
+
+    _REDIS_AVAILABLE = True
+except ImportError:
+    _REDIS_AVAILABLE = False
 
 logger = structlog.get_logger("orbit.health")
 
@@ -30,19 +38,21 @@ router = APIRouter(tags=["health"])
 async def health() -> HealthResponse:
     """健康检查——P1 ERR-1: 验证 Redis 连通性，不再始终假绿。"""
     status = "ok"
-    # 检查 Redis（不检查 SQLite——本地文件始终可用）
-    try:
-        import redis.asyncio as aioredis
-
-        from orbit.core.config import settings
-
-        _redis = aioredis.from_url(
-            settings.REDIS_URL, socket_connect_timeout=2, socket_timeout=2
-        )
-        await _redis.ping()
-        await _redis.close()
-    except Exception:
+    if not _REDIS_AVAILABLE:
         status = "degraded"
-        logger.warning("health_redis_unavailable")
+        logger.warning("health_redis_not_installed")
+    else:
+        # P1-1 (PR#138): try-finally 确保连接关闭，防止泄漏
+        try:
+            _redis = aioredis.from_url(
+                settings.REDIS_URL, socket_connect_timeout=2, socket_timeout=2
+            )
+            try:
+                await _redis.ping()
+            finally:
+                await _redis.close()
+        except Exception:
+            status = "degraded"
+            logger.warning("health_redis_unavailable")
 
     return HealthResponse(status=status, version=_APP_VERSION)

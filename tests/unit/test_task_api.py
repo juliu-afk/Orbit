@@ -51,6 +51,20 @@ async def test_health(client):
 
 
 @pytest.mark.asyncio
+async def test_health_degraded_when_redis_fails(client, monkeypatch):
+    """P2-3 (PR#138): Redis 不可用时返回 degraded 状态。"""
+    async def _mock_ping(*a, **k):
+        raise ConnectionError("redis down")
+
+    monkeypatch.setattr(
+        "redis.asyncio.Redis.ping", _mock_ping
+    )
+    resp = await client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "degraded"
+
+
+@pytest.mark.asyncio
 async def test_create_task(client, session_id):
     resp = await client.post(
         "/api/v1/tasks",

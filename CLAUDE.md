@@ -132,7 +132,7 @@ Orbit/
 | 冒烟测试 | `pytest tests/e2e/ -q --tb=short -k "smoke"` | ≤2min |
 | 回归测试 | `pytest tests/e2e/ -q --tb=short` | ≤10min |
 
-覆盖率目标：调度器/防幻觉纯函数 100%，Service 模块 ≥80%，CI 门禁 ≥80%。
+覆盖率目标：调度器/防幻觉纯函数 100%，Service 模块 ≥95%，CI 门禁 ≥95%。
 
 ## 行为拦截清单
 

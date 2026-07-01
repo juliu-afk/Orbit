@@ -87,7 +87,7 @@ source = ["src/orbit"]
 branch = true
 
 [tool.coverage.report]
-fail_under = 80
+fail_under = 95
 show_missing = true
 
 

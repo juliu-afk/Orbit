@@ -15,6 +15,7 @@ WHY 8 步而非一步: 每步独立可测，按阈值选择性执行。
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import structlog
@@ -171,8 +172,19 @@ class ContextCompressor:
             return messages
 
         # 构建摘要请求
+        # P1 SEC-8: 脱敏——发送 LLM 前过滤 API key/密码/私钥
+        _SENSITIVE = re.compile(
+            r'(sk-[A-Za-z0-9_-]{10,})'
+            r'|(Bearer\s+[A-Za-z0-9._\-=]+)'
+            r'|(api_?key\s*[:=]\s*["\']?\S+["\']?)'
+            r'|(password\s*[:=]\s*["\']?\S+["\']?)'
+            r'|(-----BEGIN\s+\w+\s+PRIVATE\s+KEY-----)'
+        )
         conversation_text = "\n".join(
-            f"[{m.get('role','?')}] {str(m.get('content',''))[:300]}"
+            _SENSITIVE.sub(
+                '***REDACTED***',
+                f"[{m.get('role','?')}] {str(m.get('content',''))[:300]}",
+            )
             for m in old_messages
             if m.get("content")
         )

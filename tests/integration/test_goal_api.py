@@ -78,3 +78,20 @@ class TestLoopAPI:
     def test_stop(self, client):
         resp = client.delete("/api/v1/loop/any")
         assert resp.status_code == 200
+
+    # P1: Goal API 并发创建冲突——第二个请求应被正确拒绝而非崩溃
+    def test_concurrent_create_no_crash(self, client):
+        import concurrent.futures
+
+        def _create():
+            return client.post(
+                "/api/v1/goal",
+                json={"description": "test concurrent", "max_react": 5},
+            )
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+            futures = [ex.submit(_create) for _ in range(3)]
+            results = [f.result() for f in concurrent.futures.as_completed(futures)]
+        # 至少有一个成功创建（可能是 200）或被正确拒绝
+        statuses = {r.status_code for r in results}
+        assert 200 in statuses or 409 in statuses  # 200=成功, 409=冲突

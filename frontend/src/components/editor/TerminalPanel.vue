@@ -22,6 +22,12 @@ import { apiPost } from '@/services/api'
 
 interface TermEntry { command: string; stdout: string; stderr: string; exitCode: number | null; duration: number }
 
+// P1: 最大输出条目——防大输出时浏览器卡死
+// P2-1 (#152): 支持 localStorage 覆盖默认值
+const MAX_ENTRIES = parseInt(
+  localStorage.getItem('terminal.max_entries') || '100', 10
+)
+
 const input = ref('')
 const loading = ref(false)
 const history = ref<TermEntry[]>([])
@@ -41,6 +47,10 @@ async function execute() {
   } catch (e: any) {
     history.value.push({ command: cmd, stdout: '', stderr: e.message || 'Command failed', exitCode: -1, duration: 0 })
   } finally {
+    // P1: 超限时移除最旧条目——防大输出卡死浏览器
+    if (history.value.length > MAX_ENTRIES) {
+      history.value = history.value.slice(-MAX_ENTRIES)
+    }
     loading.value = false
     await nextTick()
     outputRef.value?.scrollTo(0, outputRef.value.scrollHeight)

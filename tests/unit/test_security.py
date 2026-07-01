@@ -180,3 +180,12 @@ class TestPermissionEngine:
         )
         # architect 默认不允许 write_file，但 policy 显式允许
         assert engine.check("architect", "write_file", policy=policy) is True
+
+
+# P1: PermissionEngine 无匹配时 fail-closed
+def test_permission_deny_on_unknown_tool() -> None:
+    from orbit.security.permission import PermissionEngine
+
+    engine = PermissionEngine()
+    # 未注册的工具默认拒绝
+    assert engine.check("developer", "nonexistent_tool_xyz") is False

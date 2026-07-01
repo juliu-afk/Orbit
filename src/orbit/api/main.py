@@ -250,7 +250,6 @@ _scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-de
 
 # Step 9: 审查模块——SQLAlchemy 2.0 ORM
 from sqlalchemy.ext.asyncio import (  # noqa: E402
-    AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )

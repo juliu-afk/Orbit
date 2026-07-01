@@ -21,7 +21,7 @@ from orbit.agents.factory import AgentFactory
 from orbit.api.dependencies import verify_stream_token  # 5C.1
 from orbit.stream.cancellation import CancellationToken
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.stream")
 
 router = APIRouter()
 

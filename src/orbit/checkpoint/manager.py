@@ -15,7 +15,7 @@ import orjson
 import structlog
 from pydantic import BaseModel, Field
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.checkpoint")
 
 CHECKPOINT_TTL = 3600  # Redis TTL（秒），PRD 环境配置 CHECKPOINT_TTL=3600
 

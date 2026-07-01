@@ -23,7 +23,7 @@ import structlog
 
 from orbit.gateway.schemas import CircuitBreakerState
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.gateway.cb")
 
 # 熔断器默认阈值（PRD Step 2.1 SC2/SC3）
 DEFAULT_FAILURE_THRESHOLD = 5  # 连续失败 5 次触发

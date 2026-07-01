@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from orbit.graph.engines.base import GraphEngineBase
 from orbit.graph.models.nodes import ConfigNode
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.graph.config")
 
 # 支持的配置文件扩展名
 SUPPORTED_EXTENSIONS = {".env", ".yml", ".yaml", ".json", ".ini", ".conf"}

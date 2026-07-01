@@ -24,7 +24,7 @@ from orbit.hallucination.schemas import (
     ValidationResult,
 )
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.hallucination.l4")
 
 # mypy 忽略的规则（PRD Q2 决议：strict 模式但放行未标注类型的函数）
 _MYPY_FLAGS = ["--strict", "--disable-error-code", "no-untyped-def"]

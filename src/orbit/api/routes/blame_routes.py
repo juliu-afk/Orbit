@@ -7,6 +7,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 
+from orbit.api.routes._workspace import _ws, set_workspace
+
 # P1-1: Agent 邮箱后缀白名单——避免字符串包含误报
 AGENT_EMAIL_SUFFIXES = ("@anthropic.com", "noreply.github.com", "copilot.github.com", "@openai.com")
 
@@ -23,19 +25,6 @@ def _is_agent_email(email: str) -> bool:
 
 
 router = APIRouter(prefix="/git", tags=["blame"])
-
-_workspace_dir: str | None = None
-
-
-def set_workspace(d: str) -> None:
-    global _workspace_dir
-    _workspace_dir = d
-
-
-def _ws() -> str:
-    if _workspace_dir is None:
-        raise RuntimeError("workspace not set")
-    return _workspace_dir
 
 
 @router.get("/blame")

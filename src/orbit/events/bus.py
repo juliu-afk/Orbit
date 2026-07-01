@@ -12,7 +12,7 @@ import structlog
 
 from orbit.events.schemas import DashboardEvent
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.events")
 
 
 class EventBus:

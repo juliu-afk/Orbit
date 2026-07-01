@@ -17,7 +17,7 @@ from orbit.events.bus import EventBus
 from orbit.events.schemas import DashboardEvent, TaskUpdatePayload
 from orbit.scheduler.graph import GraphNode, NodeStatus, TaskGraph
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.scheduler.dag")
 
 
 class DagRunner:

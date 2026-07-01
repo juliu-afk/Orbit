@@ -31,7 +31,7 @@ from orbit.compose.models import Skill, SkillPhase
 if TYPE_CHECKING:
     from orbit.compose.models import Spec
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.compose.parser")
 
 # SKILL.md 所在目录
 SKILLS_DIR = Path(__file__).parent / "skills"

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 from orbit.graph.engines.base import GraphEngineBase
 from orbit.graph.models.nodes import DbNode
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.graph.db")
 
 
 class DbGraphError(Exception):

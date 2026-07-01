@@ -13,7 +13,7 @@ import structlog
 from orbit.compliance.rule_engine import RuleEngine, RuleStatus
 from orbit.knowledge.store import KnowledgeStore
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.compliance")
 
 
 @dataclass

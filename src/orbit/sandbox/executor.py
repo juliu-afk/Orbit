@@ -18,7 +18,7 @@ import structlog
 
 from orbit.core.config import settings
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.sandbox.executor")
 
 # MVP 用 Python 官方镜像（生产可换更小的 python:slim/alpine）
 DEFAULT_IMAGE = "python:3.12-slim"

@@ -22,7 +22,7 @@ from orbit.compose.models import Spec, Task
 from orbit.compose.parser import ComposeParser
 from orbit.scheduler.orchestrator import Scheduler
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.compose.orchestrator")
 
 
 class ComposeOrchestrator:

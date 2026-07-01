@@ -27,7 +27,7 @@ from orbit.gateway.circuit_breaker import CircuitBreaker, CircuitOpenError
 from orbit.gateway.routing import RoutingStrategy, select_model
 from orbit.gateway.schemas import LLMRequest, LLMResponse, LLMUsage
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.gateway.client")
 
 PRICES: dict[str, dict[str, float]] = {
     "deepseek/deepseek-v4-pro": {"prompt": 0.000435, "completion": 0.00087},

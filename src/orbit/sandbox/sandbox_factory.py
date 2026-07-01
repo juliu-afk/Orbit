@@ -11,7 +11,7 @@ import structlog
 from orbit.sandbox.executor import Sandbox
 from orbit.sandbox.process_sandbox import ProcessSandbox
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.sandbox.factory")
 
 # 硬停止错误信息——所有沙箱机制均不可用时的提示
 NO_SANDBOX_MESSAGE = (

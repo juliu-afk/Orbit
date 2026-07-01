@@ -9,7 +9,7 @@ import structlog
 
 from orbit.worktree.manager import WorktreeManager
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.worktree.cleanup")
 
 
 class WorktreeCleanup:

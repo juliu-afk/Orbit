@@ -32,7 +32,7 @@ from orbit.scheduler.dag_runner import DagRunner
 from orbit.scheduler.graph import NodeStatus, TaskGraph
 from orbit.scheduler.task_runner import TaskRunner
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.scheduler.orchestrator")
 
 
 class SchedulerError(Exception):

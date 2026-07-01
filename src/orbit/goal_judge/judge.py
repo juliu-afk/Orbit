@@ -17,7 +17,7 @@ import structlog
 
 from orbit.goal_judge.models import JUDGE_SYSTEM_PROMPT, Goal, Verdict
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.goal_judge")
 
 
 class GoalJudge:

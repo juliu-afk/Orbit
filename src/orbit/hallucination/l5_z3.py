@@ -22,7 +22,7 @@ from orbit.hallucination.schemas import (
     L5ValidationResult,
 )
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.hallucination.l5")
 
 # Z3 超时（毫秒）
 Z3_TIMEOUT_MS = 30000

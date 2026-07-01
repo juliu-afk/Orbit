@@ -57,7 +57,7 @@ from orbit.stream.sse import router as sse_router
 from orbit.ws.router import router as ws_router
 from orbit.ws.router import start_broadcaster
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.api")
 
 
 def create_app(

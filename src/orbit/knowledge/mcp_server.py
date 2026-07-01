@@ -18,7 +18,7 @@ import structlog
 
 from orbit.knowledge.engine import KnowledgeEngine
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.knowledge.mcp")
 
 
 def _make_response(id_val: int | str | None, result: Any) -> str:

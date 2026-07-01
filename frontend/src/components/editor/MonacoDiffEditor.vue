@@ -31,6 +31,7 @@ const currentHunk = ref(0)
 const hunks = ref<monaco.editor.ILineChange[]>([])
 const _hunkTimer = ref<ReturnType<typeof setTimeout>>()  // P1-1
 const _oldModel = { o: null as monaco.editor.ITextModel | null, m: null as monaco.editor.ITextModel | null }  // P2-1
+const _providerDisposables: monaco.IDisposable[] = []  // P1-1
 
 // 从 Monaco diff 中提取 hunk 列表
 function updateHunks() {
@@ -78,6 +79,8 @@ watch(() => [props.original, props.modified], () => {
 })
 onBeforeUnmount(() => {
   if (_hunkTimer.value) clearTimeout(_hunkTimer.value)
+  _providerDisposables.forEach(d => d.dispose())
+  _providerDisposables.length = 0
   diffEditor.value?.dispose()
 })
 </script>

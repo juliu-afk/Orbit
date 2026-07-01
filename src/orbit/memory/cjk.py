@@ -100,6 +100,19 @@ def _tokenize_cjk_jieba(text: str) -> str:
     return tokenize_for_fts(text)
 
 
+# P1 LOG-8: FTS5 特殊字符——需转义防止查询语法注入
+_FTS5_SPECIAL = re.compile(r'([*"()~&|!^])')
+
+
+def _escape_fts5(text: str) -> str:
+    """转义 FTS5 特殊字符——防止用户输入被解释为查询运算符。"""
+    return _FTS5_SPECIAL.sub(r'\\\1', text)
+
+
 def build_fts_query(raw_query: str) -> str:
-    """构建 FTS5 MATCH 查询——jieba 优先，bigram 回退."""
-    return _tokenize_cjk_jieba(raw_query)
+    """构建 FTS5 MATCH 查询——jieba 优先，bigram 回退.
+
+    P1 LOG-8: 用户输入先经 FTS5 转义防止特殊字符注入。
+    """
+    safe = _escape_fts5(raw_query)
+    return _tokenize_cjk_jieba(safe)

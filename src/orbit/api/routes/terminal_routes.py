@@ -9,11 +9,11 @@ import shlex
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from orbit.api.routes._workspace import _ws, set_workspace  # noqa: E402
 from orbit.core.security_constants import SHELL_METACHARACTERS
 
 router = APIRouter(prefix="/terminal", tags=["terminal"])
 
-_workspace_dir: str | None = None
 ALLOWED_COMMANDS = {
     "pytest",
     "ruff",
@@ -32,17 +32,6 @@ ALLOWED_COMMANDS = {
     "tail",
     "wc",
 }
-
-
-def set_workspace(d: str) -> None:
-    global _workspace_dir
-    _workspace_dir = d
-
-
-def _ws() -> str:
-    if _workspace_dir is None:
-        raise RuntimeError("workspace not set")
-    return _workspace_dir
 
 
 class ExecRequest(BaseModel):

@@ -11,20 +11,9 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from orbit.api.routes._workspace import _ws, set_workspace  # noqa: E402
+
 router = APIRouter(prefix="/tests", tags=["tests"])
-
-_workspace_dir: str | None = None
-
-
-def set_workspace(d: str) -> None:
-    global _workspace_dir
-    _workspace_dir = d
-
-
-def _ws() -> str:
-    if _workspace_dir is None:
-        raise RuntimeError("workspace not set")
-    return _workspace_dir
 
 
 class TestCase(BaseModel):

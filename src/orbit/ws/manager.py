@@ -21,11 +21,24 @@ class ConnectionManager:
     一个 task 可被多个客户端订阅（多 Tab/多运维视角）。
     """
 
+    # P1 RSCK-6: 最大连接数——防止无上限增长耗尽内存
+    MAX_CONNECTIONS = 200
+
     def __init__(self) -> None:
         self._rooms: dict[str, set[WebSocket]] = {}
+        self._total_connections = 0
+        # P1-2 (PR#139): 只对已接受的连接递减——超限拒绝不计数
+        # P2-1 (PR#139 R2): 直接用 WebSocket 引用而非 id()——防 GC 复用
+        self._counted: set[WebSocket] = set()
 
     async def connect(self, ws: WebSocket) -> None:
         """接受连接。不做认证（PRD Non-Goal：生产由反向代理处理）。"""
+        if self._total_connections >= self.MAX_CONNECTIONS:
+            await ws.close(code=1013, reason="服务器连接数已达上限")
+            logger.warning("ws_connection_limit_reached", max=self.MAX_CONNECTIONS)
+            return
+        self._total_connections += 1
+        self._counted.add(ws)
         await ws.accept()
 
     async def disconnect(self, ws: WebSocket) -> None:
@@ -34,6 +47,10 @@ class ConnectionManager:
         WHY list(self._rooms)：遍历时可能删除房间（空房间清理），
         先快照 keys 避免 RuntimeError。
         """
+        # P1-2 (PR#139): 只递减已计数的连接——超限被拒的连接不计数
+        if ws in self._counted:
+            self._counted.discard(ws)
+            self._total_connections = max(0, self._total_connections - 1)
         initial_rooms = len(self._rooms)
         for task_id in list(self._rooms):
             self._rooms[task_id].discard(ws)

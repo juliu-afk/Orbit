@@ -48,8 +48,9 @@ function navigateHunk(direction: number) {
   if (next < 0 || next >= hunks.value.length) return
   currentHunk.value = next
   const hunk = hunks.value[next]
-  const line = hunk.modifiedStartLineNumber ?? hunk.originalStartLineNumber
-  if (line) diffEditor.value?.revealPositionInCenter({ lineNumber: line, column: 1 })
+  const line = hunk.modifiedStartLineNumber != null && hunk.modifiedStartLineNumber > 0
+    ? hunk.modifiedStartLineNumber : hunk.originalStartLineNumber
+  if (line > 0) diffEditor.value?.revealPositionInCenter({ lineNumber: line, column: 1 })
 }
 
 onMounted(() => {
@@ -125,7 +126,7 @@ function registerLanguageProviders() {
 
 function updateModel() {
   if (!diffEditor.value) return
-  if (_oldModel.o) _oldModel.o.dispose()
+  if (_oldModel.o) _oldModel.o.dispose()  // P2-1
   if (_oldModel.m) _oldModel.m.dispose()
   const om = monaco.editor.createModel(props.original, props.language)
   const mm = monaco.editor.createModel(props.modified, props.language)

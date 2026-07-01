@@ -19,7 +19,7 @@ import structlog
 from orbit.observability.audit import AuditLogger
 from orbit.security.models import PermissionLayer, SecurityPolicy
 
-logger = structlog.get_logger()
+logger = structlog.get_logger("orbit.security")
 _audit = AuditLogger(trace_id="permission-engine")
 
 
@@ -170,11 +170,19 @@ class PermissionEngine:
             )
             return True
 
-        # 无匹配——默认允许（fail-open for tools）
-        _audit.log(
-            "permission_engine", "allow_default", status="allowed", agent=agent_role, tool=tool_name
+        # 无匹配——默认拒绝（P1 SEC-1: fail-closed——未知工具不应放行）
+        logger.warning(
+            "permission_denied",
+            layer="default",
+            agent=agent_role,
+            tool=tool_name,
         )
-        return True
+        _audit.log(
+            "permission_engine", "deny_default", status="denied",
+            agent=agent_role, tool=tool_name,
+            reason="no matching permission policy",
+        )
+        return False
 
     # ── 内部 ─────────────────────────────────────
 

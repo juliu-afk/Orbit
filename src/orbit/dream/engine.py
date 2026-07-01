@@ -148,8 +148,7 @@ class DreamEngine:
             resp = await self._llm.generate(req, task_id="dream_merge")
             return resp.content or content
         except (ConnectionError, TimeoutError, ValueError) as e:
-            # P1 ERR-4: LLM 合并失败应记录错误级别——静默跳过会让用户不知情
-            logger.error("dream_merge_failed_skip", error=str(e))
+            logger.warning("dream_merge_failed", error=str(e))
             return content
 
     def _stage_dedup(self, content: str) -> str:

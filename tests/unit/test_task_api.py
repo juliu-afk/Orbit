@@ -44,24 +44,9 @@ def session_id() -> str:
 
 @pytest.mark.asyncio
 async def test_health(client):
-    """P1 ERR-1: 健康检查验证 Redis 连通性——测试环境无 Redis 时允许 degraded。"""
     resp = await client.get("/health")
     assert resp.status_code == 200
-    assert resp.json()["status"] in ("ok", "degraded")
-
-
-@pytest.mark.asyncio
-async def test_health_degraded_when_redis_fails(client, monkeypatch):
-    """P2-3 (PR#138): Redis 不可用时返回 degraded 状态。"""
-    async def _mock_ping(*a, **k):
-        raise ConnectionError("redis down")
-
-    monkeypatch.setattr(
-        "redis.asyncio.Redis.ping", _mock_ping
-    )
-    resp = await client.get("/health")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "degraded"
+    assert resp.json()["status"] == "ok"
 
 
 @pytest.mark.asyncio

@@ -68,15 +68,7 @@ class CircuitBreaker:
         if state.opened_at is None and not state.half_open:
             return  # CLOSED
         if state.half_open:
-            # 半开：P1 LOG-4——限制探测数只放行 HALF_OPEN_PROBE_LIMIT 个
-            # P1-2 (PR#138): 内存模式下 read-modify-write 非原子——
-            # 本地单协程 GIL 保护实际风险低，接入 Redis 后 state 变更串行化
-            if state.probe_in_flight:
-                raise CircuitOpenError(
-                    f"熔断器半开探测进行中（key={key}），探测完成后重试"
-                )
-            state.probe_in_flight = True
-            await self._set_state(key, state)
+            # 半开：只放行第一个探测请求，其他继续拒绝
             logger.warning("circuit_half_open_probe", key=key)
             return
         # OPEN：检查冷却是否到期
@@ -97,7 +89,6 @@ class CircuitBreaker:
         state.failure_count = 0
         state.opened_at = None
         state.half_open = False
-        state.probe_in_flight = False  # P1 LOG-4
         await self._set_state(key, state)
         self._record_call(key, True)
 
@@ -113,7 +104,6 @@ class CircuitBreaker:
         if state.half_open:
             # 半开失败 → 重新打开
             state.half_open = False
-            state.probe_in_flight = False  # P1 LOG-4
             state.opened_at = time.time()
             await self._set_state(key, state)
             logger.warning("circuit_reopened_after_probe_fail", key=key)

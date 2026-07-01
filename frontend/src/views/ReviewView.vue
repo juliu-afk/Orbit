@@ -15,7 +15,7 @@
     <div class="review-body">
       <div class="review-sidebar">
         <FileTreePanel :tree-data="fileTree" :selected-file="editor.currentFile" @select-file="onSelectFile" />
-        <ReviewCommentPanel v-if="review.taskId && editor.currentFile" :review-id="review.taskId" :file="editor.currentFile" :line="editor.currentLine" />
+        <ReviewCommentPanel v-if="review.taskId && editor.currentFile" :review-id="review.taskId" :file="editor.currentFile" :line="0" />
       </div>
       <div class="review-main">
         <div v-if="!editor.currentFile" class="no-file"><el-empty description="Select a file to review" :image-size="80" /></div>
@@ -36,7 +36,7 @@
         </el-tab-pane>
         <el-tab-pane label="Outline" name="outline"><OutlinePanel :items="outlineItems" @select="onOutlineNavigate" /></el-tab-pane>
         <el-tab-pane label="Search" name="search"><SearchPanel /></el-tab-pane>
-        <el-tab-pane label="Tests" name="tests"><TestPanel @show-error="onTestError" /></el-tab-pane>
+        <el-tab-pane label="Tests" name="tests"><TestPanel /></el-tab-pane>
         <el-tab-pane label="Terminal" name="terminal"><TerminalPanel /></el-tab-pane>
         <el-tab-pane label="Conflicts" name="conflicts"><MergeConflictPanel @select-file="onSelectFile" /></el-tab-pane>
       </el-tabs>
@@ -103,9 +103,6 @@ const statusTagType = computed(() => ({ pending:'info', in_review:'', changes_re
 function onSelectFile(path: string) { editor.openFile(path, 'HEAD', null) }
 
 // P1-3: TestPanel @show-error 事件处理
-function onTestError(error: { message: string; file?: string; line?: number }) {
-  console.error('[ReviewView] test error:', error.message)
-}
 
 onMounted(async () => {
   const tid = route.params.taskId as string

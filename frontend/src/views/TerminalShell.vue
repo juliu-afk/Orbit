@@ -5,6 +5,7 @@ import { useSessionStore } from '@/stores/session'
 import { useAgentOpsStore } from '@/stores/agentops'
 import { useChatStore } from '@/stores/chat'
 import { useTaskStore } from '@/stores/task'
+import { usePeakStore } from '@/stores/peak'
 import { useEditorStore } from '@/stores/editor'
 import { useWebSocket } from '@/composables/useWebSocket'
 import { apiGet } from '@/services/api'
@@ -17,6 +18,8 @@ import type { FileNode } from '@/components/editor/FileTreePanel.vue'
 import DAGDrawer from '@/components/dag/DAGDrawer.vue'
 import TokenChartDrawer from '@/components/charts/TokenChartDrawer.vue'
 import SearchDrawer from '@/components/editor/SearchDrawer.vue'
+import ScheduleDrawer from '@/components/schedule/ScheduleDrawer.vue'
+import PeakPromptDialog, { type PeakPromptData } from '@/components/chat/PeakPromptDialog.vue'
 
 const shell = useShellStore()
 const session = useSessionStore()
@@ -77,6 +80,13 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') { shell.closeAllDrawers(); if (shell.showMonaco) shell.closeFileReview() }
 }
 
+// D13: 高峰避让弹窗
+const showPeakPrompt = ref(false)
+const peakPromptData = ref<PeakPromptData | null>(null)
+watch(() => chat.lastPeakPrompt, (d: PeakPromptData | null) => { if (d) { peakPromptData.value = d; showPeakPrompt.value = true } })
+function onPeakDefer() { showPeakPrompt.value = false; chat.resubmitWithDefer() }
+function onPeakUrgent() { showPeakPrompt.value = false; chat.resubmitWithUrgent() }
+
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   ws.setMessageHandler((msg) => {
@@ -110,10 +120,12 @@ onUnmounted(() => {
     <MonacoPanel v-if="shell.showMonaco" />
     <AgentInfoPanel v-else />
   </aside>
-  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" />
+  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @toggle-schedule="shell.toggleSchedule()" />
   <DAGDrawer v-model:show="shell.showDAG" />
   <TokenChartDrawer v-model:show="shell.showChart" />
   <SearchDrawer v-model:show="shell.showSearch" @open-file="shell.openFileReview" />
+  <ScheduleDrawer v-model:visible="shell.showSchedule" />
+  <PeakPromptDialog v-model:visible="showPeakPrompt" :data="peakPromptData" @defer="onPeakDefer" @urgent="onPeakUrgent" @cancel="showPeakPrompt = false" />
 </div>
 </template>
 

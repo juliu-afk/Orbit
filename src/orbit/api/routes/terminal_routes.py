@@ -47,6 +47,13 @@ class ExecResult(BaseModel):
     duration_ms: float
 
 
+# v0.24: 前端 InputBox 动态获取可用命令列表
+@router.get("/commands")
+async def list_commands():
+    """列出所有允许的终端命令。"""
+    return {"commands": sorted(ALLOWED_COMMANDS)}
+
+
 @router.post("/exec", response_model=ExecResult)
 async def exec_command(req: ExecRequest):
     """执行终端命令——白名单限制+30s超时。

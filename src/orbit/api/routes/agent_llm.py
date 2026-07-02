@@ -63,6 +63,12 @@ class SwitchResponse(BaseModel):
 
 # ── Routes ─────────────────────────────────────
 
+# v0.24: 前端 AgentInfoPanel 动态获取 Agent 列表
+@router.get("")
+async def list_agents():
+    """列出所有已知 Agent。"""
+    return {"agents": [{"name": n} for n in sorted(KNOWN_AGENTS)]}
+
 
 @router.get("/{agent_name}/llm", response_model=LLMConfigResponse)
 async def get_agent_llm_config(agent_name: str) -> LLMConfigResponse:

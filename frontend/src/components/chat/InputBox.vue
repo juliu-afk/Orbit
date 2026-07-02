@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { apiGet } from '@/services/api'
 const emit = defineEmits<{ (e: 'send', text: string): void; (e: 'navigate-history', d: -1 | 1): void }>()
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const inputText = ref('')
-// P1-1 fix: 后端 /api/v1/commands 端点不存在，退回硬编码。
-// 后续 v0.23 实现后端端点时改为 apiGet fallback 模式。
-const CMDS = ['/task', '/review', '/dream', '/search', '/help', '/compose']
+// v0.24: 恢复 apiGet fallback——后端 /api/v1/terminal/commands 可用时动态获取
+const FALLBACK_CMDS = ['/task', '/review', '/dream', '/search', '/help', '/compose']
+const CMDS = ref<string[]>([...FALLBACK_CMDS])
+onMounted(async () => { try { const d = await apiGet<{ commands: string[] }>('/api/v1/terminal/commands'); if (d.commands?.length) CMDS.value = d.commands } catch { /* fallback */ } })
 const showAC = ref(false)
 const acIdx = ref(0)
 const filtered = computed(() => {
   if (!inputText.value.startsWith('/') || inputText.value.includes(' ')) return []
-  return CMDS.filter(c => c.startsWith(inputText.value))
+  return CMDS.value.filter(c => c.startsWith(inputText.value))
 })
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = inputText.value.trim(); if (t) { emit('send', t); inputText.value = ''; showAC.value = false } }

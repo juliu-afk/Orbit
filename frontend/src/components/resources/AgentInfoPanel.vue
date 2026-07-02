@@ -13,10 +13,10 @@ async function fetchLLM(name: string): Promise<Row | null> {
     return { name: data.name || name, model: data.model || '', source: data.source || 'default', sourceLabel: data.source_label || 'default', isForced: data.is_forced || false }
   } catch { return null }
 }
-// P1-2 fix: 后端 GET /api/v1/agents 端点不存在，退回硬编码。
-// 后续 v0.23 实现端点时改为动态获取。
-const AGENTS = ['ArchitectAgent','DeveloperAgent','ReviewerAgent','QAAgent','ConfigAgent','ClarifierAgent']
-onMounted(async () => { const results = await Promise.all(AGENTS.map(fetchLLM)); rows.value = results.filter((r): r is Row => r !== null) })
+// v0.24: 恢复 apiGet fallback——后端 /api/v1/agents 可用时动态获取
+const FALLBACK_AGENTS = ['ArchitectAgent','DeveloperAgent','ReviewerAgent','QAAgent','ConfigAgent','ClarifierAgent']
+async function fetchAgentNames(): Promise<string[]> { try { const d = await apiGet<{ agents: Array<{ name: string }> }>('/api/v1/agents'); return d.agents?.map(a => a.name) || FALLBACK_AGENTS } catch { return FALLBACK_AGENTS } }
+onMounted(async () => { const names = await fetchAgentNames(); const results = await Promise.all(names.map(fetchLLM)); rows.value = results.filter((r): r is Row => r !== null) })
 </script>
 <template>
 <div class="flex flex-col h-full text-xs" style="font-family:var(--font-mono)">

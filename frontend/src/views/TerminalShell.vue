@@ -19,11 +19,12 @@ import SettingsDialog from '@/components/layout/SettingsDialog.vue'
 import DAGDrawer from '@/components/dag/DAGDrawer.vue'
 import TokenChartDrawer from '@/components/charts/TokenChartDrawer.vue'
 import SearchDrawer from '@/components/editor/SearchDrawer.vue'
+import ShortcutPanel from '@/components/layout/ShortcutPanel.vue'
 
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
 const chat = useChatStore(); const task = useTaskStore(); const editor = useEditorStore()
 const settings = useSettingsStore(); const ws = useWebSocket()
-const fileTree = ref<FileNode[]>([]); const showSettings = ref(false)
+const fileTree = ref<FileNode[]>([]); const showSettings = ref(false); const showShortcuts = ref(false)
 
 function buildTree(files: Array<{ path: string }>): FileNode[] {
   const root: FileNode[] = []; const dirMap = new Map<string, FileNode>()
@@ -39,7 +40,7 @@ async function onSelectFile(path:string){ await editor.openFile(path); shell.ope
 function gridAreas():string{ const cols=settings.fileTreeLeft?"filetree chat right":"chat right filetree"; return `"${cols}" "statusbar statusbar statusbar"` }
 
 watch(()=>session.currentSessionId,(n)=>{if(n)chat.connectChatWs(n,session.currentProjectName||"")})
-function onKeydown(e:KeyboardEvent){ if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();shell.toggleFileTree()}; if(e.key==='Escape'){shell.closeAllDrawers();if(shell.showMonaco)shell.closeFileReview()} }
+function onKeydown(e:KeyboardEvent){ if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();shell.toggleFileTree()}; if((e.metaKey||e.ctrlKey)&&e.key==='/'){e.preventDefault();showShortcuts.value=!showShortcuts.value}; if(e.key==='Escape'){shell.closeAllDrawers();if(shell.showMonaco)shell.closeFileReview()} }
 
 function startResize(edge:"left"|"right",e:PointerEvent){ e.preventDefault();(e.target as HTMLElement).setPointerCapture(e.pointerId); const onMove=(ev:PointerEvent)=>{ if(edge==="left")settings.fileTreeWidth=Math.max(160,Math.min(480,ev.clientX)); else settings.rightPanelWidth=Math.max(180,Math.min(600,window.innerWidth-ev.clientX)) }; window.addEventListener("pointermove",onMove); const clean=()=>window.removeEventListener("pointermove",onMove); window.addEventListener("pointerup",clean,{once:true}); window.addEventListener("pointercancel",clean,{once:true}) }
 // P2 fix: 具名函数引用避免每次渲染创建新闭包
@@ -60,6 +61,7 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
   <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @open-settings="showSettings=true" />
   <DAGDrawer v-model:show="shell.showDAG" /><TokenChartDrawer v-model:show="shell.showChart" /><SearchDrawer v-model:show="shell.showSearch" @open-file="shell.openFileReview" />
   <SettingsDialog v-model:show="showSettings" />
+  <ShortcutPanel v-model:show="showShortcuts" />
 </div>
 </template>
 

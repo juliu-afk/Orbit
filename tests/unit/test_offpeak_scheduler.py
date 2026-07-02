@@ -48,7 +48,7 @@ class TestPeakWindowManager:
             ],
             offpeak_windows=[
                 PeakWindow(days=["Mon","Tue","Wed","Thu","Fri"], hours_start="23:00", hours_end="09:00"),
-                PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="24:00"),
+                PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="23:59"),
             ],
             peak_price_multiplier=1.0,
             offpeak_price_multiplier=0.7,
@@ -61,7 +61,7 @@ class TestPeakWindowManager:
             ],
             offpeak_windows=[
                 PeakWindow(days=["Mon","Tue","Wed","Thu","Fri"], hours_start="18:00", hours_end="08:00"),
-                PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="24:00"),
+                PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="23:59"),
             ],
             peak_price_multiplier=1.0,
             offpeak_price_multiplier=0.85,
@@ -386,7 +386,9 @@ class TestOffPeakSchedulerEnqueue:
 
     @pytest.fixture
     def mock_orch(self):
-        return MagicMock()
+        m = MagicMock()
+        m.run = AsyncMock()  # orchestrator.run() 是 async
+        return m
 
     @pytest.fixture
     def mock_preflight(self):
@@ -417,8 +419,8 @@ class TestOffPeakSchedulerEnqueue:
         mgr._configs = {}
         mgr._configs["deepseek"] = ProviderPeakConfig(
             provider="deepseek", timezone="Asia/Shanghai",
-            peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri"], hours_start="00:00", hours_end="24:00")],
-            offpeak_windows=[PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="24:00")],
+            peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri"], hours_start="00:00", hours_end="23:59")],
+            offpeak_windows=[PeakWindow(days=["Sat","Sun"], hours_start="00:00", hours_end="23:59")],
             peak_price_multiplier=1.0, offpeak_price_multiplier=0.7,
         )
         mgr._holidays = set()
@@ -435,7 +437,10 @@ class TestOffPeakSchedulerEnqueue:
             assert result.target_window_start != ""
             assert result.queue_position >= 1
         finally:
-            os.unlink(db_path)
+            try:
+                os.unlink(db_path)
+            except OSError:
+                pass  # Windows: SQLite 文件锁可能延迟释放
 
     @pytest.mark.asyncio
     async def test_enqueue_offpeak_only_peak_warning(self, mock_orch, mock_preflight):
@@ -447,7 +452,7 @@ class TestOffPeakSchedulerEnqueue:
             mgr._configs = {}
             mgr._configs["deepseek"] = ProviderPeakConfig(
                 provider="deepseek", timezone="Asia/Shanghai",
-                peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="24:00")],
+                peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="23:59")],
                 offpeak_windows=[PeakWindow(days=[], hours_start="00:00", hours_end="00:00")],
                 peak_price_multiplier=1.0, offpeak_price_multiplier=0.7,
             )
@@ -463,7 +468,10 @@ class TestOffPeakSchedulerEnqueue:
                 assert result.status == "peak_warning"
                 assert "高峰" in result.warning_message
             finally:
-                os.unlink(db_path)
+                try:  # Windows: SQLite 文件锁可能延迟释放
+                    os.unlink(db_path)
+                except OSError:
+                    pass
         finally:
             os.environ.pop("ORBIT_OFFPEAK_ONLY", None)
 
@@ -480,7 +488,7 @@ class TestOffPeakSchedulerEnqueue:
             mgr._configs = {}
             mgr._configs["deepseek"] = ProviderPeakConfig(
                 provider="deepseek", timezone="Asia/Shanghai",
-                peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="24:00")],
+                peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="23:59")],
                 offpeak_windows=[PeakWindow(days=[], hours_start="00:00", hours_end="00:00")],
                 peak_price_multiplier=1.0, offpeak_price_multiplier=0.7,
             )
@@ -496,7 +504,10 @@ class TestOffPeakSchedulerEnqueue:
                 # urgent=true: urgent 检查先于 offpeak_only——不返回 warning
                 assert result.status != "peak_warning"
             finally:
-                os.unlink(db_path)
+                try:  # Windows: SQLite 文件锁可能延迟释放
+                    os.unlink(db_path)
+                except OSError:
+                    pass
         finally:
             os.environ.pop("ORBIT_OFFPEAK_ONLY", None)
 
@@ -509,7 +520,7 @@ class TestOffPeakSchedulerEnqueue:
         mgr._configs["deepseek"] = ProviderPeakConfig(
             provider="deepseek", timezone="Asia/Shanghai",
             peak_windows=[PeakWindow(days=[], hours_start="00:00", hours_end="00:00")],
-            offpeak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="24:00")],
+            offpeak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], hours_start="00:00", hours_end="23:59")],
             peak_price_multiplier=1.0, offpeak_price_multiplier=0.7,
         )
         mgr._holidays = set()
@@ -524,4 +535,7 @@ class TestOffPeakSchedulerEnqueue:
             # 低峰时也正常入队，watcher 会立即释放
             assert result.status == "queued"
         finally:
-            os.unlink(db_path)
+            try:  # Windows: SQLite 文件锁可能延迟释放
+                os.unlink(db_path)
+            except OSError:
+                pass

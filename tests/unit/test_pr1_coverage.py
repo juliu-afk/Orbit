@@ -109,7 +109,7 @@ class TestMainSchedulerInit:
 
         assert app is not None
         # 验证有 startup 事件注册（EventBus 广播协程）
-        assert len(app.router.on_startup) > 0 or len(app.router.lifespan_handlers) >= 0
+        assert len(app.router.on_startup) > 0 or app.router.lifespan_context is not None
 
 
 class TestChatRunTaskTrigger:

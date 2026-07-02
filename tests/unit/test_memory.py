@@ -112,15 +112,17 @@ class TestMemoryScoring:
         return store
 
     def test_hit_increases_score(self, tmp_store):
-        """hit() 应增加指定 key 的评分。"""
+        """hit() 应增加指定 key 的评分——flush 后持久化。"""
         tmp_store.hit("key-b", delta=1.0)
+        tmp_store._flush_scores()  # P2-4: 缓冲写入，手动 flush
         mem = tmp_store.read_file(MemoryFileType.EPISODIC)
         assert mem.frontmatter["score.key-b"] == "2.0"  # 1.0 + 1.0
         assert mem.frontmatter["score.key-a"] == "3.0"  # unchanged
 
     def test_hit_creates_new_score(self, tmp_store):
-        """hit() 对不存在的 key 应创建评分。"""
+        """hit() 对不存在的 key 应创建评分——默认 1.0 + delta。"""
         tmp_store.hit("key-new", delta=1.0)
+        tmp_store._flush_scores()  # P2-4: 缓冲写入，手动 flush
         mem = tmp_store.read_file(MemoryFileType.EPISODIC)
         # frontmatter 值均为字符串（简单解析器）
         assert float(mem.frontmatter["score.key-new"]) == 2.0  # default 1.0 + 1.0

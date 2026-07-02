@@ -37,6 +37,7 @@ from orbit.api.routes import (
     knowledge,
     loop,
     observability,
+    ponytail_debt,
     projects,
     review,
     schedule,
@@ -64,6 +65,7 @@ logger = structlog.get_logger("orbit.api")
 def create_app(
     event_bus: EventBus | None = None,
     enable_auth: bool = True,
+    lifespan: object = None,
 ) -> FastAPI:
     """应用工厂。
 
@@ -73,6 +75,7 @@ def create_app(
     event_bus：Step 6.1 Dashboard 事件总线。测试可注入 Mock，
     生产传 EventBus() 实例。为 None 时不启动广播协程。
     enable_auth：测试可传 False 跳过鉴权中间件（默认 True）。
+    lifespan：FastAPI lifespan 上下文管理器（替代已移除的 on_event）。
     """
     app = FastAPI(
         title=settings.PROJECT_NAME,
@@ -80,6 +83,7 @@ def create_app(
         description="轻量级多Agent软件开发自循环系统",
         docs_url="/docs",
         redoc_url="/redoc",
+        lifespan=lifespan,
     )
     # 鉴权中间件——CORS 之后注册（Starlette 中间件执行顺序：后注册的先执行）
     # WHY: Issue #126 P0-1——CORS全开+无鉴权=本地RCE攻击链
@@ -111,6 +115,7 @@ def create_app(
     # Session + Project API（Session PR #1）
     app.include_router(sessions.router, prefix=settings.API_V1_STR)
     app.include_router(projects.router, prefix=settings.API_V1_STR)
+    app.include_router(ponytail_debt.router, prefix=settings.API_V1_STR)
     # Agent LLM 配置 API（Step 2.3 智能路由）
     app.include_router(agent_llm.router, prefix=settings.API_V1_STR)
     # Phase 4 AC-A7: Compose 编排端点
@@ -164,16 +169,6 @@ def create_app(
         )
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
-    # 启动后台任务（EventBus 广播 + Actor Watchdog）
-    @app.on_event("startup")
-    async def _startup_background() -> None:
-        if event_bus is not None:
-            asyncio.create_task(start_broadcaster(event_bus))
-            logger.info("ws_broadcaster_started")
-        # _actor_watchdog 是模块级单例（line 168），factory 闭包可直接引用
-        asyncio.create_task(_actor_watchdog.run())  # type: ignore[possibly-undefined]
-        logger.info("watchdog_started")
-
     # ClarifierAgent 用 Flash 轻量模型
     from orbit.gateway.client import LLMClient as _LLMClient
 
@@ -199,6 +194,11 @@ except Exception:
 _llm_pro = LLMClient(default_model=MODEL_PRO)
 _llm_flash = LLMClient(default_model=MODEL_FLASH)
 _llm_glm5 = LLMClient(default_model=MODEL_GLM5)
+
+# Part A: 注入 GLM-5.2 到 Brief 生成器——项目说明书用最强模型
+from orbit.api.routes.projects import set_brief_llm  # noqa: E402
+
+set_brief_llm(_llm_glm5)
 
 # Phase 2 AC7: 上下文压缩实例
 _compressor = _ContextCompressor(llm_client=_llm_flash)
@@ -291,18 +291,51 @@ blame_routes.set_workspace(_ws_dir)
 terminal_routes.set_workspace(_ws_dir)
 diagnostics_ws.set_diagnostic_service(_diagnostic_service)
 
-app = create_app(_event_bus)
 
+# ── 应用生命周期（替代已移除的 on_event / add_event_handler）──
+# WHY lifespan: FastAPI 0.136+/Starlette 0.49+ 移除了 add_event_handler，
+# 所有启动/关闭逻辑必须统一到 lifespan 上下文管理器。
+async def _app_lifespan(app: FastAPI) -> None:
+    """统一管理所有启动/关闭逻辑。
 
-@app.on_event("startup")
-async def _init_review_tables() -> None:
+    启动：EventBus 广播 → Actor Watchdog → 审查表建表 → 高峰避让调度器
+    关闭：释放数据库连接池
+    """
+    # ── 启动阶段 ──
+    # EventBus 广播 + Actor Watchdog（原 _startup_background）
+    if _event_bus is not None:
+        asyncio.create_task(start_broadcaster(_event_bus))
+        logger.info("ws_broadcaster_started")
+    asyncio.create_task(_actor_watchdog.run())
+    logger.info("watchdog_started")
+
+    # 审查模块建表（原 _init_review_tables）
     async with _review_engine.begin() as conn:
         await conn.run_sync(ReviewBase.metadata.create_all)
 
+    # D13: 高峰避让延迟调度器（原 _init_offpeak）
+    if settings.OFFPEAK_ENABLED:
+        _peak_manager = PeakWindowManager(config_path=settings.OFFPEAK_CONFIG_PATH)
+        _offpeak_queue = DeferredQueue(db_path=settings.OFFPEAK_DB_PATH)
+        _offpeak_scheduler = OffPeakScheduler(
+            peak_manager=_peak_manager,
+            queue=_offpeak_queue,
+            orchestrator=app.state.meta_orchestrator,
+            preflight=PreFlightEstimator(),
+        )
+        await _offpeak_scheduler.start()
+        app.state.offpeak_scheduler = _offpeak_scheduler
+        app.state.peak_window_manager = _peak_manager
+        logger.info("offpeak_scheduler_initialized", config_path=settings.OFFPEAK_CONFIG_PATH)
 
-@app.on_event("shutdown")
-async def _shutdown_review() -> None:
+    yield  # 应用运行中
+
+    # ── 关闭阶段 ──
     await _review_engine.dispose()  # P0-8: 释放连接池
+
+
+app = create_app(_event_bus, lifespan=_app_lifespan)
+
 
 
 # Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
@@ -344,18 +377,4 @@ if settings.OFFPEAK_ENABLED:
         PeakWindowManager,
     )
 
-    async def _init_offpeak() -> None:
-        _peak_manager = PeakWindowManager(config_path=settings.OFFPEAK_CONFIG_PATH)
-        _offpeak_queue = DeferredQueue(db_path=settings.OFFPEAK_DB_PATH)
-        _offpeak_scheduler = OffPeakScheduler(
-            peak_manager=_peak_manager,
-            queue=_offpeak_queue,
-            orchestrator=_meta_orchestrator,
-            preflight=PreFlightEstimator(),
-        )
-        await _offpeak_scheduler.start()
-        app.state.offpeak_scheduler = _offpeak_scheduler
-        app.state.peak_window_manager = _peak_manager
-        logger.info("offpeak_scheduler_initialized", config_path=settings.OFFPEAK_CONFIG_PATH)
-
-    app.add_event_handler("startup", _init_offpeak)
+    # _init_offpeak 逻辑已迁移到 _app_lifespan()，此处仅 import 保持模块可用

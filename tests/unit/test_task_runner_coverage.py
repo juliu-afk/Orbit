@@ -152,9 +152,9 @@ def test_extract_keywords_mixed() -> None:
     assert "validateAmount" in kw
     # 停用词过滤（"的"、"修改"是停用词）
     assert "的" not in kw
-    # 中文技术词提取（"批量"、"导入"）
-    assert "批量" in kw
-    assert "导入" in kw
+    # 中文技术词提取——[一-鿿]{2,6} 贪婪匹配，"支持批量导入"作为整体
+    assert any("批量" in t for t in kw)
+    assert any("导入" in t for t in kw)
 
 
 # ════════════════════════════════════════════

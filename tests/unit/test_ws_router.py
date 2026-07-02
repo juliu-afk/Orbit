@@ -24,16 +24,13 @@ class TestStartBroadcaster:
         # 发布一个事件后立即取消循环
         import asyncio
 
-        async def _run():
-            task = asyncio.create_task(start_broadcaster(bus))
-            await asyncio.sleep(0.1)
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-
-        await _run()
+        task = asyncio.create_task(start_broadcaster(bus))
+        await asyncio.sleep(0.1)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
         # broadcaster 应正常启动和取消，无未处理异常
         assert task.cancelled() or task.done()
 

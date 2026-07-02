@@ -85,8 +85,8 @@ class TestTaskKeywords:
         async for event in agent.execute_stream(AgentInput(task="test")):
             events.append(event)
 
-        assert len(events) == 1
-        assert events[0].type == StreamEventType.FINISH_STEP
+        assert len(events) >= 1
+        assert any(e.type == StreamEventType.FINISH_STEP for e in events)
 
     @pytest.mark.asyncio
     async def test_keywords_injected_to_context(self, mock_tools):

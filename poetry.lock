@@ -4521,6 +4521,17 @@ files = [
 typing-extensions = ">=4.12.0"
 
 [[package]]
+name = "tzdata"
+version = "2026.2"
+description = "Provider of IANA time zone data"
+optional = false
+python-versions = ">=2"
+files = [
+    {file = "tzdata-2026.2-py2.py3-none-any.whl", hash = "sha256:bbe9af844f658da81a5f95019480da3a89415801f6cc966806612cc7169bffe7"},
+    {file = "tzdata-2026.2.tar.gz", hash = "sha256:9173fde7d80d9018e02a662e168e5a2d04f87c41ea174b139fbef642eda62d10"},
+]
+
+[[package]]
 name = "uc-micro-py"
 version = "2.0.0"
 description = "Micro subset of unicode data files for linkify-it-py projects."
@@ -4985,4 +4996,4 @@ type = ["pytest-mypy (>=1.0.1)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.14"
-content-hash = "a574c5df120326c14d4b64d626da1fd8530da335937d16e6c65b0f309a2ff975"
+content-hash = "736047bf4c57892f8908056f2c1e32893ab6475510477566c8981d73c042c805"

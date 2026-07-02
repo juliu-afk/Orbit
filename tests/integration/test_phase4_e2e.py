@@ -20,7 +20,7 @@ class TestSingleAgentStreaming:
     """AC-C1: POST /run → SSE stream → FINISH_STEP."""
 
     @pytest.fixture
-    def sse_app(self):
+    def sse_app(self, monkeypatch):
         """FastAPI TestClient——含 SSE + Compose 路由。"""
         from unittest.mock import AsyncMock
 
@@ -28,10 +28,14 @@ class TestSingleAgentStreaming:
         from fastapi.testclient import TestClient
 
         from orbit.agents.factory import AgentFactory
+        from orbit.api.dependencies import verify_stream_token
         from orbit.stream.sse import router as sse_router
 
+        # 5C.1: SSE 端点需要 token 认证——用 FastAPI dependency_overrides 跳过
         app = FastAPI()
         app.include_router(sse_router)
+
+        app.dependency_overrides[verify_stream_token] = lambda: "test-token"
 
         # Mock LLM
         mock_llm = AsyncMock()

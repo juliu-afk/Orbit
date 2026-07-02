@@ -322,6 +322,9 @@ async def refresh_project_brief(name: str) -> dict:
     engine = BoundaryEngine()
     write_boundaries(project.local_path, engine.generate_rules_yaml())
 
+    # 刷新 CONTEXT.md
+    await gen.generate_all_context_md(project.local_path, brief, min_subdirs=2)
+
     return {
         "code": 0,
         "data": {
@@ -331,3 +334,86 @@ async def refresh_project_brief(name: str) -> dict:
         },
         "message": "ok",
     }
+
+
+@router.post(
+    "/{name}/context/refresh",
+    response_model=dict,
+    summary="刷新目录级 CONTEXT.md",
+    description="扫描项目目录结构，重新生成所有目录的 .orbit/context.md。",
+    responses={404: {"description": "项目不存在"}, 400: {"description": "LLM 未配置"}},
+)
+async def refresh_context_md(name: str) -> dict:
+    project = _registry.get(name)
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "detail": f"项目 {name} 不存在",
+                "error_code": "PROJECT_NOT_FOUND",
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    if _brief_llm is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "detail": "LLM 客户端未配置，无法生成 CONTEXT.md",
+                "error_code": "LLM_NOT_CONFIGURED",
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    from orbit.brief.generator import BriefGenerator
+    from orbit.brief.storage import read_brief
+
+    brief = read_brief(project.local_path)
+    if brief is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "detail": "项目说明书不存在，请先调用 brief/refresh 生成",
+                "error_code": "BRIEF_NOT_FOUND",
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    gen = BriefGenerator(_brief_llm)
+    written = await gen.generate_all_context_md(project.local_path, brief, min_subdirs=2)
+
+    # 清理无对应目录的残留 context.md
+    removed = await _cleanup_stale_context(project.local_path)
+
+    return {
+        "code": 0,
+        "data": {
+            "project_name": name,
+            "generated": len(written),
+            "removed": removed,
+        },
+        "message": "ok",
+    }
+
+
+async def _cleanup_stale_context(project_path: str) -> int:
+    """清理无对应目录的残留 .orbit/context.md 文件。
+
+    WHY 需要清理: 目录被删除/重命名后，旧 context.md 残留，
+    PromptBuilder 会错误地注入过时信息。
+    """
+    import os
+
+    removed = 0
+    for root, dirs, _files in os.walk(project_path):
+        # 只检查 .orbit/ 目录
+        if os.path.basename(root) == ".orbit":
+            context_file = os.path.join(root, "context.md")
+            if os.path.isfile(context_file):
+                parent_dir = os.path.dirname(root)
+                if not os.path.isdir(parent_dir):
+                    # 父目录已被删除
+                    os.remove(context_file)
+                    removed += 1
+    return removed
+

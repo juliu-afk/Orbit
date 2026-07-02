@@ -37,7 +37,6 @@ from orbit.api.routes import (
     knowledge,
     loop,
     observability,
-    ponytail_debt,
     projects,
     review,
     schedule,
@@ -115,7 +114,6 @@ def create_app(
     # Session + Project API（Session PR #1）
     app.include_router(sessions.router, prefix=settings.API_V1_STR)
     app.include_router(projects.router, prefix=settings.API_V1_STR)
-    app.include_router(ponytail_debt.router, prefix=settings.API_V1_STR)
     # Agent LLM 配置 API（Step 2.3 智能路由）
     app.include_router(agent_llm.router, prefix=settings.API_V1_STR)
     # Phase 4 AC-A7: Compose 编排端点

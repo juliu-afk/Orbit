@@ -32,22 +32,26 @@ h1 { font-size: 36px; font-weight: 700; color: #4caf50; letter-spacing: 3px; mar
   <h1>Orbit</h1>
   <p class="sub">Multi-Agent Development System</p>
   <div class="spinner" id="spinner"></div>
-  <p id="status">正在等待后端启动...</p>
+  <p id="status">正在等待后端启动...</p><p id="timer" style="font-size:11px;color:#666;margin-top:8px"></p>
   <p id="detail"></p>
-  <div class="bar-outer"><div class="bar-inner" id="bar"></div></div>
+  <div class="bar-outer"><div class="bar-inner" id="bar"></div></div><p style="margin-top:12px;font-size:11px"><a href="#" style="color:#4caf50;text-decoration:none" onclick="window.location.href=DASHBOARD;return false">Skip waiting, enter now</a></p>
 </div>
 <script>
 const PROBE = 'http://127.0.0.1:18888/api/v1/observability/startup-probe';
 // 直接进 dashboard，跳过 Vue router 的 /boot 二次检查
 const DASHBOARD = 'http://127.0.0.1:18888/#/app';
 var delay = 1000;
+var MAX_WAIT = 30000;
 var started = Date.now();
 
 function poll() {
   var req = new XMLHttpRequest();
   req.open('GET', PROBE, true);
   req.timeout = 5000;
+  var t0 = Date.now();
   req.onload = function() {
+    var tt = Date.now() - t0;
+    document.getElementById('detail').textContent = 'HTTP ' + req.status + ' (' + tt + 'ms)';
     try {
       var data = JSON.parse(req.responseText);
       if (!data.data) throw new Error('no data');
@@ -77,17 +81,24 @@ function poll() {
       delay = 1000;
     } catch(e) {
       document.getElementById('status').textContent = '正在等待后端就绪...';
-      delay = Math.min(delay * 2, 8000);
+      delay = 1500;
     }
   };
   req.onerror = function() {
     document.getElementById('status').textContent = '正在等待后端启动...';
+    document.getElementById('detail').textContent = 'Connection failed (port 18888 not reachable)';
     var elapsed = Math.round((Date.now() - started) / 1000);
     document.getElementById('detail').textContent = '已等待 ' + elapsed + 's';
-    delay = Math.min(delay * 2, 8000);
+    delay = 1500;
   };
   req.ontimeout = req.onerror;
-  setTimeout(poll, delay);
+  var elapsed = Date.now() - started;
+      if (elapsed > MAX_WAIT) { window.location.href = DASHBOARD; return; }
+      var now = Date.now();
+      var remaining = Math.max(0, Math.round((MAX_WAIT - (now - started)) / 1000));
+      document.getElementById("timer").textContent = 'Auto-redirect in ' + remaining + 's...';
+      if (now - started > MAX_WAIT) { document.getElementById("status").textContent = 'Timeout — entering anyway...'; setTimeout(function() { window.location.href = DASHBOARD; }, 500); return; }
+      setTimeout(poll, delay);
   req.send();
 }
 setTimeout(poll, 1500);

@@ -41,7 +41,7 @@ def main() -> None:
 
     from orbit.api.main import app
 
-    host = "127.0.0.1"
+    host = "0.0.0.0"  # WHY 0.0.0.0: WebView2 用 localhost/IPv6 可能连不上 127.0.0.1
     port = 18888
 
     print(f"Orbit 启动: http://{host}:{port} (cwd={os.getcwd()})")

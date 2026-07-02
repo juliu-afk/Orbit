@@ -15,6 +15,13 @@ import orbit.lsp.service  # noqa: F401
 import orbit.review.models  # noqa: F401
 import orbit.review.service  # noqa: F401
 
+# Part A: 项目说明书模块
+import orbit.brief  # noqa: F401
+
+# Part B: Ponytail 决策阶梯
+import orbit.prompt.ponytail_rules  # noqa: F401
+import orbit.review.ponytail  # noqa: F401
+
 
 def main() -> None:
     # Windows GUI 子系统无控制台，sys.stdout/stderr 为 None，

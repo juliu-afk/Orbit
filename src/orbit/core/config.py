@@ -119,7 +119,8 @@ class Settings:
     DREAM_AUTO_TRIGGER_DAYS: int = _get_int("DREAM_AUTO_TRIGGER_DAYS", 7)
     MEMORY_MAX_FILE_SIZE: int = _get_int("MEMORY_MAX_FILE_SIZE", 50_000)
 
-    # ---- D13: 高峰避让延迟调度 ----
+    # ---- Part B: Ponytail 决策阶梯 ----
+    PONYTAIL_MODE: str = _get("PONYTAIL_MODE", "")  # "" = 自适应, "off"|"lite"|"full"|"ultra"
     OFFPEAK_ENABLED: bool = _get_bool("ORBIT_OFFPEAK_ENABLED", True)
     OFFPEAK_ONLY: bool = _get_bool("ORBIT_OFFPEAK_ONLY", False)
     OFFPEAK_CONFIG_PATH: str = _get("ORBIT_OFFPEAK_CONFIG_PATH", "configs/peak_windows.yaml")

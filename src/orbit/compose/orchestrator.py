@@ -119,10 +119,19 @@ class ComposeOrchestrator:
 
             logger.info("compose_dispatch_task", task_id=task.id, role=task.agent_role)
 
+            # Part C: RUNE 启发——注入验收标准到任务描述
+            # WHY 增强任务描述: 研究显示 prompt 中含断言提升 pass@5 20-30 点。
+            task_description = task.description
+            if task.has_rune_spec():
+                acceptance = task.build_acceptance_prompt()
+                if acceptance:
+                    task_description = f"{task.description}\n\n{acceptance}"
+                    logger.info("compose_rune_injected", task_id=task.id, has_tests=bool(task.tests))
+
             try:
                 if self.actor_spawn:
                     deferred = await self.actor_spawn.spawn(
-                        task=task.description,
+                        task=task_description,
                         role=task.agent_role,
                         parent_task_id=parent_task_id,
                         background=background,

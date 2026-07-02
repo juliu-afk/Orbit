@@ -28,6 +28,7 @@ from orbit.agents.clarifier import ClarifierAgent
 from orbit.agents.dream_agent import DreamAgent
 from orbit.agents.react_agent import ReActAgent
 from orbit.knowledge.templates import get_registry
+from orbit.prompt.ponytail_rules import determine_mode, get_ladder
 
 logger = structlog.get_logger("orbit.agents.factory")
 
@@ -90,13 +91,25 @@ class DeveloperAgent(ReActAgent):
     role = AgentRole.DEVELOPER
 
     def system_prompt(self) -> str:
-        """开发者提示——含模板参考（如有匹配）.
+        """开发者提示——含模板参考 + Ponytail 决策阶梯.
 
-        WHY 覆盖基类: 注入匹配的代码模板，减少低级格式错误的反复迭代。
+        WHY 覆盖基类: 注入匹配的代码模板和 Ponytail 行为约束，
+        模板减少低级格式错误，Ponytail 防止过度工程。
         """
         base = super().system_prompt()
         tmpl_block = _build_templates_prompt(self._task_keywords)
-        return f"{base}{tmpl_block}"
+
+        # Ponytail 决策阶梯——根据上下文自适应强度
+        pony_mode = determine_mode(
+            task_type=getattr(self, "_task_type", "unknown"),
+            project_files=getattr(self, "_project_files", 0),
+            user_override=getattr(self, "_ponytail_override", None),
+        )
+        pony_block = get_ladder(pony_mode)
+        if pony_block:
+            logger.info("ponytail_injected", agent="developer", mode=pony_mode)
+
+        return f"{base}{tmpl_block}{pony_block}"
 
 
 class ReviewerAgent(ReActAgent):

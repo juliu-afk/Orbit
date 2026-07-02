@@ -417,6 +417,8 @@ class TestOffPeakSchedulerEnqueue:
         from orbit.scheduler.offpeak_scheduler import PeakWindowManager
         mgr = PeakWindowManager.__new__(PeakWindowManager)
         mgr._configs = {}
+        # WHY 23:59 而非 24:00: datetime(hour=24) 抛出 ValueError，
+        # 全天窗口用 00:00-23:59 + cross-day logic（见 next_offpeak_window L162-164）
         mgr._configs["deepseek"] = ProviderPeakConfig(
             provider="deepseek", timezone="Asia/Shanghai",
             peak_windows=[PeakWindow(days=["Mon","Tue","Wed","Thu","Fri"], hours_start="00:00", hours_end="23:59")],

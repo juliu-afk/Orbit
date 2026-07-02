@@ -270,6 +270,40 @@ class PromptBuilder:
             if safe_env:
                 parts.append(f"\n环境信息：{safe_env}")
 
+        # L2.5: 项目说明书注入——.orbit/brief.md + boundaries + 目录级 context.md
+        # WHY 在记忆之前注入: 项目说明书是比记忆更可靠的事实来源，
+        # Agent 应先读说明书再参考历史经验。
+        brief = ctx.get("brief", "")
+        if brief:
+            # 截断到 2000 chars——说明书是背景信息，不应占据太多 token
+            brief_truncated = brief[:2000] + "\n... (截断)" if len(brief) > 2000 else brief
+            parts.append(f"\n## 项目说明书\n{brief_truncated}")
+
+        boundaries = ctx.get("boundaries", "")
+        if boundaries:
+            # 只注入 rules 列表，跳过 YAML 头
+            boundaries_short = boundaries[:1000]
+            parts.append(f"\n## 边界规则\n{boundaries_short}")
+
+        # 目录级 CONTEXT.md 层级——从目标文件向上收集
+        context_md = ctx.get("context_md")
+        if context_md and isinstance(context_md, list):
+            ctx_lines = ["\n## 目录上下文（最近优先）"]
+            # WHY 600 chars: 300 过少（API 路由层一两行注释不够），
+            # 600 可容纳 4-6 行实质性说明且保持 token 预算可控（~200 tokens/层）。
+            for dir_path, content in context_md[-3:]:  # 最多 3 个层级
+                dir_name = dir_path.split("/")[-1] if "/" in dir_path else dir_path.split("\\")[-1]
+                ctx_lines.append(f"### {dir_name}/\n{content[:600]}")
+            parts.append("\n".join(ctx_lines))
+
+        # 基础代码包——按 LLM 决策注入
+        base_pkg = ctx.get("base_package")
+        if base_pkg and isinstance(base_pkg, dict) and base_pkg.get("decision") != "skip":
+            pkg_info = f"决策: {base_pkg.get('decision')} | "
+            pkg_info += f"包: {', '.join(base_pkg.get('package_ids', []))} | "
+            pkg_info += f"理由: {base_pkg.get('reason', '')}"
+            parts.append(f"\n## 基础代码包\n{pkg_info[:500]}")
+
         # Phase 2: 记忆注入——Agent 工作记忆 + 记忆检索结果
         working_memory = ctx.get("working_memory")
         if working_memory and hasattr(working_memory, "body") and working_memory.body:

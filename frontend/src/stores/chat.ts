@@ -5,6 +5,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import type { PeakPromptData } from '@/stores/peak'
 
 export interface ChatMessage {
   id: string
@@ -31,7 +32,7 @@ export interface StructuredPRD {
 }
 
 export interface ClarifyResponse {
-  type: 'clarify' | 'task_created'
+  type: 'clarify' | 'task_created' | 'peak_prompt'
   reply: string
   clarification_status: 'clarifying' | 'ready'
   structured_prd: StructuredPRD | null
@@ -52,6 +53,8 @@ export const useChatStore = defineStore('chat', () => {
   const connecting = ref(false)
   const crossProjectWarning = ref<string | null>(null)
   const lastTaskId = ref<string | null>(null)
+  const lastPeakPrompt = ref<PeakPromptData | null>(null)
+  const pendingGoalText = ref('')
   const lastError = ref<string | null>(null)
 
   // chat WS 连接到 /api/v1/chat（非 /ws/dashboard）
@@ -123,7 +126,8 @@ export const useChatStore = defineStore('chat', () => {
     lastError.value = null
     const data = resp.data
 
-    if (data.type === 'task_created') {
+    if (data.type === 'peak_prompt') { lastPeakPrompt.value = data as unknown as PeakPromptData; return }
+      if (data.type === 'task_created') {
       // 任务已创建
       lastTaskId.value = data.task_id ?? null
       messages.value.push({
@@ -159,6 +163,7 @@ export const useChatStore = defineStore('chat', () => {
   /** 发送消息 */
   function send(text: string, sessionId: string, projectName: string) {
     if (!text.trim()) return
+    pendingGoalText.value = text.trim()
     if (!chatWs || chatWs.readyState !== WebSocket.OPEN) {
       lastError.value = '未连接到聊天服务'
       return
@@ -234,6 +239,8 @@ export const useChatStore = defineStore('chat', () => {
     }))
   }
 
+  function resubmitWithDefer() { lastPeakPrompt.value = null; return fetch('/api/v1/goal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:pendingGoalText.value,defer_to_offpeak:true})}) }
+  function resubmitWithUrgent() { lastPeakPrompt.value = null; return fetch('/api/v1/goal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:pendingGoalText.value,urgent:true})}) }
   function reset() {
     messages.value = []
     candidates.value = []
@@ -247,8 +254,8 @@ export const useChatStore = defineStore('chat', () => {
 
   return {
     messages, candidates, clarificationStatus, structuredPrd,
-    missingFields, connecting, crossProjectWarning, lastTaskId, lastError,
-    connectChatWs, send, handleChatResponse, confirmPrd, confirm, dismissWarning,
+    missingFields, connecting, crossProjectWarning, lastTaskId, lastPeakPrompt, pendingGoalText, lastError,
+    connectChatWs, send, handleChatResponse, confirmPrd, confirm, dismissWarning, resubmitWithDefer, resubmitWithUrgent,
     disconnect, restoreMessages, reset,
   }
 })

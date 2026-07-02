@@ -4,7 +4,7 @@ import { useShellStore } from '@/stores/shell'
 import type { ConnectionStatus } from '@/composables/useWebSocket'
 
 const props = defineProps<{ connectionStatus: ConnectionStatus; budgetLabel?: string }>()
-const emit = defineEmits<{ (e: 'toggle-dag'): void; (e: 'toggle-chart'): void; (e: 'toggle-search'): void }>()
+const emit = defineEmits<{ (e: 'toggle-dag'): void; (e: 'toggle-chart'): void; (e: 'toggle-search'): void; (e: 'open-settings'): void }>()
 const shell = useShellStore()
 
 const connectionLabel = computed(() => {
@@ -28,7 +28,13 @@ const connectionLabel = computed(() => {
     <span v-else style="color:var(--color-orbit-text-muted)">ready</span>
   </div>
   <div class="flex items-center gap-3">
+    <button class="status-btn" @click="emit('open-settings')" title="Settings" style="background:none;border:none;color:var(--color-orbit-text-secondary);cursor:pointer;font-family:var(--font-mono);font-size:13px;padding:2px 4px;border-radius:3px">&#9881;</button>
     <span class="flex items-center gap-1"><span class="status-dot" :class="connectionStatus"/>{{ connectionLabel }}</span>
   </div>
 </div>
 </template>
+<style scoped>
+.status-btn{background:none;border:none;color:var(--color-orbit-text-secondary);cursor:pointer;font-family:var(--font-mono);font-size:11px;padding:2px 6px;border-radius:3px;display:flex;align-items:center;gap:4px}
+.status-btn:hover{background:rgba(255,255,255,.06)}
+.status-btn.active{background:rgba(255,255,255,.1);color:#e0e0e0}
+</style>

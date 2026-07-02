@@ -26,3 +26,28 @@ html, body, #app { background: transparent; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 .el-drawer { background: var(--color-orbit-glass) !important; backdrop-filter: blur(12px); }
 .el-drawer__header { color: var(--color-orbit-text); font-family: var(--font-mono); }
+
+/* ── v0.23: 亮色主题变量覆盖 ── */
+[data-theme="light"] {
+  --color-orbit-bg: #f5f5f7;
+  --color-orbit-panel: #ffffff;
+  --color-orbit-surface: #f0f0f5;
+  --color-orbit-surface-hover: #e8e8ed;
+  --color-orbit-border: #d4d4dc;
+  --color-orbit-border-light: #e8e8ed;
+  --color-orbit-text: #1a1a2e;
+  --color-orbit-text-secondary: #666680;
+  --color-orbit-text-muted: #9999aa;
+  --color-orbit-glass: rgba(245, 245, 247, var(--glass-opacity, 0.85));
+}
+
+/* ── v0.23: 玻璃透明度变量（运行时 JS 动态设置） ── */
+:root {
+  --glass-opacity: 0.85;
+  --glass-blur: 12px;
+}
+.glass {
+  background: var(--color-orbit-glass);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}

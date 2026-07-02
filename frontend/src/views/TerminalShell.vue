@@ -42,6 +42,9 @@ watch(()=>session.currentSessionId,(n)=>{if(n)chat.connectChatWs(n,session.curre
 function onKeydown(e:KeyboardEvent){ if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();shell.toggleFileTree()}; if(e.key==='Escape'){shell.closeAllDrawers();if(shell.showMonaco)shell.closeFileReview()} }
 
 function startResize(edge:"left"|"right",e:PointerEvent){ e.preventDefault();(e.target as HTMLElement).setPointerCapture(e.pointerId); const onMove=(ev:PointerEvent)=>{ if(edge==="left")settings.fileTreeWidth=Math.max(160,Math.min(480,ev.clientX)); else settings.rightPanelWidth=Math.max(180,Math.min(600,window.innerWidth-ev.clientX)) }; window.addEventListener("pointermove",onMove); const clean=()=>window.removeEventListener("pointermove",onMove); window.addEventListener("pointerup",clean,{once:true}); window.addEventListener("pointercancel",clean,{once:true}) }
+// P2 fix: 具名函数引用避免每次渲染创建新闭包
+const handleLeftResize = (e: PointerEvent) => startResize('left', e)
+const handleRightResize = (e: PointerEvent) => startResize('right', e)
 
 onMounted(async()=>{ window.addEventListener("keydown",onKeydown); ws.setMessageHandler((msg)=>{switch(msg.type){case"task:update":task.handleTaskUpdate(msg.payload as Record<string,unknown>);break;case"metrics:snapshot":agentops.handleWsEvent("metrics:snapshot",msg.payload as Record<string,unknown>);break;case"agentops:alert":agentops.handleWsEvent("agentops:alert",msg.payload as Record<string,unknown>);break}}); ws.connect("ws://"+window.location.host+"/ws/dashboard"); await session.fetchSessions(); if(!session.currentSessionId&&session.sessions.length>0)await session.switchToSession(session.sessions[0].session_id); if(session.currentSessionId)chat.connectChatWs(session.currentSessionId,session.currentProjectName||""); agentops.startPolling(); fetchFileTree() })
 onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect(); chat.disconnect(); agentops.stopPolling(); task.reset() })
@@ -49,10 +52,10 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
 
 <template>
 <div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{gridTemplateAreas:gridAreas(),gridTemplateColumns:`var(--spacing-filetree) 1fr var(--spacing-right-panel)`}" @contextmenu.prevent>
-  <div v-show="shell.showFileTree" class="resize-handle resize-left" @pointerdown="(e) => startResize('left', e)" />
+  <div v-show="shell.showFileTree" class="resize-handle resize-left" @pointerdown="handleLeftResize" />
   <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto"><FileTreePanel :tree-data="fileTree" :selected-file="shell.selectedFile" @select-file="onSelectFile" /></aside>
   <main class="panel-center flex flex-col overflow-hidden"><TerminalChat /></main>
-  <div class="resize-handle resize-right" @pointerdown="(e) => startResize('right', e)" />
+  <div class="resize-handle resize-right" @pointerdown="handleRightResize" />
   <aside class="panel-right" style="border-left:1px solid var(--color-orbit-border);overflow-y:auto"><MonacoPanel v-if="shell.showMonaco" /><AgentInfoPanel v-else /></aside>
   <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @open-settings="showSettings=true" />
   <DAGDrawer v-model:show="shell.showDAG" /><TokenChartDrawer v-model:show="shell.showChart" /><SearchDrawer v-model:show="shell.showSearch" @open-file="shell.openFileReview" />

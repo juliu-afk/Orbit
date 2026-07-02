@@ -84,6 +84,9 @@ a = Analysis(
         "orbit.prompt.ponytail_rules",
         "orbit.review.ponytail",
         "orbit.api.routes.ponytail_debt",
+        # CLI 模块
+        "orbit.cli",
+        "orbit.cli.commands",
     ],
     hookspath=[],
     hooksconfig={},

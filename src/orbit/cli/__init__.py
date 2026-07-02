@@ -39,4 +39,4 @@ def main() -> None:
 def _print_usage() -> None:
     print("Orbit CLI")
     print("  orbit init-packages             初始化基础代码包库（3 个模板）")
-    print("  orbit brief check <path>        检查/生成项目说明书")
+    print("  orbit brief check <path>       检查/生成项目说明书")

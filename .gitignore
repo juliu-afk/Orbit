@@ -50,3 +50,4 @@ src-tauri/gen/
 Deliverables/
 backend/static/
 backend/build/
+.claude/settings.local.json

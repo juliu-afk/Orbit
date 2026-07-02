@@ -49,7 +49,7 @@ fn kill_existing_backend(_exe_path: &PathBuf) {
 }
 
 /// 启动后端进程，隐藏控制台窗口
-fn start_backend(exe_path: &PathBuf) -> Child {
+fn start_backend(exe_path: &PathBuf) -> std::io::Result<Child> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -63,13 +63,13 @@ fn start_backend(exe_path: &PathBuf) -> Child {
             .env("ORBIT_HOME", &exe_dir)
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()
-            .expect("无法启动后端进程")
+            
     }
 
     #[cfg(not(target_os = "windows"))]
     Command::new(exe_path)
         .spawn()
-        .expect("无法启动后端进程")
+        
 }
 
 /// 清理临时目录中的后端 exe
@@ -105,7 +105,11 @@ fn main() {
     let backend_path = extract_backend();
 
     println!("Orbit — 启动后端...");
-    let mut backend = start_backend(&backend_path);
+    let mut backend = start_backend(&backend_path).unwrap_or_else(|e| {
+        let msg = format!("Failed to start backend: {}", e);
+        let _ = fs::write(backend_path.parent().unwrap().join("orbit_error.log"), &msg);
+        panic!("{}", msg)
+    });
 
     // WHY boot.html: 嵌入式启动检查页，Tauri 窗口秒开，轮询后端探针状态。
     // 后端就绪后 boot.html 内 JS 自动跳转 http://127.0.0.1:18888 → Vue SPA。

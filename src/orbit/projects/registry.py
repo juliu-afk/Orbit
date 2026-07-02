@@ -121,7 +121,10 @@ class ProjectRegistry:
             ),
         )
         conn.commit()
-        logger.info("project_registered", name=name, local_path=local_path)
+        try:
+            logger.info("project_registered", name=name, local_path=local_path)
+        except Exception:
+            pass  # WHY: PyInstaller structlog weakref 异常
         return record
 
     def get(self, name: str) -> ProjectRecord | None:

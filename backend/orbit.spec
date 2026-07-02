@@ -71,6 +71,19 @@ a = Analysis(
         "orbit.compression.cascade",
         "orbit.observability.alerts",
         "aiosqlite",  # P0: PyInstaller 漏打包——SQLAlchemy async SQLite 依赖
+        # Part A: 项目说明书模块
+        "orbit.brief",
+        "orbit.brief.models",
+        "orbit.brief.checker",
+        "orbit.brief.generator",
+        "orbit.brief.storage",
+        "orbit.brief.injector",
+        "orbit.brief.boundaries",
+        "orbit.brief.package_library",
+        # Part B: Ponytail 决策阶梯
+        "orbit.prompt.ponytail_rules",
+        "orbit.review.ponytail",
+        "orbit.api.routes.ponytail_debt",
     ],
     hookspath=[],
     hooksconfig={},

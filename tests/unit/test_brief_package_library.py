@@ -78,11 +78,18 @@ class TestPackageLibrary:
         )
         assert pkg.description == "Flask 测试包"  # 旧值保留
 
-    def test_real_index_json_loaded(self) -> None:
-        """验证真实 D 盘库能正常加载。"""
+    def test_default_path_is_home_dir(self) -> None:
+        """验证默认路径使用用户目录——跨平台兼容。"""
+        import os
         lib = PackageLibrary()
+        assert ".orbit" in lib.library_path
+        assert "base-packages" in lib.library_path
+
+    def test_explicit_path_respected(self) -> None:
+        """验证显式路径优先于默认。"""
+        lib = PackageLibrary(library_path="D:/OrbitBasePackages")
         index = lib._load_index()
-        # 至少有我们创建的 3 个初始包
+        # 真实 D 盘库应有至少 3 个初始包
         ids = {p.id for p in index}
         assert "python-fastapi-minimal" in ids
         assert "react-vite-minimal" in ids
@@ -97,7 +104,8 @@ class TestPackageLibrary:
     @pytest.mark.asyncio
     async def test_decide_injection_full(self) -> None:
         """LLM 决策——空项目应 full 注入。"""
-        lib = PackageLibrary()
+        # 使用 D:盘真实库以获取候选包
+        lib = PackageLibrary(library_path="D:/OrbitBasePackages")
         candidates = lib.search(language="python", framework="fastapi")
 
         # Mock LLM 返回 full
@@ -123,7 +131,7 @@ class TestPackageLibrary:
     @pytest.mark.asyncio
     async def test_decide_injection_skip_large_project(self) -> None:
         """LLM 决策——大项目应 skip。"""
-        lib = PackageLibrary()
+        lib = PackageLibrary(library_path="D:/OrbitBasePackages")
         candidates = lib.search(language="python", framework="fastapi")
 
         class MockResponse:
@@ -148,7 +156,7 @@ class TestPackageLibrary:
     @pytest.mark.asyncio
     async def test_decide_injection_fallback_on_parse_error(self) -> None:
         """LLM 返回无法解析的响应时降级到简单规则。"""
-        lib = PackageLibrary()
+        lib = PackageLibrary(library_path="D:/OrbitBasePackages")
         candidates = lib.search(language="python", framework="fastapi")
 
         class MockResponse:

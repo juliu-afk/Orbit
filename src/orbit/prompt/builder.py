@@ -289,9 +289,11 @@ class PromptBuilder:
         context_md = ctx.get("context_md")
         if context_md and isinstance(context_md, list):
             ctx_lines = ["\n## 目录上下文（最近优先）"]
+            # WHY 600 chars: 300 过少（API 路由层一两行注释不够），
+            # 600 可容纳 4-6 行实质性说明且保持 token 预算可控（~200 tokens/层）。
             for dir_path, content in context_md[-3:]:  # 最多 3 个层级
                 dir_name = dir_path.split("/")[-1] if "/" in dir_path else dir_path.split("\\")[-1]
-                ctx_lines.append(f"### {dir_name}/\n{content[:300]}")
+                ctx_lines.append(f"### {dir_name}/\n{content[:600]}")
             parts.append("\n".join(ctx_lines))
 
         # 基础代码包——按 LLM 决策注入

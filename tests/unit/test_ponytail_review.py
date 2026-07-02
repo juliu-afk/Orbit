@@ -30,9 +30,9 @@ class TestStdlibReplacements:
 
 class TestUnnecessaryAbstractions:
     def test_single_method_class(self) -> None:
-        content = """class Validator:
-    def validate(self, data):
-        return True"""
+        content = """class DataFetcher:
+    def fetch(self, url):
+        return url"""
         findings = _check_unnecessary_abstractions(content)
         assert len(findings) > 0
         assert "abstraction" in findings[0][1]

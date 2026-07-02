@@ -31,8 +31,12 @@ if TYPE_CHECKING:
 logger = structlog.get_logger("orbit.brief.package_library")
 
 # ── 默认库路径 ─────────────────────────────────────────────
-# WHY D 盘: 用户指定——跨项目共享，不随单个项目移动。
-DEFAULT_LIBRARY_PATH = "D:/OrbitBasePackages"
+# WHY 环境变量优先: 跨平台兼容——Linux/macOS 无 D:盘。
+# ORBIT_BASE_PACKAGES_PATH 可覆盖；默认 ~/.orbit/base-packages/
+DEFAULT_LIBRARY_PATH = os.environ.get(
+    "ORBIT_BASE_PACKAGES_PATH",
+    os.path.join(os.path.expanduser("~"), ".orbit", "base-packages"),
+)
 INDEX_FILE = "index.json"
 
 
@@ -60,6 +64,12 @@ class PackageLibrary:
         index_path = os.path.join(self._library_path, INDEX_FILE)
         if not os.path.isfile(index_path):
             Path(index_path).write_text("[]", encoding="utf-8")
+            # P2-2: 首次初始化明确提示
+            logger.warning(
+                "base_package_library_empty",
+                path=self._library_path,
+                hint="基础代码包库为空。运行 'orbit init-packages' 或手动添加模板到 index.json",
+            )
 
     def _load_index(self) -> list[BasePackage]:
         """加载 index.json 为 BasePackage 列表（内存缓存）。"""
@@ -72,6 +82,13 @@ class PackageLibrary:
             self._index = [BasePackage.from_dict(item) for item in data]
         except (json.JSONDecodeError, FileNotFoundError):
             self._index = []
+        # P2-2: 空索引警告——首次使用时提示用户初始化
+        if not self._index:
+            logger.info(
+                "base_package_library_empty_on_load",
+                path=self._library_path,
+                hint="无可用基础代码包。新项目将跳过模板注入。设置 ORBIT_BASE_PACKAGES_PATH 指向已有库或运行初始化脚本。",
+            )
         return self._index
 
     def _save_index(self) -> None:

@@ -195,11 +195,6 @@ _llm_pro = LLMClient(default_model=MODEL_PRO)
 _llm_flash = LLMClient(default_model=MODEL_FLASH)
 _llm_glm5 = LLMClient(default_model=MODEL_GLM5)
 
-# Part A: 注入 GLM-5.2 到 Brief 生成器——项目说明书用最强模型
-from orbit.api.routes.projects import set_brief_llm  # noqa: E402
-
-set_brief_llm(_llm_glm5)
-
 # Phase 2 AC7: 上下文压缩实例
 _compressor = _ContextCompressor(llm_client=_llm_flash)
 _budget_tracker = _BudgetTracker()

@@ -87,41 +87,62 @@ def _check_unnecessary_abstractions(content: str) -> list[tuple[int, str]]:
     - 只有一个方法的类（除了 __init__）
     - 只有一个子类的基类
     - 只有一个实现者的抽象类
+
+    排除: dataclass、名称含 Validator/Handler/Processor/Serializer 的类——
+    这些是常见的单方法合理模式。
     """
     findings: list[tuple[int, str]] = []
 
-    # 检测 "只有一个方法" 的类（启发式——需要 AST 确认，此处做关键词扫描）
+    # P2-1: 假阳性排除——单方法类在以下场景是合理模式
+    _EXCLUDE_PATTERNS = (
+        "validator", "handler", "processor", "serializer",
+        "controller", "middleware", "interceptor", "resolver",
+    )
+
     lines = content.split("\n")
     in_class = False
     class_start = 0
     method_count = 0
+    class_name = ""  # P2-1: 跟踪类名用于排除检查
+    has_dataclass_deco = False  # P2-1: 检测 @dataclass 装饰器
 
     def _flush_class(end_line: int) -> None:
         """检查当前累积累是否应报告。"""
-        nonlocal in_class, class_start, method_count
+        nonlocal in_class, class_start, method_count, class_name, has_dataclass_deco
         if in_class and method_count == 1 and class_start > 0:
-            findings.append(
-                (class_start, "[abstraction] 类只有一个方法——考虑用独立函数替代")
-            )
+            # P2-1: 排除 dataclass 和常见单方法合理模式
+            if has_dataclass_deco:
+                pass  # dataclass 常只有 __init__ 之外的一个方法——合理
+            elif class_name and any(p in class_name.lower() for p in _EXCLUDE_PATTERNS):
+                pass  # Validator/Handler 等单方法是设计模式——合理
+            else:
+                findings.append(
+                    (class_start, f"[abstraction] 类 {class_name} 只有一个方法——考虑用独立函数替代")
+                )
         in_class = False
         class_start = 0
+        class_name = ""
+        has_dataclass_deco = False
 
+    prev_stripped = ""  # 追踪前一行——检测 @dataclass 装饰器
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
         if stripped.startswith("class "):
-            _flush_class(i)  # 新类开始前检查上一个
+            _flush_class(i)
+            # 提取类名
+            parts = stripped[6:].split("(")[0].split(":")[0].strip()
+            class_name = parts
+            # 检查前一行是否为 @dataclass
+            has_dataclass_deco = "dataclass" in prev_stripped
             in_class = True
             class_start = i
             method_count = 0
         elif in_class:
-            # 先检测类退出——行非空且不缩进 → 离开类作用域
-            # WHY 先于 def 检测: def 在 0 列是顶级函数，不是类方法。
             if line and line[0] not in (" ", "\t"):
                 _flush_class(i)
-                # 回退 in_class——让此后的顶级 def 不被当作类方法
             elif stripped.startswith("def ") and not stripped.startswith("def __init__"):
                 method_count += 1
-    # WHY: 文件末尾处理——最后如果还在类中，需要检查
+        prev_stripped = stripped
     _flush_class(len(lines))
 
     return findings

@@ -24,18 +24,19 @@ import orbit.review.ponytail  # noqa: F401
 
 
 def main() -> None:
-    # Windows GUI 子系统无控制台，sys.stdout/stderr 为 None，
-    # uvicorn 日志初始化 .isatty() 调用会崩
-    if sys.stdout is None:
-        sys.stdout = open(os.devnull, "w")  # noqa: SIM115
-    if sys.stderr is None:
-        sys.stderr = open(os.devnull, "w")  # noqa: SIM115
-
     # WHY chdir: 双击启动时工作目录不是 exe 所在目录，
     # config.py 相对路径 (data/, configs/) 无法正确解析。
     # PyInstaller 单文件模式：sys.executable 指向原始 exe 路径。
     _exe_dir = os.path.dirname(os.path.abspath(sys.executable))
     os.chdir(_exe_dir)
+
+    # WHY 写日志文件：Windows GUI 子系统无控制台，CREATE_NO_WINDOW 隐藏窗口，
+    # 所有错误信息不可见。写入 orbit_startup.log 方便排查启动问题。
+    _log_path = os.path.join(_exe_dir, "orbit_startup.log")
+    _log_fh = open(_log_path, "w", encoding="utf-8")  # noqa: SIM115
+    sys.stdout = _log_fh
+    sys.stderr = _log_fh
+    print(f"Orbit launcher started, exe_dir={_exe_dir}", flush=True)
 
     import uvicorn
 

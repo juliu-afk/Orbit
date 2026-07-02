@@ -7,10 +7,7 @@ const props = defineProps<{ data: PeakPromptData | null }>()
 const emit = defineEmits<{ defer: [goalId: string]; urgent: [goalId: string]; cancel: [] }>()
 const submitting = ref(false)
 
-function formatTime(iso: string) {
-  if (!iso) return ''
-  try { return new Date(iso).toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) } catch { return iso }
-}
+
 </script>
 
 <template>

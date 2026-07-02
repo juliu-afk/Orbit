@@ -9,13 +9,8 @@ const peak = usePeakStore()
 const tab = ref<'queue'|'savings'>('queue')
 watch(visible, v => { if (v) peak.refreshAll() })
 
+function safeToFixed(n: number | undefined, digits: number): string { if (n == null || isNaN(n)) return '0.' + '0'.repeat(digits); return n.toFixed(digits) }
 async function promote(t: DeferredTaskItem) { try { await peak.promoteToUrgent(t.goal_id) } catch { /* */ } }
-
-// P2-5: 安全 toFixed——防止 NaN 显示
-function safeToFixed(n: number | undefined, digits: number): string {
-  if (n == null || isNaN(n)) return '0.' + '0'.repeat(digits)
-  return n.toFixed(digits)
-}
 </script>
 
 <template>
@@ -44,13 +39,13 @@ function safeToFixed(n: number | undefined, digits: number): string {
       <el-tab-pane label="成本节省" name="savings">
         <div v-if="!peak.savings" style="text-align:center;color:#888;padding:32px 0">暂无数据</div>
         <div v-else style="display:flex;flex-direction:column;gap:8px">
-          <div v-for="s in [{l:'延后任务',v:peak.savings.total_tasks_deferred},{l:'低峰 Token',v:(peak.savings.total_tokens_offpeak/1000).toFixed(0)+'K'},{l:'累计节省',v:'¥'+peak.savings.total_saved_yuan.toFixed(2),hl:true}]" :key="s.l"
+          <div v-for="s in [{l:'延后任务',v:peak.savings.total_tasks_deferred},{l:'低峰 Token',v:safeToFixed(peak.savings.total_tokens_offpeak/1000,0)+'K'},{l:'累计节省',v:'¥'+safeToFixed(peak.savings.total_saved_yuan,2),hl:true}]" :key="s.l"
             :style="{display:'flex',justifyContent:'space-between',padding:'10px 12px',borderRadius:'6px',background:s.hl?'rgba(103,194,58,.1)':'var(--color-orbit-surface,#1a1a2e)'}">
             <span style="font-size:13px;color:#888">{{ s.l }}</span><span style="font-size:16px;font-weight:600">{{ s.v }}</span>
           </div>
           <el-divider />
           <div v-for="p in peak.savings.by_provider" :key="p.provider" style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0">
-            <span>{{ p.provider }}</span><span>{{ p.tasks }} 任务</span><span>¥{{ p.saved_yuan.toFixed(2) }}</span>
+            <span>{{ p.provider }}</span><span>{{ p.tasks }} 任务</span><span>¥{{ safeToFixed(p.saved_yuan, 2) }}</span>
           </div>
         </div>
       </el-tab-pane>

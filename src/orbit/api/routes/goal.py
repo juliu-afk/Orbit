@@ -93,31 +93,6 @@ async def create_goal(request: Request, req: CreateGoalRequest):
         max_price_multiplier=req.max_price_multiplier,
     )
 
-    # D13: 高峰自动询问——未设 defer/urgent 且当前为高峰时提示用户选择
-    if not req.defer_to_offpeak and not req.urgent:
-        offpeak = getattr(request.app.state, "offpeak_scheduler", None)
-        if offpeak is not None:
-            provider = req.target_provider or "deepseek"
-            if offpeak.peak_manager.is_peak(provider):
-                next_window = offpeak.peak_manager.next_offpeak_window(provider)
-                next_start = getattr(next_window, "starts_at_iso", "") if next_window else ""
-                return {
-                    "code": 0,
-                    "data": {
-                        "goal_id": goal.id,
-                        "status": "peak_prompt",
-                        "provider": provider,
-                        "next_offpeak": next_start,
-                        "prompt": (
-                            f"当前为 {provider} 高峰期。"
-                            f"是否延迟到低峰窗口执行（{next_start}）？"
-                            "设置 defer_to_offpeak=true 延迟执行，"
-                            "或设置 urgent=true 立即执行。"
-                        ),
-                    },
-                    "message": f"高峰期——请选择 defer_to_offpeak 或 urgent",
-                }
-
     # D13: 延迟执行分支——OffPeakScheduler 拦截
     if req.defer_to_offpeak and not req.urgent:
         offpeak = getattr(request.app.state, "offpeak_scheduler", None)

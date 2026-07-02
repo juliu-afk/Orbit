@@ -13,7 +13,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'chrome', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
   ],
   // P1-1 fix: 启动后端+前端两个服务
   webServer: [

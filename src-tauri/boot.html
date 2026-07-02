@@ -55,7 +55,7 @@ function poll() {
       var checks = s.checks || [];
       var done = checks.filter(function(c) { return c.status === 'passed' || c.status === 'repaired' || c.status === 'failed' || c.status === 'skipped'; }).length;
       // 全部完成(8/8)→直接进入, 不等status字段(避免status未及时从running切passed)
-      if (done === checks.length && checks.length > 0) {
+      var CRITICAL=["environment","database","agent"]; var critOk=CRITICAL.every(function(n){var c=checks.find(function(x){return x.name===n});return c&&(c.status==="passed"||c.status==="repaired")}); if((critOk&&done>=3)||done===checks.length){
         document.getElementById('status').textContent = '就绪，正在进入...';
         document.getElementById('spinner').style.display = 'none';
         document.getElementById('bar').style.width = '100%';

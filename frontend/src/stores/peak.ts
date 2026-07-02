@@ -13,6 +13,9 @@ export interface DeferredTaskItem { goal_id: string; description: string; priori
 
 export interface SavingsReport { total_tasks_deferred: number; total_tasks_done: number; total_tasks_queued: number; total_tokens_offpeak: number; total_saved_yuan: number; by_provider: Array<{ provider: string; tasks: number; tokens: number; saved_yuan: number }> }
 
+// P1-2: 从 PeakPromptDialog.vue 迁移至此——避免从 .vue SFC 导入类型
+export interface PeakPromptData { goal_id: string; provider: string; next_offpeak: string; prompt: string }
+
 export const usePeakStore = defineStore('peak', () => {
   const status = ref<PeakStatusData | null>(null)
   const queued = ref<DeferredTaskItem[]>([])
@@ -31,8 +34,10 @@ export const usePeakStore = defineStore('peak', () => {
     try { savings.value = await apiGet<SavingsReport>('/api/v1/schedule/savings-report') } catch { /* */ }
   }
   async function promoteToUrgent(goalId: string) {
-    await fetch(`/api/v1/schedule/queue/${goalId}/urgent`, { method: 'POST' })
-    await fetchQueue(); await fetchPeakStatus()
+    try {
+      await fetch(`/api/v1/schedule/queue/${goalId}/urgent`, { method: 'POST' })
+      await fetchQueue(); await fetchPeakStatus()
+    } catch (e) { console.error('[peak] promoteToUrgent failed:', e) }
   }
   async function refreshAll() {
     await Promise.all([fetchPeakStatus(), fetchQueue(), fetchSavings()])

@@ -2,15 +2,20 @@
 import { watch, ref } from 'vue'
 import { usePeakStore } from '@/stores/peak'
 import type { DeferredTaskItem } from '@/stores/peak'
+import { formatTime, formatDuration } from '@/utils/time'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const peak = usePeakStore()
 const tab = ref<'queue'|'savings'>('queue')
 watch(visible, v => { if (v) peak.refreshAll() })
 
-function fmt(t: string) { if (!t) return '—'; try { return new Date(t).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) } catch { return t } }
-function dur(s: number) { if (s<60) return s+'s'; if (s<3600) return Math.round(s/60)+'m'; return (s/3600).toFixed(1)+'h' }
 async function promote(t: DeferredTaskItem) { try { await peak.promoteToUrgent(t.goal_id) } catch { /* */ } }
+
+// P2-5: 安全 toFixed——防止 NaN 显示
+function safeToFixed(n: number | undefined, digits: number): string {
+  if (n == null || isNaN(n)) return '0.' + '0'.repeat(digits)
+  return n.toFixed(digits)
+}
 </script>
 
 <template>
@@ -30,7 +35,7 @@ async function promote(t: DeferredTaskItem) { try { await peak.promoteToUrgent(t
               <el-tag size="small" :type="t.priority==='CRITICAL'?'danger':'info'">{{ t.priority }}</el-tag>
             </div>
             <div style="display:flex;gap:12px;font-size:12px;color:#888;margin-bottom:6px">
-              <span>{{ t.provider }}</span><span>预计 {{ dur(t.estimated_duration_seconds) }}</span><span>{{ fmt(t.target_window_start) }}</span>
+              <span>{{ t.provider }}</span><span>预计 {{ formatDuration(t.estimated_duration_seconds) }}</span><span>{{ formatTime(t.target_window_start) }}</span>
             </div>
             <div style="text-align:right"><el-button size="small" text type="warning" @click="promote(t)">立即执行</el-button></div>
           </div>

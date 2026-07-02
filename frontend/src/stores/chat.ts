@@ -5,7 +5,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { PeakPromptData } from '@/components/chat/PeakPromptDialog.vue'
+import type { PeakPromptData } from '@/stores/peak'
 
 export interface ChatMessage {
   id: string

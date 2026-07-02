@@ -1,6 +1,7 @@
 <!-- 递归文件树节点——审查状态图标 -->
 <template>
   <div class="tree-node" :class="{ selected: selected === node.path, 'is-dir': node.isDir }"
+    :data-file-path="node.path"
     :style="{ paddingLeft: depth * 12 + 8 + 'px' }" @click.stop="handleClick">
     <span class="file-icon">{{ node.isDir ? (expanded ? '📂' : '📁') : '📄' }}</span>
     <span class="file-name">{{ node.name }}</span>

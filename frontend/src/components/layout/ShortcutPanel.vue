@@ -4,7 +4,7 @@ const emit = defineEmits<{ (e: 'update:show', v: boolean): void }>()
 const shortcuts = [
   { key: '⌘B / Ctrl+B', action: 'Toggle file tree' },
   { key: 'Esc', action: 'Close panel / drawer' },
-  { key: '⌘/ / Ctrl+/', action: 'Show shortcuts' },
+  { key: '⌘/ Ctrl+/', action: 'Show shortcuts' },
   { key: 'Enter', action: 'Send message' },
   { key: 'Shift+Enter', action: 'New line' },
   { key: 'Tab', action: 'Autocomplete slash command' },

@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { useSettingsStore } from '@/stores/settings'
+import { useShellStore } from '@/stores/shell'
 const props = defineProps<{ show: boolean }>()
 const emit = defineEmits<{ (e: 'update:show', v: boolean): void }>()
 const s = useSettingsStore()
-// v0.24: 布局预设一键切换
+const shell = useShellStore()
+// v0.24: 布局预设一键切换——改宽度+显隐，避免零宽DOM残留
 function preset(name: string) {
   switch (name) {
-    case 'default': s.fileTreeLeft = true; s.agentRight = true; s.fileTreeWidth = 240; s.rightPanelWidth = 260; break
-    case 'wide': s.fileTreeLeft = false; s.agentRight = true; s.fileTreeWidth = 0; s.rightPanelWidth = 260; break
-    case 'focus': s.fileTreeLeft = true; s.agentRight = false; s.fileTreeWidth = 240; s.rightPanelWidth = 0; break
+    case 'default': s.fileTreeLeft = true; s.agentRight = true; s.fileTreeWidth = 240; s.rightPanelWidth = 260; shell.showFileTree = true; break  // P1 fix
+    case 'wide': s.fileTreeLeft = false; s.agentRight = true; s.fileTreeWidth = 0; s.rightPanelWidth = 260; shell.showFileTree = false; break     // P1 fix
+    case 'focus': s.fileTreeLeft = true; s.agentRight = false; s.fileTreeWidth = 240; s.rightPanelWidth = 0; shell.closeFileReview(); break       // P1 fix: 收起右面板
   }
 }
 </script>

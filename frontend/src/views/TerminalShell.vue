@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch } from 'vue'
+import { onMounted, onUnmounted, watch, ref } from 'vue'
 import { useShellStore } from '@/stores/shell'
 import { useSessionStore } from '@/stores/session'
 import { useAgentOpsStore } from '@/stores/agentops'
 import { useChatStore } from '@/stores/chat'
 import { useTaskStore } from '@/stores/task'
+import { useEditorStore } from '@/stores/editor'
 import { useWebSocket } from '@/composables/useWebSocket'
+import { apiGet } from '@/services/api'
 import StatusBar from '@/components/layout/StatusBar.vue'
 import TerminalChat from '@/components/chat/TerminalChat.vue'
 import MonacoPanel from '@/components/editor/MonacoPanel.vue'
 import AgentInfoPanel from '@/components/resources/AgentInfoPanel.vue'
+import FileTreePanel from '@/components/editor/FileTreePanel.vue'
+import type { FileNode } from '@/components/editor/FileTreePanel.vue'
 import DAGDrawer from '@/components/dag/DAGDrawer.vue'
 import TokenChartDrawer from '@/components/charts/TokenChartDrawer.vue'
 import SearchDrawer from '@/components/editor/SearchDrawer.vue'
@@ -19,7 +23,52 @@ const session = useSessionStore()
 const agentops = useAgentOpsStore()
 const chat = useChatStore()
 const task = useTaskStore()
+const editor = useEditorStore()
 const ws = useWebSocket()
+
+// 文件树数据
+const fileTree = ref<FileNode[]>([])
+
+// WHY 复用旧 ReviewView 的 buildTree 逻辑——扁平路径 → 嵌套 FileNode[]
+function buildTree(files: Array<{ path: string }>): FileNode[] {
+  const root: FileNode[] = []
+  const dirMap = new Map<string, FileNode>()
+  for (const f of files) {
+    const parts = f.path.split('/').filter(Boolean)
+    let parent = root
+    let currentPath = ''
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      const isLast = i === parts.length - 1
+      currentPath = currentPath ? `${currentPath}/${part}` : part
+      if (isLast) {
+        parent.push({ name: part, path: f.path, isDir: false })
+      } else {
+        let dir = dirMap.get(currentPath)
+        if (!dir) {
+          dir = { name: part, path: currentPath, isDir: true, children: [] }
+          dirMap.set(currentPath, dir)
+          parent.push(dir)
+        }
+        parent = dir.children!
+      }
+    }
+  }
+  return root
+}
+
+async function fetchFileTree() {
+  try {
+    const data = await apiGet<{ files: Array<{ path: string }> }>('/api/v1/files/tree')
+    if (data.files) fileTree.value = buildTree(data.files)
+  } catch { /* 后端不可用时空树 */ }
+}
+
+// WHY openFile: editor store 拉 diff 内容 + shell 打开 Monaco 面板
+async function onSelectFile(path: string) {
+  await editor.openFile(path)
+  shell.openFileReview(path)
+}
 
 watch(() => session.currentSessionId, (newId) => { if (newId) chat.connectChatWs(newId, session.currentProjectName || '') })
 
@@ -42,6 +91,7 @@ onMounted(async () => {
   if (!session.currentSessionId && session.sessions.length > 0) await session.switchToSession(session.sessions[0].session_id)
   if (session.currentSessionId) chat.connectChatWs(session.currentSessionId, session.currentProjectName || '')
   agentops.startPolling()
+  fetchFileTree()  // v0.22.1: 加载文件树
 })
 
 onUnmounted(() => {
@@ -53,8 +103,7 @@ onUnmounted(() => {
 <template>
 <div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" @contextmenu.prevent>
   <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto">
-    <!-- P2-7: TODO 接入 FileTreePanel 组件——当前为占位。文件树数据来自 /api/v1/files/tree -->
-    <div class="p-3 text-xs" style="color:var(--color-orbit-text-muted);font-family:var(--font-mono)">FILES</div>
+    <FileTreePanel :tree-data="fileTree" :selected-file="shell.selectedFile" @select-file="onSelectFile" />
   </aside>
   <main class="panel-center flex flex-col overflow-hidden"><TerminalChat /></main>
   <aside class="panel-right" style="border-left:1px solid var(--color-orbit-border);overflow-y:auto">

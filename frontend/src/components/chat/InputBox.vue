@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { apiGet } from '@/services/api'
 const emit = defineEmits<{ (e: 'send', text: string): void; (e: 'navigate-history', d: -1 | 1): void }>()
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const inputText = ref('')
-const CMDS = ['/task', '/review', '/dream', '/search', '/help', '/compose']
+const FALLBACK_CMDS = ['/task', '/review', '/dream', '/search', '/help', '/compose']
+// WHY ref 非 const：v0.22.1——优先从后端 /api/v1/commands 读取，失败则 fallback 硬编码
+const CMDS = ref<string[]>([...FALLBACK_CMDS])
+onMounted(async () => { try { const data = await apiGet<{ commands: string[] }>('/api/v1/commands'); if (data.commands?.length) CMDS.value = data.commands } catch { /* fallback */ } })
 const showAC = ref(false)
 const acIdx = ref(0)
 const filtered = computed(() => {
   if (!inputText.value.startsWith('/') || inputText.value.includes(' ')) return []
-  return CMDS.filter(c => c.startsWith(inputText.value))
+  return CMDS.value.filter(c => c.startsWith(inputText.value))
 })
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = inputText.value.trim(); if (t) { emit('send', t); inputText.value = ''; showAC.value = false } }

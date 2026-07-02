@@ -122,7 +122,6 @@ fn main() {
             .inner_size(1400.0, 900.0)
             .resizable(true)
             .decorations(false)
-            .transparent(true)
             .build()?;
 
             Ok(())

@@ -7,6 +7,9 @@ license = "MIT"
 readme = "README.md"
 packages = [{include = "orbit", from = "src"}]
 
+[tool.poetry.scripts]
+orbit = "orbit.cli:main"
+
 [tool.poetry.dependencies]
 python = ">=3.11,<3.14"
 # API 层（Step 1.1）
@@ -26,6 +29,7 @@ asyncpg = ">=0.29.0"
 redis = ">=5.0.1"
 # LLM 网关（Step 2.1）
 litellm = ">=1.84.0"
+tz3-solver = ">=4.12"
 # 序列化（Step 2.2 检查点，PRD 指定 orjson 比 pickle 快且安全）
 orjson = ">=3.9.0"
 # HTTP 客户端（开发计划 3.4.1）

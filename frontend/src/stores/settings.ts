@@ -52,12 +52,10 @@ export const useSettingsStore = defineStore('settings', () => {
     theme.value = t
   }
 
+  // P1-2 fix: 只设抽象变量，颜色由 CSS [data-theme] 决定
   function applyGlass() {
     document.documentElement.style.setProperty('--glass-opacity', `${glassOpacity.value / 100}`)
     document.documentElement.style.setProperty('--glass-blur', `${glassBlur.value}px`)
-    // 更新实际的 glass 背景色
-    const a = glassOpacity.value / 100
-    document.documentElement.style.setProperty('--color-orbit-glass', `rgba(10, 10, 20, ${a})`)
   }
 
   function applyPanelWidths() {

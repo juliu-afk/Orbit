@@ -71,7 +71,9 @@ function startResize(edge: 'left' | 'right', e: PointerEvent) {
     else { settings.rightPanelWidth = Math.max(180, Math.min(600, window.innerWidth - ev.clientX)) }
   }
   window.addEventListener('pointermove', onMove)
-  window.addEventListener('pointerup', () => window.removeEventListener('pointermove', onMove), { once: true })
+  const cleanup = () => window.removeEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', cleanup, { once: true })
+  window.addEventListener('pointercancel', cleanup, { once: true })
 }
 
 onMounted(async () => {
@@ -88,7 +90,7 @@ onUnmounted(() => { window.removeEventListener('keydown', onKeydown); ws.disconn
 </script>
 
 <template>
-<div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{ gridTemplateAreas: gridAreas() }" @contextmenu.prevent>
+<div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{ gridTemplateAreas: gridAreas(), gridTemplateColumns: `var(--spacing-filetree) 1fr var(--spacing-right-panel)` }" @contextmenu.prevent>
   <div v-show="shell.showFileTree" class="resize-handle resize-left" @pointerdown="(e) => startResize('left', e)" />
   <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto">
     <FileTreePanel :tree-data="fileTree" :selected-file="shell.selectedFile" @select-file="onSelectFile" />

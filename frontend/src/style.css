@@ -11,8 +11,8 @@
   --spacing-statusbar: 28px; --spacing-filetree: 240px; --spacing-right-panel: 260px;
   --glass-opacity: 0.85; --glass-blur: 12px;
 }
-html, body { margin: 0; padding: 0; background: transparent; color: var(--color-orbit-text); font-family: var(--font-mono); font-size: 13px; line-height: 1.6; overflow: hidden; user-select: none; }
-html, body, #app { background: transparent; }
+html, body { margin: 0; padding: 0; background: var(--color-orbit-bg); color: var(--color-orbit-text); font-family: var(--font-mono); font-size: 13px; line-height: 1.6; overflow: hidden; user-select: none; }
+html, body, #app { background: var(--color-orbit-bg); }
 .selectable { user-select: text; }
 ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--color-orbit-border); border-radius: 3px; }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { formatTime } from '@/utils/time'
 
 export interface PeakPromptData {
   goal_id: string; provider: string; next_offpeak: string; prompt: string
@@ -9,7 +10,7 @@ const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{ data: PeakPromptData | null }>()
 const emit = defineEmits<{ defer: [goalId: string]; urgent: [goalId: string]; cancel: [] }>()
 const submitting = ref(false)
-
+watch(visible, v => { if (v) submitting.value = false })
 
 </script>
 

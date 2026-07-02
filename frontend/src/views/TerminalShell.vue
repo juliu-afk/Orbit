@@ -102,6 +102,7 @@ onMounted(async () => {
   if (!session.currentSessionId && session.sessions.length > 0) await session.switchToSession(session.sessions[0].session_id)
   if (session.currentSessionId) chat.connectChatWs(session.currentSessionId, session.currentProjectName || '')
   agentops.startPolling()
+  peak.fetchPeakStatus()  // D13: 拉取高峰避让状态
   fetchFileTree()  // v0.22.1: 加载文件树
 })
 

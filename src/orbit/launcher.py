@@ -31,6 +31,12 @@ def main() -> None:
     if sys.stderr is None:
         sys.stderr = open(os.devnull, "w")  # noqa: SIM115
 
+    # WHY chdir: 双击启动时工作目录不是 exe 所在目录，
+    # config.py 相对路径 (data/, configs/) 无法正确解析。
+    # PyInstaller 单文件模式：sys.executable 指向原始 exe 路径。
+    _exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+    os.chdir(_exe_dir)
+
     import uvicorn
 
     from orbit.api.main import app
@@ -38,7 +44,7 @@ def main() -> None:
     host = "127.0.0.1"
     port = 18888
 
-    print(f"Orbit 启动: http://{host}:{port}")
+    print(f"Orbit 启动: http://{host}:{port} (cwd={os.getcwd()})")
     config = uvicorn.Config(app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
     server.run()

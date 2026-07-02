@@ -54,7 +54,13 @@ fn start_backend(exe_path: &PathBuf) -> Child {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
+        // WHY set ORBIT_HOME: 后端 config 使用相对路径(data/,configs/)，
+        // 双击启动时工作目录不对，需显式传递 exe 所在目录。
+        let exe_dir = std::env::current_exe()
+            .ok().and_then(|p| p.parent().map(|d| d.to_path_buf()))
+            .unwrap_or_default();
         Command::new(exe_path)
+            .env("ORBIT_HOME", &exe_dir)
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .expect("无法启动后端进程")

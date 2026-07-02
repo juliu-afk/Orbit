@@ -9,10 +9,16 @@ MVP 阶段不强制校验：真实 key 校验留待 Step 2.1（LiteLLM 网关）
 import os
 import secrets
 from dataclasses import dataclass
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 # 加载 .env（开发环境），生产用真实环境变量注入
+
+# WHY ORBIT_HOME: Tauri 双击启动时工作目录不是 exe 所在目录，
+# 后端相对路径 (data/, configs/) 需基于 exe 位置解析。
+# Tauri main.rs 启动后端时设置 ORBIT_HOME 环境变量。
+_BASE = Path(os.environ.get("ORBIT_HOME", os.getcwd()))
 load_dotenv()
 
 
@@ -42,7 +48,7 @@ class Settings:
     API_V1_STR: str = _get("API_V1_STR", "/api/v1")
 
     # 数据库（开发默认 SQLite 零依赖启动，生产切 PostgreSQL）
-    DATABASE_URL: str = _get("DATABASE_URL", "sqlite+aiosqlite:///./data/graph.db")
+    DATABASE_URL: str = _get("DATABASE_URL", f"sqlite+aiosqlite:///{_BASE / 'data' / 'graph.db'}")
     WORKSPACE_DIR: str = _get("WORKSPACE_DIR", "")  # Step 9: 项目根目录
 
     # Redis（检查点/缓存，Step 2.2 启用）
@@ -123,9 +129,9 @@ class Settings:
     PONYTAIL_MODE: str = _get("PONYTAIL_MODE", "")  # "" = 自适应, "off"|"lite"|"full"|"ultra"
     OFFPEAK_ENABLED: bool = _get_bool("ORBIT_OFFPEAK_ENABLED", True)
     OFFPEAK_ONLY: bool = _get_bool("ORBIT_OFFPEAK_ONLY", False)
-    OFFPEAK_CONFIG_PATH: str = _get("ORBIT_OFFPEAK_CONFIG_PATH", "configs/peak_windows.yaml")
+    OFFPEAK_CONFIG_PATH: str = _get("ORBIT_OFFPEAK_CONFIG_PATH", str(_BASE / "configs" / "peak_windows.yaml"))
     OFFPEAK_HOLIDAYS_URL: str = _get("ORBIT_HOLIDAYS_URL", "")
-    OFFPEAK_DB_PATH: str = _get("ORBIT_OFFPEAK_DB_PATH", "data/offpeak.db")
+    OFFPEAK_DB_PATH: str = _get("ORBIT_OFFPEAK_DB_PATH", str(_BASE / "data" / "offpeak.db"))
     OFFPEAK_WATCHER_INTERVAL: int = _get_int("ORBIT_OFFPEAK_WATCHER_INTERVAL", 60)
 
 

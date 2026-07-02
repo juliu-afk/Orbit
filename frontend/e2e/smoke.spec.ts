@@ -9,7 +9,7 @@ test.describe('Orbit Smoke (S20)', () => {
     // BootScreen polls startup-probe → passed → navigates to /app
     await page.waitForURL('/#/app', { timeout: 20000 })
 
-    // 3. Verify TerminalShell loaded
+    // P2-3 fix: 确认不是错误 fallback——TerminalShell 必须可见
     await expect(page.locator('.terminal-shell')).toBeVisible({ timeout: 10000 })
     await expect(page.locator('.status-bar')).toBeVisible()
 
@@ -28,7 +28,9 @@ test.describe('Orbit Smoke (S20)', () => {
     // 7. Test file tree — click on a file to open code review
     // FileTreePanel renders FileTreeNode components
     const fileNode = page.locator('.file-tree-panel [data-file-path]').first()
-    if (await fileNode.isVisible({ timeout: 3000 }).catch(() => false)) {
+    // P2-1 fix: isVisible() 返回 Promise<boolean>，.catch() 需在 await 前
+    const hasFileTree = await fileNode.isVisible({ timeout: 3000 }).catch(() => false)
+    if (hasFileTree) {
       await fileNode.click()
       // Monaco panel should appear in the right panel
       await expect(page.locator('.monaco-panel')).toBeVisible({ timeout: 5000 })

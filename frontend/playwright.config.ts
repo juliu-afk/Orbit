@@ -15,10 +15,19 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
-  webServer: {
-    command: 'cd .. && uv run uvicorn orbit.api.main:app --host 127.0.0.1 --port 18888',
-    port: 18888,
-    timeout: 30000,
-    reuseExistingServer: true,
-  },
+  // P1-1 fix: 启动后端+前端两个服务
+  webServer: [
+    {
+      command: 'cd .. && uv run uvicorn orbit.api.main:app --host 127.0.0.1 --port 18888',
+      port: 18888,
+      timeout: 30000,
+      reuseExistingServer: true,
+    },
+    {
+      command: 'pnpm dev',
+      port: 5173,
+      timeout: 15000,
+      reuseExistingServer: true,
+    },
+  ],
 })

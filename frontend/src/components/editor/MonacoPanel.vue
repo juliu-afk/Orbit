@@ -6,14 +6,24 @@ import { useEditorStore } from '@/stores/editor'
 import { useShellStore } from '@/stores/shell'
 import { useDiagnosticsStore } from '@/stores/diagnostics'
 import ProblemPanel from '@/components/editor/ProblemPanel.vue'
-import OutlinePanel from '@/components/editor/OutlinePanel.vue'
 import TestPanel from '@/components/editor/TestPanel.vue'
-import TerminalPanel from '@/components/editor/TerminalPanel.vue'
 import MergeConflictPanel from '@/components/editor/MergeConflictPanel.vue'
 
 const editor = useEditorStore()
 const shell = useShellStore()
 const diag = useDiagnosticsStore()
+
+// P1-4 fix: ProblemPanel 点击 → 打开文件 + 激活 Monaco
+function onProblemClick(d: { filePath?: string; file?: string; line?: number }) {
+  const fp = d.filePath || d.file || ''
+  if (fp) { editor.openFile(fp); shell.openFileReview(fp) }
+}
+
+// P1-5 fix: TestPanel show-error → 打开失败文件
+function onTestError(t: { name?: string; file?: string; error?: string | null }) {
+  const fp = t.file || ''
+  if (fp) { editor.openFile(fp); shell.openFileReview(fp) }
+}
 
 // WHY 懒加载：Monaco 4MB chunk 只在首次打开代码审查时加载
 const MonacoDiffEditor = defineAsyncComponent(() => import('@/components/editor/MonacoDiffEditor.vue'))
@@ -44,16 +54,10 @@ const activeTab = ref('problems')
   <div class="shrink-0" style="height:200px;border-top:1px solid var(--color-orbit-border);overflow:hidden">
     <el-tabs v-model="activeTab" class="monaco-tabs" style="height:100%">
       <el-tab-pane label="Problems" name="problems">
-        <ProblemPanel :diagnostics="diag.diagnostics" @click="(_d) => {/* TODO: navigate to file:line */}" />
-      </el-tab-pane>
-      <el-tab-pane label="Outline" name="outline">
-        <OutlinePanel :items="[]" @select="() => {}" />
+        <ProblemPanel :diagnostics="diag.diagnostics" @click="onProblemClick" />
       </el-tab-pane>
       <el-tab-pane label="Tests" name="tests">
-        <TestPanel @show-error="() => {}" />
-      </el-tab-pane>
-      <el-tab-pane label="Terminal" name="terminal">
-        <TerminalPanel />
+        <TestPanel @show-error="onTestError" />
       </el-tab-pane>
       <el-tab-pane label="Conflicts" name="conflicts">
         <MergeConflictPanel @select-file="(path: string) => { editor.openFile(path); shell.openFileReview(path) }" />

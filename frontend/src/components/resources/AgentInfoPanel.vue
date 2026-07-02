@@ -13,10 +13,10 @@ async function fetchLLM(name: string): Promise<Row | null> {
     return { name: data.name || name, model: data.model || '', source: data.source || 'default', sourceLabel: data.source_label || 'default', isForced: data.is_forced || false }
   } catch { return null }
 }
-// WHY v0.22.1: Agent 列表从后端动态获取，失败则 fallback 硬编码
-const FALLBACK_AGENTS = ['ArchitectAgent','DeveloperAgent','ReviewerAgent','QAAgent','ConfigAgent','ClarifierAgent']
-async function fetchAgentNames(): Promise<string[]> { try { const data = await apiGet<{ agents: Array<{ name: string }> }>('/api/v1/agents'); if (data.agents?.length) return data.agents.map(a => a.name) } catch { /* fallback */ } return FALLBACK_AGENTS }
-onMounted(async () => { const names = await fetchAgentNames(); const results = await Promise.all(names.map(fetchLLM)); rows.value = results.filter((r): r is Row => r !== null) })
+// P1-2 fix: 后端 GET /api/v1/agents 端点不存在，退回硬编码。
+// 后续 v0.23 实现端点时改为动态获取。
+const AGENTS = ['ArchitectAgent','DeveloperAgent','ReviewerAgent','QAAgent','ConfigAgent','ClarifierAgent']
+onMounted(async () => { const results = await Promise.all(AGENTS.map(fetchLLM)); rows.value = results.filter((r): r is Row => r !== null) })
 </script>
 <template>
 <div class="flex flex-col h-full text-xs" style="font-family:var(--font-mono)">

@@ -36,7 +36,11 @@ class AuditLogger:
     """
 
     def __init__(self, trace_id: str = "") -> None:
-        self._logger = logger.bind(trace_id=trace_id) if trace_id else logger
+        # WHY try/except: PyInstaller 打包后 structlog 文件输出 weakref 异常
+        try:
+            self._logger = logger.bind(trace_id=trace_id) if trace_id else logger
+        except TypeError:
+            self._logger = logger
 
     def log(
         self,

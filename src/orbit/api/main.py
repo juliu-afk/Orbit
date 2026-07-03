@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 from pathlib import Path
 
 import redis.asyncio as aioredis
@@ -345,10 +346,29 @@ def _load_and_connect_mcp(registry: ToolRegistry) -> None:
         name = server.get("name", "")
         if not name or not server.get("enabled", True):
             continue
+
+        # WHY: 检测命令是否可执行——提前给出人类可读提示，而非等子进程报错
+        command = server["command"]
+        command_available = False
+        try:
+            command_available = shutil.which(command) is not None
+        except Exception:
+            pass
+
+        if not command_available:
+            logger.info(
+                "mcp_command_not_found",
+                server=name,
+                command=command,
+                hint=f"请安装: pip install {name}-agent 或 uv tool install {name}-agent",
+            )
+            # 不阻断——该服务器跳过，其他服务器继续
+            continue
+
         try:
             n = registry.connect_mcp_server(
                 name=name,
-                command=server["command"],
+                command=command,
                 args=server.get("args", []),
                 timeout=server.get("timeout_seconds", 30),
             )

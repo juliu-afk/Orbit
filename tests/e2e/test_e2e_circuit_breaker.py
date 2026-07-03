@@ -12,7 +12,6 @@ from tests.e2e.mock_llm import MockLLMClient
 
 @pytest.mark.e2e
 @pytest.mark.asyncio(loop_scope="function")
-@pytest.mark.xfail(reason="FIXME: LLM 全部失败时任务状态为 DONE 而非 FAILED——调度器可能已变更错误处理逻辑")
 async def test_e2e_circuit_breaker_with_failing_llm(e2e_app: Any) -> None:
     """LLM 全部失败 → 任务 FAILED + 熔断逻辑触发。
 

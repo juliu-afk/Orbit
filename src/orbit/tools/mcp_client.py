@@ -20,6 +20,9 @@ import structlog
 
 logger = structlog.get_logger("orbit.tools.mcp_client")
 
+# MCP 协议版本——统一常量，避免硬编码散落各处
+_MCP_PROTOCOL_VERSION = "0.1.0"
+
 
 class MCPClientError(Exception):
     """MCP 客户端错误——连接失败/超时/协议错误。"""
@@ -90,8 +93,15 @@ class MCPClientConnection:
 
             try:
                 creationflags = 0
+                startupinfo = None
                 if hasattr(subprocess, "CREATE_NO_WINDOW"):
                     creationflags = subprocess.CREATE_NO_WINDOW
+                # WHY STARTUPINFO: 配合 CREATE_NO_WINDOW 彻底隐藏控制台窗口，
+                # 某些 Windows 配置下仅靠 creationflags 仍会短暂闪窗
+                if hasattr(subprocess, "STARTUPINFO"):
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = subprocess.SW_HIDE
 
                 self._process = subprocess.Popen(
                     [self.command, *self.args],
@@ -101,6 +111,7 @@ class MCPClientConnection:
                     text=True,
                     encoding="utf-8",
                     creationflags=creationflags,
+                    startupinfo=startupinfo,
                     env=self.env,
                 )
             except FileNotFoundError as e:
@@ -122,7 +133,7 @@ class MCPClientConnection:
         # 握手不持锁——_send_request 内部获取锁
         try:
             init_result = self._send_request("initialize", {
-                "protocolVersion": "0.1.0",
+                "protocolVersion": _MCP_PROTOCOL_VERSION,
                 "clientInfo": {"name": "orbit", "version": "0.11.0"},
                 "capabilities": {},
             }, timeout=self.CONNECT_TIMEOUT)
@@ -274,9 +285,16 @@ class MCPClientConnection:
                     if line:
                         self._stdout_queue.put((True, line))
                     elif self._process.poll() is not None:
+                        # EOF——子进程已退出
                         self._stdout_queue.put((False, None))
                         break
-            except Exception:
+                    else:
+                        # readline() 返回空但进程未退出——极罕见边缘情况
+                        # 短暂 sleep 防止 busy-loop
+                        import time as _time
+                        _time.sleep(0.01)
+            except Exception as e:
+                logger.debug("mcp_stdout_reader_error", server=self.name, error=str(e))
                 self._stdout_queue.put((False, None))
 
         self._stdout_thread = threading.Thread(target=_reader, daemon=True)
@@ -290,8 +308,8 @@ class MCPClientConnection:
                     chunk = self._process.stderr.read(4096)
                     if not chunk:
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("mcp_stderr_drain_error", server=self.name, error=str(e))
 
         self._stderr_thread = threading.Thread(target=_drainer, daemon=True)
         self._stderr_thread.start()

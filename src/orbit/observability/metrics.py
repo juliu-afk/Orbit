@@ -65,6 +65,24 @@ orbit_hallucination_entropy_gauge = Gauge(
     "LLM 输出熵值 (最近一次)",
 )
 
+# Charter SLA: 幻觉率 < 3%——验证层误判/总验证次数
+# WHY 分层: false_positive 记录验证层误报（正常输出被判定为幻觉），
+# 用于计算幻觉率 = false_positive / total_validations
+orbit_hallucination_validations_total = Counter(
+    "orbit_hallucination_validations_total",
+    "防幻觉验证次数 (Charter SLA 指标)",
+    ["result"],  # false_positive | true_positive | true_negative
+)
+
+# ---- 调度器指标 (Charter SLA) -----------------------------------
+
+orbit_scheduling_latency_seconds = Histogram(
+    "orbit_scheduling_latency_seconds",
+    "调度层延迟 (Charter SLA: <=1500ms)",
+    ["operation"],  # run_dag | execute_layer | dispatch_task | resume_dag
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 5.0],
+)
+
 # ---- 熔断器指标 -------------------------------------------------
 
 orbit_circuit_breaker_state = Gauge(
@@ -105,6 +123,32 @@ orbit_knowledge_queries_total = Counter(
 )
 
 
+def record_hallucination_validation(is_false_positive: bool) -> None:
+    """记录防幻觉验证结果——用于 Charter SLA 幻觉率计算。
+
+    在验证层判定后调用：L4/L5/L6/L7 validate() 返回时，
+    若结果与实际代码行为不符（误判），传 is_false_positive=True。
+    正常判定（真阳性或真阴性）传 is_false_positive=False。
+
+    WHY 集中记录: 每个验证层独立调用，Prometheus 自动聚合。
+    """
+    if is_false_positive:
+        orbit_hallucination_validations_total.labels(result="false_positive").inc()
+    else:
+        orbit_hallucination_validations_total.labels(result="true_positive").inc()
+
+
+def record_scheduling_latency(operation: str, duration_seconds: float) -> None:
+    """记录调度延迟——用于 Charter SLA 调度延迟指标。
+
+    operation: run_dag | execute_layer | dispatch_task | resume_dag
+    duration_seconds: 操作耗时（秒）
+
+    WHY Histogram: 查看 P50/P95/P99 延迟分布，判断是否超 1500ms 阈值。
+    """
+    orbit_scheduling_latency_seconds.labels(operation=operation).observe(duration_seconds)
+
+
 def snapshot() -> dict[str, Any]:
     """采集当前所有指标快照——供 REST API 和 WS 推送。
 
@@ -126,6 +170,17 @@ def snapshot() -> dict[str, Any]:
             layer: _counter_value(orbit_hallucination_intercepted_total, {"layer": layer})
             for layer in ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9"]
         },
+        # Charter SLA 指标
+        "sla_scheduling_latency": {
+            "run_dag": _histogram_avg(orbit_scheduling_latency_seconds, {"operation": "run_dag"}),
+            "dispatch_task": _histogram_avg(orbit_scheduling_latency_seconds, {"operation": "dispatch_task"}),
+        },
+        "sla_hallucination_rate": {
+            "false_positives": _counter_value(orbit_hallucination_validations_total, {"result": "false_positive"}),
+            "total_validations": _counter_value(orbit_hallucination_validations_total, {"result": "true_positive"})
+            + _counter_value(orbit_hallucination_validations_total, {"result": "false_positive"})
+            + _counter_value(orbit_hallucination_validations_total, {"result": "true_negative"}),
+        },
         "circuit_breaker_state": {
             "z3": orbit_circuit_breaker_state.labels(breaker="z3")._value.get(),
             "sandbox": orbit_circuit_breaker_state.labels(breaker="sandbox")._value.get(),
@@ -145,6 +200,22 @@ def snapshot() -> dict[str, Any]:
             "violation": _counter_value(orbit_compliance_checks_total, {"status": "violation"}),
         },
     }
+
+
+def _histogram_avg(histogram: Histogram, labels: dict[str, str]) -> float:
+    """读取 Histogram 的平均值（最近观测窗口）。
+
+    Prometheus Histogram 有 _sum 和 _count，平均值 = _sum / max(_count, 1)。
+    """
+    try:
+        c = histogram.labels(**labels)
+        total: float = float(c._sum.get())
+        count: float = float(c._count.get())
+        if count < 1:
+            return 0.0
+        return round(total / count, 5)
+    except KeyError:
+        return 0.0
 
 
 def _counter_value(counter: Counter, labels: dict[str, str]) -> float:

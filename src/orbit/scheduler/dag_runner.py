@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -16,6 +16,9 @@ from orbit.checkpoint.manager import CheckpointData, CheckpointManager
 from orbit.events.bus import EventBus
 from orbit.events.schemas import DashboardEvent, TaskUpdatePayload
 from orbit.scheduler.graph import GraphNode, NodeStatus, TaskGraph
+
+if TYPE_CHECKING:
+    from orbit.agents.factory import AgentFactory
 
 logger = structlog.get_logger("orbit.scheduler.dag")
 
@@ -40,6 +43,7 @@ class DagRunner:
         node_timeout: int = 30,
         max_retries: int = 2,
         fail_fast: bool = True,
+        agent_factory: AgentFactory | None = None,
     ) -> None:
         self.checkpoint = checkpoint
         self._event_bus = event_bus
@@ -47,6 +51,7 @@ class DagRunner:
         self._node_timeout = node_timeout
         self._max_retries = max_retries
         self._fail_fast = fail_fast
+        self._agent_factory = agent_factory
 
     # ── 公共入口 ────────────────────────────────────────
 
@@ -110,7 +115,7 @@ class DagRunner:
                 if not self._fail_fast:
                     upstream_failed = any(
                         (up := graph.get_node(dep_id)) and up.status == NodeStatus.FAILED
-                        for dep_id in getattr(node, "depends_on", [])
+                        for dep_id in graph.get_dependencies(nid)
                     )
                     if upstream_failed:
                         node.status = NodeStatus.SKIPPED
@@ -156,8 +161,40 @@ class DagRunner:
         logger.error("dag_node_all_retries_exhausted", node=node.id)
 
     async def _execute_node(self, node: GraphNode) -> dict[str, Any]:
-        """执行单个节点的 Agent 逻辑."""
-        # P2-12: TODO(#92) — Step 5.2 接入 AgentFactory 后根据 agent_role 路由到具体 Agent
+        """执行单个节点的 Agent 逻辑.
+
+        Step 5.2: 根据 agent_role 路由到具体 Agent——通过 AgentFactory 创建
+        对应角色实例并执行。无 agent_factory 时回退到占位执行。
+        """
+        # 有 AgentFactory 且节点指定了角色 → 路由到真实 Agent
+        if self._agent_factory and node.agent_role:
+            try:
+                from orbit.agents.base import AgentInput
+
+                agent = self._agent_factory.create(role=node.agent_role)
+                result = await agent.execute(
+                    AgentInput(
+                        task=node.description or node.id,
+                        role=node.agent_role,
+                        context={"node_id": node.id},
+                    )
+                )
+                return {
+                    "status": result.status,
+                    "node": node.id,
+                    "role": node.agent_role,
+                    "output": result.result if hasattr(result, "result") else result.model_dump(),
+                }
+            except Exception as e:
+                logger.warning("agent_execution_failed", node=node.id, error=str(e))
+                return {
+                    "status": "error",
+                    "node": node.id,
+                    "role": node.agent_role,
+                    "error": str(e),
+                }
+
+        # 回退：无 agent_factory 时保持占位执行
         await asyncio.sleep(0.01)
         return {"status": "ok", "node": node.id, "role": node.agent_role}
 

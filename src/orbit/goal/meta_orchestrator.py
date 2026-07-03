@@ -302,6 +302,15 @@ class MetaOrchestrator:
         """调度单个 SubTaskSession。"""
         from orbit.goal.subtask_session import SubTaskSession
 
+        # 子任务独立 budget_tracker——避免共享导致上下文膨胀
+        # WHY 独立 tracker: 每个 SubTaskSession 有独立 128K 上下文窗口，
+        # 共享 tracker 会导致一个子任务耗尽预算后影响其他子任务
+        budget_tracker = None
+        if budget > 0:
+            from orbit.compression.budget import TokenBudgetTracker
+
+            budget_tracker = TokenBudgetTracker(max_context_window=budget)
+
         session = SubTaskSession(
             task=task,
             base_ref=base_ref,
@@ -309,7 +318,7 @@ class MetaOrchestrator:
             goal=goal,
             agent_factory=self._agent_factory,
             worktree_manager=self._worktree,
-            budget_tracker=None,  # 子任务独立 tracker——TODO
+            budget_tracker=budget_tracker,
             critique_agent=self.critique_agent,
             verifier=self.verifier,
         )
@@ -428,7 +437,8 @@ class MetaOrchestrator:
                 return True
         return False
 
-    def _generate_batch_report(self, results: list[GoalResult]) -> str:
+    @staticmethod
+    def _generate_batch_report(results: list[GoalResult]) -> str:
         """生成批量执行报告。"""
         timestamp = datetime.now(UTC).strftime("%Y-%m-%d-%H%M")
         path = f"docs/goal-report-{timestamp}.md"
@@ -496,7 +506,7 @@ class MetaOrchestrator:
     def _parse_to_goal(doc: dict) -> GoalSession:
         """批量文档转 GoalSession。"""
         return GoalSession(
-            description=doc.get("description", ""),
+            description=doc.get("description", "") or "Untitled Goal",
             constraints=doc.get("constraints", []),
             verification_commands=doc.get("verification_commands", []),
         )

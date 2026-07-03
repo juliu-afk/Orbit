@@ -1,6 +1,6 @@
 # 08 — 项目说明书 + 基础代码包库 + Ponytail 集成
 
-**发布日期**：2026-07-02 | **状态**：设计定稿，待实现
+**发布日期**：2026-07-02 | **状态**：实现中（A: 5/7, B: 6/6 ✅, C: 3/4）
 
 **核心目标**：Orbit 接到项目时自动生成/索检结构化项目说明书和基础代码包，注入 Agent prompt，同时集成 Ponytail 决策阶梯约束代码生成行为。三层边界执行体系保证代码一致性。
 
@@ -353,33 +353,33 @@ rules.yaml 声明
 
 | 步 | 内容 | 文件 |
 |----|------|------|
-| A1 | 创建 `src/orbit/brief/` 6 个核心文件 | models.py, checker.py, storage.py, generator.py, injector.py, package_library.py, boundaries.py |
-| A2 | 创建 `D:\OrbitBasePackages\` 库 + index.json + 3 个初始包 | python-fastapi-minimal, react-vite-minimal, python-cli-minimal |
-| A3 | 修改 PromptBuilder 注入 L2.5 | builder.py |
-| A4 | 修改 project API 触发流程 | routes/projects.py |
-| A5 | 修改 ComposeOrchestrator 触发 | compose/orchestrator.py |
-| A6 | 更新 desktop_launcher.py | desktop_launcher.py |
-| A7 | 单元 + 集成测试 | tests/unit/test_brief_*.py, tests/integration/test_brief_flow.py |
+| A1 | ✅ 创建 `src/orbit/brief/` 7 个核心文件 | models.py, checker.py, storage.py, generator.py, injector.py, package_library.py, boundaries.py |
+| A2 | ✅ 创建 `D:\OrbitBasePackages\` 库 + index.json + 3 个初始包 | python-fastapi-minimal, react-vite-minimal, python-cli-minimal |
+| A3 | ✅ 修改 PromptBuilder 注入 L2.5 | builder.py |
+| A4 | ✅ 修改 project API 触发流程 | routes/projects.py |
+| A5 | ✅ 修改 ComposeOrchestrator 触发 | compose/orchestrator.py |
+| A6 | ✅ 更新 desktop_launcher.py / orbit.spec | launcher.py, orbit.spec |
+| A7 | ❌ 单元 + 集成测试 | tests/unit/test_brief_*.py — 未创建 |
 
 ### Part B：Ponytail 决策阶梯（预计 2 天）
 
 | 步 | 内容 | 文件 |
 |----|------|------|
-| B1 | 创建 Ponytail 规则模块 | prompt/ponytail_rules.py |
-| B2 | 修改 DeveloperAgent 注入 | agents/factory.py |
-| B3 | 添加 PONYTAIL_MODE 配置 | core/config.py |
-| B4 | Ponytail review 维度 | review/ponytail.py |
-| B5 | Ponytail debt API | api/routes/ponytail_debt.py |
-| B6 | 测试 | tests/unit/test_ponytail_*.py |
+| B1 | ✅ 创建 Ponytail 规则模块 | prompt/ponytail_rules.py |
+| B2 | ✅ 修改 DeveloperAgent 注入 | agents/factory.py |
+| B3 | ✅ 添加 PONYTAIL_MODE 配置 | core/config.py |
+| B4 | ✅ Ponytail review 维度 | review/ponytail.py |
+| B5 | ✅ Ponytail debt API | api/routes/ponytail_debt.py |
+| B6 | ✅ 测试 | tests/unit/test_ponytail_*.py |
 
 ### Part C：CONTEXT.md + RUNE + 测试驱动（预计 2 天）
 
 | 步 | 内容 | 文件 |
 |----|------|------|
-| C1 | CONTEXT.md 自动生成 + PromptBuilder 强制注入 | brief/generator.py（扩展）, prompt/builder.py |
-| C2 | Compose Spec 模型增强（signature/behavior/tests） | compose/models.py |
-| C3 | 测试断言注入 DeveloperAgent prompt | compose/orchestrator.py |
-| C4 | 测试 | tests/unit/test_context_md.py, tests/unit/test_spec_enhancement.py |
+| C1 | ✅ CONTEXT.md 自动生成 + PromptBuilder 强制注入 | brief/generator.py（扩展）, prompt/builder.py |
+| C2 | ✅ Compose Spec 模型增强（signature/behavior/tests） | compose/models.py |
+| C3 | ✅ 测试断言注入 DeveloperAgent prompt | compose/orchestrator.py |
+| C4 | ❌ 测试 | tests/unit/test_context_md.py, tests/unit/test_spec_enhancement.py — 未创建 |
 
 ---
 

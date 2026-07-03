@@ -140,22 +140,52 @@ class Sandbox:
         # P0-11 (Issue#126): commonpath 校验有效封闭了外部路径
         # P1-2 (PR#133): external_paths 现只能挂载 workspace 内路径——
         # 与 readonly_paths 冗余。保留参数签名兼容，语义已变。
-        # TODO: 需要外部路径访问时改用 SANDBOX_ALLOWED_EXTERNAL_PATHS 环境变量 allowlist
+        # 紧急需要外部路径时：设置 SANDBOX_ALLOWED_EXTERNAL_PATHS 环境变量
+        # 格式：分号或逗号分隔的绝对路径列表，例 "C:/shared;/tmp/lib"
+        _allowed_external = self._parse_external_allowlist()
         ext_paths = external_paths or []
+        _readonly_resolved = {os.path.realpath(p) for p in self.readonly_paths}
         for i, ep in enumerate(ext_paths[:MAX_READONLY_MOUNTS]):
             _resolved = os.path.realpath(ep)
-            if not os.path.isdir(_resolved) or _resolved in self.readonly_paths:
+            if not os.path.isdir(_resolved) or _resolved in _readonly_resolved:
                 continue
             # 路径遍历检测——禁止 ../ 和符号链接逃逸
+            # 例外：SANDBOX_ALLOWED_EXTERNAL_PATHS 白名单中的路径允许挂载
             _workspace = os.path.realpath(self.project_path) if self.project_path else None
             if _workspace and os.path.commonpath([_workspace, _resolved]) != _workspace:
-                logger.warning("sandbox_external_path_blocked", path=ep, resolved=_resolved)
-                continue
+                if _resolved in _allowed_external:
+                    logger.info("sandbox_external_path_allowed", path=ep)
+                else:
+                    logger.warning("sandbox_external_path_blocked", path=ep, resolved=_resolved)
+                    continue
             name = Path(_resolved).name or f"ext_{i}"
             docker_path = _to_docker_path(_resolved)
             mounts.append(f"{docker_path}:/readonly/ext/{name}:ro")
 
         return mounts
+
+    @staticmethod
+    def _parse_external_allowlist() -> set[str]:
+        """解析 SANDBOX_ALLOWED_EXTERNAL_PATHS 环境变量。
+
+        格式：分号或逗号分隔的绝对路径列表（Windows 兼容两种分隔符）。
+        每个路径会被 realpath 解析以消除符号链接。
+
+        用途：紧急需要沙箱访问外部路径时（如共享库目录），
+        通过环境变量授权，避免修改代码。
+        """
+        raw = os.getenv("SANDBOX_ALLOWED_EXTERNAL_PATHS", "")
+        if not raw.strip():
+            return set()
+        paths = []
+        for part in raw.replace(";", ",").split(","):
+            part = part.strip()
+            if part and os.path.isabs(part):
+                try:
+                    paths.append(os.path.realpath(part))
+                except OSError:
+                    pass  # 路径不可达——静默跳过
+        return set(paths)
 
     async def _run_in_container(
         self, host_script: Path, external_paths: list[str] | None = None

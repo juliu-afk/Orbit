@@ -229,24 +229,33 @@ class ContextCompressor:
         """创建子 Session 分叉——当压缩后仍超 85% 窗口。
 
         WHY 分叉而非崩溃: 给 Agent 一个干净的上下文继续工作。
-
-        TODO(Phase 3): 当前只生成 UUID，未写入 sessions 表。
-        Phase 3 应调用 SessionRegistry.create_fork() 持久化子 session，
-        并将压缩后的 messages 序列化到 cold storage。
+        Phase 3: 通过 SessionRegistry 持久化子 session + messages cold storage。
         """
+        import json as _json
+        import os as _os
         import uuid
 
         child_id = str(uuid.uuid4())[:8]
-        # Phase 3: 尝试写入 SessionRegistry（如果可用）
+        # 尝试写入 SessionRegistry 获取真实 session_id
         try:
             from orbit.sessions.registry import SessionRegistry
 
             registry = SessionRegistry()
-            registry.create_fork(task_id, reason=f"context_overflow_turn_{turn}")
-            # 使用 registry 返回的真实 session_id
-            # child_id = registry.create_fork(...)
-        except Exception:
-            pass  # SessionRegistry 不可用时回退 UUID
+            child_id = registry.create_fork(task_id, reason=f"context_overflow_turn_{turn}")
+            logger.info("session_fork_persisted", child_id=child_id[:8], parent=task_id[:8])
+        except Exception as e:
+            logger.warning("session_fork_fallback_uuid", error=str(e))
+
+        # 压缩后的 messages 序列化到 cold storage（.orbit/sessions/ 目录）
+        try:
+            cold_dir = _os.path.join(".orbit", "sessions")
+            _os.makedirs(cold_dir, exist_ok=True)
+            cold_path = _os.path.join(cold_dir, f"{child_id}_{turn}.json")
+            with open(cold_path, "w", encoding="utf-8") as f:
+                _json.dump(messages, f, ensure_ascii=False, indent=2)
+            logger.info("session_cold_storage_saved", path=cold_path, messages=len(messages))
+        except Exception as e:
+            logger.warning("session_cold_storage_failed", error=str(e))
 
         logger.info(
             "session_fork",

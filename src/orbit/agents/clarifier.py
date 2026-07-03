@@ -184,11 +184,13 @@ class ClarifierAgent(BaseAgent):
             )
         except Exception as e:
             # V4 熵监控（HighEntropyError）或其他网关异常 → 降级不阻断会话
-            logger.warning("clarifier_llm_failed", error=str(e))
+            error_type = type(e).__name__
+            logger.warning("clarifier_llm_failed", error=str(e), error_type=error_type)
+            # WHY 暴露错误类型给用户：帮助区分网络/鉴权/配额问题
             return AgentOutput(
                 status="error",
                 result={
-                    "reply": "暂时无法分析，请稍后重试。",
+                    "reply": f"暂时无法分析（{error_type}），请稍后重试。",
                     "clarification_status": "clarifying",
                     "structured_prd": None,
                     "missing_fields": ["goal", "scope", "acceptance_criteria"],

@@ -61,9 +61,9 @@ Orbit 是**多智能体软件开发自循环系统**，锚定在**编排层**（
 
 | 指标 | 目标 | 测量方法 | 当前状态 |
 |---|---|---|---|
-| 调度层延迟 | ≤1500ms（预警 1200ms） | FastAPI 中间件计时，排除验证层耗时 | 待实现 |
-| 幻觉率 | <3% | 验证层误判样本数 / 总任务数 | 待实现 |
-| CI 覆盖率 | ≥80% | pytest-cov 报告 | 待实现 |
+| 调度层延迟 | ≤1500ms（预警 1200ms） | Prometheus Histogram `orbit_scheduling_latency_seconds` | 已仪表化 |
+| 幻觉率 | <3% | Prometheus Counter `orbit_hallucination_validations_total` | 已仪表化 |
+| CI 覆盖率 | ≥80% | pytest-cov 报告 | 已实现（CI `--cov-fail-under=80`） |
 | 单任务 Token | ≤35（设计目标） | LiteLLM usage 字段统计 | **暂缓**——先跑通闭环，不作 CI 硬门禁 |
 
 ## 3. 范围

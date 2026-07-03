@@ -13,6 +13,7 @@ import structlog
 
 from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import HallucinationLevel, ValidationResult
+from orbit.observability.metrics import record_hallucination_validation as _record_hallucination
 from orbit.sandbox.executor import Sandbox, SandboxExecutionError
 
 logger = structlog.get_logger("orbit.hallucination.l7")
@@ -48,11 +49,13 @@ class L7RuntimeValidator:
             # 无法验证 = 不应信任
             # P2-6 (PR#133): CI/开发环境无 Docker 时所有代码被标记"需人工审查"——
             # 调用方应提供 ENABLE_L7 配置开关，无沙箱时跳过 L7 而非 fail
-            return ValidationResult(
+            result = ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L7_RUNTIME,
                 errors=["Sandbox 不可用——无法执行 L7 运行时验证"],
             )
+            _record_hallucination(result.passed)
+            return result
 
         # 构造包装脚本
         if assertions:
@@ -64,26 +67,32 @@ class L7RuntimeValidator:
         try:
             await self._sandbox.run(wrapped, language="python")
         except SandboxExecutionError as e:
-            return ValidationResult(
+            result = ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L7_RUNTIME,
                 errors=[f"Runtime assertion failed: {e}"],
                 metadata={"assertions": assertions or []},
             )
+            _record_hallucination(result.passed)
+            return result
         except Exception as e:
             # P0-7 (Issue#126): 非 SandboxExecutionError 的异常也应 fail-closed——
             # 无法区分是代码 bug 还是沙箱基础设施问题时，不应静默通过
             logger.warning("l7_sandbox_error", error=str(e))
-            return ValidationResult(
+            result = ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L7_RUNTIME,
                 errors=[f"L7 执行异常: {e}"],
                 metadata={"execution_error": str(e)},
             )
+            _record_hallucination(result.passed)
+            return result
 
         logger.info("l7_runtime_ok", assertion_count=len(assertions or []))
-        return ValidationResult(
+        result = ValidationResult(
             passed=True,
             level=HallucinationLevel.L7_RUNTIME,
             metadata={"assertions": assertions or [], "all_passed": True},
         )
+        _record_hallucination(result.passed)
+        return result

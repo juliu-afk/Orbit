@@ -24,6 +24,7 @@ from orbit.hallucination.schemas import (
     L6ContractMatch,
     ValidationResult,
 )
+from orbit.observability.metrics import record_hallucination_validation as _record_hallucination
 
 logger = structlog.get_logger()
 
@@ -57,11 +58,13 @@ class L6ContractValidator:
         # 解析 OpenAPI spec
         spec = await self._load_spec()
         if spec is None:
-            return ValidationResult(
+            result = ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L6_CONTRACT,
                 errors=[f"OpenAPI spec not found: {self._spec_path}"],
             )
+            _record_hallucination(result.passed)
+            return result
 
         # 提取 spec 定义的端点
         spec_endpoints = self._extract_spec_endpoints(spec)
@@ -80,7 +83,7 @@ class L6ContractValidator:
             # NOTE: spec 中定义但代码未实现的端点不报错（可能是其他文件定义）
 
         if violations:
-            return ValidationResult(
+            result = ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L6_CONTRACT,
                 errors=[
@@ -89,12 +92,16 @@ class L6ContractValidator:
                 ],
                 metadata={"violations": [v.model_dump() for v in violations]},
             )
+            _record_hallucination(result.passed)
+            return result
 
-        return ValidationResult(
+        result = ValidationResult(
             passed=True,
             level=HallucinationLevel.L6_CONTRACT,
             metadata={"checked_endpoints": len(spec_endpoints)},
         )
+        _record_hallucination(result.passed)
+        return result
 
     async def _load_spec(self) -> dict[str, Any] | None:
         """加载 OpenAPI spec（缓存结果）。"""

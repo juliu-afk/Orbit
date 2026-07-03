@@ -19,7 +19,26 @@ from dotenv import load_dotenv
 # 后端相对路径 (data/, configs/) 需基于 exe 位置解析。
 # Tauri main.rs 启动后端时设置 ORBIT_HOME 环境变量。
 _BASE = Path(os.environ.get("ORBIT_HOME", os.getcwd()))
-load_dotenv()
+
+
+def _find_dotenv(base: Path) -> Path | None:
+    """从 base 向上搜索目录树，找 .env 文件。
+
+    WHY 向上搜索: Tauri exe 在 Deliverables/ 子目录，.env 在项目根。
+    _BASE 可能指向 Deliverables/，需往上找。
+    """
+    for parent in [base] + list(base.parents):
+        dotenv = parent / ".env"
+        if dotenv.exists():
+            return dotenv
+    return None
+
+
+_dotenv_path = _find_dotenv(_BASE)
+if _dotenv_path is not None:
+    load_dotenv(_dotenv_path)
+else:
+    load_dotenv()
 
 
 def _get(key: str, default: str = "") -> str:

@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
@@ -178,6 +179,7 @@ class TaskRunner:
         self, role: str, task_id: str, context: dict[str, Any], timeout: int = 300
     ) -> str:
         """拉起 Agent 协程——AgentFactory 创建 + 注入依赖 + 超时保护."""
+        t_start = time.monotonic()
         if self._agent_factory is None:
             raise RuntimeError("AgentFactory 未配置")
 
@@ -212,40 +214,46 @@ class TaskRunner:
             self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, role=role)
 
         try:
-            ctx_dict = agent_context.to_dict() if hasattr(agent_context, "to_dict") else {}
-            agent_input = AgentInput(
-                task=ctx_dict.get("l3", {}).get("prd", ""),
-                context=ctx_dict,
-                role=role,  # type: ignore[arg-type]
-            )
-            output_obj = await asyncio.wait_for(agent.execute(agent_input), timeout=timeout)
-            if output_obj.status == "ok":
-                r = output_obj.result
-                output = r.get("design") or r.get("code") or r.get("review") or str(r)
-            else:
-                raise RuntimeError(f"Agent {role} 返回错误: {output_obj.error}")
-        except TimeoutError:  # P1-6: 兼容 Python <3.11
-            logger.warning("agent_timeout", role=role, task_id=task_id)
-            raise
-        except asyncio.CancelledError:
-            raise  # P0-1: 不吞取消信号
-        except Exception as e:
-            logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
-            if self._audit_logger:
-                self._audit_logger.log(
-                    "orchestrator", "agent_run_error", task_id=task_id, role=role, error=str(e)
+            try:
+                ctx_dict = agent_context.to_dict() if hasattr(agent_context, "to_dict") else {}
+                agent_input = AgentInput(
+                    task=ctx_dict.get("l3", {}).get("prd", ""),
+                    context=ctx_dict,
+                    role=role,  # type: ignore[arg-type]
                 )
-            raise
+                output_obj = await asyncio.wait_for(agent.execute(agent_input), timeout=timeout)
+                if output_obj.status == "ok":
+                    r = output_obj.result
+                    output = r.get("design") or r.get("code") or r.get("review") or str(r)
+                else:
+                    raise RuntimeError(f"Agent {role} 返回错误: {output_obj.error}")
+            except TimeoutError:  # P1-6: 兼容 Python <3.11
+                logger.warning("agent_timeout", role=role, task_id=task_id)
+                raise
+            except asyncio.CancelledError:
+                raise  # P0-1: 不吞取消信号
+            except Exception as e:
+                logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
+                if self._audit_logger:
+                    self._audit_logger.log(
+                        "orchestrator", "agent_run_error", task_id=task_id, role=role, error=str(e)
+                    )
+                raise
 
-        # 减熵闭环-2 B4: 记录文件编辑
-        try:
-            target_file = context.get("target_file", "")
-            if target_file and role:
-                self._edit_detector.record_edit(target_file, agent_id=role)
-        except Exception:
-            pass  # fail-open
+            # 减熵闭环-2 B4: 记录文件编辑
+            try:
+                target_file = context.get("target_file", "")
+                if target_file and role:
+                    self._edit_detector.record_edit(target_file, agent_id=role)
+            except Exception:
+                pass  # fail-open
 
-        return str(output)
+            return str(output)
+        finally:
+            elapsed = time.monotonic() - t_start
+            from orbit.observability.metrics import record_scheduling_latency
+
+            record_scheduling_latency("dispatch_task", elapsed)
 
     def _build_context(self, task_id: str, context: dict[str, Any]) -> Any:
         """构建 L1-L5 TaskContext."""

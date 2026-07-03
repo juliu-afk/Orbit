@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.agents.base import AgentRole, BaseAgent
+from orbit.agents.chatter import ChatterAgent
 from orbit.agents.clarifier import ClarifierAgent
 from orbit.agents.dream_agent import DreamAgent
 from orbit.agents.react_agent import ReActAgent
@@ -184,6 +185,7 @@ class AgentFactory:
         AgentRole.CONFIG_MANAGER: ConfigManagerAgent,
         AgentRole.CLARIFIER: ClarifierAgent,
         AgentRole.DREAM: DreamAgent,  # Phase 2: /dream 自进化
+        AgentRole.CHATTER: ChatterAgent,  # 通用对话——首触点
     }
 
     @classmethod

@@ -157,33 +157,44 @@ class TestMemoryScoring:
 
 
 class TestHydeGeneration:
-    """Phase 3: HyDE 接口预留（async wrapper 未来 PR 启用）。"""
+    """Phase 3: HyDE 接口——同步占位 + 异步 LLM 生成。"""
 
     def test_hyde_placeholder_returns_empty(self, tmp_path):
-        """P1-2: _generate_hyde_questions 当前始终返回空字符串。"""
+        """同步 _generate_hyde_questions 始终返回空——需用异步版。"""
         from orbit.memory.store import MemoryStore
 
         store = MemoryStore(str(tmp_path))
-        # 带 LLM 也返回空——async wrapper 待实现
+        # 同步版本无法 await LLM——返回空字符串是预期行为
         result = store._generate_hyde_questions("test", object())
         assert result == ""
 
-    def test_hyde_skipped_without_llm(self, tmp_path):
-        """无 LLM 时 append_to_file 不应崩溃，内容正常写入。"""
+    @pytest.mark.asyncio
+    async def test_hyde_async_without_llm_returns_empty(self, tmp_path):
+        """无 LLM 时异步版也返回空——不崩溃。"""
         from orbit.memory.store import MemoryStore
 
         store = MemoryStore(str(tmp_path))
-        store.append_to_file(MemoryFileType.EPISODIC, "bare memory")
-        mem = store.read_file(MemoryFileType.EPISODIC)
-        assert "bare memory" in mem.body
-        assert "HyDE" not in mem.body
+        result = await store._generate_hyde_questions_async("test", None)
+        assert result == ""
 
-    def test_hyde_interface_present(self):
-        """_generate_hyde_questions 方法存在——确保接口不退化。"""
+    @pytest.mark.asyncio
+    async def test_hyde_async_method_exists(self):
+        """_generate_hyde_questions_async 方法存在——确保接口不退化。"""
         from orbit.memory.store import MemoryStore
 
         store = MemoryStore()
-        assert hasattr(store, "_generate_hyde_questions")
+        assert hasattr(store, "_generate_hyde_questions_async")
+
+    @pytest.mark.asyncio
+    async def test_append_to_file_async_basic(self, tmp_path):
+        """异步追加——无 LLM 时与同步版行为一致。"""
+        from orbit.memory.store import MemoryFileType, MemoryStore
+
+        store = MemoryStore(str(tmp_path))
+        await store.append_to_file_async(MemoryFileType.EPISODIC, "async entry")
+        mem = store.read_file(MemoryFileType.EPISODIC)
+        assert "async entry" in mem.body
+        assert "HyDE" not in mem.body  # 无 LLM——不生成 HyDE
 
 
 class TestDreamVerifier:

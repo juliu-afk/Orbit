@@ -240,9 +240,9 @@ async def test_exec_command_success(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "hello world" in result
 
 
+@pytest.mark.skip(reason="P2-4: needs fixing")
 @pytest.mark.asyncio
-    @pytest.mark.skip(reason="P2-4: needs fixing")
-    test_exec_command_with_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_exec_command_with_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     """exec_command 有 stderr→格式含 stderr:."""
     from unittest.mock import AsyncMock, patch
 
@@ -258,9 +258,9 @@ async def test_exec_command_success(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "error msg" in result
 
 
+@pytest.mark.skip(reason="P2-4: needs fixing")
 @pytest.mark.asyncio
-    @pytest.mark.skip(reason="P2-4: needs fixing")
-    test_exec_command_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_exec_command_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     """exec_command 超时→返回超时消息."""
     from unittest.mock import AsyncMock, patch
 

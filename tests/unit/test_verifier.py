@@ -114,7 +114,7 @@ class TestValidateCommands:
             v._validate_commands(["python -c 'print(1)'"])
 
     @pytest.mark.skip(reason="P2-4: needs fixing")
-    test_python_c_no_space_also_disabled(self):
+    def test_python_c_no_space_also_disabled(self):
         """python -c\"...\"（无空格）也被拦截."""
         v = ExecutorVerifier()
         with pytest.raises(CommandNotAllowedError):

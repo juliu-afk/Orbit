@@ -1,0 +1,20 @@
+# MCP 客户端配置——Orbit 连接外部 MCP 服务器
+# 每个服务器的工具会自动注册到 ToolRegistry，
+# 并加上 "{name}/" 前缀（如 serena/find_symbol）
+servers:
+  # Serena —— 语义级代码导航与编辑（LSP 后端，40+ 语言）
+  - name: serena
+    command: serena
+    args:
+      - "start-mcp-server"
+      - "--context"
+      - "ide-assistant"
+    enabled: true
+    timeout_seconds: 30
+
+  # 示例：自定义 MCP 服务器
+  # - name: my-server
+  #   command: python
+  #   args: ["-m", "my_mcp_server"]
+  #   enabled: false
+  #   timeout_seconds: 30

@@ -31,11 +31,13 @@ class {{middleware_name}}Middleware(BaseHTTPMiddleware):
     ) -> Response:
         """请求前处理."""
         # TODO: 前置逻辑（鉴权/日志/计时等）
+        # 示例：request.state.start_time = time.time()
 
         response = await call_next(request)
 
         """响应后处理."""
         # TODO: 后置逻辑（审计/缓存/Header 注入等）
+        # 示例：response.headers["X-Process-Time"] = str(elapsed)
 
         return response
 

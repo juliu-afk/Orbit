@@ -90,6 +90,11 @@ class ComposeOrchestrator:
             except Exception as e:
                 logger.warning("compose_worktree_failed_fallback_off", error=str(e))
 
+        # Part A Step A5: brief 就绪检查——spec 指向新项目时自动生成
+        # WHY 同步检查: 项目说明书缺失 → Agent 上下文不完整 → 产出不一致
+        _project_path = getattr(spec, "project_path", "") or "."
+        await self._ensure_brief_ready(_project_path)
+
         # 2. Spec review（对标 MiMo spec review）
         spec_review = await self._spec_review(spec)
         if not spec_review.get("ok", True):
@@ -171,6 +176,31 @@ class ComposeOrchestrator:
         }
 
     # ── 内部门禁 ──────────────────────────────────
+
+    @staticmethod
+    async def _ensure_brief_ready(project_path: str) -> None:
+        """Part A Step A5: 检查项目说明书是否就绪，缺失时自动生成。
+
+        WHY fail-open: 生成失败不阻塞任务执行——Agent 可凭代码图谱
+        等其他 context 来源完成工作，只是质量可能略降。
+        """
+        if not project_path or project_path == ".":
+            return  # 无法确定项目路径——静默跳过
+        try:
+            from orbit.brief.checker import is_ready
+
+            if is_ready(project_path):
+                return  # 已就绪——无需操作
+
+            logger.info("brief_not_ready_generating", project_path=str(project_path))
+            from orbit.brief.generator import BriefGenerator
+
+            gen = BriefGenerator()
+            await gen.generate(project_path)
+            await gen.generate_all_context_md(project_path)
+            logger.info("brief_generated", project_path=str(project_path))
+        except Exception as e:
+            logger.warning("brief_ensure_failed", error=str(e))
 
     async def _spec_review(self, spec: Spec) -> dict[str, Any]:
         """方案审查门禁——检查 spec 完整性。"""

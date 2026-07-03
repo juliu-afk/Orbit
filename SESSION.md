@@ -1,5 +1,20 @@
 # Orbit 开发会话记录
 
+## 2026-07-03 — Clarifier .env 路径修复
+
+### PR #185: fix: Clarifier LLM 调用失败——.env 路径 + PyInstaller 漏打包 (MERGED)
+
+**根因**: Tauri 启动时 ORBIT_HOME=Deliverables/，load_dotenv() 从 CWD 找 .env 找不到
+→ API key 为 sk-dummy → LLM 401。PyInstaller 三处漏打包进一步阻断。
+
+**修复**:
+- config.py: `_find_dotenv()` 向上搜索目录树
+- clarifier.py: 降级消息暴露 error_type
+- orbit.spec: +litellm 子模块(自定义hook) + certifi cacert.pem + tiktoken_ext
+- hooks/hook-litellm.py: 手动 walk 补 115 个命名空间包子包
+
+**踩坑**: linter 多次 revert 修改文件，PyInstaller 4 次增量构建逐层排障
+
 ## 2026-07-01-02 — 全链路测试库 + 覆盖率冲刺
 
 ### 测试库 Phase 1-5 (全部 MERGED)

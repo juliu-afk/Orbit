@@ -19,6 +19,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.agents.factory import AgentFactory
 from orbit.api.dependencies import AuthMiddleware
+
 # 路由模块懒加载——create_app() 内部按需导入，避免测试时全量加载 26 个路由模块
 # _ROUTE_IMPORTS 映射: route_name -> (module_import_path, router_attr)
 _ROUTE_MODULES: dict[str, tuple[str, str]] = {
@@ -50,6 +51,38 @@ _ROUTE_MODULES: dict[str, tuple[str, str]] = {
     "diagnostics_ws": ("orbit.api.routes.diagnostics_ws", "router"),
     "health": ("orbit.api.routes.health", "router"),
 }
+
+from orbit.api.routes import (
+    agent_llm,
+    backup,
+    blame_routes,
+    chat,
+    codegraph_routes,
+    compliance,
+    compliance_routes,
+    compose,
+    diagnostics_ws,
+    dream,
+    files_routes,
+    git_routes,
+    goal,
+    health,
+    insights_routes,
+    knowledge,
+    loop,
+    observability,
+    projects,
+    review,
+    schedule,
+    search_routes,
+    sessions,
+    tasks,
+    terminal_routes,
+    tests_routes,
+    versioning,
+)
+
+
 from orbit.checkpoint.manager import CheckpointManager
 from orbit.compression.budget import TokenBudgetTracker as _BudgetTracker
 from orbit.compression.compressor import ContextCompressor as _ContextCompressor

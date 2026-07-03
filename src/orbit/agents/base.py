@@ -23,6 +23,7 @@ class AgentRole(StrEnum):
     CONFIG_MANAGER = "config_manager"
     CLARIFIER = "clarifier"  # 需求澄清 Agent
     DREAM = "dream"  # Phase 2: /dream 自进化 Agent（自然语言交互 PR）
+    CHATTER = "chatter"  # 通用对话 Agent——无约束，首触点
 
 
 class AgentInput(BaseModel):

@@ -13,6 +13,24 @@
 
     <!-- Tab A: 打开已有项目 -->
     <div v-if="mode === 'open'" class="tab-content">
+      <!-- 已注册项目列表 -->
+      <div v-if="existingProjects.length > 0" class="project-list-section">
+        <p class="section-label">已注册项目</p>
+        <div
+          v-for="p in existingProjects"
+          :key="p.name"
+          class="project-list-item"
+          :class="{ selected: selectedProject === p.name }"
+          @click="selectProject(p)"
+        >
+          <span class="pli-name">📁 {{ p.name }}</span>
+          <span class="pli-path">{{ p.local_path || p.path || '' }}</span>
+        </div>
+      </div>
+      <p v-else class="hint">暂无已注册项目——请手动输入路径或新建项目</p>
+
+      <!-- 手动输入路径 -->
+      <el-divider v-if="existingProjects.length > 0">或手动输入路径</el-divider>
       <el-input
         v-model="openPath"
         placeholder="粘贴项目文件夹路径，如 D:/Code-Insight-Financial"
@@ -57,8 +75,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useSessionStore } from '@/stores/session'
+
+interface ProjectItem {
+  name: string
+  local_path?: string
+  path?: string
+  repo_url?: string
+}
 
 const visible = defineModel<boolean>('visible', { default: false })
 const emit = defineEmits<{
@@ -73,6 +98,26 @@ const newParentDir = ref('')
 const pathError = ref('')
 const createError = ref('')
 const submitting = ref(false)
+const existingProjects = ref<ProjectItem[]>([])
+const selectedProject = ref('')
+
+// WHY 弹窗打开时自动拉取已注册项目列表：替代手动输入路径
+watch(visible, async (v) => {
+  if (v) {
+    try {
+      const r = await fetch('/api/v1/projects')
+      const j = await r.json()
+      if (j.code === 0 && Array.isArray(j.data)) {
+        existingProjects.value = j.data
+      }
+    } catch { /* fetch 失败静默回退到手动输入 */ }
+  }
+})
+
+function selectProject(p: ProjectItem) {
+  selectedProject.value = p.name
+  openPath.value = p.local_path || p.path || ''
+}
 
 // WHY 前端即时校验: 减少无效 API 请求，提升 UX
 const ILLEGAL_CHARS = /[<>"|?*]/
@@ -170,4 +215,16 @@ function resetForm() {
 .mb-8 { margin-bottom: 8px; }
 .hint { font-size: 12px; color: #888; margin-top: 6px; }
 .error { font-size: 12px; color: #f44336; margin-top: 6px; }
+.section-label { font-size: 12px; color: #888; margin-bottom: 8px; }
+.project-list-section { margin-bottom: 12px; }
+.project-list-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 10px; border-radius: 4px; cursor: pointer;
+  border: 1px solid #2a2a4a; margin-bottom: 4px;
+  transition: background 0.15s;
+}
+.project-list-item:hover { background: rgba(76, 175, 80, 0.08); }
+.project-list-item.selected { border-color: #4caf50; background: rgba(76, 175, 80, 0.12); }
+.pli-name { font-size: 13px; font-weight: 500; color: #e0e0e0; }
+.pli-path { font-size: 11px; color: #666; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

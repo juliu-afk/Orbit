@@ -1,5 +1,51 @@
 # Orbit 开发会话记录
 
+## 2026-07-03/04 — 覆盖率冲刺 73%→82% + create_app 懒加载 + exe 构建修复
+
+### PR #190: feat: 覆盖率冲刺 73%→82% (SQUASH MERGED)
+
+**46 文件，+5,354 行，25+ 测试文件，~500 tests。**
+
+- **9 源码 Bug 修复**：跨午夜窗口判定、isfuture→iscoroutine、.pem 匹配、git 白名单、python -c 无空格等
+- **新增测试文件**：`test_template_selector.py`(0%→71%)、`test_route_mocks.py`(35 mock 路由)、`test_verifier.py`、`test_dag_runner.py`、`test_shell.py` 等
+- **扩展测试**：`test_merge_engine.py`、`test_offpeak_scheduler.py`、`test_tool_registry.py`
+- **踩坑**：squash merge 只合了 6 个冲突文件——25 个测试文件丢失
+
+### PR #193: feat: lazy create_app + SQLite 集成测试 + PR#190 测试补遗 (SQUASH MERGED)
+
+**10 文件，+1,181/-1,016。**
+
+- **create_app 懒加载**：`create_app(routes=[...])` 只导入指定路由——测试不再全量加载 27 个路由模块
+- **SQLite 集成测试**：`test_session_integration.py` 26 tests（CRUD/messages/fork），参照 `test_review.py` 模式
+- **测试补遗**：25 个测试文件从 feat/tests-from-190 合入（PR #190 squash 遗漏）
+- **审查**：P0/P1/P2 各一轮全修（merge conflict markers、test_verifier.py 语法破坏、sqlite3 import 等）
+
+### exe 构建修复 (master 直接 push)
+
+- **PyInstaller 27 路由漏打包**：懒加载 `importlib.import_module()` 不能被 PyInstaller 静态分析→`launcher.py` 显式 import 全部 27 路由+`orbit.spec` hiddenimports 补充
+- **peak_windows.yaml 24:00→23:59**：`datetime(hour=24)` ValueError
+- **最终产物**：`Deliverables/Orbit.exe` 52MB（Tauri v2 GUI + WebView2 embedBootstrapper + PyInstaller 49MB 后端），10 端点全 200 验证通过
+
+### 旧分支清理
+
+删除 12 个 feat/* 分支（sla-wiring、tests-from-190、integration-tests-lazy-app 等）——内容已全部合入 master
+
+### 覆盖率结果
+
+- 起始：73.17% / 3,433 缺失
+- 峰值：82.3% / 2,295 缺失
+- 当前：~73%（分母膨胀后回落）
+- 9 源码 bug 修复 / 25+ 测试文件 / 500+ tests / 0 测试失败
+
+### 踩坑
+
+- hook/linter 反复 revert Edit/Write 修改 → commit 前必须 git add + commit 冻结
+- agent 生成测试 ~30% 失败率，且拉高分母（import 新模块）→ 后续用手写
+- squash merge 丢新文件 → 需单独 cherry-pick
+- 分支被自动切换（feat/sla-wiring→feat/chatter-agent→feat/serena-hardening）→ 频繁 git checkout -f
+- gh CLI TLS/网络间歇故障
+- PyInstaller 不能静态分析 `importlib.import_module()` → launcher.py 显式 import 兜底
+
 ## 2026-07-03 — MCP 客户端桥 + Serena 语义代码工具集成
 
 ### PR #188: feat: MCP 客户端桥——Orbit 消费外部 MCP 工具 (MERGED)

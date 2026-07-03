@@ -180,9 +180,51 @@ class PromptBuilder:
         parts = [
             ROLE_DESCRIPTIONS.get(role, ROLE_DESCRIPTIONS[AgentRole.DEVELOPER]),
             self._build_tools_guide(role, tools_schema),
+            self._build_mcp_guide(tools_schema),
             RULES_BLOCK,
         ]
         return "\n\n".join(parts)
+
+    @staticmethod
+    def _build_mcp_guide(tools_schema: list[dict] | None) -> str:
+        """当存在 MCP 语义工具时注入使用指南。
+
+        WHY: Agent 默认不知道 MCP 工具的存在和用法——需要显式教会。
+        WHY 动态提取前缀: 不硬编码 "serena"，未来支持其他 MCP 服务器。
+        """
+        if not tools_schema:
+            return ""
+        # 收集每个 MCP 服务器前缀及其工具名
+        mcp_by_prefix: dict[str, list[str]] = {}
+        for s in tools_schema:
+            name = s.get("function", {}).get("name", "")
+            if "/" not in name:
+                continue
+            prefix, tool = name.split("/", 1)
+            mcp_by_prefix.setdefault(prefix, []).append(tool)
+
+        if not mcp_by_prefix:
+            return ""
+
+        # 为每个 MCP 服务器生成指南
+        guides: list[str] = []
+        for prefix, tools in mcp_by_prefix.items():
+            tool_list = "`, `".join(tools[:6])
+            guides.append(f"""## {prefix} 语义代码工具（MCP）
+
+你拥有 **{prefix}**——LSP 驱动的语义代码导航工具。**优先使用 {prefix} 而非 grep/read_file 做代码定位：**
+
+| 任务 | ❌ 旧方式 | ✅ 用 {prefix} |
+|------|----------|-------------|
+| 定位函数/类定义 | `grep` 猜位置 | `{prefix}/find_symbol` 精确到行 |
+| 查调用者/引用 | `grep` 搜函数名 | `{prefix}/find_referencing_symbols` 100% 准确 |
+| 读文件结构 | `read_file` 整文件（~15K tokens） | `{prefix}/get_symbols_overview` ~300 tokens |
+| 跨文件重命名 | 手工 `edit_file` 逐个改 | `{prefix}/rename_symbol` 原子操作 |
+| 替换函数体 | `edit_file` 字符串匹配（脆弱） | `{prefix}/replace_symbol_body` 手术级 |
+
+**原则**：先 `get_symbols_overview` → `find_symbol` → 再动代码。
+可用工具：`{tool_list}` 等。""")
+        return "\n\n".join(guides)
 
     @staticmethod
     def _build_tools_guide(role: AgentRole, tools_schema: list[dict] | None) -> str:

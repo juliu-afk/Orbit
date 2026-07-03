@@ -23,6 +23,7 @@ from orbit.hallucination.schemas import (
     HallucinationLevel,
     ValidationResult,
 )
+from orbit.observability.metrics import record_hallucination_validation as _record_hallucination
 
 logger = structlog.get_logger("orbit.hallucination.l4")
 
@@ -58,11 +59,13 @@ class L4TypeValidator:
         # 检查 mypy 是否可用（缓存结果）
         available = await self._check_available()
         if not available:
-            return ValidationResult(
+            result = ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L4_TYPE,
                 errors=["mypy is not installed or not found in PATH"],
             )
+            _record_hallucination(result.passed)
+            return result
 
         # 写临时文件（mypy 需文件输入，不支持 stdin）
         with tempfile.NamedTemporaryFile(
@@ -72,7 +75,9 @@ class L4TypeValidator:
             tmp_path = Path(f.name)
 
         try:
-            return await self._run_mypy(tmp_path)
+            result = await self._run_mypy(tmp_path)
+            _record_hallucination(result.passed)
+            return result
         finally:
             try:
                 tmp_path.unlink(missing_ok=True)

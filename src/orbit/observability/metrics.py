@@ -66,12 +66,12 @@ orbit_hallucination_entropy_gauge = Gauge(
 )
 
 # Charter SLA: 幻觉率 < 3%——验证层误判/总验证次数
-# WHY 分层: false_positive 记录验证层误报（正常输出被判定为幻觉），
-# 用于计算幻觉率 = false_positive / total_validations
+# label `pass` 记录通过（代码被验证层放行），`flag` 记录拦截。
+# 幻觉率 = flag / (pass + flag)，需人工审查 flag 中的 false_positive 率
 orbit_hallucination_validations_total = Counter(
     "orbit_hallucination_validations_total",
     "防幻觉验证次数 (Charter SLA 指标)",
-    ["result"],  # false_positive | true_positive | true_negative
+    ["result"],  # pass | flag
 )
 
 # ---- 调度器指标 (Charter SLA) -----------------------------------
@@ -123,19 +123,16 @@ orbit_knowledge_queries_total = Counter(
 )
 
 
-def record_hallucination_validation(is_false_positive: bool) -> None:
+def record_hallucination_validation(passed: bool) -> None:
     """记录防幻觉验证结果——用于 Charter SLA 幻觉率计算。
 
     在验证层判定后调用：L4/L5/L6/L7 validate() 返回时，
-    若结果与实际代码行为不符（误判），传 is_false_positive=True。
-    正常判定（真阳性或真阴性）传 is_false_positive=False。
-
-    WHY 集中记录: 每个验证层独立调用，Prometheus 自动聚合。
+    passed=True → `pass`（放行），passed=False → `flag`（拦截）。
+    SLA 幻觉率 = flag / (pass + flag)。
     """
-    if is_false_positive:
-        orbit_hallucination_validations_total.labels(result="false_positive").inc()
-    else:
-        orbit_hallucination_validations_total.labels(result="true_positive").inc()
+    orbit_hallucination_validations_total.labels(
+        result="pass" if passed else "flag"
+    ).inc()
 
 
 def record_scheduling_latency(operation: str, duration_seconds: float) -> None:
@@ -176,10 +173,8 @@ def snapshot() -> dict[str, Any]:
             "dispatch_task": _histogram_avg(orbit_scheduling_latency_seconds, {"operation": "dispatch_task"}),
         },
         "sla_hallucination_rate": {
-            "false_positives": _counter_value(orbit_hallucination_validations_total, {"result": "false_positive"}),
-            "total_validations": _counter_value(orbit_hallucination_validations_total, {"result": "true_positive"})
-            + _counter_value(orbit_hallucination_validations_total, {"result": "false_positive"})
-            + _counter_value(orbit_hallucination_validations_total, {"result": "true_negative"}),
+            "pass": _counter_value(orbit_hallucination_validations_total, {"result": "pass"}),
+            "flag": _counter_value(orbit_hallucination_validations_total, {"result": "flag"}),
         },
         "circuit_breaker_state": {
             "z3": orbit_circuit_breaker_state.labels(breaker="z3")._value.get(),

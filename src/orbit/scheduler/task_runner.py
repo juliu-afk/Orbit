@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
@@ -37,7 +38,7 @@ logger = structlog.get_logger("orbit.scheduler.runner")
 
 # 状态→角色映射（从 Scheduler._agent_cycle 移出）
 ROLE_MAP: dict[TaskState, str] = {
-    TaskState.IDLE: "clarifier",
+    TaskState.IDLE: "chatter",  # 首触点——通用对话，检测到编程意图后路由到 clarifier
     TaskState.PARSING: "clarifier",
     TaskState.PLANNING: "architect",
     TaskState.CODING: "developer",
@@ -119,7 +120,15 @@ class TaskRunner:
                 self._publish_task_update(
                     task_id, state.value, _state_to_progress(state), context=context
                 )
-                state = _transition(state, self._fast_lane)
+
+                # 意图路由: IDLE 状态由 chatter 接管——
+                # chat → 结束, programming → 正常进入 PARSING
+                if state == TaskState.IDLE and context.get("chatter_intent") == "chat":
+                    state = TaskState.DONE
+                    logger.info("task_chat_complete", task_id=task_id)
+                else:
+                    state = _transition(state, self._fast_lane)
+
                 await self._save_checkpoint(task_id, state, context)
             except asyncio.CancelledError:
                 raise  # P0-1: 不吞取消信号，保持协作式取消语义
@@ -147,7 +156,11 @@ class TaskRunner:
     # ── Agent 循环 ──────────────────────────────────────
 
     async def _agent_cycle(self, task_id: str, state: TaskState, context: dict[str, Any]) -> str:
-        """单个 Agent 循环——按状态映射角色→拉起 Agent 执行."""
+        """单个 Agent 循环——按状态映射角色→拉起 Agent 执行.
+
+        IDLE 状态特殊处理: chatter agent 返回 _intent 标记，
+        "chat" → 结束任务, "programming" → 继续进入 PARSING (clarifier).
+        """
         role = ROLE_MAP.get(state)
         if role and self._agent_factory is not None:
             context["state"] = state.value
@@ -170,14 +183,43 @@ class TaskRunner:
                 except Exception as e:
                     logger.warning("router_evaluate_failed", error=str(e))
 
-            return await self._run_agent(role, task_id, context)
+            result = await self._run_agent(role, task_id, context)
+
+            # IDLE + chatter: 提取意图标记用于路由决策
+            if state == TaskState.IDLE and role == "chatter":
+                intent = self._extract_chatter_intent(result)
+                context["chatter_intent"] = intent
+                logger.info(
+                    "chatter_intent_detected",
+                    task_id=task_id,
+                    intent=intent,
+                )
+
+            return result
 
         raise RuntimeError(f"状态 {state.value} 无 Agent 角色映射，Orbit 不支持直接 LLM 调用。")
+
+    @staticmethod
+    def _extract_chatter_intent(output: str) -> str:
+        """从 chatter agent 输出中提取意图标记。"""
+        import json as _json
+        import re as _re
+
+        try:
+            data = _json.loads(output)
+            return data.get("_intent", "chat")
+        except (_json.JSONDecodeError, ValueError, TypeError):
+            pass
+        match = _re.search(r'"__?intent__?"\s*:\s*"(chat|programming)"', output)
+        if match:
+            return match.group(1)
+        return "chat"
 
     async def _run_agent(
         self, role: str, task_id: str, context: dict[str, Any], timeout: int = 300
     ) -> str:
         """拉起 Agent 协程——AgentFactory 创建 + 注入依赖 + 超时保护."""
+        t_start = time.monotonic()
         if self._agent_factory is None:
             raise RuntimeError("AgentFactory 未配置")
 
@@ -212,40 +254,46 @@ class TaskRunner:
             self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, role=role)
 
         try:
-            ctx_dict = agent_context.to_dict() if hasattr(agent_context, "to_dict") else {}
-            agent_input = AgentInput(
-                task=ctx_dict.get("l3", {}).get("prd", ""),
-                context=ctx_dict,
-                role=role,  # type: ignore[arg-type]
-            )
-            output_obj = await asyncio.wait_for(agent.execute(agent_input), timeout=timeout)
-            if output_obj.status == "ok":
-                r = output_obj.result
-                output = r.get("design") or r.get("code") or r.get("review") or str(r)
-            else:
-                raise RuntimeError(f"Agent {role} 返回错误: {output_obj.error}")
-        except TimeoutError:  # P1-6: 兼容 Python <3.11
-            logger.warning("agent_timeout", role=role, task_id=task_id)
-            raise
-        except asyncio.CancelledError:
-            raise  # P0-1: 不吞取消信号
-        except Exception as e:
-            logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
-            if self._audit_logger:
-                self._audit_logger.log(
-                    "orchestrator", "agent_run_error", task_id=task_id, role=role, error=str(e)
+            try:
+                ctx_dict = agent_context.to_dict() if hasattr(agent_context, "to_dict") else {}
+                agent_input = AgentInput(
+                    task=ctx_dict.get("l3", {}).get("prd", ""),
+                    context=ctx_dict,
+                    role=role,  # type: ignore[arg-type]
                 )
-            raise
+                output_obj = await asyncio.wait_for(agent.execute(agent_input), timeout=timeout)
+                if output_obj.status == "ok":
+                    r = output_obj.result
+                    output = r.get("design") or r.get("code") or r.get("review") or str(r)
+                else:
+                    raise RuntimeError(f"Agent {role} 返回错误: {output_obj.error}")
+            except TimeoutError:  # P1-6: 兼容 Python <3.11
+                logger.warning("agent_timeout", role=role, task_id=task_id)
+                raise
+            except asyncio.CancelledError:
+                raise  # P0-1: 不吞取消信号
+            except Exception as e:
+                logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
+                if self._audit_logger:
+                    self._audit_logger.log(
+                        "orchestrator", "agent_run_error", task_id=task_id, role=role, error=str(e)
+                    )
+                raise
 
-        # 减熵闭环-2 B4: 记录文件编辑
-        try:
-            target_file = context.get("target_file", "")
-            if target_file and role:
-                self._edit_detector.record_edit(target_file, agent_id=role)
-        except Exception:
-            pass  # fail-open
+            # 减熵闭环-2 B4: 记录文件编辑
+            try:
+                target_file = context.get("target_file", "")
+                if target_file and role:
+                    self._edit_detector.record_edit(target_file, agent_id=role)
+            except Exception:
+                pass  # fail-open
 
-        return str(output)
+            return str(output)
+        finally:
+            elapsed = time.monotonic() - t_start
+            from orbit.observability.metrics import record_scheduling_latency
+
+            record_scheduling_latency("dispatch_task", elapsed)
 
     def _build_context(self, task_id: str, context: dict[str, Any]) -> Any:
         """构建 L1-L5 TaskContext."""
@@ -595,3 +643,7 @@ def _state_to_progress(state: TaskState) -> float:
         TaskState.CANCELLED: 1.0,
     }
     return mapping.get(state, 0.0)
+
+# ── 状态流转图 (ChatterAgent 意图路由) ─────────────────
+# IDLE(chatter) → chat intent → DONE
+# IDLE(chatter) → programming intent → PARSING(clarifier) → PLANNING(architect) → CODING(developer) → VERIFYING(reviewer) → DONE

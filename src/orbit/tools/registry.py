@@ -136,6 +136,8 @@ class ToolRegistry:
         self._invocations: list[ToolInvocation] = []
         # Doom Loop 追踪: agent_name -> tool_name -> list[ToolCall]
         self._tool_history: dict[str, dict[str, list[ToolCall]]] = {}
+        # MCP 客户端连接: server_name -> MCPClientConnection
+        self._mcp_connections: dict[str, Any] = {}
 
     # ── 单例 ─────────────────────────────────────────
 
@@ -247,10 +249,16 @@ class ToolRegistry:
         "dream": {"read_file", "grep", "glob"},
     }
 
+    # MCP 工具自动授予的角色——这些角色需要代码导航/编辑能力
+    # WHY: MCP 工具名是动态的（serena/find_symbol），无法在 ROLE_TOOLS 中
+    # 静态枚举。改为按 toolset 前缀 `mcp:` 自动匹配。
+    MCP_ROLES: set[str] = {"architect", "developer", "reviewer", "qa"}
+
     def list_for_role(self, role_value: str) -> list[dict]:
         """返回指定角色可用的工具 JSON Schema.
 
         WHY: 按角色裁剪工具列表——关闭不该有的门。
+        MCP 工具（toolset 以 `mcp:` 开头）自动授予代码相关角色。
         """
         # 未知角色回退空集——最小权限原则：新角色默认无工具
         allowed = self.ROLE_TOOLS.get(role_value, set())
@@ -258,7 +266,12 @@ class ToolRegistry:
         seen: set[str] = set()
 
         for name, entry in self._entries.items():
+            # 本地工具：走白名单
             if name in allowed:
+                schemas.append(entry.schema)
+                seen.add(name)
+            # MCP 工具：自动授予有代码能力的角色
+            elif entry.toolset.startswith("mcp:") and role_value in self.MCP_ROLES:
                 schemas.append(entry.schema)
                 seen.add(name)
 
@@ -648,6 +661,132 @@ class ToolRegistry:
             return False
         dq.append(now)
         return True
+
+    # ── MCP 客户端集成 ─────────────────────────────────────
+
+    def connect_mcp_server(
+        self,
+        name: str,
+        command: str,
+        args: list[str],
+        env: dict[str, str] | None = None,
+        timeout: int = 30,
+    ) -> int:
+        """连接外部 MCP 服务器，发现并注册其工具。
+
+        WHY: 让 Orbit Agent 透明调用外部 MCP 工具（如 Serena 的语义代码导航），
+        通过 MCP 协议桥接——Agent 不感知工具是本地还是远程。
+
+        Returns:
+            成功注册的工具数量（0 = 无工具或连接失败）
+        """
+        # WHY: 防止重复连接——先断开旧连接再建新连接
+        if name in self._mcp_connections:
+            old = self._mcp_connections.pop(name)
+            try:
+                old.disconnect()
+            except Exception:
+                pass
+
+        from orbit.tools.mcp_client import MCPClientConnection, MCPClientError
+
+        conn = MCPClientConnection(name=name, command=command, args=args, env=env)
+        conn.CALL_TIMEOUT = timeout
+
+        try:
+            conn.connect()
+        except MCPClientError as e:
+            logger.warning("mcp_connect_failed", server=name, error=str(e))
+            return 0
+
+        try:
+            tools = conn.list_tools()
+        except MCPClientError as e:
+            logger.warning("mcp_list_tools_failed", server=name, error=str(e))
+            conn.disconnect()
+            return 0
+
+        count = 0
+        for tool in tools:
+            tool_name = tool.get("name", "")
+            if not tool_name:
+                continue
+            # 加服务器前缀避免与本地工具名冲突
+            prefixed_name = f"{name}/{tool_name}"
+            schema = self._convert_mcp_schema(prefixed_name, tool)
+            handler = self._create_mcp_handler(name, conn, tool_name)
+
+            self.register_tool(
+                name=prefixed_name,
+                toolset=f"mcp:{name}",
+                schema=schema,
+                handler=handler,
+                concurrency="safe",
+            )
+            count += 1
+
+        self._mcp_connections[name] = conn
+        logger.info("mcp_server_registered", server=name, tools=count)
+        return count
+
+    def disconnect_mcp_servers(self) -> None:
+        """断开所有 MCP 服务器连接——应用关闭时调用。"""
+        for name, conn in list(self._mcp_connections.items()):
+            try:
+                conn.disconnect()
+            except Exception:
+                pass
+        self._mcp_connections.clear()
+
+    @staticmethod
+    def _convert_mcp_schema(prefixed_name: str, tool: dict[str, Any]) -> dict[str, Any]:
+        """MCP inputSchema → OpenAI function calling 格式。
+
+        WHY 转换: Orbit 的 ToolEntry.schema 使用 OpenAI function calling 格式，
+        与 LLM 的 tool_calls 参数一致，无需额外适配层。
+        """
+        input_schema = tool.get("inputSchema", {})
+        return {
+            "type": "function",
+            "function": {
+                "name": prefixed_name,
+                "description": tool.get("description", ""),
+                "parameters": {
+                    "type": input_schema.get("type", "object"),
+                    "properties": input_schema.get("properties", {}),
+                    "required": input_schema.get("required", []),
+                },
+            },
+        }
+
+    def _create_mcp_handler(
+        self,
+        server_name: str,
+        conn: Any,
+        tool_name: str,
+    ) -> ToolHandler:
+        """创建 MCP 工具调用闭包——将 ToolRegistry 调用转发到 MCP 服务器。
+
+        WHY 闭包而非类方法: 每个远程工具绑定不同的 tool_name，
+        闭包捕获 server_name + conn + tool_name，无需为每个工具创建类。
+        """
+        from orbit.tools.mcp_client import MCPClientError
+
+        def handler(**kwargs: Any) -> str:
+            try:
+                return conn.call_tool(tool_name, kwargs)
+            except MCPClientError as e:
+                return f"MCP 工具调用失败 [{server_name}/{tool_name}]: {e}"
+            except Exception as e:
+                logger.error(
+                    "mcp_handler_error",
+                    server=server_name,
+                    tool=tool_name,
+                    error=str(e),
+                )
+                return f"MCP 工具异常 [{server_name}/{tool_name}]: {e}"
+
+        return handler
 
 
 # ── 模块级函数 ─────────────────────────────────────────

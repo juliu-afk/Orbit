@@ -7,6 +7,7 @@ _execute_node_with_retry / _execute_node / _save_dag_checkpoint.
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -15,6 +16,7 @@ import structlog
 from orbit.checkpoint.manager import CheckpointData, CheckpointManager
 from orbit.events.bus import EventBus
 from orbit.events.schemas import DashboardEvent, TaskUpdatePayload
+from orbit.observability.metrics import record_scheduling_latency
 from orbit.scheduler.graph import GraphNode, NodeStatus, TaskGraph
 
 if TYPE_CHECKING:
@@ -57,6 +59,7 @@ class DagRunner:
 
     async def run_dag(self, graph: TaskGraph) -> dict[str, NodeStatus]:
         """DAG 入口: 验证→拓扑排序→分层并发执行."""
+        t_start = time.monotonic()
         graph.validate_dag()
         layers = graph.topological_sort()
         logger.info(
@@ -78,6 +81,8 @@ class DagRunner:
                 break
 
         results = {n.id: n.status for n in graph.nodes}
+        elapsed = time.monotonic() - t_start
+        record_scheduling_latency("run_dag", elapsed)
         logger.info("dag_execution_complete", task_id=graph.task_id, results=results)
         return results
 

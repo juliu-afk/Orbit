@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
+from pathlib import Path
 
 import redis.asyncio as aioredis
 import structlog
@@ -18,6 +20,39 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.agents.factory import AgentFactory
 from orbit.api.dependencies import AuthMiddleware
+
+# 路由模块懒加载——create_app() 内部按需导入，避免测试时全量加载 26 个路由模块
+# _ROUTE_IMPORTS 映射: route_name -> (module_import_path, router_attr)
+_ROUTE_MODULES: dict[str, tuple[str, str]] = {
+    "tasks": ("orbit.api.routes.tasks", "router"),
+    "knowledge": ("orbit.api.routes.knowledge", "router"),
+    "compliance": ("orbit.api.routes.compliance", "router"),
+    "observability": ("orbit.api.routes.observability", "router"),
+    "backup": ("orbit.api.routes.backup", "router"),
+    "versioning": ("orbit.api.routes.versioning", "router"),
+    "chat": ("orbit.api.routes.chat", "router"),
+    "sessions": ("orbit.api.routes.sessions", "router"),
+    "projects": ("orbit.api.routes.projects", "router"),
+    "agent_llm": ("orbit.api.routes.agent_llm", "router"),
+    "compose": ("orbit.api.routes.compose", "router"),
+    "dream": ("orbit.api.routes.dream", "router"),
+    "goal": ("orbit.api.routes.goal", "router"),
+    "loop": ("orbit.api.routes.loop", "router"),
+    "review": ("orbit.api.routes.review", "router"),
+    "files_routes": ("orbit.api.routes.files_routes", "router"),
+    "git_routes": ("orbit.api.routes.git_routes", "router"),
+    "codegraph_routes": ("orbit.api.routes.codegraph_routes", "router"),
+    "search_routes": ("orbit.api.routes.search_routes", "router"),
+    "tests_routes": ("orbit.api.routes.tests_routes", "router"),
+    "blame_routes": ("orbit.api.routes.blame_routes", "router"),
+    "schedule": ("orbit.api.routes.schedule", "router"),
+    "insights_routes": ("orbit.api.routes.insights_routes", "router"),
+    "compliance_routes": ("orbit.api.routes.compliance_routes", "router"),
+    "terminal_routes": ("orbit.api.routes.terminal_routes", "router"),
+    "diagnostics_ws": ("orbit.api.routes.diagnostics_ws", "router"),
+    "health": ("orbit.api.routes.health", "router"),
+}
+
 from orbit.api.routes import (
     agent_llm,
     backup,
@@ -47,6 +82,8 @@ from orbit.api.routes import (
     tests_routes,
     versioning,
 )
+
+
 from orbit.checkpoint.manager import CheckpointManager
 from orbit.compression.budget import TokenBudgetTracker as _BudgetTracker
 from orbit.compression.compressor import ContextCompressor as _ContextCompressor
@@ -285,6 +322,61 @@ terminal_routes.set_workspace(_ws_dir)
 diagnostics_ws.set_diagnostic_service(_diagnostic_service)
 
 
+# ── MCP 客户端：连接外部 MCP 服务器 ──
+def _load_and_connect_mcp(registry: ToolRegistry) -> None:
+    """从 YAML 配置加载并连接 MCP 服务器。
+
+    WHY 独立函数: 启动逻辑可复用。失败降级不阻断 Orbit 启动。
+    """
+    import yaml
+
+    config_path = Path(settings.WORKSPACE_DIR or os.getcwd()) / "configs" / "mcp_clients.yaml"
+    if not config_path.exists():
+        logger.info("mcp_no_config", path=str(config_path))
+        return
+
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+    except Exception as e:
+        logger.warning("mcp_config_parse_failed", error=str(e))
+        return
+
+    for server in config.get("servers", []):
+        name = server.get("name", "")
+        if not name or not server.get("enabled", True):
+            continue
+
+        # WHY: 检测命令是否可执行——提前给出人类可读提示，而非等子进程报错
+        command = server["command"]
+        command_available = False
+        try:
+            command_available = shutil.which(command) is not None
+        except Exception:
+            pass
+
+        if not command_available:
+            logger.info(
+                "mcp_command_not_found",
+                server=name,
+                command=command,
+                hint=f"请安装: pip install {name}-agent 或 uv tool install {name}-agent",
+            )
+            # 不阻断——该服务器跳过，其他服务器继续
+            continue
+
+        try:
+            n = registry.connect_mcp_server(
+                name=name,
+                command=command,
+                args=server.get("args", []),
+                timeout=server.get("timeout_seconds", 30),
+            )
+            logger.info("mcp_server_connected", server=name, tools_registered=n)
+        except Exception as e:
+            logger.warning("mcp_connect_failed", server=name, error=str(e))
+
+
 # ── 应用生命周期（替代已移除的 on_event / add_event_handler）──
 # WHY lifespan: FastAPI 0.136+/Starlette 0.49+ 移除了 add_event_handler，
 # 所有启动/关闭逻辑必须统一到 lifespan 上下文管理器。
@@ -321,9 +413,20 @@ async def _app_lifespan(app: FastAPI) -> None:
         app.state.peak_window_manager = _peak_manager
         logger.info("offpeak_scheduler_initialized", config_path=settings.OFFPEAK_CONFIG_PATH)
 
+    # MCP 客户端：连接外部服务器（如 Serena）——启动时自动发现工具
+    try:
+        _load_and_connect_mcp(ToolRegistry.get_instance())
+    except Exception:
+        logger.exception("mcp_init_failed")
+
     yield  # 应用运行中
 
     # ── 关闭阶段 ──
+    # MCP 客户端：断开所有外部连接
+    try:
+        ToolRegistry.get_instance().disconnect_mcp_servers()
+    except Exception:
+        pass
     await _review_engine.dispose()  # P0-8: 释放连接池
 
 

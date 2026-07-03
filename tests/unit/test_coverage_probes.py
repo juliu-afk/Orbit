@@ -354,3 +354,162 @@ class TestConstants:
     def test_probe_timeout_positive(self):
         """超时常量 > 0。"""
         assert PROBE_TIMEOUT_SECONDS > 0
+
+
+# ════════════════════════════════════════════
+# 7. _try_repair 独立测试
+# ════════════════════════════════════════════
+
+
+class TestTryRepair:
+    @pytest.mark.asyncio
+    async def test_try_repair_success(self):
+        """修复函数存在且成功→True."""
+        engine = StartupProbeEngine()
+        check = ProbeResult("test", "测试")
+
+        with patch.dict(
+            "orbit.observability.probes._REPAIR_FUNCTIONS",
+            {"test": AsyncMock(return_value="修复完成")},
+        ):
+            result = await engine._try_repair(check)
+
+        assert result is True
+        assert "修复完成" in check.message
+
+    @pytest.mark.asyncio
+    async def test_try_repair_not_registered(self):
+        """无修复函数→False."""
+        engine = StartupProbeEngine()
+        check = ProbeResult("norepair", "无修复")
+
+        result = await engine._try_repair(check)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_try_repair_exception(self):
+        """修复函数异常→False."""
+        engine = StartupProbeEngine()
+        check = ProbeResult("broken", "损坏")
+
+        with patch.dict(
+            "orbit.observability.probes._REPAIR_FUNCTIONS",
+            {"broken": AsyncMock(side_effect=RuntimeError("修复失败"))},
+        ):
+            result = await engine._try_repair(check)
+
+        assert result is False
+
+
+# ════════════════════════════════════════════
+# 8. 自愈函数
+# ════════════════════════════════════════════
+
+
+class TestRepairFunctions:
+    @pytest.mark.asyncio
+    async def test_repair_environment(self):
+        """环境自愈→返回默认配置消息."""
+        from orbit.observability.probes import _repair_environment
+
+        result = await _repair_environment()
+        assert "默认环境配置" in result
+
+    @pytest.mark.asyncio
+    async def test_repair_session_store_delegates(self):
+        """会话存储自愈→委托给 _repair_database."""
+        from orbit.observability.probes import _repair_session_store
+
+        with patch(
+            "orbit.observability.probes._repair_database",
+            AsyncMock(return_value="db fixed"),
+        ):
+            result = await _repair_session_store()
+
+        assert result == "db fixed"
+
+
+# ════════════════════════════════════════════
+# 9. 探针函数
+# ════════════════════════════════════════════
+
+
+class TestProbeFunctions:
+    @pytest.mark.asyncio
+    async def test_probe_llm_gateway_success(self):
+        """LLM 网关模块存在→就绪."""
+        from orbit.observability.probes import _probe_llm_gateway
+
+        with patch.dict("sys.modules", {"orbit.gateway.client": MagicMock()}):
+            result = await _probe_llm_gateway()
+
+        assert "就绪" in result
+
+    @pytest.mark.asyncio
+    async def test_probe_llm_gateway_import_error(self):
+        """LLM 网关模块未导入→非致命跳过."""
+        from orbit.observability.probes import _probe_llm_gateway
+
+        with patch.dict("sys.modules", {"orbit.gateway.client": None}):
+            result = await _probe_llm_gateway()
+
+        assert "未导入" in result
+
+    @pytest.mark.asyncio
+    async def test_probe_code_graph_success(self):
+        """代码图谱模块存在→就绪."""
+        from orbit.observability.probes import _probe_code_graph
+
+        with patch.dict("sys.modules", {"orbit.graph.meta_graph": MagicMock()}):
+            result = await _probe_code_graph()
+
+        assert "就绪" in result
+
+    @pytest.mark.asyncio
+    async def test_probe_code_graph_not_ready(self):
+        """代码图谱模块未就绪→非关键路径."""
+        from orbit.observability.probes import _probe_code_graph
+
+        with patch.dict("sys.modules", {"orbit.graph.meta_graph": None}):
+            result = await _probe_code_graph()
+
+        assert "未就绪" in result
+
+    @pytest.mark.asyncio
+    async def test_probe_environment_success(self):
+        """环境探针→返回配置加载成功."""
+        from orbit.observability.probes import _probe_environment
+
+        mock_settings = MagicMock()
+        mock_settings.PROJECT_NAME = "Orbit"
+        mock_settings.SANDBOX_TIMEOUT_SECONDS = 30
+        with patch("orbit.observability.probes.settings", mock_settings, create=True):
+            result = await _probe_environment()
+
+        assert "Orbit" in result
+        assert "配置加载成功" in result
+
+
+# ════════════════════════════════════════════
+# 10. Docker 辅助函数扩展
+# ════════════════════════════════════════════
+
+
+class TestDockerHelpersExtended:
+    def test_docker_is_installed_windows_default_path(self, monkeypatch):
+        """Windows 默认安装路径→True."""
+        import shutil
+
+        monkeypatch.setattr(shutil, "which", lambda x: None)
+        monkeypatch.setattr("os.name", "nt")
+        with patch("os.path.exists", return_value=True):
+            assert _docker_is_installed() is True
+
+    def test_start_docker_service_unix(self):
+        """Unix 下启动 Docker→调用 systemctl."""
+        with patch("subprocess.run") as mock_run:
+            with patch("os.name", "posix"):
+                _start_docker_service()
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0] == ["systemctl", "start", "docker"]

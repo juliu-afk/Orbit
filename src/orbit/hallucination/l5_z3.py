@@ -21,6 +21,7 @@ from orbit.hallucination.schemas import (
     HallucinationLevel,
     L5ValidationResult,
 )
+from orbit.observability.metrics import record_hallucination_validation as _record_hallucination
 
 logger = structlog.get_logger("orbit.hallucination.l5")
 
@@ -53,24 +54,30 @@ class L5Z3Validator:
         # 解析 @formal 装饰器提取契约
         contract = self._parse_contract(func_code)
         if contract is None:
-            return L5ValidationResult(
+            result = L5ValidationResult(
                 passed=True,
                 level=HallucinationLevel.L5_Z3,
                 z3_status="skipped",
                 warnings=["No @formal decorator found, skipped"],
             )
+            _record_hallucination(result.passed)
+            return result
 
         # 构造 Z3 公式并求解
         try:
-            return await self._solve(contract)
+            result = await self._solve(contract)
+            _record_hallucination(result.passed)
+            return result
         except Exception as e:
             logger.warning("l5_z3_error", error=str(e))
-            return L5ValidationResult(
+            result = L5ValidationResult(
                 passed=True,
                 level=HallucinationLevel.L5_Z3,
                 z3_status="unknown",
                 warnings=[f"Z3 solver error: {e}"],
             )
+            _record_hallucination(result.passed)
+            return result
 
     def _parse_contract(self, func_code: str) -> dict[str, Any] | None:
         """从 @formal 装饰器提取 pre/post conditions。

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 import tempfile
 
 import pytest
@@ -17,7 +18,6 @@ from orbit.sessions.registry import SessionRegistry
 @pytest.fixture
 def reg():
     """临时 SQLite 数据库——创建 projects 表满足 FK 约束，隔离测试。"""
-    import sqlite3
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     # 创建 projects 表以满足 sessions 表 FK

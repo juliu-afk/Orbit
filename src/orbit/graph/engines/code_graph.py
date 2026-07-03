@@ -247,6 +247,35 @@ class CodeGraphEngine(GraphEngineBase):
             nodes = result.scalars().all()
             return list({n.file_path for n in nodes if n.file_path})
 
+    async def find_definitions_with_positions(
+        self, symbol_name: str
+    ) -> list[dict[str, Any]]:
+        """查询符号定义位置——含行号信息。
+
+        WHY: /codegraph/definition 端点需要返回精确行号，
+        而非仅 file_path。CodeNode 已有 start_line/end_line 字段。
+        """
+        from sqlalchemy import select as sa_select
+
+        async with self.session_factory() as session:
+            stmt = sa_select(CodeNode).where(CodeNode.name == symbol_name)
+            result = await session.execute(stmt)
+            nodes = result.scalars().all()
+            seen: set[str] = set()
+            definitions: list[dict[str, Any]] = []
+            for node in nodes:
+                if not node.file_path or node.file_path in seen:
+                    continue
+                seen.add(node.file_path)
+                definitions.append({
+                    "file_path": node.file_path,
+                    "start_line": node.start_line or 1,
+                    "end_line": node.end_line or node.start_line or 1,
+                    "name": node.name,
+                    "kind": node.type or "function",
+                })
+            return definitions
+
     def find_importers_of(self, module_path: str) -> list[str]:
         """Phase 3: 哪些文件导入了指定模块（内存查询，毫秒级）。
 
@@ -304,3 +333,15 @@ class CodeGraphEngine(GraphEngineBase):
                 if node:
                     names.append(node.name)
         return names
+
+    async def get_symbol_meta(self, symbol_name: str) -> dict | None:
+        """获取符号的元数据——类型签名、文档等。
+
+        WHY: /codegraph/hover 端点调用此方法，
+        从 CodeNode.meta JSON 字段提取信息返回给前端。
+        此前该方法不存在，hover 端点始终 500。
+        """
+        node = await self.find_node_by_name(CodeNode, symbol_name)
+        if node is None:
+            return None
+        return node.meta or {}

@@ -145,12 +145,74 @@ class MemoryStore:
         self.write_file(file_type, new_body, fm)
 
     def _generate_hyde_questions(self, entry: str, llm_client: object | None) -> str:
-        """Phase 3: HyDE 假设问答——预留 async 集成接口。
+        """Phase 3: HyDE 假设问答——同步占位（async 版本见下方）。
 
-        P1-2: append_to_file 是同步方法，LLMClient.generate() 返回 coroutine，
-        同步调用无法 await。当前返回空字符串，待 async wrapper 实现后再启用。
+        同步上下文无法 await LLM——返回空字符串。
+        需要 HyDE 时使用 append_to_file_async()。
         """
-        return ""  # TODO: async HyDE wrapper (future PR)
+        return ""
+
+    async def _generate_hyde_questions_async(self, entry: str, llm_client: object | None) -> str:
+        """Phase 3: HyDE 假设问答——用 LLM 生成假设问题增强检索。
+
+        WHY HyDE: 用户搜索的关键词通常与记忆文件中存储的表述不同。
+        LLM 预测会检索此条目的问题，让 BM25 匹配更容易命中文档。
+        """
+        if not llm_client:
+            return ""
+        try:
+            prompt = (
+                "为以下知识片段生成 2-3 个假设性问题（HyDE Hypothesis）。\n"
+                "这些问题是用户搜索时可能使用的查询短语。\n"
+                "只输出问题，一行一个，不超过 3 行。\n\n"
+                f"知识：\n{entry[:1000]}"
+            )
+            response = await llm_client.generate(prompt)
+            if isinstance(response, str):
+                return response.strip()
+            return str(response) if response else ""
+        except Exception as e:
+            logger.warning("hyde_generation_failed", error=str(e))
+            return ""
+
+    async def append_to_file_async(
+        self, file_type: MemoryFileType, entry: str, llm_client: object = None
+    ) -> None:
+        """追加条目（异步版）——支持 HyDE 假设问答生成。
+
+        与 append_to_file 相同的写入逻辑，但 llm_client 传入时
+        会异步生成 HyDE 问题并追加到条目后方。
+        """
+        existing = self.read_file(file_type)
+        new_body = existing.body.rstrip() + "\n\n" + entry.strip() + "\n"
+
+        fm = dict(existing.frontmatter)
+        if llm_client:
+            hyde = await self._generate_hyde_questions_async(entry, llm_client)
+            if hyde:
+                new_body += "\n\n## HyDE 假设问答\n" + hyde + "\n"
+                fm["has_hyde"] = True
+
+        if len(new_body.encode("utf-8")) > self._config.max_memory_file_size:
+            split_point = int(len(existing.body) * 0.3)
+            truncated = existing.body[split_point:]
+            new_body = (
+                f"[旧记忆已归档——超出 {self._config.max_memory_file_size // 1000}KB 限制]\n\n"
+                + truncated.rstrip()
+                + "\n\n"
+                + entry.strip()
+                + "\n"
+            )
+            fm.pop("has_hyde", None)
+            if len(new_body.encode("utf-8")) > self._config.max_memory_file_size:
+                new_body = (
+                    f"[旧记忆已归档——超出 {self._config.max_memory_file_size // 1000}KB 限制]\n\n"
+                    + entry.strip()[: self._config.max_memory_file_size // 2]
+                    + "\n"
+                )
+            logger.warning("memory_file_truncated", path=str(self._path_for(file_type)))
+
+        self.write_file(file_type, new_body, fm)
 
     # ── 搜索 ───────────────────────────────────────────
 

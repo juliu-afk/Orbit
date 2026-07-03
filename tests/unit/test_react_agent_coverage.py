@@ -403,3 +403,226 @@ class TestGoalJudge:
         # 异常不应阻断 Agent——fail-open 正常完成
         result = await agent.execute(AgentInput(task="test", context={"task_id": "t1"}))
         assert result.status == "ok"
+
+
+# ── _emit ─────────────────────────────────────────────────────
+
+
+class TestEmit:
+    """_emit 事件推送方法."""
+
+    @pytest.mark.asyncio
+    async def test_emit_publishes_event(self, mock_tools):
+        """_emit 推送事件到 EventBus."""
+        from orbit.events.schemas import DashboardEvent
+
+        event_bus = MagicMock()
+
+        class TestAgent(ReActAgent):
+            role = AgentRole.DEVELOPER
+
+        agent = TestAgent(llm=AsyncMock(), tools=mock_tools, event_bus=event_bus)
+
+        await agent._emit("t1", "test:event", {"key": "value"})
+
+        event_bus.publish.assert_called_once()
+        published: DashboardEvent = event_bus.publish.call_args[0][0]
+        assert published.type == "test:event"
+
+    @pytest.mark.asyncio
+    async def test_emit_no_event_bus(self, mock_tools):
+        """_emit 无 EventBus→跳过."""
+        class TestAgent(ReActAgent):
+            role = AgentRole.DEVELOPER
+
+        agent = TestAgent(llm=AsyncMock(), tools=mock_tools, event_bus=None)
+        await agent._emit("t1", "test", {"key": "value"})  # 不应抛异常
+
+
+# ── Tool dispatch edge cases ──────────────────────────────────
+
+
+class TestToolDispatch:
+    """工具调度边界: JSONDecodeError, dispatch Exception."""
+
+    @pytest.mark.asyncio
+    async def test_tool_args_json_decode_error(self, mock_tools):
+        """工具参数 JSON 解析失败→fallback 到 raw 字符串."""
+        from orbit.stream.events import StreamEventType
+
+        call_count = [0]
+
+        async def mock_stream(req, task_id="", agent_name=""):
+            call_count[0] += 1
+            yield (
+                StreamEventType.TOOL_CALL,
+                {
+                    "tool_calls": [
+                        {
+                            "id": "c1",
+                            "type": "function",
+                            "function": {"name": "read_file", "arguments": "not-json"},
+                        }
+                    ]
+                },
+            )
+
+        llm = AsyncMock()
+        llm.generate_stream_with_tools = mock_stream
+
+        class TestAgent(ReActAgent):
+            role = AgentRole.DEVELOPER
+            MAX_TURNS = 2
+
+        agent = TestAgent(llm=llm, tools=mock_tools)
+
+        result = await agent.execute(AgentInput(task="test", context={"task_id": "t1"}))
+        # JSONDecodeError handled internally, should not crash
+        assert result.status is not None
+
+    @pytest.mark.asyncio
+    async def test_tool_dispatch_exception(self, mock_tools):
+        """工具调度抛出通用异常→工具执行失败字符串."""
+        from orbit.stream.events import StreamEventType
+
+        mock_tools.dispatch = AsyncMock(side_effect=RuntimeError("dispatch failed"))
+
+        async def mock_stream(req, task_id="", agent_name=""):
+            yield (
+                StreamEventType.TOOL_CALL,
+                {
+                    "tool_calls": [
+                        {
+                            "id": "c1",
+                            "type": "function",
+                            "function": {"name": "read_file", "arguments": '{"path":"x.py"}'},
+                        }
+                    ]
+                },
+            )
+
+        llm = AsyncMock()
+        llm.generate_stream_with_tools = mock_stream
+
+        class TestAgent(ReActAgent):
+            role = AgentRole.DEVELOPER
+            MAX_TURNS = 2
+
+        agent = TestAgent(llm=llm, tools=mock_tools)
+
+        result = await agent.execute(AgentInput(task="test", context={"task_id": "t1"}))
+        assert result.status is not None  # Should not crash
+
+    @pytest.mark.asyncio
+    async def test_tool_dispatch_doom_loop_error(self, mock_tools):
+        """工具调度抛出 DoomLoopError→特殊处理."""
+        from orbit.stream.events import StreamEventType
+        from orbit.tools.registry import DoomLoopError
+
+        mock_tools.dispatch = AsyncMock(side_effect=DoomLoopError("loop detected"))
+
+        async def mock_stream(req, task_id="", agent_name=""):
+            yield (
+                StreamEventType.TOOL_CALL,
+                {
+                    "tool_calls": [
+                        {
+                            "id": "c1",
+                            "type": "function",
+                            "function": {"name": "read_file", "arguments": '{"path":"x.py"}'},
+                        }
+                    ]
+                },
+            )
+
+        llm = AsyncMock()
+        llm.generate_stream_with_tools = mock_stream
+
+        class TestAgent(ReActAgent):
+            role = AgentRole.DEVELOPER
+            MAX_TURNS = 2
+
+        agent = TestAgent(llm=llm, tools=mock_tools)
+
+        result = await agent.execute(AgentInput(task="test", context={"task_id": "t1"}))
+        assert result.status is not None  # Should not crash
+
+
+# ── Compressor FORK ──────────────────────────────────────────
+
+
+class TestCompressorFork:
+    """Phase 2 AC7: Compressor 返回 FORK→子 session 继续."""
+
+    @pytest.mark.asyncio
+    async def test_compressor_fork_action(self, mock_tools):
+        """Compressor 返回 FORK→FINISH_STEP with child_session_id."""
+        from orbit.compression.models import CompressionAction, CompressionResult
+        from orbit.stream.events import StreamEventType
+
+        compressor = AsyncMock()
+        compressor.compress.return_value = CompressionResult(
+            action=CompressionAction.FORK,
+            child_session_id="child-123",
+            compressed_messages=[],
+        )
+        budget_tracker = MagicMock()
+
+        llm = AsyncMock()
+        # llm.generate_stream_with_tools won't be called
+
+        class TestAgent(ReActAgent):
+            role = AgentRole.DEVELOPER
+            MAX_TURNS = 5
+
+        agent = TestAgent(
+            llm=llm,
+            tools=mock_tools,
+            compressor=compressor,
+            budget_tracker=budget_tracker,
+        )
+
+        events: list = []
+        async for event in agent.execute_stream(
+            AgentInput(task="test", context={"task_id": "t1"})
+        ):
+            events.append(event)
+
+        # FORK 应立即触发 FINISH_STEP
+        assert len(events) >= 1
+        assert events[0].type == StreamEventType.FINISH_STEP
+        assert events[0].data.get("child_session_id") == "child-123"
+
+
+# ── DecisionLog fail-open during record ──────────────────────
+
+
+class TestDecisionLogRecordFailOpen:
+    """决策记录异常→fail-open, 不阻塞 Agent."""
+
+    @pytest.mark.asyncio
+    async def test_decision_record_fail_open(self, mock_tools):
+        """dlog.record 抛异常→finish 正常."""
+        mock_dlog = MagicMock()
+        mock_dlog.record.side_effect = ValueError("disk full")
+        mock_dlog.query.return_value = []
+
+        llm = AsyncMock()
+
+        async def mock_stream(req, task_id="", agent_name=""):
+            yield (
+                StreamEventType.TEXT_DELTA,
+                {"delta": "task complete\n\n[DECISION] Q: choice\nA: option1\nRationale: reason"},
+            )
+
+        llm.generate_stream_with_tools = mock_stream
+
+        class TestAgent(ReActAgent):
+            role = AgentRole.DEVELOPER
+
+        agent = TestAgent(llm=llm, tools=mock_tools, task_keywords=["cache"])
+        agent._decision_log = mock_dlog
+
+        # 不应因 record 失败而中断
+        result = await agent.execute(AgentInput(task="decide", context={"task_id": "t1"}))
+        assert result.status == "ok"

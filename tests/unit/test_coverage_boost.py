@@ -37,11 +37,9 @@ class TestLauncher:
         import types
 
         fake_uvicorn = types.ModuleType("uvicorn")
-        fake_uvicorn.Config = lambda *a, **k: None
-        fake_server = types.SimpleNamespace(run=lambda: None)
-        fake_uvicorn.Server = lambda *a, **k: fake_server
+        fake_uvicorn.run = lambda *a, **k: None
         monkeypatch.setitem(__import__("sys").modules, "uvicorn", fake_uvicorn)
-        launcher.main()  # 不崩即通过
+        launcher.main()  # Python 3.14: print() + sys.stdout=None okay
 
     def test_launcher_normal_stdout(self, monkeypatch) -> None:
         """正常 stdout 环境下走逻辑。"""
@@ -50,9 +48,7 @@ class TestLauncher:
         from orbit import launcher
 
         fake_uvicorn = types.ModuleType("uvicorn")
-        fake_uvicorn.Config = lambda *a, **k: None
-        fake_server = types.SimpleNamespace(run=lambda: None)
-        fake_uvicorn.Server = lambda *a, **k: fake_server
+        fake_uvicorn.run = lambda *a, **k: None
         monkeypatch.setitem(__import__("sys").modules, "uvicorn", fake_uvicorn)
         launcher.main()
 

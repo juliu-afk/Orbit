@@ -1,5 +1,43 @@
 # Orbit 开发会话记录
 
+## 2026-07-03 — MCP 客户端桥 + Serena 语义代码工具集成
+
+### PR #188: feat: MCP 客户端桥——Orbit 消费外部 MCP 工具 (MERGED)
+
+**背景**：调研 Serena (oraios/serena)，开源 LSP 驱动的语义代码导航工具，通过 MCP 协议暴露。
+决定将 MCP 客户端能力集成到 Orbit，让 Agent 能调用外部 MCP 工具。
+
+**交付**：
+- `src/orbit/tools/mcp_client.py`: MCPClientConnection——JSON-RPC 2.0 over stdio，后台线程解决 Windows 管道阻塞
+- `src/orbit/tools/registry.py`: connect_mcp_server() + schema 转换 + handler 工厂
+- `src/orbit/api/main.py`: 启动时加载 configs/mcp_clients.yaml
+- `configs/mcp_clients.yaml`: Serena 配置
+- `tests/unit/test_mcp_client.py`: 13 单元测试
+
+**审查修复**：
+- R1: 3 致命 + 7 风险全部修复（stderr 死锁/readline 超时/disconnect 竞态等）
+- R2: 5 P2 细节优化
+
+### PR #191: feat: Serena 集成闭环——Agent 能实际使用 MCP 工具 (MERGED)
+
+**问题**：PR #188 只建了基础设施。Agent 不知道 Serena 存在——ROLE_TOOLS 白名单没配，prompt 没教。
+
+**交付**：
+- `tools/registry.py`: MCP_ROLES 自动授予 architect/developer/reviewer/qa
+- `prompt/builder.py`: _build_mcp_guide() 教会 Agent 优先用 Serena 做代码导航
+- `api/main.py`: shutil.which() 检测安装状态+提示
+- `mcp_clients.yaml`: enabled=true
+
+**R3 修复**：f.txt 删除/import shutil 提顶/builder.py 前缀动态化
+
+### Serena 验证
+- `pip install serena-agent` → 22 工具可被发现
+- 首次启动需下载 LSP 后端 (>90s)，后续秒级
+
+### 文档
+- `docs/research/serena-vs-orbit-comparison.md` — 调研对比分析
+- `docs/requirements/2026-07-03-MCP-Client-Bridge/` — 阶段 1-4 完整文档
+
 ## 2026-07-03 — Clarifier .env 路径修复
 
 ### PR #185: fix: Clarifier LLM 调用失败——.env 路径 + PyInstaller 漏打包 (MERGED)

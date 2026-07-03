@@ -10,6 +10,7 @@ from pathlib import Path
 
 import certifi  # noqa: E402  # WHY: 获取 cacert.pem 路径，打包进 exe
 import litellm  # noqa: E402  # WHY: 获取 model_prices JSON 路径，打包进 exe
+from PyInstaller.utils.hooks import collect_submodules  # noqa: E402
 
 # 项目根目录 (spec 在 backend/, 根目录是其父目录)
 ROOT = Path(SPECPATH).resolve().parent
@@ -21,6 +22,10 @@ _CERTIFI_DIR = Path(certifi.where()).parent
 # WHY: litellm 启动时加载 model_prices JSON，漏打包导致 FileNotFoundError
 _LITELLM_DIR = Path(litellm.__file__).parent
 
+# WHY collect_submodules: litellm 有大量子模块（llms/, proxy/, litellm_core_utils/ 等），
+# 手动枚举 hiddenimports 不现实。一次性收集所有子模块 + 数据文件。
+_litellm_imports = collect_submodules("litellm")
+
 a = Analysis(
     [str(ROOT / "src" / "orbit" / "launcher.py")],
     pathex=[str(ROOT / "src")],
@@ -31,6 +36,8 @@ a = Analysis(
         (str(_LITELLM_DIR / "model_prices_and_context_window_backup.json"), "litellm"),
     ],
     hiddenimports=[
+        "litellm",  # WHY: _do_completion 动态 import，PyInstaller 检测不到
+        *_litellm_imports,  # WHY: 收集所有 litellm 子模块
         "uvicorn",
         "uvicorn.loops",
         "uvicorn.protocols",
@@ -99,8 +106,11 @@ a = Analysis(
         # CLI 模块
         "orbit.cli",
         "orbit.cli.commands",
+        # WHY tiktoken_ext 是命名空间包，PyInstaller 无法自动收集
+        # tiktoken 编码注册依赖此模块，漏打包导致 "Unknown encoding cl100k_base"
+        "tiktoken_ext.openai_public",
     ],
-    hookspath=[],
+    hookspath=[str(ROOT / "backend" / "hooks")],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],

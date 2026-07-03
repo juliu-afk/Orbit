@@ -19,8 +19,12 @@ class TestCodeGraphRoutes:
         resp = client.get("/api/v1/codegraph/definition")
         assert resp.status_code in (200, 422, 404)
 
+<<<<<<< HEAD
     def     @pytest.mark.skip(reason="P2-4: needs fixing")
     test_definition_with_query(self, client):
+=======
+    def test_definition_with_query(self, client):
+>>>>>>> feat/tests-from-190
         resp = client.get("/api/v1/codegraph/definition", params={"symbol": "foo"})
         assert resp.status_code in (200, 422, 500, 503)
 
@@ -28,8 +32,12 @@ class TestCodeGraphRoutes:
         resp = client.get("/api/v1/codegraph/references")
         assert resp.status_code in (200, 422, 404)
 
+<<<<<<< HEAD
     def     @pytest.mark.skip(reason="P2-4: needs fixing")
     test_references_with_query(self, client):
+=======
+    def test_references_with_query(self, client):
+>>>>>>> feat/tests-from-190
         resp = client.get("/api/v1/codegraph/references", params={"symbol": "foo"})
         assert resp.status_code in (200, 422, 500, 503)
 
@@ -45,8 +53,12 @@ class TestCodeGraphRoutes:
         resp = client.get("/api/v1/codegraph/hover")
         assert resp.status_code in (200, 422, 404)
 
+<<<<<<< HEAD
     def     @pytest.mark.skip(reason="P2-4: needs fixing")
     test_hover_with_query(self, client):
+=======
+    def test_hover_with_query(self, client):
+>>>>>>> feat/tests-from-190
         resp = client.get("/api/v1/codegraph/hover", params={"symbol": "foo"})
         assert resp.status_code in (200, 422)
 

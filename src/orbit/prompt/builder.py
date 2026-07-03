@@ -218,16 +218,16 @@ class PromptBuilder:
 1. 查找函数/类/变量定义时，**必须**用 `{prefix}/find_symbol`，**禁止**用 `grep` 猜行号
 2. 了解文件结构时，**必须**先用 `{prefix}/get_symbols_overview`，**禁止**直接 `read_file` 全文件
 3. 查找调用者/引用时，**必须**用 `{prefix}/find_referencing_symbols`，**禁止**用 `grep` 搜函数名
-4. 跨文件重命名时，**必须**用 `{prefix}/rename_symbol`，**禁止**逐个 `edit_file`
-5. 修改函数体时，**必须**用 `{prefix}/replace_symbol_body`，**禁止**用 `edit_file` 字符串匹配
+4. 重命名符号时，**必须**用 `{prefix}/rename_symbol`，**禁止**逐个 `edit_file`
+5. 修改函数体时，**必须**用 `{prefix}/replace_symbol_body`，**禁止**用 `edit_file` 盲替换
 
-| 场景 | ✅ 正确做法 | ❌ 错误做法 |
-|------|-----------|-----------|
+| 场景 | ✅ 正确 | ❌ 错误 |
+|------|--------|--------|
 | 定位代码 | `{prefix}/find_symbol` | `grep` + `read_file` |
 | 了解结构 | `{prefix}/get_symbols_overview` | `read_file` 全文件 |
 | 查引用 | `{prefix}/find_referencing_symbols` | `grep` 函数名 |
-| 重命名 | `{prefix}/rename_symbol` | 手工 `edit_file`×N |
-| 改函数 | `{prefix}/replace_symbol_body` | `edit_file` 盲替换 |
+| 重命名符号 | `{prefix}/rename_symbol` | 手工 `edit_file`×N |
+| 修改函数体 | `{prefix}/replace_symbol_body` | `edit_file` 盲替换 |
 
 **工作流**：`get_symbols_overview` → `find_symbol`(按需含 body) → `replace_symbol_body` 或 `insert_after/before_symbol`。
 可用工具：`{tool_list}` 等。""")

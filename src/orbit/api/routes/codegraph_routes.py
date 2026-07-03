@@ -56,7 +56,8 @@ async def go_to_definition(symbol: str = Query(...), file: str = Query("")):
             }
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return None
+    # 符号未找到——返回 null，前端据此显示"未找到定义"
+    return {"file": "", "line": 0, "name": symbol, "kind": "unknown"}
 
 
 @router.get("/references")

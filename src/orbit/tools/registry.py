@@ -249,10 +249,16 @@ class ToolRegistry:
         "dream": {"read_file", "grep", "glob"},
     }
 
+    # MCP 工具自动授予的角色——这些角色需要代码导航/编辑能力
+    # WHY: MCP 工具名是动态的（serena/find_symbol），无法在 ROLE_TOOLS 中
+    # 静态枚举。改为按 toolset 前缀 `mcp:` 自动匹配。
+    MCP_ROLES: set[str] = {"architect", "developer", "reviewer", "qa"}
+
     def list_for_role(self, role_value: str) -> list[dict]:
         """返回指定角色可用的工具 JSON Schema.
 
         WHY: 按角色裁剪工具列表——关闭不该有的门。
+        MCP 工具（toolset 以 `mcp:` 开头）自动授予代码相关角色。
         """
         # 未知角色回退空集——最小权限原则：新角色默认无工具
         allowed = self.ROLE_TOOLS.get(role_value, set())
@@ -260,7 +266,12 @@ class ToolRegistry:
         seen: set[str] = set()
 
         for name, entry in self._entries.items():
+            # 本地工具：走白名单
             if name in allowed:
+                schemas.append(entry.schema)
+                seen.add(name)
+            # MCP 工具：自动授予有代码能力的角色
+            elif entry.toolset.startswith("mcp:") and role_value in self.MCP_ROLES:
                 schemas.append(entry.schema)
                 seen.add(name)
 

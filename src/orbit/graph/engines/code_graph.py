@@ -154,14 +154,34 @@ class CodeGraphEngine(GraphEngineBase):
         )
 
     def _get_namespace(self, node: ast.AST, tree: ast.Module) -> str:
-        """推断符号的命名空间（模块级或类内）。
+        """推断符号的命名空间——向上遍历父节点找 ClassDef 拼接。
 
-        TODO PR#5 P2-2：当前简化为模块级，类内方法无法区分。
-        Step 5.x Agent 角色细化时需实现真正嵌套命名空间推断
-        （遍历父节点找 ClassDef，拼 Calculator.compute 形式）。
-        当前 find_node_by_name 的 namespace 过滤未启用，影响有限。
+        WHY 嵌套命名空间: 类内方法 Calculator.compute 需与模块级函数
+        calc_total 区分——否则 find_node_by_name 同名查找会冲突。
+        构建 parent map → 向上收集 ClassDef 名 → 拼 Class.method 形式。
+        模块级符号返回 "__main__"。
         """
-        return "__main__"
+        # 构建 parent map——一次遍历整个 AST
+        parent_map: dict[ast.AST, ast.AST] = {}
+        for parent in ast.walk(tree):
+            for child in ast.iter_child_nodes(parent):
+                parent_map[child] = parent
+
+        # 向上查找所有 enclosing ClassDef
+        classes: list[str] = []
+        current: ast.AST = node
+        while current in parent_map:
+            parent = parent_map[current]
+            if isinstance(parent, ast.ClassDef):
+                classes.append(parent.name)
+            if isinstance(parent, ast.Module):
+                break
+            current = parent
+
+        if not classes:
+            return "__main__"
+        # 从外层到内层：OuterClass.InnerClass.method
+        return ".".join(reversed(classes))
 
     def _get_args(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
         """提取函数参数名。"""

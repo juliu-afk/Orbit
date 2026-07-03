@@ -8,8 +8,18 @@ import os
 import sys
 from pathlib import Path
 
+import certifi  # noqa: E402  # WHY: 获取 cacert.pem 路径，打包进 exe
+import litellm  # noqa: E402  # WHY: 获取 model_prices JSON 路径，打包进 exe
+
 # 项目根目录 (spec 在 backend/, 根目录是其父目录)
 ROOT = Path(SPECPATH).resolve().parent
+
+# certifi CA bundle——PyInstaller 不会自动收集 .pem 数据文件
+# WHY: HTTPS 请求需要 CA 证书验证，漏打包导致 FileNotFoundError
+_CERTIFI_DIR = Path(certifi.where()).parent
+# litellm 数据文件——PyInstaller 不会自动收集 .json 数据文件
+# WHY: litellm 启动时加载 model_prices JSON，漏打包导致 FileNotFoundError
+_LITELLM_DIR = Path(litellm.__file__).parent
 
 a = Analysis(
     [str(ROOT / "src" / "orbit" / "launcher.py")],
@@ -17,6 +27,8 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(ROOT / "backend" / "static"), "static"),
+        (str(_CERTIFI_DIR / "cacert.pem"), "certifi"),
+        (str(_LITELLM_DIR / "model_prices_and_context_window_backup.json"), "litellm"),
     ],
     hiddenimports=[
         "uvicorn",

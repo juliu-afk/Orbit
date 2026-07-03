@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
@@ -178,6 +179,7 @@ class TaskRunner:
         self, role: str, task_id: str, context: dict[str, Any], timeout: int = 300
     ) -> str:
         """拉起 Agent 协程——AgentFactory 创建 + 注入依赖 + 超时保护."""
+        t_start = time.monotonic()
         if self._agent_factory is None:
             raise RuntimeError("AgentFactory 未配置")
 
@@ -245,6 +247,10 @@ class TaskRunner:
         except Exception:
             pass  # fail-open
 
+        elapsed = time.monotonic() - t_start
+        from orbit.observability.metrics import record_scheduling_latency
+
+        record_scheduling_latency("dispatch_task", elapsed)
         return str(output)
 
     def _build_context(self, task_id: str, context: dict[str, Any]) -> Any:

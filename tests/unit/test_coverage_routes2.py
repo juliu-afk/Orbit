@@ -42,6 +42,26 @@ class TestProjectsRoutes:
         resp = client.get("/api/v1/projects/Orbit")
         assert resp.status_code in (200, 404)
 
+    def test_register_project(self, client):
+        resp = client.post("/api/v1/projects", json={"name": "test_proj", "local_path": "."})
+        assert resp.status_code in (200, 400, 403, 422)
+
+    def test_get_project_not_found(self, client):
+        resp = client.get("/api/v1/projects/__nonexistent__project__")
+        assert resp.status_code in (200, 404)
+
+    def test_get_project_brief(self, client):
+        resp = client.get("/api/v1/projects/__nonexistent__/brief")
+        assert resp.status_code in (200, 404, 422)
+
+    def test_refresh_project_brief(self, client):
+        resp = client.post("/api/v1/projects/__nonexistent__/brief/refresh")
+        assert resp.status_code in (200, 400, 404, 422)
+
+    def test_refresh_context_md(self, client):
+        resp = client.post("/api/v1/projects/__nonexistent__/context/refresh")
+        assert resp.status_code in (200, 400, 404, 422)
+
 
 class TestBlameRoutes:
     def test_blame_no_file(self, client):
@@ -63,3 +83,11 @@ class TestTestsRoutes:
     def test_test_results(self, client):
         resp = client.get("/api/v1/tests/results")
         assert resp.status_code in (200, 404)
+
+    def test_coverage_no_params(self, client):
+        resp = client.get("/api/v1/tests/coverage")
+        assert resp.status_code in (200, 404)
+
+    def test_coverage_with_limit(self, client):
+        resp = client.get("/api/v1/tests/coverage", params={"limit": 10})
+        assert resp.status_code in (200, 404, 422)

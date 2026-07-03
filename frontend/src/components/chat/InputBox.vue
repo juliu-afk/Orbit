@@ -22,7 +22,8 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape') { showAC.value = false }
 }
 function focus() { inputRef.value?.focus() }
-defineExpose({ focus })
+function setText(text: string) { inputText.value = text; inputRef.value?.focus() }
+defineExpose({ focus, setText })
 </script>
 <template>
 <div class="input-box">

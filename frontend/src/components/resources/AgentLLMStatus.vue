@@ -93,9 +93,21 @@ async function fetchStatus() {
   agentRows.value = rows
 }
 
-function showHistory(row: AgentLLMRow) {
-  // TODO: Phase 2——展示模型切换历史
-  console.log('show history for', row.name)
+// Phase 2: 展示 Agent 当前配置详情（后续版本扩展切换历史记录）
+async function showHistory(row: AgentLLMRow) {
+  try {
+    const resp = await fetch(`/api/v1/agents/${row.name}/llm`)
+    const data = await resp.json()
+    const cur = data.current
+    const detail = cur
+      ? `模型: ${cur.model}\n来源: ${row.sourceLabel}\n原因: ${cur.reason || '—'}\n生效时间: ${cur.effective_since || '—'}\n强制: ${cur.is_forced ? '是' : '否'}`
+      : '未获取到配置信息'
+    // eslint-disable-next-line no-alert
+    alert(`[${row.name}] LLM 配置详情\n\n${detail}`)
+  } catch {
+    // eslint-disable-next-line no-alert
+    alert(`[${row.name}] 配置信息获取失败`)
+  }
 }
 
 onMounted(fetchStatus)

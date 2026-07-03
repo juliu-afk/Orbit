@@ -36,8 +36,18 @@ function onSend(text: string) {
   scrollBottom()
 }
 
-// TODO: 实现历史导航——从 historyBuf 恢复输入
-function onNavHistory(_d: -1 | 1) { /* TODO */ }
+// 从 historyBuf 恢复输入——ArrowUp 向旧消息、ArrowDown 向新消息
+function onNavHistory(d: -1 | 1) {
+  const next = historyIdx.value + d
+  if (next < 0) return  // 已到最早
+  if (next >= historyBuf.value.length) {  // 已到最新→清空
+    historyIdx.value = historyBuf.value.length
+    inputRef.value?.setText('')
+    return
+  }
+  historyIdx.value = next
+  inputRef.value?.setText(historyBuf.value[next] ?? '')
+}
 
 function openCtx(e: MouseEvent, msg: ChatMessage) { ctxPos.value = { x: e.clientX, y: e.clientY }; ctxMsg.value = msg; ctxVisible.value = true }
 function closeCtx() { ctxVisible.value = false; ctxMsg.value = null }

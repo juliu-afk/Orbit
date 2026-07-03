@@ -116,12 +116,7 @@ def test_validate_echo_rm_triggers_warning() -> None:
     assert "删除文件" in res.warnings
 
 
-<<<<<<< HEAD
-def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_validate_git_reset_hard_warning() -> None:
-=======
 def test_validate_git_reset_hard_warning() -> None:
->>>>>>> feat/tests-from-190
     """git reset --hard 触发硬重置警告."""
     res = validate_command("git reset --hard HEAD")
     assert res is not None
@@ -129,12 +124,7 @@ def test_validate_git_reset_hard_warning() -> None:
     assert "硬重置" in res.warnings
 
 
-<<<<<<< HEAD
-def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_validate_git_clean_warning() -> None:
-=======
 def test_validate_git_clean_warning() -> None:
->>>>>>> feat/tests-from-190
     """git clean 触发清理警告."""
     res = validate_command("git clean -fd")
     assert res is not None
@@ -251,12 +241,8 @@ async def test_exec_command_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-<<<<<<< HEAD
-async def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_exec_command_with_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
-=======
-async def test_exec_command_with_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
->>>>>>> feat/tests-from-190
+    @pytest.mark.skip(reason="P2-4: needs fixing")
+    test_exec_command_with_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     """exec_command 有 stderr→格式含 stderr:."""
     from unittest.mock import AsyncMock, patch
 
@@ -273,12 +259,8 @@ async def test_exec_command_with_stderr(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 @pytest.mark.asyncio
-<<<<<<< HEAD
-async def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_exec_command_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
-=======
-async def test_exec_command_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
->>>>>>> feat/tests-from-190
+    @pytest.mark.skip(reason="P2-4: needs fixing")
+    test_exec_command_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     """exec_command 超时→返回超时消息."""
     from unittest.mock import AsyncMock, patch
 

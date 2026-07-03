@@ -310,12 +310,8 @@ def test_publish_update_sends_event(runner: DagRunner, event_bus: FakeEventBus) 
 
 
 @pytest.mark.asyncio
-<<<<<<< HEAD
-async def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_execute_node_with_agent_factory_success() -> None:
-=======
-async def test_execute_node_with_agent_factory_success() -> None:
->>>>>>> feat/tests-from-190
+async @pytest.mark.skip(reason="P2-4: needs fixing")
+    def test_execute_node_with_agent_factory_success() -> None:
     """agent_factory 存在且节点有角色→Agent 执行成功路径."""
     from unittest.mock import AsyncMock, MagicMock
 
@@ -339,12 +335,8 @@ async def test_execute_node_with_agent_factory_success() -> None:
 
 
 @pytest.mark.asyncio
-<<<<<<< HEAD
-async def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_execute_node_with_agent_factory_failure() -> None:
-=======
-async def test_execute_node_with_agent_factory_failure() -> None:
->>>>>>> feat/tests-from-190
+async @pytest.mark.skip(reason="P2-4: needs fixing")
+    def test_execute_node_with_agent_factory_failure() -> None:
     """Agent 抛出异常→返回 error 字典."""
     from unittest.mock import AsyncMock, MagicMock
 
@@ -363,12 +355,8 @@ async def test_execute_node_with_agent_factory_failure() -> None:
 
 
 @pytest.mark.asyncio
-<<<<<<< HEAD
-async def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_execute_node_no_agent_role_fallback() -> None:
-=======
-async def test_execute_node_no_agent_role_fallback() -> None:
->>>>>>> feat/tests-from-190
+async @pytest.mark.skip(reason="P2-4: needs fixing")
+    def test_execute_node_no_agent_role_fallback() -> None:
     """node.agent_role 为空→回退到占位执行."""
     from unittest.mock import MagicMock
 

@@ -5,7 +5,7 @@ ChatterAgent 无约束、啥都能聊，仅在检测到编程意图时路由到 
 其他 Agent (architect/developer/reviewer) 保持原有触发条件不变。
 
 意图路由机制：
-- chatter 返回 `output.result` 中包含 `__intent__: "chat"|"programming"`
+- chatter 返回 `output.result` 中包含 `_intent: "chat"|"programming"`
 - task_runner._agent_cycle 检查 intent → "programming" 时继续进入 PARSING
 - "chat" 时结束任务（DONE）
 """
@@ -76,7 +76,7 @@ class ChatterAgent(BaseAgent):
                         "你好！我是 Orbit 的对话助手。当前 LLM 未配置，"
                         "请检查环境变量或 CC_SWITCH 设置。"
                     ),
-                    "__intent__": "chat",
+                    "_intent": "chat",
                     "reason": "llm_not_configured",
                 },
             )
@@ -101,7 +101,7 @@ class ChatterAgent(BaseAgent):
                 status="ok",
                 result={
                     "reply": parsed.get("reply", content[:500]),
-                    "__intent__": parsed.get("intent", "chat"),
+                    "_intent": parsed.get("intent", "chat"),
                     "reason": parsed.get("reason", ""),
                 },
             )
@@ -111,8 +111,8 @@ class ChatterAgent(BaseAgent):
                 status="ok",
                 result={
                     "reply": "抱歉，我暂时无法处理这个消息。请稍后再试。",
-                    "__intent__": "chat",
-                    "reason": f"error: {e}",
+                    "_intent": "chat",
+                    "reason": "chatter_execution_failed",
                 },
             )
 

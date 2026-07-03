@@ -158,7 +158,7 @@ class TaskRunner:
     async def _agent_cycle(self, task_id: str, state: TaskState, context: dict[str, Any]) -> str:
         """单个 Agent 循环——按状态映射角色→拉起 Agent 执行.
 
-        IDLE 状态特殊处理: chatter agent 返回 __intent__ 标记，
+        IDLE 状态特殊处理: chatter agent 返回 _intent 标记，
         "chat" → 结束任务, "programming" → 继续进入 PARSING (clarifier).
         """
         role = ROLE_MAP.get(state)
@@ -207,7 +207,7 @@ class TaskRunner:
 
         try:
             data = _json.loads(output)
-            return data.get("__intent__", "chat")
+            return data.get("_intent", "chat")
         except (_json.JSONDecodeError, ValueError, TypeError):
             pass
         match = _re.search(r'"__?intent__?"\s*:\s*"(chat|programming)"', output)
@@ -643,3 +643,7 @@ def _state_to_progress(state: TaskState) -> float:
         TaskState.CANCELLED: 1.0,
     }
     return mapping.get(state, 0.0)
+
+# ── 状态流转图 (ChatterAgent 意图路由) ─────────────────
+# IDLE(chatter) → chat intent → DONE
+# IDLE(chatter) → programming intent → PARSING(clarifier) → PLANNING(architect) → CODING(developer) → VERIFYING(reviewer) → DONE

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
 from pathlib import Path
 
 import redis.asyncio as aioredis
@@ -316,7 +317,6 @@ def _load_and_connect_mcp(registry: ToolRegistry) -> None:
         command = server["command"]
         command_available = False
         try:
-            import shutil
             command_available = shutil.which(command) is not None
         except Exception:
             pass

@@ -9,5 +9,5 @@ servers:
       - "start-mcp-server"
       - "--context"
       - "ide-assistant"
-    enabled: false  # 首次启动需下载 LSP (>90s)，手动开启
+    enabled: true  # 首次启动需下载 LSP 后端（>90s），后续秒级
     timeout_seconds: 30

@@ -2,13 +2,14 @@
 
 WHY 手写而非 mcp SDK：MVP 阶段零额外依赖。
 MCP 协议足够简单（JSON-RPC 2.0 + tools/list + tools/call），
-~100 行实现完整工具注册+调用循环。
+~150 行实现完整工具注册+调用循环。
 
 协议规范：https://spec.modelcontextprotocol.io/
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import sys
 from collections.abc import Callable
@@ -52,11 +53,24 @@ class McpServer:
     {name, description, inputSchema: {type: "object", properties: {...}}}
     """
 
-    def __init__(self, engine: KnowledgeEngine | None = None) -> None:
+    def __init__(
+        self,
+        engine: KnowledgeEngine | None = None,
+        code_graph: Any = None,
+        workspace_dir: str = ".",
+    ) -> None:
         self._engine = engine or KnowledgeEngine()
+        self._code_graph = code_graph  # CodeGraphEngine 实例（可选）
+        self._workspace_dir = workspace_dir
         self._tools: dict[str, dict[str, Any]] = {}
         self._handlers: dict[str, Callable[..., Any]] = {}
         self._register_builtin_tools()
+
+    def set_code_graph(self, code_graph: Any) -> None:
+        """注入 CodeGraphEngine——供 main.py 在启动时调用。"""
+        self._code_graph = code_graph
+        # 重新注册代码工具——code_graph 就绪后
+        self._register_code_tools()
 
     def _register_builtin_tools(self) -> None:
         """注册内置知识查询工具。"""
@@ -86,6 +100,61 @@ class McpServer:
             },
             handler=self._handle_query_knowledge,
         )
+        # 代码工具——如果 code_graph 已注入则注册
+        if self._code_graph is not None:
+            self._register_code_tools()
+
+    def _register_code_tools(self) -> None:
+        """注册代码导航工具——基于 CodeGraph AST 索引。
+
+        WHY: 让外部 Agent（Claude Code/Codex）能通过 Orbit MCP 做代码导航，
+        不再仅限领域知识查询。50 行实现，偷师 Serena 的 MCP 开放思路。
+        """
+        self.register_tool(
+            name="find_symbol",
+            description="在代码库中查找符号（函数/类/变量）的定义位置，返回文件路径和行号。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "符号名称，如 MyClass 或 my_function",
+                    },
+                },
+                "required": ["symbol"],
+            },
+            handler=self._handle_find_symbol,
+        )
+        self.register_tool(
+            name="find_referencing_symbols",
+            description="查找所有调用了指定符号的位置（反向调用图）。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {
+                        "type": "string",
+                        "description": "被调用的符号名称",
+                    },
+                },
+                "required": ["symbol"],
+            },
+            handler=self._handle_find_referencing_symbols,
+        )
+        self.register_tool(
+            name="get_symbols_overview",
+            description="获取文件的符号大纲——列出所有类、方法、函数及其行号，~300 tokens 替代全文件读取。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "相对于项目根的源文件路径",
+                    },
+                },
+                "required": ["file_path"],
+            },
+            handler=self._handle_get_symbols_overview,
+        )
 
     def register_tool(
         self,
@@ -112,6 +181,87 @@ class McpServer:
         if result is None:
             return {"found": False, "message": f"概念 {domain}/{concept} 不存在"}
         return {"found": True, **result.to_dict()}
+
+    # ── 代码导航工具处理器 ──────────────────────────────
+
+    def _handle_find_symbol(self, symbol: str = "", **_: Any) -> dict[str, Any]:
+        """查找符号定义——返回文件路径+行号。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化——项目未加载代码图谱"}
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is not None:
+            # 已有事件循环——用线程池避免冲突
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(
+                    asyncio.run,
+                    self._code_graph.find_definitions_with_positions(symbol),
+                )
+                defs = future.result(timeout=10)
+        else:
+            defs = asyncio.run(
+                self._code_graph.find_definitions_with_positions(symbol),
+            )
+        if not defs:
+            return {"found": False, "symbol": symbol}
+        return {"found": True, "definitions": defs}
+
+    def _handle_find_referencing_symbols(
+        self, symbol: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """查找符号的所有调用者。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化——项目未加载代码图谱"}
+        import asyncio
+        try:
+            _ = asyncio.get_running_loop()
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(
+                    asyncio.run,
+                    self._code_graph.get_callers(symbol),
+                )
+                callers = future.result(timeout=10)
+        except RuntimeError:
+            callers = asyncio.run(self._code_graph.get_callers(symbol))
+        return {"symbol": symbol, "callers": callers}
+
+    def _handle_get_symbols_overview(
+        self, file_path: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """获取文件大纲——AST 解析提取类/方法/函数。"""
+        import os
+        full_path = os.path.join(self._workspace_dir, file_path)
+        try:
+            with open(full_path, encoding="utf-8") as f:
+                content = f.read()
+        except FileNotFoundError:
+            return {"error": f"文件不存在: {file_path}"}
+        except Exception as e:
+            return {"error": f"读取文件失败: {e}"}
+
+        tree = ast.parse(content)
+        items: list[dict[str, Any]] = []
+        class_methods: set[str] = set()
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, ast.ClassDef):
+                children = []
+                for n in ast.walk(node):
+                    if isinstance(n, ast.FunctionDef):
+                        class_methods.add(n.name)
+                        children.append({"name": n.name, "kind": "method", "line": n.lineno})
+                items.append({
+                    "name": node.name, "kind": "class",
+                    "line": node.lineno, "children": children,
+                })
+        for node in ast.iter_child_nodes(tree):
+            if isinstance(node, ast.FunctionDef) and node.name not in class_methods:
+                items.append({"name": node.name, "kind": "function", "line": node.lineno})
+        return {"file": file_path, "symbols": items}
 
     def _handle_request(self, request: dict[str, Any]) -> str | None:
         """处理单个 JSON-RPC 请求，返回响应字符串或 None（通知）。"""
@@ -174,8 +324,26 @@ class McpServer:
 
 
 def main() -> None:
-    """MCP Server 入口——`python -m orbit.knowledge.mcp_server`。"""
-    server = McpServer()
+    """MCP Server 入口——`python -m orbit.knowledge.mcp_server`。
+
+    自动尝试初始化 CodeGraph，将代码导航工具注册到 MCP。
+    失败时降级——仅暴露 query_knowledge 工具。
+    """
+    code_graph = None
+    try:
+        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+        from orbit.core.config import settings
+        from orbit.graph.engines.code_graph import CodeGraphEngine
+
+        db_url = getattr(settings, "DATABASE_URL", "sqlite+aiosqlite:///knowledge.db")
+        engine = create_async_engine(db_url, echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+        code_graph = CodeGraphEngine(session_factory)
+        logger.info("mcp_code_graph_initialized")
+    except Exception as e:
+        logger.info("mcp_code_graph_unavailable", reason=str(e))
+
+    server = McpServer(code_graph=code_graph)
     server.run()
 
 

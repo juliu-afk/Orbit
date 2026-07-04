@@ -1,10 +1,10 @@
-"""自然语言聊天 API (NL交互 PR #3 + Session PR #1 + 需求澄清 Agent 接入).
+"""自然语言聊天 API (NL交互 PR #3 + Session PR #1 + ChatterAgent 首触).
 
 WebSocket 端点: ws://host:18888/api/v1/chat
-接受文本输入 → 项目匹配(首轮) → ClarifierAgent 多轮澄清 → 确认转开发.
+接受文本输入 → ChatterAgent 首触(意图路由) → chat 直接回复 / programming 转 ClarifierAgent 多轮澄清 → 确认转开发.
 
-架构约束：chat 端点只调 ClarifierAgent.execute()，不直接接触 LLMClient。
-数据流: 用户 ↔ chat端点 ↔ ClarifierAgent ↔ (LLMClient网关 ↔ litellm ↔ 真实LLM)
+架构约束：chat 端点只调 Agent.execute()，不直接接触 LLMClient。
+数据流: 用户 ↔ chat端点 ↔ ChatterAgent(首触) → [chat→回复] | [programming→ClarifierAgent] ↔ (LLMClient网关 ↔ litellm ↔ 真实LLM)
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from orbit.agents.base import AgentInput
+from orbit.agents.chatter import ChatterAgent  # 通用对话——首触点
 from orbit.agents.clarifier import ClarifierAgent, StructuredPRD, validate_prd
 from orbit.context.matcher import ContextMatcher
 from orbit.projects.registry import ProjectRegistry
@@ -34,26 +35,37 @@ if _registry.count() == 0:
     )
 _matcher = ContextMatcher(_registry)
 
-# ---- ClarifierAgent 实例（进程级单例）----
+# ---- Agent 实例（进程级单例）----
 # WHY llm=None 默认：无 LLM key 时不报错，走 mock 模式（供 CI）
 # 生产环境由调用方注入 LLMClient，这里延迟实例化
+_chatter_agent: ChatterAgent | None = None
 _clarifier_agent: ClarifierAgent | None = None
 
 
-def get_clarifier() -> ClarifierAgent:
-    """获取/创建 ClarifierAgent 单例。
+def get_chatter() -> ChatterAgent:
+    """获取/创建 ChatterAgent 单例——用户首触点。"""
+    global _chatter_agent
+    if _chatter_agent is None:
+        _chatter_agent = ChatterAgent(llm=None)
+    return _chatter_agent
 
-    WHY 延迟初始化：LLMClient 依赖环境变量（API key），
-    在首次使用时才实例化，避免 import 时报错。
-    """
+
+def get_clarifier() -> ClarifierAgent:
+    """获取/创建 ClarifierAgent 单例——需求澄清。"""
     global _clarifier_agent
     if _clarifier_agent is None:
-        _clarifier_agent = ClarifierAgent(llm=None)  # 默认 mock，生产可 set_clarifier_llm() 注入
+        _clarifier_agent = ClarifierAgent(llm=None)
     return _clarifier_agent
 
 
+def set_chatter_llm(llm_client: Any) -> None:
+    """注入 ChatterAgent 真实 LLMClient（生产环境调用）。"""
+    global _chatter_agent
+    _chatter_agent = ChatterAgent(llm=llm_client)
+
+
 def set_clarifier_llm(llm_client: Any) -> None:
-    """注入真实 LLMClient（生产环境调用）。"""
+    """注入 ClarifierAgent 真实 LLMClient（生产环境调用）。"""
     global _clarifier_agent
     _clarifier_agent = ClarifierAgent(llm=llm_client)
 
@@ -192,7 +204,7 @@ def _on_goal_task_done(goal_id: str, task) -> None:
 async def _handle_chat(
     ws: WebSocket, text: str, session_id: str, project_name: str, payload: dict[str, Any]
 ) -> None:
-    """处理用户聊天消息：项目匹配(首轮) + ClarifierAgent 澄清。"""
+    """处理用户聊天消息：ChatterAgent 首触 → 意图路由 → ClarifierAgent 澄清。"""
     if not text.strip():
         await _send(ws, 1, None, "输入为空")
         return
@@ -207,14 +219,12 @@ async def _handle_chat(
         await _send(ws, 1, None, f"会话 {session_id} 不存在")
         return
 
-    # ---- 构建上下文 ----
-    # 对话历史（最近 10 轮 = 20 条）
+    # ---- 构建上下文（项目信息 + 对话历史）----
     history: list[dict[str, Any]] = []
     if session_id:
         msgs = _session_registry.get_messages(session_id, limit=20)
         history = [{"role": m.role, "content": m.content} for m in msgs]
 
-    # 项目信息（首轮匹配或从 project_name 查）
     project_info: dict[str, Any] = {}
     candidates: list[dict[str, Any]] = []
     if not history:
@@ -241,7 +251,47 @@ async def _handle_chat(
                 "tags": proj.tags,
             }
 
-    # ---- 调用 ClarifierAgent（不直接接触 LLM）----
+    # ---- Phase 1: ChatterAgent 首触 + 意图路由 ----
+    chatter_input = AgentInput(
+        task=text,
+        context={
+            "project": project_info,
+            "history": history,
+            "session_id": session_id,
+            "project_name": project_name,
+        },
+        role="chatter",  # type: ignore[arg-type]
+    )
+    chatter_agent = get_chatter()
+    chatter_output = await chatter_agent.execute(chatter_input)
+    intent = chatter_output.result.get("_intent", "chat")
+    chatter_reply = chatter_output.result.get("reply", "")
+
+    # WHY 意图路由：chat → 直接返回，programming → 转 ClarifierAgent
+    if intent != "programming":
+        # 普通对话——直接返回 ChatterAgent 回复
+        result_data: dict[str, Any] = {
+            "type": "chat",
+            "reply": chatter_reply,
+            "agent_role": "Chatter",
+        }
+        if candidates:
+            result_data["candidates"] = candidates
+
+        if session_id:
+            try:
+                _session_registry.add_message(session_id=session_id, role="user", content=text)
+                _session_registry.add_message(
+                    session_id=session_id, role="agent", content=chatter_reply
+                )
+                _session_registry.touch(session_id)
+            except Exception:
+                pass
+
+        await _send(ws, 0, result_data)
+        return
+
+    # ---- Phase 2: programming intent → ClarifierAgent 需求澄清 ----
     agent_input = AgentInput(
         task=text,
         context={
@@ -259,13 +309,15 @@ async def _handle_chat(
     # 后台异步刷新 CONTEXT.md——不阻塞聊天响应
     _schedule_context_sync(project_name)
 
-    result_data: dict[str, Any] = {
+    result_data = {
         "type": "clarify",
         "reply": output.result.get("reply", ""),
         "clarification_status": output.result.get("clarification_status", "clarifying"),
         "structured_prd": output.result.get("structured_prd"),
         "missing_fields": output.result.get("missing_fields", []),
         "agent_role": "Clarifier",
+        # 携带 ChatterAgent 的意图识别结果——前端可展示过渡信息
+        "chatter_notice": chatter_reply,
     }
     # 首轮带项目匹配结果
     if candidates:
@@ -276,7 +328,6 @@ async def _handle_chat(
     if result_data["clarification_status"] == "ready" and prd_raw:
         validation = validate_prd(prd_raw)
         if not validation.passed:
-            # 校验不过 → 打回 Agent 汇报（这里仅通知前端本轮未 ready，下轮重问）
             result_data["clarification_status"] = "clarifying"
             result_data["reply"] = (
                 result_data["reply"]
@@ -292,11 +343,7 @@ async def _handle_chat(
     # ---- 持久化用户消息 + Agent 回复 ----
     if session_id:
         try:
-            _session_registry.add_message(
-                session_id=session_id,
-                role="user",
-                content=text,
-            )
+            _session_registry.add_message(session_id=session_id, role="user", content=text)
             _session_registry.add_message(
                 session_id=session_id,
                 role="agent",
@@ -305,7 +352,7 @@ async def _handle_chat(
             )
             _session_registry.touch(session_id)
         except Exception:
-            pass  # 持久化失败不阻塞聊天
+            pass
 
     await _send(ws, 0, result_data)
 

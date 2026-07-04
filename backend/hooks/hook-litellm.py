@@ -1,37 +1,36 @@
-"""PyInstaller hook for litellm——处理命名空间包子包。
+"""PyInstaller hook for litellm — collect ALL submodules AND data files.
 
-WHY: litellm 大量使用无 __init__.py 的命名空间包（如 litellm_core_utils）。
-PyInstaller 的 collect_submodules 不支持命名空间包，必须手动 walk 收集。
+WHY: litellm has 1727+ .py modules AND many .json data files (tokenizers, etc.)
+that PyInstaller cannot discover. We filesystem-scan everything.
 """
+
 import os
 from pathlib import Path
 
+import litellm
 from PyInstaller.utils.hooks import collect_data_files
 
+_litellm_dir = Path(litellm.__file__).parent
+_pkg_root = _litellm_dir.parent  # site-packages/
 
-def _walk_hidden_imports(root_dir: str, package_prefix: str) -> list[str]:
-    """递归 walk 目录树，收集所有含 __init__.py 的子包为 hiddenimports。"""
-    imports: list[str] = []
-    for dirpath, dirnames, filenames in os.walk(root_dir):
-        if "__init__.py" in filenames:
-            rel = Path(dirpath).relative_to(Path(root_dir).parent)
-            pkg = str(rel).replace(os.sep, ".")
-            imports.append(pkg)
-        if "__pycache__" in dirnames:
-            dirnames.remove("__pycache__")
-    return imports
+# 1. Collect all .py submodules
+hiddenimports = []
+for root, dirs, files in os.walk(_litellm_dir):
+    for f in files:
+        if f.endswith(".py"):
+            fp = Path(root) / f
+            rel = fp.relative_to(_pkg_root).with_suffix("")
+            mod = ".".join(rel.parts)
+            if mod.endswith(".__init__"):
+                mod = mod[:-9]
+            hiddenimports.append(mod)
 
-
-_litellm_dir = str(Path(__file__).parent.parent.parent / "litellm")
-
-# 如果上面路径不存在，尝试从已安装的 litellm 获取
-if not os.path.isdir(_litellm_dir):
-    import litellm as _litellm_pkg
-
-    _litellm_dir = str(Path(_litellm_pkg.__file__).parent)
-
-# 收集所有子包（含命名空间包子包）
-hiddenimports = _walk_hidden_imports(_litellm_dir, "litellm")
-
-# 收集数据文件（JSON 等）
-datas = collect_data_files("litellm", includes=["**/*.json"])
+# 2. Collect all .json data files (tokenizer configs, model prices, etc.)
+#    PyInstaller datas format: [(src, dest_dir), ...]
+datas = []
+for root, dirs, files in os.walk(_litellm_dir):
+    for f in files:
+        if f.endswith(".json"):
+            src = str(Path(root) / f)
+            rel_dir = str(Path(root).relative_to(_pkg_root))
+            datas.append((src, rel_dir))

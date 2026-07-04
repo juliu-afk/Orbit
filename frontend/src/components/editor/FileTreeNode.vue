@@ -24,13 +24,13 @@ function handleClick() { if (props.node.isDir) expanded.value = !expanded.value;
 </script>
 
 <style scoped>
-.tree-node { display: flex; align-items: center; padding: 2px 8px; cursor: pointer; font-size: 13px; gap: 4px; user-select: none; }
-.tree-node:hover { background: var(--el-fill-color-light); }
-.tree-node.selected { background: var(--el-color-primary-light-9); }
-.tree-node.is-dir { font-weight: 500; }
+.tree-node { display: flex; align-items: center; padding: 2px 8px; cursor: pointer; font-size: 13px; gap: 4px; user-select: none; color: var(--color-orbit-text-secondary); }
+.tree-node:hover { background: var(--color-orbit-surface-hover); color: var(--color-orbit-text); }
+.tree-node.selected { background: var(--color-orbit-accent); color: #fff; }
+.tree-node.is-dir { font-weight: 500; color: var(--color-orbit-text); }
 .file-icon { flex-shrink: 0; font-size: 12px; }
 .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--el-text-color-placeholder); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--color-orbit-text-muted); }
 .status-approved { background: #67c23a; }
 .status-rejected { background: #f56c6c; }
 .status-pending { background: #e6a23c; }

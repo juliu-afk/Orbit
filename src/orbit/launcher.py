@@ -21,6 +21,7 @@ try:
     import orbit.api.routes.tests_routes, orbit.api.routes.blame_routes  # noqa
     import orbit.api.routes.insights_routes, orbit.api.routes.compliance_routes  # noqa
     import orbit.api.routes.terminal_routes, orbit.api.routes.diagnostics_ws  # noqa
+    import orbit.api.routes.config_routes  # noqa
     import orbit.api.routes.health  # noqa
     import orbit.files.service, orbit.lsp.service  # noqa
     import orbit.review.models, orbit.review.service  # noqa

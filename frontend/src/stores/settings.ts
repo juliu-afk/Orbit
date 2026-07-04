@@ -5,7 +5,7 @@ export interface UserSettings {
   theme: 'dark' | 'light'; fileTreeLeft: boolean; agentRight: boolean
   glassOpacity: number; glassBlur: number; fileTreeWidth: number; rightPanelWidth: number
 }
-const DEFAULTS: UserSettings = { theme: 'dark', fileTreeLeft: true, agentRight: true, glassOpacity: 85, glassBlur: 12, fileTreeWidth: 240, rightPanelWidth: 260 }
+const DEFAULTS: UserSettings = { theme: 'dark', fileTreeLeft: true, agentRight: true, glassOpacity: 45, glassBlur: 4, fileTreeWidth: 240, rightPanelWidth: 260 }
 const STORAGE_KEY = 'orbit-settings'
 function load(): UserSettings { try { const r = localStorage.getItem(STORAGE_KEY); if (r) return { ...DEFAULTS, ...JSON.parse(r) } } catch { /* corrupt */ } return { ...DEFAULTS } }
 function save(s: UserSettings) { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) }

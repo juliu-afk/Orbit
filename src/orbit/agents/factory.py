@@ -162,7 +162,11 @@ class ConfigManagerAgent(BaseAgent):
         from orbit.gateway.schemas import LLMRequest
 
         resp = await self.llm.generate(
-            LLMRequest(prompt=input_data.task),
+            LLMRequest(
+                prompt=input_data.task,
+                # Inkeep 借鉴 #1: 注入 task_type 用于模型路由
+                task_type=input_data.context.get("task_type"),
+            ),
             task_id=input_data.context.get("task_id", ""),
         )
         return AgentOutput(result={"config": resp.content})

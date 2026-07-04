@@ -31,6 +31,10 @@ class LLMRequest(BaseModel):
     provider: str | None = Field(
         None, description="LLM provider: anthropic | openai | None(自动检测)"
     )
+    # Inkeep 借鉴 #1: 任务类型——用于三层模型路由
+    task_type: str | None = Field(
+        None, description="reasoning | structured_output | summarization——用于自动模型选择"
+    )
 
 
 class LLMUsage(BaseModel):

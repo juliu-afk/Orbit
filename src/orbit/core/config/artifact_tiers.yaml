@@ -1,0 +1,8 @@
+# 图谱查询结果三级分级阈值（Inkeep 借鉴 #2）
+# 运行时动态调整，也可手动覆盖
+preview_threshold: 2048   # 2KB——≤此值自动进上下文
+full_threshold: 65536     # 64KB——≤此值可完整查询，超过则拒绝
+# 动态调整参数（每 100 次查询评估一次）
+adjustment_interval: 100
+max_preview_threshold: 8192
+max_full_threshold: 262144

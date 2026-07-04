@@ -92,6 +92,8 @@ class ChatterAgent(BaseAgent):
                 system_prompt=CHATTER_SYSTEM_PROMPT,
                 temperature=0.8,
                 max_tokens=1024,
+                # Inkeep 借鉴 #1: 注入 task_type 用于模型路由
+                task_type=input_data.context.get("task_type"),
             )
             resp = await self.llm.generate(req, task_id=input_data.context.get("task_id", ""))
             content = resp.content or ""

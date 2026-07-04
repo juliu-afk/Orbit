@@ -303,6 +303,8 @@ class ReActAgent(BaseAgent):
                     system_prompt=system,
                     messages=messages if len(messages) > 2 else None,
                     tools=tools_schema if tools_schema else None,
+                    # Inkeep 借鉴 #1: 注入 task_type 用于模型路由
+                    task_type=input_data.context.get("task_type"),
                 )
 
                 # 流式接收 text_delta + tool_call

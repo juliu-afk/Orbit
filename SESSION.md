@@ -26,6 +26,34 @@
 - **peak_windows.yaml 24:00→23:59**：`datetime(hour=24)` ValueError
 - **最终产物**：`Deliverables/Orbit.exe` 52MB（Tauri v2 GUI + WebView2 embedBootstrapper + PyInstaller 49MB 后端），10 端点全 200 验证通过
 
+## 2026-07-04 — Inkeep 竞品借鉴 5 项 (PR #195)
+
+### PR #195: feat(gateway): Inkeep 借鉴 5 项——模型路由+分级存储+按需加载+Trace+Git配置 (MERGED)
+
+**30 文件，+4,766/-850。47 单元测试，0 回归。2 P1 + 4 P2 审查修复。**
+
+基于 `docs/research/research-inkeep-analysis.md` 竞品分析，5 项设计模式自建增强：
+
+- **US-1 TaskModelRouter**（P0）：reasoning→Pro, structured_output→Flash, summarization→nano——预计节省 40-60% token 成本
+- **US-2 ArtifactTierManager**（P0）：preview/full/oversized 三级 + 动态阈值调整 + UTF-8 安全截断
+- **US-3 load_knowledge tool**（P1）：Agent 按需拉取知识，AST 自注册，KnowledgeEngine 单例复用
+- **US-4 TraceSpan**（P2 后端）：异步批量 flush（500ms/50条）+ 三层保留（7d/30d/OTEL导出）
+- **US-5 ConfigStore**（P2 后端）：YAML+Git，branch/merge/rollback/diff/clash resolve——全部复用 git
+
+**审查修复（0b4f824）**：
+- P1-1: _flush_batch bare except → structlog.warning(exc_info=True)
+- P1-2: start_worker 竞态 → asyncio.Lock
+- P2-1~4: to_dict() 注释 + max(0,) 保护 + CREATE_NO_WINDOW + 单例
+- 边缘: Alembic migration (003_trace_spans.sql) + orbit.spec hiddenimports ×2
+
+**待后续 PR**：US-4/5 前端（TraceViewer.vue + ConfigView.vue + YamlEditor.vue + VersionHistory.vue）——后端 API 已就绪。
+
+### 关键决策
+
+- US-1 模型映射：Phase 1 Task-Type 硬编码 + YAML 可配置（4 方案中选 A），Phase 2 Agent 显式声明 Tier
+- US-5 配置后端：真 Git（方案 A）而非 SQLite 线性历史——配置存 YAML 文件 + git 仓库，branch/merge/conflict 免费
+- US-4/5 前端拆分：P2 优先级，后端先行交付（API 可通过 curl/Postman 测试），前端下个 PR 补齐
+
 ### 旧分支清理
 
 删除 12 个 feat/* 分支（sla-wiring、tests-from-190、integration-tests-lazy-app 等）——内容已全部合入 master

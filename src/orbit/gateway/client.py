@@ -212,6 +212,10 @@ class LLMClient:
             kwargs["api_base"] = GLM_API_BASE
             kwargs["api_key"] = settings.ZAI_API_KEY
 
+        # DeepSeek 模型——显式传 api_key（避免 litellm 自行查找失败 FileNotFoundError）
+        if model.startswith("deepseek/"):
+            kwargs["api_key"] = settings.DEEPSEEK_API_KEY
+
         # Phase 1: 工具调用支持——传递 tools schema 给 LLM
         if tools_schema:
             kwargs["tools"] = tools_schema

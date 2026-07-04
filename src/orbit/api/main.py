@@ -180,12 +180,14 @@ def create_app(
         )
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
-    # ClarifierAgent 用 Flash 轻量模型（仅当 chat 路由被加载时）
+    # ChatterAgent + ClarifierAgent 用 Flash 轻量模型（仅当 chat 路由被加载时）
     from orbit.gateway.client import LLMClient as _LLMClient
     if "chat" in _active:
         import importlib
         _chat_mod = importlib.import_module("orbit.api.routes.chat")
-        _chat_mod.set_clarifier_llm(_LLMClient(default_model=MODEL_FLASH))
+        _flash_llm = _LLMClient(default_model=MODEL_FLASH)
+        _chat_mod.set_chatter_llm(_flash_llm)
+        _chat_mod.set_clarifier_llm(_flash_llm)
 
     return app
 

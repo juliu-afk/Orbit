@@ -46,6 +46,22 @@
 - gh CLI TLS/网络间歇故障
 - PyInstaller 不能静态分析 `importlib.import_module()` → launcher.py 显式 import 兜底
 
+### Serena 强化 + 偷师清单 A/B/C (master 直接 push)
+
+- **Prompt 加固**：Serena 从建议升级为硬约束——5 条强制规则，禁止 grep/read_file 替代
+- **A: hover 修复**：`code_graph.py` +`get_symbol_meta()`，/hover 不再 500
+- **C: Go to Def 行号**：`find_definitions_with_positions()` 返回 `{file, line, end_line}`
+- **B: CodeGraph → MCP**：`mcp_server.py` +3 代码导航工具（`find_symbol`/`find_referencing_symbols`/`get_symbols_overview`）
+
+### 偷师清单状态
+
+| 项 | 状态 | 说明 |
+|----|------|------|
+| A. hover bug | ✅ | get_symbol_meta |
+| B. CodeGraph → MCP | ✅ | 3 代码工具 |
+| C. Go to Def 行号 | ✅ | find_definitions_with_positions |
+| D-H | 不搞 | MCP 桥借 Serena 轮子 |
+
 ## 2026-07-03 — MCP 客户端桥 + Serena 语义代码工具集成
 
 ### PR #188: feat: MCP 客户端桥——Orbit 消费外部 MCP 工具 (MERGED)

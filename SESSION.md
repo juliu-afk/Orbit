@@ -321,3 +321,43 @@ memory: orbit-coverage-sprint.md
 
 ### 完成
 - PR #51 关闭——内容已通过 PR #50 合并，test isolation 修复 cherry-pick 到 master (d8da444)
+
+## 2026-07-04 — ChatterAgent 聊天路由 + PyInstaller 打包防复发体系
+
+### PR #196: fix: ChatterAgent 首触路由 + PyInstaller 打包防复发体系 (MERGE)
+
+**9 文件，+539/-312。**
+
+**问题**：打开 exe 聊天框发消息，ClarifierAgent 直接回 "暂时无法分析（FileNotFoundError）"——两个根因：
+1. chat.py 硬编码 ClarifierAgent，忽略已写好的 ChatterAgent（用户首触点）
+2. PyInstaller 打包漏 litellm 1727 子模块 + tiktoken 命名空间包 + DeepSeek api_key 未显式传
+
+**修复**：
+- `chat.py`：ChatterAgent 首触 → 意图路由(intent="chat"→直接回复 / intent="programming"→ClarifierAgent)
+- `client.py`：DeepSeek 模型显式传 `settings.DEEPSEEK_API_KEY`，不再让 litellm 自己找
+- `orbit.spec`：合并重复 Analysis 块 → `_discover_orbit_modules()` 自动发现 209 模块 + `THIRD_PARTY_DATAS` 集中管理
+- `hook-litellm.py`：PyInstaller hook 文件系统扫描 1727 模块 + 38 JSON 数据文件
+- `tiktoken_ext` + `tiktoken_ext.openai_public`：命名空间包加入 `_INFRA_IMPORTS`
+
+### PyInstaller 打包防复发体系（7 层）
+
+| 层 | 脚本 | 检查内容 |
+|---|------|---------|
+| 0 | check_spec | 结构——重复 Analysis/EXE |
+| 1 | check_spec | 数据文件——cacert/litellm json |
+| 2 | check_spec | 自动发现——209 orbit 模块 |
+| 3 | check_spec | 路由对齐——29 api.routes |
+| 4 | check_spec | Hook 验证——litellm 1727模块+38json |
+| 4.5 | check_spec | 命名空间包——tiktoken_ext |
+| 5 | check_spec | 关键依赖——6 库可导入 |
+| 7 | smoke_test | 运行时——探针+health+chat WS |
+
+- `build-desktop.sh` 步骤 0.5 强制运行 check_spec（失败阻断）+ 步骤 7 smoke_test
+- 防住了 8/8 个本轮问题（含 3 个之前漏掉的第三方库问题，已补层 4/4.5/7）
+
+### 踩坑
+- `orbit.spec` 有两个 Analysis 块→PyInstaller 用最后一个→第一个的 datas 修复完全无效
+- `SPECPATH` 是目录路径不是文件路径→check_spec 设错了导致 ROOT 偏移到 backend/，自动发现返回空
+- litellm `collect_submodules()` 只收集 479/1727 模块（缺 tokenizers）→必须文件系统扫描
+- tiktoken 编码数据在 `tiktoken_ext` 命名空间包→PyInstaller 不自动发现→需加入 hiddenimports
+- chat.py `set_clarifier_llm` 注入只在 chat 路由加载时生效→加 `set_chatter_llm` 同步注入

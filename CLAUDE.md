@@ -147,6 +147,9 @@ Orbit/
 | 调度器状态机改动 | 审查全生命周期 + 检查点回滚路径 |
 | 防幻觉层判定逻辑改动 | 审查 L1-L8 全链路影响 |
 | LLM API key | ⛔ 禁止硬编码 |
+| PyInstaller 构建 | 必须经 `check_spec.py` + `smoke_test.py` 双重门禁 |
+| orbit.spec 修改 | 禁止新增 Analysis/EXE 块——只改现有块；新增第三方依赖必须同步更新 `THIRD_PARTY_DATAS` 或 `hook-*.py` |
+| 新加 import 第三方库 | 若有命名空间包（无 `__init__.py`）→ 加入 `_INFRA_IMPORTS`；若有数据文件（.json/.pem）→ 加入 hook 或 `THIRD_PARTY_DATAS` |
 
 ## Token 节省规则
 

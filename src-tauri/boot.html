@@ -28,7 +28,8 @@ h1 { font-size: 36px; font-weight: 700; color: #4caf50; letter-spacing: 3px; mar
 </style>
 </head>
 <body>
-<div class="card">
+<!-- WHY data-tauri-drag-region: Tauri frameless 窗口，boot 页也需要拖拽区域 -->
+<div class="card" data-tauri-drag-region>
   <h1>Orbit</h1>
   <p class="sub">Multi-Agent Development System</p>
   <div class="spinner" id="spinner"></div>

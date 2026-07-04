@@ -84,6 +84,13 @@ a = Analysis(
         "orbit.compression.cascade",
         "orbit.observability.alerts",
         "aiosqlite",  # P0: PyInstaller 漏打包——SQLAlchemy async SQLite 依赖
+        # Inkeep 借鉴 5 项（PR #195）
+        "orbit.gateway.task_router",
+        "orbit.graph.tier",
+        "orbit.tools.knowledge_tools",
+        "orbit.observability.trace",
+        "orbit.core.config_store",
+        "orbit.api.routes.config_routes",
         # Part A: 项目说明书模块
         "orbit.brief",
         "orbit.brief.models",
@@ -236,6 +243,13 @@ a = Analysis(
         "orbit.compression.cascade",
         "orbit.observability.alerts",
         "aiosqlite",  # P0: PyInstaller 漏打包——SQLAlchemy async SQLite 依赖
+        # Inkeep 借鉴 5 项（PR #195）
+        "orbit.gateway.task_router",
+        "orbit.graph.tier",
+        "orbit.tools.knowledge_tools",
+        "orbit.observability.trace",
+        "orbit.core.config_store",
+        "orbit.api.routes.config_routes",
         # Part A: 项目说明书模块
         "orbit.brief",
         "orbit.brief.models",

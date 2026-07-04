@@ -82,6 +82,7 @@ _ROUTE_SPEC: dict[str, tuple[str, str, str | None]] = {
     "insights_routes":  ("orbit.api.routes.insights_routes", "router", "API_V1_STR"),
     "compliance_routes":("orbit.api.routes.compliance_routes", "router", "API_V1_STR"),
     "terminal_routes":  ("orbit.api.routes.terminal_routes", "router", "API_V1_STR"),
+    "config_routes":    ("orbit.api.routes.config_routes", "router", "API_V1_STR"),
     "diagnostics_ws":   ("orbit.api.routes.diagnostics_ws", "router", None),
     "health":           ("orbit.api.routes.health", "router", None),
 }

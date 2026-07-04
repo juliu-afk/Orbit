@@ -2,8 +2,9 @@
 #![windows_subsystem = "windows"]
 
 use std::fs;
+use std::fs::File;
 use std::path::PathBuf;
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 
 /// 编译期嵌入启动检查页，运行时作为 data: URI 加载——秒开不依赖后端。
 const BOOT_HTML: &str = include_str!("../boot.html");
@@ -48,8 +49,13 @@ fn kill_existing_backend(_exe_path: &PathBuf) {
     std::thread::sleep(std::time::Duration::from_millis(800));
 }
 
-/// 启动后端进程，隐藏控制台窗口
-fn start_backend(exe_path: &PathBuf) -> std::io::Result<Child> {
+/// 启动后端进程，隐藏控制台窗口，stdout/stderr 写入运行时日志
+fn start_backend(exe_path: &PathBuf, log_path: &PathBuf) -> std::io::Result<Child> {
+    // WHY 日志文件: Tauri 用 CREATE_NO_WINDOW 启动后端，stdout/stderr 无控制台可写，
+    // 必须显式管道到文件才能追查运行时错误和崩溃
+    let log_file = File::create(log_path)?;
+    let err_file = log_file.try_clone()?;
+
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -62,14 +68,20 @@ fn start_backend(exe_path: &PathBuf) -> std::io::Result<Child> {
         Command::new(exe_path)
             .env("ORBIT_HOME", &exe_dir)
             .creation_flags(CREATE_NO_WINDOW)
+            .stdout(Stdio::from(log_file))
+            .stderr(Stdio::from(err_file))
             .spawn()
-            
     }
 
     #[cfg(not(target_os = "windows"))]
-    Command::new(exe_path)
-        .spawn()
-        
+    {
+        let log_file = File::create(log_path)?;
+        let err_file = log_file.try_clone()?;
+        Command::new(exe_path)
+            .stdout(Stdio::from(log_file))
+            .stderr(Stdio::from(err_file))
+            .spawn()
+    }
 }
 
 /// 清理临时目录中的后端 exe
@@ -103,9 +115,11 @@ fn percent_encode(s: &str) -> String {
 fn main() {
     // 解压后端到临时目录
     let backend_path = extract_backend();
+    let log_path = backend_path.parent().unwrap().join("orbit_runtime.log");
 
     println!("Orbit — 启动后端...");
-    let mut backend = start_backend(&backend_path).unwrap_or_else(|e| {
+    println!("运行时日志: {}", log_path.display());
+    let mut backend = start_backend(&backend_path, &log_path).unwrap_or_else(|e| {
         let msg = format!("Failed to start backend: {}", e);
         let _ = fs::write(backend_path.parent().unwrap().join("orbit_error.log"), &msg);
         panic!("{}", msg)
@@ -132,6 +146,7 @@ fn main() {
             .inner_size(1400.0, 900.0)
             .resizable(true)
             .decorations(false)
+            .transparent(true)
             .build()?;
 
             Ok(())

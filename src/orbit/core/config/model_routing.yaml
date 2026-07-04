@@ -1,0 +1,5 @@
+# 模型路由映射——task_type → model（Inkeep 借鉴 #1）
+# 编辑后保存即生效，无需重启
+reasoning: deepseek/deepseek-v4-pro
+structured_output: deepseek/deepseek-v4-flash
+summarization: openai/glm-4.7-flash

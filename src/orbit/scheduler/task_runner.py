@@ -45,6 +45,15 @@ ROLE_MAP: dict[TaskState, str] = {
     TaskState.VERIFYING: "reviewer",
 }
 
+# Inkeep 借鉴 #1: TaskState → task_type 映射（三层模型路由）
+_TASK_TYPE_MAP: dict[TaskState, str] = {
+    TaskState.IDLE: "summarization",              # 闲聊/首触点
+    TaskState.PARSING: "structured_output",       # 需求解析需结构化输出
+    TaskState.PLANNING: "reasoning",              # 架构设计需最强推理
+    TaskState.CODING: "reasoning",                # 代码生成需推理
+    TaskState.VERIFYING: "structured_output",     # 审查结果结构化
+}
+
 TERMINAL_STATES = {TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED}
 
 
@@ -165,6 +174,9 @@ class TaskRunner:
         if role and self._agent_factory is not None:
             context["state"] = state.value
             context["agent_name"] = role
+            # Inkeep 借鉴 #1: 注入 task_type 供 Agent 选择模型
+            task_type = _TASK_TYPE_MAP.get(state, "reasoning")
+            context["task_type"] = task_type
 
             if state == TaskState.PLANNING and self.router is not None:
                 try:

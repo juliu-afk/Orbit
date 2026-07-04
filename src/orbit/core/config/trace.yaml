@@ -1,0 +1,4 @@
+# Trace 链路追踪设置（Inkeep 借鉴 #4）
+full_retention_days: 7     # 完整 span 保留天数
+summary_retention_days: 30 # 摘要保留天数
+cleanup_interval_hours: 6  # 清理任务间隔

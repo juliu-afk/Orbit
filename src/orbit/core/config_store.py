@@ -245,14 +245,19 @@ class ConfigStore:
         """同步执行 git 命令——subprocess.run。"""
         try:
             import subprocess
+            import sys
 
-            result = subprocess.run(
-                ["git", *args],
+            # P2-3: Windows 上隐藏控制台窗口（CREATE_NO_WINDOW = 0x08000000）
+            kwargs: dict = dict(
                 cwd=str(self.repo_path),
                 capture_output=True,
                 text=True,
                 timeout=30,
             )
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+
+            result = subprocess.run(["git", *args], **kwargs)
             if result.returncode != 0:
                 stderr = result.stderr.strip()
                 # 空提交（nothing to commit）不是错误

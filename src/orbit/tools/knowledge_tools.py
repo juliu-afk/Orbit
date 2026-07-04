@@ -10,6 +10,17 @@ from typing import Any
 
 from orbit.knowledge.engine import KnowledgeEngine
 
+# P2-4: 模块级单例——避免每次 tool call 都重建 KnowledgeEngine（含 DB 连接）
+_knowledge_engine: KnowledgeEngine | None = None
+
+
+def _get_engine() -> KnowledgeEngine:
+    global _knowledge_engine
+    if _knowledge_engine is None:
+        _knowledge_engine = KnowledgeEngine()
+    return _knowledge_engine
+
+
 # JSON Schema——LLM 可见
 LOAD_KNOWLEDGE_SCHEMA: dict[str, Any] = {
     "type": "function",
@@ -58,7 +69,7 @@ def load_knowledge_handler(params: dict[str, Any]) -> dict[str, Any]:
             "message": "domain 和 concept 均为必填参数",
         }
 
-    engine = KnowledgeEngine()
+    engine = _get_engine()
     result = engine.query_structured(domain, concept)
     return result
 

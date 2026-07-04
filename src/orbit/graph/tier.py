@@ -47,6 +47,7 @@ class TieredResult:
         }
         if self.full_content is not None:
             result["full_content"] = self.full_content
+        # P2-1: query_params 必须包含——FULL tier 的 Agent 需要它重建查询
         if self.query_params:
             result["query_params"] = self.query_params
         return result
@@ -142,8 +143,8 @@ class ArtifactTierManager:
 
     def record_full_request(self) -> None:
         """Agent 请求了 full 内容——说明 preview 不够，降低命中计数。"""
-        if self._preview_hits > 0:
-            self._preview_hits -= 1
+        # P2-2: max(0, ...) 保护——防止并发调用导致负数
+        self._preview_hits = max(0, self._preview_hits - 1)
 
     def maybe_adjust(self) -> bool:
         """每 ADJUSTMENT_INTERVAL 次查询评估一次，必要时动态调整阈值。

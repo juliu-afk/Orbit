@@ -15,7 +15,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
+import structlog
 from pydantic import BaseModel, Field
+
+logger = structlog.get_logger("orbit.trace")
 
 # 默认保留配置（可通过 US-5 配置面板调整）
 DEFAULT_FULL_RETENTION_DAYS = 7
@@ -84,6 +87,7 @@ class TraceCollector:
     _queue: asyncio.Queue[_SpanRecord | None] = asyncio.Queue(maxsize=10000)
     _worker_task: asyncio.Task | None = None
     _db_path: str = ""
+    _worker_lock = asyncio.Lock()  # P1-2: 防 start_worker 并发竞态
 
     @classmethod
     def start_span(
@@ -142,9 +146,11 @@ class TraceCollector:
     async def start_worker(cls, db_path: str) -> None:
         """启动后台 flush worker。"""
         cls._db_path = db_path
-        if cls._worker_task is not None:
-            return
-        cls._worker_task = asyncio.create_task(cls._flush_loop())
+        # P1-2: asyncio.Lock 防并发创建多个 worker
+        async with cls._worker_lock:
+            if cls._worker_task is not None:
+                return
+            cls._worker_task = asyncio.create_task(cls._flush_loop())
 
     @classmethod
     async def stop_worker(cls) -> None:
@@ -227,7 +233,8 @@ class TraceCollector:
                 )
                 await db.commit()
         except Exception:
-            pass  # fail-open——trace 写入失败不阻塞
+            # P1-1: fail-open 但必须记录——trace 数据静默丢失比缺功能更危险
+            logger.warning("trace_flush_failed", batch_size=len(batch), exc_info=True)
 
 
 class TraceStore:

@@ -142,3 +142,90 @@ class TestSerialization:
         if state == TaskState.CODING:
             context["parallel_tool_calls"] = False
         assert "parallel_tool_calls" not in context
+
+
+# ═══════════════════════════════════════════════════════════════
+# REAL METHOD CALLS — P1-1 真实生产代码调用测试
+# ═══════════════════════════════════════════════════════════════
+
+class TestExtractChatterIntentRealCall:
+    """调用 _extract_chatter_intent 真实静态方法。"""
+
+    def test_json_intent_chat(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        result = TaskRunner._extract_chatter_intent('{"_intent": "chat"}')
+        assert result == "chat"
+
+    def test_json_intent_programming(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        result = TaskRunner._extract_chatter_intent('{"_intent": "programming"}')
+        assert result == "programming"
+
+    def test_regex_fallback_intent(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        # JSON parse will fail on invalid JSON → falls back to regex
+        result = TaskRunner._extract_chatter_intent(
+            'not valid json but contains "_intent": "programming" marker'
+        )
+        assert result == "programming"
+
+    def test_no_intent_defaults_to_chat(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        result = TaskRunner._extract_chatter_intent("hello world")
+        assert result == "chat"
+
+    def test_empty_string(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        result = TaskRunner._extract_chatter_intent("")
+        assert result == "chat"
+
+    def test_malformed_json_with_regex_match(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        result = TaskRunner._extract_chatter_intent(
+            'blah {"_intent": "chat", extra} stuff'
+        )
+        # JSON parse fails, regex fallback matches
+        assert result == "chat"
+
+
+class TestExtractKeywordsRealCall:
+    """调用 _extract_keywords 真实静态方法。"""
+
+    def test_empty_text_returns_empty(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        result = TaskRunner._extract_keywords("")
+        assert result == []
+
+    def test_english_identifiers_extracted(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        result = TaskRunner._extract_keywords("We need to fix UserAuth and TokenManager")
+        assert "UserAuth" in result
+        assert "TokenManager" in result
+
+    def test_chinese_terms_extracted(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        # CJK regex: [一-鿿]{2,6} — test with safe unicode escape
+        text = "需要修复用户认证模块"  # 需要修复用户认证模块
+        result = TaskRunner._extract_keywords(text)
+        # 9-char CJK string → multiple 2-6 char terms extracted
+        assert len(result) >= 1, f"Expected CJK terms, got: {result}"
+
+    def test_stop_words_filtered(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        result = TaskRunner._extract_keywords("我们需要在系统中添加一个新的功能")
+        # stopwords like 我们/需要/在/的/一个/新 should be filtered
+        assert "我们" not in result
+        assert "需要" not in result
+
+    def test_deduplication(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        result = TaskRunner._extract_keywords("Fix Fix Fix UserAuth UserAuth")
+        assert result.count("UserAuth") == 1
+        assert result.count("Fix") == 1
+
+    def test_max_20_keywords(self):
+        from orbit.scheduler.task_runner import TaskRunner
+        # Generate text with many unique identifiers
+        text = " ".join(f"Module{i}" for i in range(30))
+        result = TaskRunner._extract_keywords(text)
+        assert len(result) <= 20

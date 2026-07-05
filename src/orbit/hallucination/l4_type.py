@@ -203,39 +203,77 @@ class L4TypeValidator:
     def _compare_behavior(predicted: str, result: ValidationResult) -> bool:
         """对比 Agent 自述行为与 mypy 实际结果。
 
-        REVIEW-FIX P1-3: 从 predicted_behavior 提取类型声明关键词，
-        与 mypy 错误做交叉匹配。矛盾 → False。无声明可提取 → mypy passed。
+        REVIEW-FIX P1-3 + NEW-2: 从 mypy 错误提取 got/expected 类型，
+        与 Agent 自述的返回/接受类型做精确匹配。
 
-        WHY 不直接用 result.passed：Agent 可能自述"返回 int"而 mypy 报
-        "incompatible return type"——这是真实矛盾，behavior_match 应返回 False，
-        即使 Z3/合约层最终 passed 判定不受影响。
+        WHY 不直接用关键词共现：Agent 自述"returns str" + mypy 报
+        "got str, expected int" → 关键词 "str" 共现 → 旧逻辑误判矛盾。
+        实际上 Agent 正确预测了实际返回类型(str)，新逻辑识别为匹配。
+
+        算法：
+        1. mypy passed → True（无矛盾）
+        2. 从 mypy 错误提取 got/expected 类型
+        3. 从 predicted 提取 returns/accepts 类型声明
+        4. 自述类型 = mypy "got" 类型 → Agent 正确预测实际行为 → True
+        5. 自述类型 = mypy "expected" 类型 → Agent 正确预测期望类型 → True
+        6. 自述类型与 mypy 类型不重叠 → 矛盾 → False
+        7. 无法提取 → fail-open → True
         """
         if result.passed:
             return True
         if not predicted.strip():
-            return result.passed  # 无自述行为 → 退化为 mypy 结果
+            return result.passed
 
-        # 从 Agent 自述中提取类型声明关键词
         import re as _re
-        type_keywords: set[str] = set()
-        # 匹配 "returns int" / "returns str" / "accepts list" / "takes no args" 等
+
+        # Step 1: 从 mypy 错误提取 got/expected 类型
+        error_text = ' '.join(result.errors)
+        mypy_types: set[str] = set()
+        # 格式1: "got str, expected int" / "got \"str\", expected \"int\""
+        for m in _re.finditer(
+            r'got\s+"?\'?(\w+(?:\[[^\]]+\])?)',
+            error_text, _re.IGNORECASE,
+        ):
+            mypy_types.add(m.group(1).lower())
+        for m in _re.finditer(
+            r'expected\s+"?\'?(\w+(?:\[[^\]]+\])?)',
+            error_text, _re.IGNORECASE,
+        ):
+            mypy_types.add(m.group(1).lower())
+        # 格式2: "has type \"X\"" / "incompatible type \"X\"" / "type \"X\""
+        for m in _re.finditer(r'(?:has|incompatible|return)?\s*type\s+"(\w+)', error_text):
+            mypy_types.add(m.group(1).lower())
+        # 格式3: 直接的类型名（fallback）
+        if not mypy_types:
+            for m in _re.finditer(
+                r'\b(int|str|float|bool|list|dict|None|tuple|set)\b',
+                error_text,
+            ):
+                mypy_types.add(m.group(1).lower())
+
+        if not mypy_types:
+            return True  # 无法提取 mypy 类型 → fail-open
+
+        # Step 2: 从 Agent 自述提取类型声明
+        predicted_types: set[str] = set()
         for m in _re.finditer(
             r'(returns?|accepts?|takes?|expects?|outputs?)\s+'
             r'(\w+(?:\s*\|\s*\w+)*)',
             predicted, _re.IGNORECASE,
         ):
             types = _re.split(r'\s*\|\s*', m.group(2))
-            type_keywords.update(t.lower() for t in types)
-        # 匹配类型名本身
-        for m in _re.finditer(r'\b(int|str|float|bool|list|dict|None|tuple|set)\b', predicted):
-            type_keywords.add(m.group(1).lower())
+            predicted_types.update(t.lower() for t in types)
+        # fallback: 直接匹配内置类型名
+        if not predicted_types:
+            for m in _re.finditer(
+                r'\b(int|str|float|bool|list|dict|None|tuple|set)\b',
+                predicted,
+            ):
+                predicted_types.add(m.group(1).lower())
 
-        if not type_keywords:
-            return result.passed  # 无类型声明可提取 → 默认 mypy 判定
+        if not predicted_types:
+            return True  # 无类型声明可提取 → fail-open
 
-        # 检查 mypy 错误是否与自述类型矛盾
-        error_text = ' '.join(result.errors).lower()
-        contradiction = any(kw in error_text for kw in type_keywords)
-
-        # 自述了某类型 + mypy 报该类型错误 → 行为矛盾
-        return not contradiction
+        # Step 3: 对比——自述类型与 mypy 提及的类型有交集 → 匹配
+        overlap = predicted_types & mypy_types
+        return len(overlap) > 0

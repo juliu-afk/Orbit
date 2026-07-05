@@ -162,25 +162,27 @@ class TestL4BehaviorComparison:
         match = L4TypeValidator._compare_behavior("returns anything", result)
         assert match is True
 
-    def test_returns_int_vs_mypy_int_error(self):
-        """Agent 自述"returns int"，mypy 报 int 相关错误 → 矛盾。"""
+    def test_returns_int_vs_mypy_got_str_expected_int(self):
+        """NEW-2: Agent 自述"returns int"，mypy 报 "got str, expected int"
+        → 自述 int 与 mypy expected=int 交集 → 匹配（Agent正确预测了期望类型）。"""
         result = ValidationResult(
             passed=False,
             level=HallucinationLevel.L4_TYPE,
             errors=["Incompatible return type: got str, expected int"],
         )
         match = L4TypeValidator._compare_behavior("function returns int", result)
-        assert match is False  # 自述 int + mypy 报 int 错误 = 矛盾
+        assert match is True  # int ∈ {str, int}
 
-    def test_returns_str_vs_mypy_int_error_no_contradiction(self):
-        """Agent 自述"returns str"，mypy 报 int 错误 → 无矛盾（关键词不匹配）。"""
+    def test_returns_str_vs_mypy_got_str_expected_int(self):
+        """NEW-2: Agent 自述"returns str"，mypy 报 "got str, expected int"
+        → 自述 str 与 mypy got=str 交集 → 匹配（Agent正确预测了实际返回类型）。"""
         result = ValidationResult(
             passed=False,
             level=HallucinationLevel.L4_TYPE,
             errors=["Incompatible return type: got str, expected int"],
         )
         match = L4TypeValidator._compare_behavior("function returns str", result)
-        assert match is False  # mypy failed, but keyword "str" ≠ "int" → default False
+        assert match is True  # str ∈ {str, int}
 
     def test_empty_prediction_falls_back_to_mypy(self):
         """无自述行为 → 退化为 mypy 结果。"""
@@ -196,25 +198,79 @@ class TestL4BehaviorComparison:
         match2 = L4TypeValidator._compare_behavior("", result2)
         assert match2 is True
 
-    def test_no_type_keywords_in_prediction(self):
-        """自述不含类型关键词 → 退化为 mypy 结果。"""
+    def test_no_type_keywords_and_no_mypy_types_fail_open(self):
+        """NEW-2: 自述无类型 + mypy 错误无 got/expected → 双方无法提取 → fail-open → True。"""
         result = ValidationResult(
             passed=False,
             level=HallucinationLevel.L4_TYPE,
             errors=["Syntax error in line 5"],
         )
         match = L4TypeValidator._compare_behavior("this code does the thing", result)
-        assert match is False  # mypy failed, no keywords → use mypy
+        assert match is True  # both sides empty → fail-open
 
-    def test_accepts_list_vs_mypy_arg_error(self):
-        """Agent 自述"accepts list"，mypy 报 list 相关错误 → 矛盾。"""
+    def test_accepts_list_vs_mypy_arg_error_overlap(self):
+        """NEW-2: Agent 自述"accepts list"，mypy 报 has type list[int]
+        → 自述 list 与 mypy list 交集 → 匹配。"""
         result = ValidationResult(
             passed=False,
             level=HallucinationLevel.L4_TYPE,
             errors=['Argument 1 has incompatible type "list[int]"; expected "str"'],
         )
         match = L4TypeValidator._compare_behavior("function accepts list", result)
-        assert match is False
+        assert match is True  # list ∈ {list, str} from has type extraction
+
+    def test_returns_float_no_overlap_with_mypy_types(self):
+        """NEW-2: Agent 自述"returns float"，mypy 报 "got str, expected int"
+        → float 不在 {str, int} → 无交集 → 矛盾。"""
+        result = ValidationResult(
+            passed=False,
+            level=HallucinationLevel.L4_TYPE,
+            errors=["Incompatible return type: got str, expected int"],
+        )
+        match = L4TypeValidator._compare_behavior("function returns float", result)
+        assert match is False  # float ∉ {str, int}
+
+    # ── NEW-2: mypy 错误格式变体测试 ──
+
+    def test_mypy_quoted_type_format(self):
+        """mypy 格式: got "str", expected "int"（带引号）。"""
+        result = ValidationResult(
+            passed=False,
+            level=HallucinationLevel.L4_TYPE,
+            errors=['Incompatible return type (got "str", expected "int")'],
+        )
+        match = L4TypeValidator._compare_behavior("function returns str", result)
+        assert match is True  # str ∈ {str, int}
+
+    def test_mypy_has_type_format(self):
+        """mypy 格式: has type "list[int]"（assignment 场景）。"""
+        result = ValidationResult(
+            passed=False,
+            level=HallucinationLevel.L4_TYPE,
+            errors=['Incompatible types in assignment (expression has type "list[int]")'],
+        )
+        match = L4TypeValidator._compare_behavior("function returns list", result)
+        assert match is True  # list ∈ {list}
+
+    def test_mypy_no_recognizable_types_fallback_keyword(self):
+        """mypy 错误不含 got/expected/has type 格式 → fallback 内置类型匹配。"""
+        result = ValidationResult(
+            passed=False,
+            level=HallucinationLevel.L4_TYPE,
+            errors=["Name 'int' is not defined"],
+        )
+        match = L4TypeValidator._compare_behavior("function returns int", result)
+        assert match is True  # fallback: int ∈ {int}
+
+    def test_mypy_no_types_at_all_fail_open(self):
+        """mypy 错误完全无法提取类型 → fail-open → True。"""
+        result = ValidationResult(
+            passed=False,
+            level=HallucinationLevel.L4_TYPE,
+            errors=["Syntax error in line 5"],
+        )
+        match = L4TypeValidator._compare_behavior("function returns int", result)
+        assert match is True  # fail-open
 
 
 # ═══════════════════════════════════════════════════════════════

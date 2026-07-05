@@ -292,7 +292,9 @@ class TaskRunner:
             return data.get("_intent", "chat")
         except (_json.JSONDecodeError, ValueError, TypeError):
             pass
-        match = _re.search(r'"__?intent__?"\s*:\s*"(chat|programming)"', output)
+        # REVIEW-FIX: 原 regex "__?intent__?" 要求 intent 前后均有 _，
+        # 不匹配 "_intent"（仅前缀有 _）。改为 _{0,2} 使前后 _ 均可选。
+        match = _re.search(r'"_{0,2}intent_{0,2}"\s*:\s*"(chat|programming)"', output)
         if match:
             return match.group(1)
         return "chat"
@@ -519,83 +521,6 @@ class TaskRunner:
                 ).model_dump(),
             )
         )
-
-    @staticmethod
-    @staticmethod
-    def _extract_keywords(prd_text: str) -> list[str]:
-        """从 PRD 文本提取技术关键词——减熵闭环-1. P2-PRE-1: +@staticmethod."""
-        if not prd_text:
-            return []
-        _stop = {
-            "的",
-            "是",
-            "在",
-            "和",
-            "了",
-            "有",
-            "不",
-            "要",
-            "可以",
-            "需要",
-            "应该",
-            "能够",
-            "使用",
-            "通过",
-            "进行",
-            "实现",
-            "添加",
-            "修改",
-            "删除",
-            "支持",
-            "提供",
-            "包括",
-            "用于",
-            "the",
-            "a",
-            "an",
-            "is",
-            "are",
-            "be",
-            "to",
-            "of",
-            "in",
-            "for",
-            "and",
-            "or",
-            "not",
-            "this",
-            "that",
-            "with",
-            "from",
-            "it",
-            "we",
-            "you",
-            "as",
-            "if",
-            "but",
-            "so",
-            "all",
-            "no",
-        }
-        keywords: list[str] = []
-        for word in prd_text.replace("\n", " ").split():
-            word = word.strip(".,;:()[]{}<>\"'`/\\|!@#$%^&*+-=~")
-            if len(word) < 2:
-                continue
-            if any(c.isupper() for c in word) or "_" in word:
-                if word.lower() not in _stop:
-                    keywords.append(word)
-        cn_terms = re.findall(r"[一-鿿]{2,6}", prd_text)
-        for t in cn_terms:
-            if t not in _stop and t not in keywords:
-                keywords.append(t)
-        seen: set[str] = set()
-        uniq = []
-        for k in keywords:
-            if k.lower() not in seen:
-                seen.add(k.lower())
-                uniq.append(k)
-        return uniq[:20]
 
     @staticmethod
     def _extract_keywords(prd_text: str) -> list[str]:

@@ -59,6 +59,8 @@ class OrbitWiring:
         self._grpo: object | None = None
         self._injector: object | None = None
         self._llm_distill: object | None = None
+        self._monitor: object | None = None
+        self._mcts: object | None = None
 
     # ── 生命周期钩子 ───────────────────────────────────
 
@@ -229,3 +231,34 @@ class OrbitWiring:
             except Exception:
                 pass
         return self._llm_distill
+
+    def _get_monitor(self):
+        if self._monitor is None:
+            try:
+                from orbit.metacognition.monitor import MonitorAgent
+                self._monitor = MonitorAgent()
+            except Exception: pass
+        return self._monitor
+
+    def _get_mcts(self):
+        if self._mcts is None:
+            try:
+                from orbit.agents.mcts import MCTSPlanner
+                self._mcts = MCTSPlanner()
+            except Exception: pass
+        return self._mcts
+
+    def get_mcts_planner(self):
+        return self._get_mcts()
+
+    async def start_monitor(self, task_id: str, goal: str = "") -> object | None:
+        mon = self._get_monitor()
+        if mon is None: return None
+        mon._goal = goal
+        mon._task_id = task_id
+        import asyncio
+        queue: asyncio.Queue = asyncio.Queue()
+        task = asyncio.create_task(mon.run(queue, task_id=task_id))
+        task._monitor_queue = queue
+        logger.debug("monitor_started", task_id=task_id, goal=goal[:60])
+        return task

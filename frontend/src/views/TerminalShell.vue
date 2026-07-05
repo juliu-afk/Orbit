@@ -18,6 +18,8 @@ import type { FileNode } from '@/components/editor/FileTreePanel.vue'
 import DAGDrawer from '@/components/dag/DAGDrawer.vue'
 import TokenChartDrawer from '@/components/charts/TokenChartDrawer.vue'
 import SearchDrawer from '@/components/editor/SearchDrawer.vue'
+import TraceDrawer from '@/components/observability/TraceDrawer.vue'
+import ConfigDrawer from '@/components/config/ConfigDrawer.vue'
 import ShortcutPanel from '@/components/layout/ShortcutPanel.vue'
 
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
@@ -57,8 +59,9 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
   <main class="panel-center flex flex-col overflow-hidden"><TerminalChat /></main>
   <div class="resize-handle resize-right" @pointerdown="handleRightResize" />
   <aside class="panel-right" style="border-left:1px solid var(--color-orbit-border);overflow-y:auto"><MonacoPanel v-if="shell.showMonaco" /><AgentInfoPanel v-else /></aside>
-  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" />
+  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @toggle-trace="shell.toggleTrace()" @toggle-config="shell.toggleConfig()" />
   <DAGDrawer v-model:show="shell.showDAG" /><TokenChartDrawer v-model:show="shell.showChart" /><SearchDrawer v-model:show="shell.showSearch" @open-file="shell.openFileReview" />
+  <TraceDrawer v-model:show="shell.showTrace" /><ConfigDrawer v-model:show="shell.showConfig" />
   <ShortcutPanel v-model:show="showShortcuts" />
 </div>
 </template>

@@ -37,3 +37,11 @@ export async function apiPost<T = unknown>(path: string, body: unknown): Promise
 export async function apiGet<T = unknown>(path: string): Promise<T> {
   return request<T>(path, { method: 'GET' })
 }
+
+export async function apiPut<T = unknown>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}

@@ -7,6 +7,7 @@ const props = defineProps<{ connectionStatus: ConnectionStatus; budgetLabel?: st
 const emit = defineEmits<{
   (e: 'toggle-dag'): void; (e: 'toggle-chart'): void
   (e: 'toggle-search'): void
+  (e: 'toggle-trace'): void; (e: 'toggle-config'): void
 }>()
 const shell = useShellStore()
 
@@ -26,6 +27,8 @@ const connectionLabel = computed(() => {
     <button class="status-btn" :class="{ active: shell.showDAG }" @click="emit('toggle-dag')">DAG</button>
     <button class="status-btn" :class="{ active: shell.showChart }" @click="emit('toggle-chart')">Charts</button>
     <button class="status-btn" :class="{ active: shell.showSearch }" @click="emit('toggle-search')">Search</button>
+    <button class="status-btn" :class="{ active: shell.showTrace }" @click="emit('toggle-trace')">Trace</button>
+    <button class="status-btn" :class="{ active: shell.showConfig }" @click="emit('toggle-config')">Config</button>
   </div>
   <div class="flex items-center gap-2">
     <span v-if="shell.selectedFile">{{ shell.selectedFile }}</span>

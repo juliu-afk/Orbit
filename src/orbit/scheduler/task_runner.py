@@ -297,6 +297,59 @@ class TaskRunner:
             return match.group(1)
         return "chat"
 
+    async def _run_scoping(self, task_id: str, context: dict[str, Any]) -> str:
+        """SCOPING 状态——确定性变更范围分析 (Phase 2 Token节省).
+
+        纯规则引擎——git diff + Python AST，0 LLM 调用。
+        输出变更范围报告，决定后续测试粒度。
+        fail-open: 任何异常返回 generic 报告，不阻塞任务。
+        """
+        import json as _json
+
+        try:
+            from orbit.context.scanners.affected_files import AffectedFilesScanner
+            from orbit.context.scanners.import_deps import ImportDependencyScanner
+        except ImportError:
+            logger.warning("scoping_scanner_import_failed", task_id=task_id)
+            return _json.dumps({"test_scope": "unit_integration", "note": "scanner_unavailable"})
+
+        project_path = context.get("project_path", ".")
+        scope_report: dict[str, Any] = {}
+
+        # 扫描 1: git diff → 受影响文件
+        try:
+            af_scanner = AffectedFilesScanner()
+            scope_report["affected_files"] = af_scanner.scan(project_path)
+        except Exception as e:
+            logger.warning("scoping_affected_files_failed", error=str(e))
+            scope_report["affected_files"] = {"error": str(e), "total": 0}
+
+        # 扫描 2: Python AST → import 依赖
+        try:
+            deps_scanner = ImportDependencyScanner()
+            affected = scope_report.get("affected_files", {})
+            changed = affected.get("changed", []) + affected.get("added", [])
+            scope_report["import_deps"] = deps_scanner.scan(project_path, affected_files=changed)
+        except Exception as e:
+            logger.warning("scoping_import_deps_failed", error=str(e))
+            scope_report["import_deps"] = {"error": str(e)}
+
+        # 决策测试粒度
+        affected = scope_report.get("affected_files", {})
+        scope_report["test_scope"] = _decide_test_scope(affected)
+
+        context["scope_report"] = scope_report
+        # 注入 L2——供 Architect/Developer/Reviewer/QA 消费
+        context.setdefault("l2", {})["scope_report"] = scope_report
+
+        logger.info(
+            "scoping_complete",
+            task_id=task_id,
+            files=affected.get("total", 0),
+            test_scope=scope_report["test_scope"],
+        )
+        return _json.dumps(scope_report)
+
     async def _run_agent(
         self, role: str, task_id: str, context: dict[str, Any], timeout: int | None = None
     ) -> str:
@@ -521,83 +574,6 @@ class TaskRunner:
         )
 
     @staticmethod
-    @staticmethod
-    def _extract_keywords(prd_text: str) -> list[str]:
-        """从 PRD 文本提取技术关键词——减熵闭环-1. P2-PRE-1: +@staticmethod."""
-        if not prd_text:
-            return []
-        _stop = {
-            "的",
-            "是",
-            "在",
-            "和",
-            "了",
-            "有",
-            "不",
-            "要",
-            "可以",
-            "需要",
-            "应该",
-            "能够",
-            "使用",
-            "通过",
-            "进行",
-            "实现",
-            "添加",
-            "修改",
-            "删除",
-            "支持",
-            "提供",
-            "包括",
-            "用于",
-            "the",
-            "a",
-            "an",
-            "is",
-            "are",
-            "be",
-            "to",
-            "of",
-            "in",
-            "for",
-            "and",
-            "or",
-            "not",
-            "this",
-            "that",
-            "with",
-            "from",
-            "it",
-            "we",
-            "you",
-            "as",
-            "if",
-            "but",
-            "so",
-            "all",
-            "no",
-        }
-        keywords: list[str] = []
-        for word in prd_text.replace("\n", " ").split():
-            word = word.strip(".,;:()[]{}<>\"'`/\\|!@#$%^&*+-=~")
-            if len(word) < 2:
-                continue
-            if any(c.isupper() for c in word) or "_" in word:
-                if word.lower() not in _stop:
-                    keywords.append(word)
-        cn_terms = re.findall(r"[一-鿿]{2,6}", prd_text)
-        for t in cn_terms:
-            if t not in _stop and t not in keywords:
-                keywords.append(t)
-        seen: set[str] = set()
-        uniq = []
-        for k in keywords:
-            if k.lower() not in seen:
-                seen.add(k.lower())
-                uniq.append(k)
-        return uniq[:20]
-
-    @staticmethod
     def _extract_keywords(prd_text: str) -> list[str]:
         """从 PRD 文本提取技术关键词——减熵闭环-1.
 
@@ -704,7 +680,8 @@ class TaskRunner:
 
 STATE_TRANSITIONS: dict[TaskState, TaskState] = {
     TaskState.IDLE: TaskState.PARSING,
-    TaskState.PARSING: TaskState.PLANNING,
+    TaskState.PARSING: TaskState.SCOPING,     # Phase 2: PARSING → SCOPING → PLANNING
+    TaskState.SCOPING: TaskState.PLANNING,
     TaskState.PLANNING: TaskState.CODING,
     TaskState.CODING: TaskState.VERIFYING,
     TaskState.VERIFYING: TaskState.DONE,
@@ -712,7 +689,7 @@ STATE_TRANSITIONS: dict[TaskState, TaskState] = {
 
 FAST_LANE_TRANSITIONS: dict[TaskState, TaskState] = {
     TaskState.IDLE: TaskState.PARSING,
-    TaskState.PARSING: TaskState.CODING,
+    TaskState.PARSING: TaskState.CODING,       # 快车道跳过 SCOPING+PLANNING
     TaskState.CODING: TaskState.DONE,
     TaskState.DONE: TaskState.DONE,
 }
@@ -741,6 +718,7 @@ def _state_to_progress(state: TaskState) -> float:
     mapping = {
         TaskState.IDLE: 0.0,
         TaskState.PARSING: 0.2,
+        TaskState.SCOPING: 0.3,    # Phase 2: PARSING(0.2) < SCOPING(0.3) < PLANNING(0.4)
         TaskState.PLANNING: 0.4,
         TaskState.CODING: 0.7,
         TaskState.VERIFYING: 0.9,
@@ -750,6 +728,43 @@ def _state_to_progress(state: TaskState) -> float:
     }
     return mapping.get(state, 0.0)
 
-# ── 状态流转图 (ChatterAgent 意图路由) ─────────────────
+# ── 状态流转图 (ChatterAgent 意图路由 + Phase 2 SCOPING) ─────────────────
 # IDLE(chatter) → chat intent → DONE
-# IDLE(chatter) → programming intent → PARSING(clarifier) → PLANNING(architect) → CODING(developer) → VERIFYING(reviewer) → DONE
+# IDLE(chatter) → programming intent → PARSING(clarifier) → SCOPING(规则引擎) → PLANNING(architect) → CODING(developer) → VERIFYING(reviewer) → DONE
+# 快车道: PARSING → CODING → DONE（跳过 SCOPING+PLANNING）
+
+
+def _decide_test_scope(affected: dict[str, Any]) -> str:
+    """变更范围 → 测试粒度决策 (Phase 2 Token节省).
+
+    WHY 确定性规则而非 LLM: 文件路径 → 测试粒度的映射是机械的，
+    不需要推理能力。LLM 判断反而慢且不稳定。
+
+    规则:
+      - 0 文件或无变更 → "smoke"
+      - 仅 frontend/ → "smoke"
+      - 触及核心模块 → "full_regression"
+      - 其他 → "unit_integration"
+    """
+    files: list[str] = affected.get("changed", []) + affected.get("added", [])
+    if not files:
+        return "smoke"
+
+    # 核心模块——改动影响面大，需全量回归
+    _core_modules = {
+        "src/orbit/agents/",
+        "src/orbit/scheduler/",
+        "src/orbit/gateway/",
+        "src/orbit/compression/",
+        "src/orbit/hallucination/",
+        "src/orbit/checkpoint/",
+        "src/orbit/sandbox/",
+    }
+    if any(any(f.startswith(m) for m in _core_modules) for f in files):
+        return "full_regression"
+
+    # 纯前端变更——冒烟够用
+    if all(f.startswith("frontend/") for f in files):
+        return "smoke"
+
+    return "unit_integration"

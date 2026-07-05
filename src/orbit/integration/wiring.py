@@ -72,6 +72,8 @@ class OrbitWiring:
         self._llm_distill: object | None = None
         self._monitor: object | None = None
         self._mcts: object | None = None
+        self._gepa: object | None = None
+        self._scope: object | None = None
 
     # ── 生命周期钩子 ───────────────────────────────────
 
@@ -130,6 +132,10 @@ class OrbitWiring:
                 am.remember(trigger=title, action=f"避免: {title}",
                             expected_outcome="下次不再重复此错误",
                             category=category, tags=tags or [])
+        # SCOPE 战术记忆——每次事件都记录为战术规则
+        scope = self._get_scope()
+        if scope:
+            scope.add_tactical(task_id, title)
 
     def enhance_prompt(self, base_prompt: str, category: str = "",
                        keywords: list[str] | None = None) -> str:
@@ -184,6 +190,28 @@ class OrbitWiring:
         grpo = self._get_grpo()
         if grpo:
             grpo.update_utilities()
+
+        # GEPA Prompt 进化——GRPO 评分后对低效用原则进行遗传优化
+        gepa = self._get_gepa()
+        if gepa and de:
+            low_utility = [p for p in de.top_principles(50) if p.utility_score < 0.6]
+            if len(low_utility) >= 3:
+                try:
+                    await gepa.evolve_population(low_utility, failure_reason="原则效用低于0.6，需进化", category="")
+                except Exception as e:
+                    logger.debug("gepa_evolution_failed", error=str(e))
+
+        # SCOPE 战术→战略升级检查——高频战术规则自动升级
+        scope = self._get_scope()
+        if scope:
+            try:
+                from orbit.evolution.scope import ScopeMemory
+                # 触发升级检查——add_tactical已在record_event中调用
+                strategies = scope.get_strategic_all()
+                if strategies:
+                    logger.debug("scope_strategies_active", count=len(strategies))
+            except Exception as e:
+                logger.debug("scope_check_failed", error=str(e))
 
     # ── 懒初始化 ───────────────────────────────────────
 
@@ -300,6 +328,24 @@ class OrbitWiring:
         task._monitor_queue = queue
         logger.debug("monitor_started", task_id=task_id, goal=goal[:60])
         return task
+
+    def _get_gepa(self):
+        if self._gepa is None:
+            try:
+                from orbit.evolution.gepa import GEPAEngine
+                self._gepa = GEPAEngine(llm=None, distill=self._get_distill())
+            except Exception as e:
+                logger.debug("gepa_init_failed", error=str(e))
+        return self._gepa
+
+    def _get_scope(self):
+        if self._scope is None:
+            try:
+                from orbit.evolution.scope import ScopeMemory
+                self._scope = ScopeMemory(self._db_path)
+            except Exception as e:
+                logger.debug("scope_init_failed", error=str(e))
+        return self._scope
 
     def _infer_category_from_task(self, task_id: str) -> str:
         """从 task_id 推断任务类别——供 GRPO 基线分类。"""

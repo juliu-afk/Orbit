@@ -1,5 +1,7 @@
 """NL交互 PR #1——项目注册表单元测试。"""
 
+import pytest
+
 from orbit.projects.registry import ProjectRegistry
 
 
@@ -36,8 +38,8 @@ class TestProjectRegistry:
             reg.close()
             _cleanup()
 
-    def     @pytest.mark.skip(reason="P2-4: needs fixing")
-    test_list_all(self) -> None:
+    @pytest.mark.skip(reason="P2-4: needs fixing")
+    def test_list_all(self) -> None:
         reg = ProjectRegistry()
         try:
             reg.register("A")
@@ -49,8 +51,8 @@ class TestProjectRegistry:
             reg.close()
             _cleanup()
 
-    def     @pytest.mark.skip(reason="P2-4: needs fixing")
-    test_deactivate(self) -> None:
+    @pytest.mark.skip(reason="P2-4: needs fixing")
+    def test_deactivate(self) -> None:
         reg = ProjectRegistry()
         try:
             reg.register("Temp")

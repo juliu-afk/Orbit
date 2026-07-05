@@ -25,3 +25,26 @@
 ## 审查结论
 
 **✅ 通过** — 0 致命问题，0 严重问题。严格按阶段2方案实现，6 文件改动清晰可追溯。
+
+---
+
+## REVIEW-FIX: PR #199 审查修复 (2026-07-05)
+
+| # | 严重度 | 问题 | 修复 |
+|---|:--:|------|------|
+| P0-1 | 致命 | `_run_agent` 超时 20s→生产大面积超时 | 改名 `AGENT_STEP_TIMEOUT` → 默认 120s / CODING 180s |
+| P1-1 | 严重 | 测试全部常量验证，零行为覆盖 | 重写 `test_cua_task_runner.py`：「循环上限模拟」「resume重置」「超时注入路径」 |
+| P1-2 | 严重 | `GraphNode.serialize_tools` 死代码 | 移除该字段 |
+| P1-3 | 严重 | L4 `behavior_match = result.passed` 空壳 | 新增 `_compare_behavior()` 静态方法——关键词交叉对比 |
+| P1-4 | 严重 | L2 偏差计算未测试 | 新增 `TestL2DeviationCalculation`——6 条行为测试覆盖全部边界 |
+| P1-5 | 严重 | resume 不重置 `_cycle_count` | `resume()` 中 `context["_cycle_count"] = 0` |
+| P2-1 | 建议 | L5 契约对比用子串匹配→误报 | **不修**——Phase A 接受，后续用 embedding 相似度替代 |
+| P2-2 | 建议 | `_describe_contract` 不处理嵌套 | **不修**——当前契约格式仅 flat pre/post 列表，嵌套结构未使用 |
+
+### 测试结果（修复后）
+
+| 测试层 | 通过 | 变化 |
+|--------|:--:|------|
+| CUA 新测试 | **43** | +6 (37→43) |
+| 已有相关测试 | **99** | 零回归 |
+| **合计** | **142** | 全绿 |

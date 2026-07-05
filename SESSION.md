@@ -1,5 +1,32 @@
 # Orbit 开发会话记录
 
+## 2026-07-06 — Phase B 遗留收尾 (PR #212 · MERGED)
+
+**背景**: 审计 19 项遗留，5 项不过时，全部收尾。
+
+### 交付
+
+| 层 | 内容 | 文件 |
+|----|------|------|
+| 前端 | TraceViewer——Trace 链路瀑布图 + span 详情 + OTEL 导出 | `TraceDrawer.vue` |
+| 前端 | ConfigView——YAML 编辑 + Git 历史 + 分支管理 + 冲突解决 | `ConfigDrawer.vue` + 3 子组件 |
+| 后端 | FeedbackEngine——轨迹分析→失败率/漂移率/效率→调优建议 | `feedback.py` |
+| 后端 | TrajectoryCollector 生命周期接线 + /feedback 端点 | `main.py`, `observability.py` |
+| 运维 | 代码签名 SOP + build-desktop.sh 签名占位 | `SOP-代码签名.md` |
+| 测试 | `test_stream.py` 补 valid_values + 8 条 feedback 测试 | `test_stream.py`, `test_feedback.py` |
+
+### 审查
+
+- R1: P2-1（FeedbackEngine DB 路径 bug——永远读不到数据）+ P2-2（docstring 误导）→ 全修
+
+### 关键决策
+
+- FeedbackEngine 改为依赖注入——接受 TrajectoryCollector 实例，不自建连接
+- 代码签名跳过证书购买（个人项目无营业执照），仅写 SOP 文档
+- 14/19 遗留项判定为过时——MCP 已实现、沙箱已覆盖、上下文管线已替代等
+
+---
+
 ## 2026-07-06 — Sprint 1 P0：开源项目借鉴 (PR #211 · MERGED)
 
 **基于**: 4 个开源项目源码解构（pm-skills / Compound Engineering / turboVec / ECC）。

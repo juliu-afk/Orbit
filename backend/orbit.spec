@@ -71,6 +71,9 @@ _INFRA_IMPORTS: list[str] = [
     "orbit.observability.trajectory",
     "orbit.hallucination.pipeline",
     "orbit.context.builders", "orbit.context.prebuilders", "orbit.context.scanners",
+    # PR#205: auto-discover 跳过 test_ 前缀——动态 importlib 需要显式声明
+    "orbit.context.builders.test_builder",
+    "orbit.context.scanners.test_coverage",
     "orbit.agents.preact", "orbit.agents.mcts",
     "orbit.memory.agentic", "orbit.metacognition.vigil", "orbit.tools.mcp_server",
     "orbit.evolution.grpo", "orbit.evolution.inject", "orbit.evolution.llm_distill",

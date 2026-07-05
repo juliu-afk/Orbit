@@ -62,20 +62,14 @@ class GEPAPopulation:
         return ranked[: self.elite_size]
 
     def select_parents(self, principles: list[StrategyPrinciple]) -> tuple[StrategyPrinciple, StrategyPrinciple]:
-        """选择两个父本——高效用加权随机。"""
+        """选择两个不同父本——高效用加权随机。"""
         ranked = sorted(principles, key=lambda p: p.utility_score, reverse=True)[:6]
+        if len(ranked) < 2:
+            return ranked[0], ranked[0]
         weights = [p.utility_score + 0.1 for p in ranked]
-        total = sum(weights)
-        r1, r2 = random.random() * total, random.random() * total
-        p1 = p2 = ranked[0]
-        acc = 0.0
-        for p in ranked:
-            acc += p.utility_score + 0.1
-            if r1 <= acc: p1 = p; break
-        acc = 0.0
-        for p in ranked:
-            acc += p.utility_score + 0.1
-            if r2 <= acc: p2 = p; break
+        p1, p2 = random.choices(ranked, weights=weights, k=2)
+        while p1 is p2 and len(ranked) > 1:
+            p2 = random.choices(ranked, weights=weights, k=1)[0]
         return p1, p2
 
 

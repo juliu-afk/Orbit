@@ -16,6 +16,7 @@ WHY: 当前原则库是单层的，无战术/战略区分。
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 import time
 from dataclasses import dataclass, field
@@ -128,7 +129,6 @@ class ScopeMemory:
                     )
                     self._db.commit()
                 return None
-        import hashlib
         sid = hashlib.sha256(rule.encode()).hexdigest()[:16]
         self._db.execute(
             "INSERT INTO strategic_rules (id, rule, utility, created_at) VALUES (?,?,?,?)",
@@ -187,7 +187,6 @@ class ScopeMemory:
         logger.info("scope_upgrade", rule=rule[:80], source_count=source_count)
 
     def _rule_hash(self, rule: str) -> str:
-        import hashlib
         return hashlib.sha256(rule.lower().strip().encode()).hexdigest()[:12]
 
     def _to_strategic(self, row: sqlite3.Row) -> StrategicRule:

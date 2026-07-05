@@ -1,7 +1,33 @@
 """Phase G 单元测试——GEPA/SCOPE."""
 from __future__ import annotations
 
+from orbit.evolution.distill import DistillationEngine, StrategyPrinciple
+from orbit.evolution.gepa import GEPAPopulation
 from orbit.evolution.scope import ScopeMemory
+
+
+class TestGEPAPopulation:
+    def test_select_elite(self):
+        pop = GEPAPopulation(population_size=10, elite_size=3)
+        principles = [
+            StrategyPrinciple(id="1", principle="a", utility_score=0.3),
+            StrategyPrinciple(id="2", principle="b", utility_score=0.9),
+            StrategyPrinciple(id="3", principle="c", utility_score=0.7),
+            StrategyPrinciple(id="4", principle="d", utility_score=0.5),
+        ]
+        elite = pop.select_elite(principles)
+        assert len(elite) == 3
+        assert elite[0].utility_score == 0.9
+
+    def test_select_parents_different(self):
+        pop = GEPAPopulation()
+        principles = [
+            StrategyPrinciple(id=str(i), principle=f"p{i}", utility_score=0.3 + i * 0.1)
+            for i in range(6)
+        ]
+        p1, p2 = pop.select_parents(principles)
+        assert p1.id != p2.id or len(principles) == 1
+
 
 
 class TestScopeMemory:

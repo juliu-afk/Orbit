@@ -70,6 +70,9 @@ _INFRA_IMPORTS: list[str] = [
     "orbit.memory.profile",
     "orbit.observability.trajectory",
     "orbit.hallucination.pipeline",
+    "orbit.context.builders", "orbit.context.prebuilders", "orbit.context.scanners",
+    "orbit.agents.preact", "orbit.agents.mcts",
+    "orbit.memory.agentic", "orbit.metacognition.vigil", "orbit.tools.mcp_server",
 ]
 
 _HIDDEN_IMPORTS = _INFRA_IMPORTS + _ORBIT_MODULES

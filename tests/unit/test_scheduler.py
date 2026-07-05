@@ -95,15 +95,18 @@ def test_terminal_states_no_transition(scheduler):
 
 
 def test_state_sequence_correct(scheduler):
+    """P1 修复：新增 SCOPING 状态——PARSING→SCOPING→PLANNING。"""
     seq = [
         _transition(TaskState.IDLE),
         _transition(TaskState.PARSING),
+        _transition(TaskState.SCOPING),
         _transition(TaskState.PLANNING),
         _transition(TaskState.CODING),
         _transition(TaskState.VERIFYING),
     ]
     assert seq == [
         TaskState.PARSING,
+        TaskState.SCOPING,
         TaskState.PLANNING,
         TaskState.CODING,
         TaskState.VERIFYING,

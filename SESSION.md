@@ -1,34 +1,5 @@
 # Orbit 开发会话记录
 
-## 2026-07-06 — Sprint 1 P0：开源项目借鉴 (PR #211 · MERGED)
-
-**基于**: 4 个开源项目源码解构（pm-skills / Compound Engineering / turboVec / ECC）。
-**报告**: `docs/open-source-deep-dive-2026-07-05.html`（生成于 `docs/research/`）
-
-### 交付
-
-| P0 | 内容 | 文件 |
-|----|------|------|
-| P0-1 | PrinciplesContextBuilder——蒸馏引擎→Agent system prompt | `context/builders/principles_builder.py` |
-| P0-2 | StrategyContextBuilder——STRATEGY.md 三级降级锚点 | `context/builders/strategy_builder.py` |
-| P0-3 | 6×SKILL.md 方法论注入（逆向 pm-skills prompt 框架） | `compose/skills/*.md` |
-| P0-4 | turboVec+BGE 语义搜索（4-bit 8x压缩+TF-IDF降级） | `knowledge/embedding.py`, `knowledge/vector.py` |
-| 修复 | 10 测试文件 `def @pytest.mark.skip` 语法错误（22处） | `tests/unit/test_*.py` |
-
-### 依赖
-- turbovec 0.8.0 (MIT) + sentence-transformers 5.6.0 (Apache 2.0)
-
-### 审查
-- WorkBuddy: P2×2——中文路径改名+测试缺口（后项下个 Sprint）
-- 合并: squash merge → master
-
-### 踩坑
-- **Session auto-commit**: 非插件 hook——可能是 Claude session-end 自动保存导致变更直接提交到 master（commit message "test"）。后续切 feature 分支后再工作
-- **Poetry resolver 失败**: `tz3-solver` typo 导致 `poetry add` 失败，改用 `pip install` 直装
-- **Merge conflict**: squash merge 残留 `search()` 方法体缺失，修复后推送
-
----
-
 ## 2026-07-05 — CUA 模式迁移 Phase A (PR #199 · MERGED)
 
 **基于**：三大 CUA 项目（OpenAI CUA Sample / trycua / OpenCUA）源码解构分析。

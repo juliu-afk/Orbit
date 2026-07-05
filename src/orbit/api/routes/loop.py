@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/api/v1/loop", tags=["loop"])
+router = APIRouter(prefix="/loop", tags=["loop"])
 
 
 class CreateLoopRequest(BaseModel):

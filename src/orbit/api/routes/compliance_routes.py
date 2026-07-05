@@ -7,7 +7,7 @@ import re
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/compliance", tags=["compliance_check"])  # P2-4: 区分旧 compliance 模块
+router = APIRouter(prefix="/compliance-check", tags=["compliance_check"])  # P2-4: 区分旧 compliance 模块，避免路由冲突
 
 _file_service = None
 

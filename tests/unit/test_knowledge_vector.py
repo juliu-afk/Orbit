@@ -24,7 +24,11 @@ class TestVectorStore:
     def test_index_built(self, vector: VectorStore) -> None:
         """索引构建成功——所有概念可搜索。"""
         assert len(vector._documents) == 10
-        assert len(vector._idf) > 0
+        if vector._use_turbovec:
+            assert vector._index is not None
+            assert len(vector._concepts) == 10
+        else:
+            assert len(vector._idf) > 0
 
     def test_search_exact_concept(self, vector: VectorStore) -> None:
         """搜索"流动比率"——应返回 CurrentRatio 为高分结果。"""

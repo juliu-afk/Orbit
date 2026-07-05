@@ -127,6 +127,8 @@
 1. ⚠️ PrinciplesBuilder 需在 PromptBuilder 集成时传入 DistillationEngine 实例——当前 `__init__(engine=None)` 无人传参。**不阻塞 merge**——这是连线问题，在后续 PromptBuilder 改动中解决。
 2. ⚠️ 新模块测试缺口——4 个新 Python 文件无对应单元测试。建议下个 Sprint 补。
 3. ✅ pyproject.toml 依赖已添加。两个依赖开源协议确认: turbovec (MIT) + sentence-transformers (Apache 2.0)，与 Orbit (MIT) 兼容。
+4. ✅ 单元测试运行: 本次改动引入 0 失败。5 个预存失败（test_knowledge_tool×2, test_scheduler, test_stream, test_task_runner_coverage——均与本次改动无关）。10 个测试文件的 `def @pytest.mark.skip` 语法错误已修复。
+5. ✅ turboVec 集成验证: BGE 模型加载成功，turbovec 索引构建+搜索通过，空查询降级正确处理。
 
 ---
 

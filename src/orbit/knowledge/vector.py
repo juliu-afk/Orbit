@@ -126,7 +126,15 @@ class VectorStore:
         self._index = index
         self._embedder = embedder
         self._concepts = [e["concept"] for e in entries]
-        self._documents = {e["concept"]: e for e in entries}  # 保留文档元数据
+        # 保留文档元数据 + TF 数据（供 TF-IDF fallback 使用）
+        self._documents = {}
+        for e in entries:
+            text = f"{e['concept']} {e['name_zh']} {e['definition']} {e['formula']}"
+            self._documents[e["concept"]] = {
+                **e,
+                "tokens": _tokenize(text),
+                "tf": self._compute_tf(_tokenize(text)),
+            }
         self._use_turbovec = True
         logger.info(
             "turbovec_index_built",
@@ -173,6 +181,8 @@ class VectorStore:
         Returns:
             [{concept, name_zh, definition, formula, score, source_uri}, ...]
         """
+        if not query.strip():
+            return []
         if self._use_turbovec and self._index is not None:
             return self._search_turbovec(query, top_k)
         return self._search_tfidf(query, top_k)
@@ -183,9 +193,12 @@ class VectorStore:
 
         try:
             query_vec = np.array(
-                self._embedder.encode_query(query), dtype=np.float32
+                [self._embedder.encode_query(query)], dtype=np.float32
             )
             scores, indices = self._index.search(query_vec, k=min(top_k, len(self._concepts)))
+            # turbovec returns 2D results for batch queries
+            scores = scores[0] if scores.ndim == 2 else scores
+            indices = indices[0] if indices.ndim == 2 else indices
         except Exception as e:
             logger.warning("turbovec_search_failed_fallback_tfidf", error=str(e))
             return self._search_tfidf(query, top_k)

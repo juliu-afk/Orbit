@@ -11,8 +11,10 @@ class TestFeedbackEngine:
     @pytest.fixture
     def engine(self):
         from orbit.observability.feedback import FeedbackEngine
+        from orbit.observability.trajectory import TrajectoryCollector
 
-        return FeedbackEngine(db_path=":memory:")
+        collector = TrajectoryCollector(db_path=":memory:")
+        return FeedbackEngine(collector=collector)
 
     @pytest.mark.asyncio
     async def test_analyze_insufficient_data(self, engine):
@@ -21,8 +23,9 @@ class TestFeedbackEngine:
         assert report is None
 
     @pytest.mark.asyncio
-    async def test_analyze_with_mock_data(self, engine):
+    async def test_analyze_with_mock_data(self):
         """有 ≥5 条完成轨迹 → 返回 FeedbackReport."""
+        from orbit.observability.feedback import FeedbackEngine
         from orbit.observability.trajectory import (
             StepOutcome,
             TrajectoryCollector,
@@ -54,22 +57,18 @@ class TestFeedbackEngine:
                 total_tool_calls=3 + i,
             )
 
-        # 用 collector 的 db_path 初始化 engine
-        from orbit.observability.feedback import FeedbackEngine
-
-        engine2 = FeedbackEngine(db_path=":memory:")
-        # 手动插入数据——engine 用的是独立连接
-        # 换成直接测 _compute_metrics
+        # FeedbackEngine 与 collector 共享数据库连接
+        engine2 = FeedbackEngine(collector=collector)
         completed = collector.get_completed(limit=100)
         failed = collector.get_failed(limit=50)
         assert len(completed) + len(failed) >= 5
 
-        metrics = engine._compute_metrics(completed, failed)
+        metrics = engine2._compute_metrics(completed, failed)
         assert metrics.total_trajectories >= 5
         assert metrics.success_rate >= 0.0
         assert metrics.avg_turns > 0
 
-        recs = engine._generate_recommendations(metrics, None)
+        recs = engine2._generate_recommendations(metrics, None)
         assert isinstance(recs, list)
 
         collector.close()

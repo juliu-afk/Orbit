@@ -65,9 +65,16 @@ class FeedbackEngine:
     """审计反馈引擎——分析轨迹数据，生成改进建议.
 
     用法:
-        engine = FeedbackEngine("trajectories.db")
+        from orbit.observability.trajectory import TrajectoryCollector
+        collector = TrajectoryCollector(db_path="data/trajectories.db")
+        engine = FeedbackEngine(collector=collector)
         report = await engine.analyze()
         # → FeedbackReport with metrics + recommendations
+
+    WHY 依赖注入 TrajectoryCollector:
+      FeedbackEngine 不自己创建数据库连接——接受 lifespan 管理的
+      TrajectoryCollector 实例，避免连接到错误的数据库文件导致
+      analyze() 永远返回 None（读不到数据）。
     """
 
     # 分析阈值
@@ -87,8 +94,10 @@ class FeedbackEngine:
     );
     """
 
-    def __init__(self, db_path: str = ":memory:") -> None:
-        self._db_path = db_path
+    def __init__(self, collector: Any | None = None) -> None:
+        from orbit.observability.trajectory import TrajectoryCollector
+
+        self._collector = collector if collector is not None else TrajectoryCollector(db_path=":memory:")
 
     # ── 公开接口 ─────────────────────────────────
 
@@ -98,7 +107,7 @@ class FeedbackEngine:
         Returns:
             FeedbackReport 如果有足够数据，否则 None.
         """
-        collector = _open_collector(self._db_path)
+        collector = self._collector
         try:
             completed = collector.get_completed(limit=100)
             failed = collector.get_failed(limit=50)
@@ -136,6 +145,11 @@ class FeedbackEngine:
             return report
         finally:
             collector.close()
+
+    @property
+    def _db_path(self) -> str:
+        """从 collector 获取 DB 路径——feedback_results 与 trajectories 同库."""
+        return self._collector.db_path  # type: ignore[attr-defined]
 
     async def get_last_report(self) -> FeedbackReport | None:
         """读取最近一次分析报告."""
@@ -308,13 +322,6 @@ class FeedbackEngine:
 
 
 # ── 内部辅助 ─────────────────────────────────────
-
-def _open_collector(db_path: str):
-    """打开 TrajectoryCollector（延迟导入避免循环依赖）."""
-    from orbit.observability.trajectory import TrajectoryCollector
-
-    return TrajectoryCollector(db_path=db_path)
-
 
 def _earliest_time(trajs: list[dict]) -> float:
     earliest = float("inf")

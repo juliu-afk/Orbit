@@ -295,13 +295,19 @@ _feedback_engine: FeedbackEngine | None = None
 
 
 def _get_feedback_engine() -> FeedbackEngine:
-    """获取单例 FeedbackEngine——延迟初始化."""
+    """获取单例 FeedbackEngine——从 app.state 注入 TrajectoryCollector.
+
+    WHY 不是直接 db_path: FeedbackEngine 需要用 lifespan 管理的
+    TrajectoryCollector 实例，否则连接到错误的数据库文件，
+    analyze() 永远返回 None。
+    """
     global _feedback_engine
     if _feedback_engine is None:
-        from orbit.core.config import settings
+        # 延迟导入避免循环依赖
+        from orbit.observability.trajectory import TrajectoryCollector
 
-        db_path = settings.database_url.replace("sqlite:///", "") if settings.database_url else ":memory:"
-        _feedback_engine = FeedbackEngine(db_path=db_path)
+        collector = TrajectoryCollector(db_path="data/trajectories.db")
+        _feedback_engine = FeedbackEngine(collector=collector)
     return _feedback_engine
 
 

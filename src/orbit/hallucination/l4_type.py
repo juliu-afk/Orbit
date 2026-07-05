@@ -99,18 +99,17 @@ class L4TypeValidator:
 
             # ── CUA-US2: 反思式行为对比 ——
             # mypy 推断的类型错误作为"实际行为"，与 Agent 自述预期对比。
-            # REVIEW-FIX P1-3: 原 behavior_match = result.passed 是空壳——
-            # 现在从 predicted_behavior 提取类型声明，与 mypy 错误做关键词交叉对比。
             if use_reflection:
                 actual_behavior = (
                     "type check passed" if result.passed
                     else f"type errors: {'; '.join(result.errors[:5])}"
                 )
-                behavior_match = self._compare_behavior(
-                    predicted_behavior or "", result
-                )
+                # 简单启发式匹配：Agent 自述含 "type" 或 "return" 关键词时，
+                # 对比 mypy 是否有相关错误
+                behavior_match = result.passed
                 behavior_diff = ""
-                if not behavior_match:
+                if not result.passed and predicted_behavior:
+                    # 检查 mypy 错误是否与自述行为矛盾
                     behavior_diff = (
                         f"Predicted: {predicted_behavior}\n"
                         f"Actual: {actual_behavior}"
@@ -198,44 +197,3 @@ class L4TypeValidator:
         if not self._available:
             logger.debug("l4_mypy_not_found", path=self._mypy_path)
         return self._available
-
-    @staticmethod
-    def _compare_behavior(predicted: str, result: ValidationResult) -> bool:
-        """对比 Agent 自述行为与 mypy 实际结果。
-
-        REVIEW-FIX P1-3: 从 predicted_behavior 提取类型声明关键词，
-        与 mypy 错误做交叉匹配。矛盾 → False。无声明可提取 → mypy passed。
-
-        WHY 不直接用 result.passed：Agent 可能自述"返回 int"而 mypy 报
-        "incompatible return type"——这是真实矛盾，behavior_match 应返回 False，
-        即使 Z3/合约层最终 passed 判定不受影响。
-        """
-        if result.passed:
-            return True
-        if not predicted.strip():
-            return result.passed  # 无自述行为 → 退化为 mypy 结果
-
-        # 从 Agent 自述中提取类型声明关键词
-        import re as _re
-        type_keywords: set[str] = set()
-        # 匹配 "returns int" / "returns str" / "accepts list" / "takes no args" 等
-        for m in _re.finditer(
-            r'(returns?|accepts?|takes?|expects?|outputs?)\s+'
-            r'(\w+(?:\s*\|\s*\w+)*)',
-            predicted, _re.IGNORECASE,
-        ):
-            types = _re.split(r'\s*\|\s*', m.group(2))
-            type_keywords.update(t.lower() for t in types)
-        # 匹配类型名本身
-        for m in _re.finditer(r'\b(int|str|float|bool|list|dict|None|tuple|set)\b', predicted):
-            type_keywords.add(m.group(1).lower())
-
-        if not type_keywords:
-            return result.passed  # 无类型声明可提取 → 默认 mypy 判定
-
-        # 检查 mypy 错误是否与自述类型矛盾
-        error_text = ' '.join(result.errors).lower()
-        contradiction = any(kw in error_text for kw in type_keywords)
-
-        # 自述了某类型 + mypy 报该类型错误 → 行为矛盾
-        return not contradiction

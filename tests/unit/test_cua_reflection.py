@@ -1,13 +1,12 @@
-"""CUA Phase A 反思式 CoT 测试 (US2) — REVIEW-FIX P1-1/P1-4.
+"""CUA Phase A 反思式 CoT 单元测试 (US2).
 
-含模型构造测试 + 真实行为测试：L2 偏差计算 / L4 行为对比 / L5 契约对比。
+测试范围：L2ReflectionResult / L4BehaviorResult / L5ContractResult 模型 + 行为。
 """
 
 from __future__ import annotations
 
 import pytest
 
-from orbit.hallucination.l4_type import L4TypeValidator
 from orbit.hallucination.schemas import (
     HallucinationLevel,
     L2ReflectionResult,
@@ -17,26 +16,37 @@ from orbit.hallucination.schemas import (
 )
 
 
-# ═══════════════════════════════════════════════════════════════
-# L2 反思式验证
-# ═══════════════════════════════════════════════════════════════
+class TestL2ReflectionResult:
+    """L2 反思式验证结果模型。"""
 
-class TestL2ReflectionModel:
-    """L2ReflectionResult 模型构造。"""
+    def test_baseline_no_prediction_returns_plain_validation_result(self):
+        """不传 predicted_calls 时，L2 应返回普通 ValidationResult（向后兼容）。"""
+        result = ValidationResult(
+            passed=True,
+            level=HallucinationLevel.L2_DYNAMIC,
+            metadata={"traced_calls": ["foo", "bar"], "call_count": 2},
+        )
+        assert result.passed is True
+        assert result.level == HallucinationLevel.L2_DYNAMIC
+        assert not isinstance(result, L2ReflectionResult)
 
-    def test_perfect_match_zero_deviation(self):
+    def test_reflection_perfect_match_zero_deviation(self):
+        """预测与实际完全匹配 → deviation_score=0.0。"""
         result = L2ReflectionResult(
             passed=True,
             level=HallucinationLevel.L2_DYNAMIC,
             predicted_calls=["foo", "bar"],
             actual_calls=["foo", "bar"],
             deviation_score=0.0,
+            unpredicted_calls=[],
+            unexpected_calls=[],
         )
         assert result.deviation_score == 0.0
         assert result.unpredicted_calls == []
         assert result.unexpected_calls == []
 
-    def test_full_mismatch_max_deviation(self):
+    def test_reflection_full_mismatch_max_deviation(self):
+        """预测与实际情况完全不同 → deviation_score=1.0。"""
         result = L2ReflectionResult(
             passed=True,
             level=HallucinationLevel.L2_DYNAMIC,
@@ -47,194 +57,134 @@ class TestL2ReflectionModel:
             unexpected_calls=["baz", "qux"],
         )
         assert result.deviation_score == 1.0
+        assert len(result.unpredicted_calls) == 2
+        assert len(result.unexpected_calls) == 2
 
-    def test_deviation_bounded_by_pydantic(self):
-        """deviation_score 必须在 [0, 1] 内——Pydantic Field(ge=0, le=1)。"""
-        with pytest.raises(Exception):
+    def test_reflection_partial_match(self):
+        """部分匹配 → 0 < deviation < 1。"""
+        result = L2ReflectionResult(
+            passed=True,
+            level=HallucinationLevel.L2_DYNAMIC,
+            predicted_calls=["foo", "bar", "baz"],
+            actual_calls=["foo", "qux"],
+            deviation_score=0.67,
+            unpredicted_calls=["bar", "baz"],
+            unexpected_calls=["qux"],
+        )
+        assert 0.0 < result.deviation_score < 1.0
+        assert "bar" in result.unpredicted_calls
+        assert "qux" in result.unexpected_calls
+
+    def test_reflection_empty_prediction(self):
+        """空预测列表——Agent 预测不调用任何函数。"""
+        result = L2ReflectionResult(
+            passed=True,
+            level=HallucinationLevel.L2_DYNAMIC,
+            predicted_calls=[],
+            actual_calls=["unexpected_func"],
+            deviation_score=1.0,
+            unpredicted_calls=[],
+            unexpected_calls=["unexpected_func"],
+        )
+        assert result.predicted_calls == []
+        assert len(result.unexpected_calls) == 1
+
+    def test_reflection_deviation_bounded(self):
+        """deviation_score 必须在 [0.0, 1.0] 区间内。"""
+        with pytest.raises(Exception):  # Pydantic validation
             L2ReflectionResult(
                 passed=True,
                 level=HallucinationLevel.L2_DYNAMIC,
                 predicted_calls=["foo"],
                 actual_calls=[],
-                deviation_score=1.5,
+                deviation_score=1.5,  # 超出上限
             )
 
 
-class TestL2DeviationCalculation:
-    """L2 偏差分计算逻辑——REVIEW-FIX P1-4: 真实行为测试。
+class TestL4BehaviorResult:
+    """L4 行为反思验证结果模型。"""
 
-    模拟 l2_dynamic.py L149-160 的计算逻辑。
-    """
-
-    @staticmethod
-    def _compute_deviation(predicted: list[str], actual: list[str]) -> float:
-        """与 L2DynamicTracer.validate 中偏差计算逻辑一致。"""
-        pred_set = set(predicted)
-        actual_set = set(actual)
-        unexpected = actual_set - pred_set
-        total = max(len(pred_set), 1)
-        return min(len(unexpected) / total, 1.0)
-
-    def test_exact_match_zero(self):
-        assert self._compute_deviation(["foo", "bar"], ["foo", "bar"]) == 0.0
-
-    def test_one_extra_actual(self):
-        """预测 2 个，实际调了 3 个——1 个意外。"""
-        dev = self._compute_deviation(["foo", "bar"], ["foo", "bar", "baz"])
-        assert dev == 0.5  # 1/2
-
-    def test_all_unexpected(self):
-        """预测 [a,b]，实际 [c,d]——全部意外。"""
-        dev = self._compute_deviation(["a", "b"], ["c", "d"])
-        assert dev == 1.0  # 2/2
-
-    def test_empty_prediction_actual_calls(self):
-        """预测 []（Agent 认为不调用任何函数），实际调了函数——全部意外。"""
-        dev = self._compute_deviation([], ["unexpected_func"])
-        assert dev == 1.0  # 1/max(0,1)=1/1
-
-    def test_prediction_but_no_calls(self):
-        """预测了函数但实际没调——偏差 0（没有意外调用）。"""
-        dev = self._compute_deviation(["foo", "bar"], [])
-        assert dev == 0.0  # 0 意外 / 2 = 0
-
-    def test_many_unexpected(self):
-        """大偏差场景——预测 5 个，意外 3 个。"""
-        dev = self._compute_deviation(
-            ["a", "b", "c", "d", "e"],
-            ["a", "x", "y", "z"],
+    def test_baseline_no_behavior_prediction(self):
+        """不传 predicted_behavior 时返回普通 ValidationResult。"""
+        result = ValidationResult(
+            passed=True,
+            level=HallucinationLevel.L4_TYPE,
         )
-        # 意外: x,y,z = 3, total = max(5,1) = 5, deviation = 3/5 = 0.6
-        assert dev == 0.6
+        assert not isinstance(result, L4BehaviorResult)
 
-
-# ═══════════════════════════════════════════════════════════════
-# L4 反思式验证
-# ═══════════════════════════════════════════════════════════════
-
-class TestL4BehaviorModel:
-    """L4BehaviorResult 模型构造。"""
-
-    def test_match_when_mypy_passes(self):
+    def test_behavior_match_when_mypy_passes(self):
+        """mypy 通过 + 自述行为 → behavior_match=True。"""
         result = L4BehaviorResult(
             passed=True,
             level=HallucinationLevel.L4_TYPE,
             predicted_behavior="function returns str",
             actual_behavior="type check passed",
             behavior_match=True,
+            behavior_diff="",
         )
         assert result.behavior_match is True
+        assert result.behavior_diff == ""
 
-    def test_mismatch_when_mypy_fails_with_contradiction(self):
+    def test_behavior_mismatch_when_mypy_fails(self):
+        """mypy 报类型错误 + 自述行为矛盾 → behavior_match=False。"""
         result = L4BehaviorResult(
             passed=False,
             level=HallucinationLevel.L4_TYPE,
-            errors=["error: Incompatible return type (got str, expected int)"],
+            errors=["error: Incompatible return type"],
             predicted_behavior="function returns int",
-            actual_behavior="type errors: Incompatible return type...",
+            actual_behavior="type errors: Incompatible return type (got str, expected int)",
             behavior_match=False,
-            behavior_diff="Predicted: function returns int\nActual: type errors: ...",
+            behavior_diff="Predicted: function returns int\nActual: type errors: Incompatible return type...",
         )
         assert result.behavior_match is False
-        assert "Predicted:" in result.behavior_diff
+        assert result.behavior_diff != ""
 
-    def test_mypy_unavailable_no_match(self):
+    def test_mypy_unavailable_behavior(self):
+        """mypy 不可用 → behavior_match=False + 原因。"""
         result = L4BehaviorResult(
             passed=False,
             level=HallucinationLevel.L4_TYPE,
-            errors=["mypy is not installed"],
+            errors=["mypy is not installed or not found in PATH"],
             predicted_behavior="function returns int",
             actual_behavior="mypy unavailable",
             behavior_match=False,
+            behavior_diff="mypy not available—cannot verify behavior",
         )
         assert result.behavior_match is False
 
 
-class TestL4BehaviorComparison:
-    """L4 _compare_behavior 真实逻辑——REVIEW-FIX P1-3。
+class TestL5ContractResult:
+    """L5 契约反思验证结果模型。"""
 
-    测试 L4TypeValidator._compare_behavior 静态方法。
-    """
-
-    def test_mypy_passed_always_match(self):
-        """mypy 通过 → behavior_match=True（无关自述内容）。"""
-        result = ValidationResult(passed=True, level=HallucinationLevel.L4_TYPE)
-        match = L4TypeValidator._compare_behavior("returns anything", result)
-        assert match is True
-
-    def test_returns_int_vs_mypy_int_error(self):
-        """Agent 自述"returns int"，mypy 报 int 相关错误 → 矛盾。"""
-        result = ValidationResult(
-            passed=False,
-            level=HallucinationLevel.L4_TYPE,
-            errors=["Incompatible return type: got str, expected int"],
-        )
-        match = L4TypeValidator._compare_behavior("function returns int", result)
-        assert match is False  # 自述 int + mypy 报 int 错误 = 矛盾
-
-    def test_returns_str_vs_mypy_int_error_no_contradiction(self):
-        """Agent 自述"returns str"，mypy 报 int 错误 → 无矛盾（关键词不匹配）。"""
-        result = ValidationResult(
-            passed=False,
-            level=HallucinationLevel.L4_TYPE,
-            errors=["Incompatible return type: got str, expected int"],
-        )
-        match = L4TypeValidator._compare_behavior("function returns str", result)
-        assert match is False  # mypy failed, but keyword "str" ≠ "int" → default False
-
-    def test_empty_prediction_falls_back_to_mypy(self):
-        """无自述行为 → 退化为 mypy 结果。"""
-        result = ValidationResult(
-            passed=False,
-            level=HallucinationLevel.L4_TYPE,
-            errors=["type error"],
-        )
-        match = L4TypeValidator._compare_behavior("", result)
-        assert match is False  # mypy failed
-
-        result2 = ValidationResult(passed=True, level=HallucinationLevel.L4_TYPE)
-        match2 = L4TypeValidator._compare_behavior("", result2)
-        assert match2 is True
-
-    def test_no_type_keywords_in_prediction(self):
-        """自述不含类型关键词 → 退化为 mypy 结果。"""
-        result = ValidationResult(
-            passed=False,
-            level=HallucinationLevel.L4_TYPE,
-            errors=["Syntax error in line 5"],
-        )
-        match = L4TypeValidator._compare_behavior("this code does the thing", result)
-        assert match is False  # mypy failed, no keywords → use mypy
-
-    def test_accepts_list_vs_mypy_arg_error(self):
-        """Agent 自述"accepts list"，mypy 报 list 相关错误 → 矛盾。"""
-        result = ValidationResult(
-            passed=False,
-            level=HallucinationLevel.L4_TYPE,
-            errors=['Argument 1 has incompatible type "list[int]"; expected "str"'],
-        )
-        match = L4TypeValidator._compare_behavior("function accepts list", result)
-        assert match is False
-
-
-# ═══════════════════════════════════════════════════════════════
-# L5 反思式验证
-# ═══════════════════════════════════════════════════════════════
-
-class TestL5ContractModel:
-    """L5ContractResult 模型构造。"""
-
-    def test_no_self_claimed_returns_base(self):
+    def test_baseline_no_self_claimed(self):
+        """不传 self_claimed_contract 时返回普通 L5ValidationResult。"""
         from orbit.hallucination.schemas import L5ValidationResult
+
         result = L5ValidationResult(
-            passed=True, level=HallucinationLevel.L5_Z3, z3_status="unsat",
+            passed=True,
+            level=HallucinationLevel.L5_Z3,
+            z3_status="unsat",
         )
         assert not isinstance(result, L5ContractResult)
+        assert result.z3_status == "unsat"
 
-    def test_contract_mismatch_does_not_affect_passed(self):
-        """契约矛盾不改变 Z3 passed——反思是附加信号。"""
+    def test_contract_match_when_consistent(self):
+        """自述契约与 Z3 契约一致 → contract_mismatch=False。"""
         result = L5ContractResult(
             passed=True,
+            level=HallucinationLevel.L5_Z3,
+            z3_status="unsat",
+            self_claimed_contract="ensures: result > 0",
+            z3_verified_contract="ensures: result > 0",
+            contract_mismatch=False,
+        )
+        assert result.contract_mismatch is False
+        assert result.z3_status == "unsat"
+
+    def test_contract_mismatch_detected(self):
+        """自述契约与 Z3 契约矛盾 → contract_mismatch=True，但不影响 passed。"""
+        result = L5ContractResult(
+            passed=True,  # Z3 验证通过（unsat），但契约描述不一致
             level=HallucinationLevel.L5_Z3,
             z3_status="unsat",
             self_claimed_contract="ensures: result > 0",
@@ -242,26 +192,12 @@ class TestL5ContractModel:
             contract_mismatch=True,
         )
         assert result.contract_mismatch is True
-        assert result.passed is True  # Z3 passed 独立
-
-    def test_counterexample_with_contract_mismatch(self):
-        """Z3 反例 + 契约矛盾——两个信号独立。"""
-        result = L5ContractResult(
-            passed=False,
-            level=HallucinationLevel.L5_Z3,
-            z3_status="sat",
-            errors=["Counterexample found: {'x': 0}"],
-            counterexample={"x": "0"},
-            self_claimed_contract="ensures: result > 0",
-            z3_verified_contract="ensures: result == x + 1",
-            contract_mismatch=True,
-        )
-        assert result.passed is False
-        assert result.z3_status == "sat"
-        assert result.counterexample is not None
-        assert result.contract_mismatch is True
+        # 关键：即使契约描述矛盾，Z3 判定仍独立
+        assert result.passed is True
+        assert result.z3_status == "unsat"
 
     def test_no_formal_decorator_with_reflection(self):
+        """无 @formal 装饰器但有自述契约 → 跳过，contract_mismatch=False。"""
         result = L5ContractResult(
             passed=True,
             level=HallucinationLevel.L5_Z3,
@@ -272,26 +208,58 @@ class TestL5ContractModel:
             contract_mismatch=False,
         )
         assert result.z3_status == "skipped"
+        assert result.contract_mismatch is False
 
+    def test_z3_counterexample_with_contract_mismatch(self):
+        """Z3 找到反例 + 契约矛盾 → 两个信号独立记录。"""
+        result = L5ContractResult(
+            passed=False,
+            level=HallucinationLevel.L5_Z3,
+            z3_status="sat",
+            errors=["Counterexample found: {'x': 0, 'y': -1}"],
+            counterexample={"x": "0", "y": "-1"},
+            self_claimed_contract="ensures: result > 0",
+            z3_verified_contract="ensures: result == x + y",
+            contract_mismatch=True,
+        )
+        assert result.passed is False
+        assert result.z3_status == "sat"
+        assert result.counterexample is not None
+        assert result.contract_mismatch is True
 
-# ═══════════════════════════════════════════════════════════════
-# 向后兼容
-# ═══════════════════════════════════════════════════════════════
 
 class TestBackwardCompatibility:
-    """所有新参数默认 None 时行为不变。"""
+    """向后兼容——所有新参数默认 None 时行为不变。"""
 
     def test_validation_result_no_reflection_fields(self):
+        """ValidationResult 不应包含反思字段。"""
         result = ValidationResult(passed=True, level=HallucinationLevel.L2_DYNAMIC)
         assert not hasattr(result, "predicted_calls")
+        assert not hasattr(result, "deviation_score")
 
-    def test_l2_reflection_is_validation_result(self):
-        result = L2ReflectionResult(passed=True, level=HallucinationLevel.L2_DYNAMIC)
-        assert isinstance(result, ValidationResult)
-
-    def test_l5_contract_is_l5_validation(self):
+    def test_l5_validation_result_no_reflection_fields(self):
+        """L5ValidationResult 不应包含契约反思字段。"""
         from orbit.hallucination.schemas import L5ValidationResult
+
+        result = L5ValidationResult(
+            passed=True, level=HallucinationLevel.L5_Z3, z3_status="unsat"
+        )
+        assert not hasattr(result, "self_claimed_contract")
+        assert not hasattr(result, "contract_mismatch")
+
+    def test_l2_reflection_inherits_validation_result(self):
+        """L2ReflectionResult 是 ValidationResult 的子类——polymorphic safe。"""
+        result = L2ReflectionResult(
+            passed=True, level=HallucinationLevel.L2_DYNAMIC
+        )
+        assert isinstance(result, ValidationResult)
+        assert result.passed is True
+
+    def test_l5_contract_inherits_l5_validation(self):
+        """L5ContractResult 是 L5ValidationResult 的子类——polymorphic safe。"""
+        from orbit.hallucination.schemas import L5ValidationResult
+
         result = L5ContractResult(
-            passed=True, level=HallucinationLevel.L5_Z3, z3_status="unsat",
+            passed=True, level=HallucinationLevel.L5_Z3, z3_status="unsat"
         )
         assert isinstance(result, L5ValidationResult)

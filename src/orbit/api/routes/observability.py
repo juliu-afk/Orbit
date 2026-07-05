@@ -8,6 +8,7 @@ GET  /observability/alerts/history     告警历史
 GET  /observability/audit              审计日志（按 task_id）
 POST /observability/lessons            记录教训
 GET  /observability/lessons            查询教训库
+GET  /observability/feedback           审计反馈分析报告
 """
 
 from __future__ import annotations
@@ -284,6 +285,42 @@ async def trace_recent(limit: int = 20) -> dict[str, Any]:
     store = _get_trace_store()
     tasks = await store.get_recent_tasks(limit=limit)
     return {"code": 0, "data": tasks, "message": "ok"}
+
+
+# ── 审计反馈 ─────────────────────────────────────
+
+from orbit.observability.feedback import FeedbackEngine  # noqa: E402
+
+_feedback_engine: FeedbackEngine | None = None
+
+
+def _get_feedback_engine() -> FeedbackEngine:
+    """获取单例 FeedbackEngine——延迟初始化."""
+    global _feedback_engine
+    if _feedback_engine is None:
+        from orbit.core.config import settings
+
+        db_path = settings.database_url.replace("sqlite:///", "") if settings.database_url else ":memory:"
+        _feedback_engine = FeedbackEngine(db_path=db_path)
+    return _feedback_engine
+
+
+@router.get("/feedback", summary="审计反馈分析报告")
+async def feedback_report() -> dict[str, Any]:
+    """分析 Agent 执行轨迹，输出改进建议。
+
+    返回成功率/漂移率/效率指标 + 分类建议（prompt/threshold/scheduling/tool）。
+    ≥5 条已完成轨迹才触发分析。
+    """
+    engine = _get_feedback_engine()
+    report = await engine.analyze()
+    if report is None:
+        return {
+            "code": 0,
+            "data": None,
+            "message": "暂无足够数据进行分析（需≥5条已完成轨迹）",
+        }
+    return {"code": 0, "data": report.model_dump(), "message": "ok"}
 
 
 # ── 启动预检（Session PR 后续） ────────────────────────────

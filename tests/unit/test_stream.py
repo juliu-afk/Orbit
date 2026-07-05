@@ -161,6 +161,9 @@ class TestSSEEventFormat:
             "finish_step",
             "error",
             "cancelled",
+            "reflection",
+            "metacog_alert",
+            "hitl_request",
         }
         for t in StreamEventType:
             assert t.value in valid_types, f"Missing valid type: {t.value}"

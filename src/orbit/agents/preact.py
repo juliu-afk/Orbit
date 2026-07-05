@@ -115,7 +115,7 @@ class PreActEngine:
             return None
 
         # 工具是否存在
-        tools = self._tools.list_all()
+        tools = self._tools.list_tools()
         tool_names = {t.get("function", {}).get("name", "") for t in tools}
         if action_name not in tool_names:
             return PreActPrediction(

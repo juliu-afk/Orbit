@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
+from orbit.agents.preact import PreActEngine
 from orbit.agents.reflection import ReflectionEngine
 from orbit.events.schemas import DashboardEvent
 from orbit.gateway.schemas import LLMRequest
@@ -93,6 +94,7 @@ class ReActAgent(BaseAgent):
         budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7: Token 预算
         task_keywords: list[str] | None = None,  # 模板匹配关键词（模板库减熵）
         reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
+        preact_engine: PreActEngine | None = None,  # Phase D: PreAct
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
@@ -111,6 +113,7 @@ class ReActAgent(BaseAgent):
         self._decision_log: DecisionLog | None = None
         # Phase A: ReflAct 反思引擎
         self._reflection_engine = reflection_engine
+        self._preact_engine = preact_engine
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——向后兼容 wrapper。
@@ -343,6 +346,21 @@ class ReActAgent(BaseAgent):
                                 data={"tool_calls": tool_calls},
                             )
 
+                            # Phase D: PreAct——执行前预测，跳过高风险Action
+                            if self._preact_engine and self._goal:
+                                goal_str = self._goal.description if hasattr(self._goal,"description") else str(self._goal)
+                                for tc in list(tool_calls):
+                                    fn = tc.get("function",{})
+                                    tn = fn.get("name","")
+                                    try:
+                                        args = json.loads(fn.get("arguments","{}"))
+                                        pred = await self._preact_engine.predict(
+                                            goal=goal_str, action_name=tn, action_args=args,
+                                            observation="", use_llm=(turn>0))
+                                        if pred.should_skip() and pred.alternative:
+                                            logger.info("preact_skip", task_id=task_id, tool=tn, alt=pred.alternative[:80])
+                                            tool_calls.remove(tc)
+                                    except Exception: pass  # fail-open
                             # 执行每个工具
                             for tc in tool_calls:
                                 func = tc.get("function", {})

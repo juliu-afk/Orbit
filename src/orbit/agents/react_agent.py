@@ -229,6 +229,14 @@ class ReActAgent(BaseAgent):
         if decision_history_block:
             system += "\n\n" + decision_history_block
 
+        # Phase F: 接线——注入策略原则 + AgenticMemory 建议
+        try:
+            from orbit.integration.wiring import OrbitWiring
+            wiring = OrbitWiring()
+            kw = getattr(self, "_task_keywords", None) or []
+            system = wiring.enhance_prompt(system, category="", keywords=kw)
+        except Exception: pass
+
         # 2. 初始化消息历史
         messages: list[dict] = [
             {"role": "system", "content": system},

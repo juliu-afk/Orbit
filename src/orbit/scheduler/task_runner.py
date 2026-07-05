@@ -119,6 +119,8 @@ class TaskRunner:
         self._fast_lane = fast_lane
         # 减熵闭环-2: 编辑摇摆检测器（全局单例）
         self._edit_detector = EditStabilityDetector()
+        # Phase F: 全模块集成接线器（懒初始化）
+        self._wiring = None
 
     # ── 公共入口 ────────────────────────────────────────
 
@@ -127,6 +129,8 @@ class TaskRunner:
         state = TaskState.IDLE
         await self._save_checkpoint(task_id, state, {"prd": prd})
         context: dict[str, Any] = {"prd": prd, "artifacts": {}, "mode": "auto"}
+        # Phase F: 接线——任务开始
+        self._wire("on_task_start", task_id, prd[:100], project_id=context.get("project_path",""))
         # 减熵闭环-2 B4: 检查目标文件编辑稳定性
         try:
             target_file = context.get("target_file", "")
@@ -184,6 +188,10 @@ class TaskRunner:
 
                 prev_state = state
 
+                # Phase F: 接线——记录状态变迁事件
+                if prev_state == TaskState.CODING and observation:
+                    self._wire("record_event", task_id, f"CODING完成", "success" if "error" not in str(observation)[:200].lower() else "failure")
+
                 # 意图路由: IDLE 状态由 chatter 接管——
                 # chat → 结束, programming → 正常进入 PARSING
                 if state == TaskState.IDLE and context.get("chatter_intent") == "chat":
@@ -203,8 +211,15 @@ class TaskRunner:
                 logger.error("task_failed", task_id=task_id, state=state.value, error=str(e))
                 state = TaskState.FAILED
                 await self._save_checkpoint(task_id, state, {**context, "error": str(e)})
+                self._wire("on_task_end", task_id, "failed", 0.0, turns=cycle_count)
                 return state
 
+        # Phase F: 接线——任务完成 + 周期蒸馏
+        self._wire("on_task_end", task_id, "completed" if state == TaskState.DONE else str(state.value), 0.8, turns=cycle_count)
+        try:
+            w = self._get_wiring()
+            if w: asyncio.create_task(w.maybe_distill())
+        except Exception: pass
         return state
 
     async def resume(self, task_id: str) -> TaskState | None:
@@ -676,6 +691,22 @@ class TaskRunner:
                 uniq.append(k)
         # 最多 20 个关键词，避免 prompt 膨胀
         return uniq[:20]
+
+    # Phase F: 接线辅助方法
+    def _wire(self, method: str, *args, **kwargs) -> None:
+        """调用 OrbitWiring 方法——fail-open。"""
+        try:
+            w = self._get_wiring()
+            if w: getattr(w, method)(*args, **kwargs)
+        except Exception: pass
+
+    def _get_wiring(self):
+        if self._wiring is None:
+            try:
+                from orbit.integration.wiring import OrbitWiring
+                self._wiring = OrbitWiring()
+            except Exception: pass
+        return self._wiring
 
 
 # ── 共享工具函数 ────────────────────────────────────────

@@ -40,9 +40,11 @@ class TaskContext:
     l4: dict[str, Any] = field(default_factory=dict)
     # L5: 长期记忆——知识检索结果
     l5: list[dict[str, Any]] = field(default_factory=list)
+    # Phase 2 Token节省: 每个字符串字段硬上限——防止单字段撑爆 context window
+    max_chars_per_field: int = 5000
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        raw = {
             "task_id": self.task_id,
             "l1": self.l1,
             "l2": self.l2,
@@ -50,6 +52,29 @@ class TaskContext:
             "l4": self.l4,
             "l5": self.l5,
         }
+        return self._truncate_all(raw)
+
+    def _truncate_all(self, d: dict[str, Any]) -> dict[str, Any]:
+        """递归截断所有字符串值到 max_chars_per_field。head+tail 保留可读性。"""
+        result: dict[str, Any] = {}
+        limit = self.max_chars_per_field
+        for k, v in d.items():
+            if isinstance(v, str) and len(v) > limit:
+                half = limit // 2
+                cut = len(v) - limit
+                result[k] = v[:half] + f"\n... [{cut} chars truncated] ...\n" + v[-half:]
+            elif isinstance(v, dict):
+                result[k] = self._truncate_all(v)
+            elif isinstance(v, list):
+                result[k] = [
+                    self._truncate_all(item) if isinstance(item, dict)
+                    else (item[:limit] + f"\n... [{len(item) - limit} chars truncated] ..."
+                          if isinstance(item, str) and len(item) > limit else item)
+                    for item in v
+                ]
+            else:
+                result[k] = v
+        return result
 
 
 @dataclass

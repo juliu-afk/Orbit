@@ -4,5 +4,6 @@
 """
 
 from orbit.context.matcher import ContextMatcher, MatchCandidate, MatchResult
+from orbit.context.prebuilder import ContextPrebuilder
 
-__all__ = ["ContextMatcher", "MatchCandidate", "MatchResult"]
+__all__ = ["ContextMatcher", "MatchCandidate", "MatchResult", "ContextPrebuilder"]

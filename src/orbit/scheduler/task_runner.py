@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from orbit.observability.audit import AuditLogger
     from orbit.tools.registry import ToolRegistry
 
+import importlib as _importlib  # Phase 2: _run_scoping dynamic imports
 import structlog
 
 from orbit.agents.base import AgentInput
@@ -232,6 +233,10 @@ class TaskRunner:
         "chat" → 结束任务, "programming" → 继续进入 PARSING (clarifier).
         """
         role = ROLE_MAP.get(state)
+        # Phase 2 Token节省: SCOPING 走规则引擎——非 LLM Agent
+        if role == "__scoping__":
+            return await self._run_scoping(task_id, context)
+
 
         # Phase 2 Token节省: SCOPING 走规则引擎——非 LLM Agent
         if role == "__scoping__":
@@ -298,6 +303,73 @@ class TaskRunner:
         if match:
             return match.group(1)
         return "chat"
+
+
+    async def _run_scoping(self, task_id: str, context: dict[str, Any]) -> str:
+        """SCOPING——5 Scanner + 7 Builder (PR#201 审查修复). 0 LLM, fail-open."""
+        import json as _json
+        import os as _os
+
+        project_path = context.get("project_path") or _os.getcwd()
+        sr: dict[str, Any] = {}
+        af = {"changed": [], "added": [], "total": 0}
+
+        scanner_specs = [
+            ("orbit.context.scanners.affected_files", "AffectedFilesScanner", "affected_files", False),
+            ("orbit.context.scanners.import_deps", "ImportDependencyScanner", "import_deps", True),
+            ("orbit.context.scanners.test_coverage", "TestCoverageScanner", "test_gaps", True),
+            ("orbit.context.scanners.schema_change", "SchemaChangeScanner", "schema_changes", False),
+            ("orbit.context.scanners.permission_string", "PermissionStringScanner", "permission_changes", False),
+        ]
+        for mod_path, cls_name, key, needs_changed in scanner_specs:
+            try:
+                mod = _importlib.import_module(mod_path)
+                scanner = getattr(mod, cls_name)()
+                kw: dict[str, Any] = {}
+                if key == "affected_files":
+                    kw["base_branch"] = context.get("base_branch", "master")
+                if needs_changed:
+                    kw["affected_files"] = af.get("changed", []) + af.get("added", [])
+                sr[key] = scanner.scan(project_path, **kw)
+                if key == "affected_files":
+                    af = sr[key]
+            except Exception as e:
+                logger.warning(f"scoping_{key}_failed", error=str(e))
+                sr[key] = {"error": str(e)}
+
+        sr["test_scope"] = _decide_test_scope(af)
+
+        l2: dict[str, Any] = context.setdefault("l2", {})
+        l2.update(sr)
+        prd_text = context.get("prd", "")
+        for mod_path, cls_name, key in [
+            ("orbit.context.builders.test_builder", "TestContextBuilder", "test_input"),
+            ("orbit.context.builders.design_builder", "DesignContextBuilder", "design_input"),
+            ("orbit.context.builders.impl_builder", "ImplementationContextBuilder", "impl_input"),
+            ("orbit.context.builders.req_builder", "RequirementsContextBuilder", "req_input"),
+            ("orbit.context.builders.debug_builder", "DebugContextBuilder", "debug_input"),
+            ("orbit.context.builders.docs_builder", "DocsContextBuilder", "docs_input"),
+            ("orbit.context.builders.release_builder", "ReleaseContextBuilder", "release_input"),
+        ]:
+            try:
+                mod = _importlib.import_module(mod_path)
+                builder = getattr(mod, cls_name)()
+                l2[key] = builder.build({
+                    "affected_files": af, "test_scope": sr["test_scope"],
+                    "import_deps": sr.get("import_deps", {}), "prd": prd_text,
+                    "design": l2.get("design_input", {}),
+                    "schema_changes": sr.get("schema_changes", {}),
+                    "permission_changes": sr.get("permission_changes", {}),
+                    "error": context.get("error", ""), "traceback": context.get("traceback", ""),
+                    "brief": context.get("brief", ""),
+                })
+            except Exception:
+                pass
+
+        context["scope_report"] = sr
+        logger.info("scoping_complete", task_id=task_id,
+                     files=af.get("total", 0), test_scope=sr["test_scope"])
+        return _json.dumps(sr)
 
     async def _run_agent(
         self, role: str, task_id: str, context: dict[str, Any], timeout: int | None = None
@@ -678,3 +750,20 @@ def _state_to_progress(state: TaskState) -> float:
 # ── 状态流转图 (ChatterAgent 意图路由) ─────────────────
 # IDLE(chatter) → chat intent → DONE
 # IDLE(chatter) → programming intent → PARSING(clarifier) → PLANNING(architect) → CODING(developer) → VERIFYING(reviewer) → DONE
+
+
+def _decide_test_scope(affected: dict[str, Any]) -> str:
+    """变更范围 → 测试粒度决策 (Phase 2, PR#201)."""
+    files: list[str] = affected.get("changed", []) + affected.get("added", [])
+    if not files:
+        return "smoke"
+    _core_modules = {
+        "src/orbit/agents/", "src/orbit/scheduler/", "src/orbit/gateway/",
+        "src/orbit/compression/", "src/orbit/hallucination/",
+        "src/orbit/checkpoint/", "src/orbit/sandbox/",
+    }
+    if any(any(f.startswith(m) for m in _core_modules) for f in files):
+        return "full_regression"
+    if all(f.startswith("frontend/") for f in files):
+        return "smoke"
+    return "unit_integration"

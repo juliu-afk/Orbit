@@ -44,6 +44,19 @@ class HITLRequest:
     timestamp: float = field(default_factory=lambda: __import__("time").time())
 
 
+# 全局注册表——WS router 通过 task_id 查找 HITLManager 实例
+_hitl_registry: dict[str, "HITLManager"] = {}
+
+
+def resolve_hitl_static(task_id: str, response: "HITLResponse") -> bool:
+    """WS router 收到 hitl:response 后调用——查找注册的 HITLManager 并 resolve。"""
+    hitl = _hitl_registry.get(task_id)
+    if hitl:
+        hitl.resolve(task_id, response)
+        return True
+    return False
+
+
 @dataclass
 class HITLResponse:
     """HITL 响应——从前端回传。"""
@@ -106,6 +119,9 @@ class HITLManager:
         timeout = timeout or self._default_timeout
 
         # 通过 EventBus 推送 HITL 请求到 WebSocket
+        # 注册到全局表——WS router 需要找到此实例
+        _hitl_registry[task_id] = self
+
         if self._event_bus:
             try:
                 from orbit.events.schemas import DashboardEvent

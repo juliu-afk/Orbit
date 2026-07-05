@@ -433,6 +433,17 @@ class ReActAgent(BaseAgent):
                                 tool_call_count += 1
                                 self._budget.consume()
 
+                                # Phase A: 代码生成工具调用后运行防幻觉快速检查
+                                if tool_name in ("write_file", "edit_file") and "code" in str(tool_args)[:200]:
+                                    try:
+                                        from orbit.hallucination.pipeline import HallucinationPipeline
+                                        pipeline = HallucinationPipeline(graph=self.graph, sandbox=self.sandbox)
+                                        result = await pipeline.validate_quick(str(tool_args))
+                                        if not result.passed:
+                                            logger.warning("hallucination_in_react", task_id=task_id, tool=tool_name, errors=result.errors)
+                                    except Exception:
+                                        pass  # fail-open
+
                         elif event_type == StreamEventType.ERROR:
                             yield StreamEvent(
                                 type=StreamEventType.ERROR,

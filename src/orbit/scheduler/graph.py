@@ -43,6 +43,8 @@ class GraphNode(BaseModel):
     status: NodeStatus = NodeStatus.PENDING
     retry_count: int = 0
     error: str | None = None
+    # CUA-US1: CODING 节点禁用并行工具调用，防止并发编辑冲突
+    serialize_tools: bool = False
 
 
 class TaskGraph(BaseModel):

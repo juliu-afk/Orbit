@@ -1,0 +1,2592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIF 多利益方平台 —— FDE 战略报告</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d2991d;
+    --purple: #a371f7;
+    --cyan: #39c5cf;
+    --pink: #db61a2;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+    background: var(--bg); color: var(--text); line-height:1.7; font-size:15px;
+  }
+  .container { max-width:1100px; margin:0 auto; padding:40px 24px; }
+
+  /* Cover */
+  .cover {
+    text-align:center; padding:80px 0 60px; border-bottom:1px solid var(--border); margin-bottom:60px;
+  }
+  .cover h1 { font-size:2.4em; font-weight:700; margin-bottom:12px; letter-spacing:-0.5px; }
+  .cover .subtitle { font-size:1.15em; color: var(--text-muted); margin-bottom:8px; }
+  .cover .meta { font-size:0.9em; color: var(--text-muted); margin-top:32px; }
+  .cover .badge-row { margin-top:20px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .badge {
+    display:inline-block; padding:4px 14px; border-radius:20px; font-size:0.8em; font-weight:600;
+    border:1px solid var(--border);
+  }
+  .badge-accent { color:var(--accent); border-color:var(--accent); }
+  .badge-green { color:var(--green); border-color:var(--green); }
+  .badge-purple { color:var(--purple); border-color:var(--purple); }
+  .badge-orange { color:var(--orange); border-color:var(--orange); }
+
+  /* TOC */
+  .toc {
+    background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:32px 40px;
+    margin-bottom:60px;
+  }
+  .toc h2 { font-size:1.2em; margin-bottom:20px; color:var(--accent); }
+  .toc ol { padding-left:24px; }
+  .toc li { margin:6px 0; font-size:0.95em; }
+  .toc a { color:var(--text); text-decoration:none; }
+  .toc a:hover { color:var(--accent); }
+  .toc .toc-l2 { padding-left:20px; list-style-type:circle; font-size:0.9em; color:var(--text-muted); }
+
+  /* Sections */
+  section { margin-bottom:60px; }
+  h2 {
+    font-size:1.6em; font-weight:700; margin-bottom:24px; padding-bottom:12px;
+    border-bottom:1px solid var(--border); color:var(--accent);
+  }
+  h3 { font-size:1.25em; font-weight:600; margin:32px 0 16px; color:var(--text); }
+  h4 { font-size:1.05em; font-weight:600; margin:24px 0 12px; color:var(--cyan); }
+  p { margin-bottom:14px; }
+  strong { color:#fff; }
+
+  /* Callouts */
+  .callout {
+    border-left:3px solid; padding:16px 20px; margin:20px 0; border-radius:0 6px 6px 0;
+    background:var(--surface);
+  }
+  .callout-info { border-color:var(--accent); }
+  .callout-warn { border-color:var(--orange); }
+  .callout-danger { border-color:var(--red); }
+  .callout-success { border-color:var(--green); }
+  .callout-title { font-weight:700; font-size:0.9em; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+
+  /* Tables */
+  table { width:100%; border-collapse:collapse; margin:20px 0; font-size:0.92em; }
+  th, td {
+    text-align:left; padding:10px 14px; border:1px solid var(--border);
+    vertical-align:top;
+  }
+  th { background:var(--surface); font-weight:600; color:var(--text); white-space:nowrap; }
+  tr:nth-child(even) { background:rgba(255,255,255,0.015); }
+
+  /* Coverage bar */
+  .coverage-bar {
+    height:8px; border-radius:4px; background:var(--surface); margin-top:6px;
+    overflow:hidden; border:1px solid var(--border);
+  }
+  .coverage-fill { height:100%; border-radius:3px; }
+  .cov-high { background:var(--green); }
+  .cov-mid { background:var(--orange); }
+  .cov-low { background:var(--red); }
+
+  /* Architecture diagram */
+  .arch-box {
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    padding:20px 24px; margin:16px 0; white-space:pre; font-family:'JetBrains Mono','Fira Code',monospace;
+    font-size:0.85em; line-height:1.5; overflow-x:auto;
+  }
+
+  /* Phase timeline */
+  .phase-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    padding:24px; margin:20px 0;
+  }
+  .phase-card h4 { margin-top:0; font-size:1.15em; }
+  .phase-meta { display:flex; gap:20px; flex-wrap:wrap; margin:12px 0; font-size:0.85em; color:var(--text-muted); }
+
+  /* Risk matrix */
+  .risk-high { color:var(--red); font-weight:700; }
+  .risk-mid { color:var(--orange); font-weight:600; }
+  .risk-low { color:var(--green); }
+
+  /* Stakeholder cards */
+  .stakeholder-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+    gap:16px; margin:20px 0;
+  }
+  .sh-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:8px;
+    padding:20px;
+  }
+  .sh-card h4 { margin-top:0; font-size:1.05em; }
+  .sh-card .tag-row { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+  .tag {
+    font-size:0.75em; padding:2px 10px; border-radius:12px; border:1px solid;
+    font-weight:600;
+  }
+
+  /* Flow diagram */
+  .flow-row {
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:16px 0;
+    font-family:'JetBrains Mono','Fira Code',monospace; font-size:0.85em;
+  }
+  .flow-node {
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    padding:8px 14px; white-space:nowrap;
+  }
+  .flow-arrow { color:var(--text-muted); font-size:1.2em; }
+
+  /* Print */
+  @media print {
+    body { font-size:12px; }
+    .container { max-width:100%; }
+    section { page-break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ====== COVER ====== -->
+<div class="cover">
+  <h1>CIF 多利益方平台</h1>
+  <div class="subtitle">以 Orbit 为 FDE 引擎，构建财务数据基础设施</div>
+  <div class="subtitle" style="font-size:1em;">——同一数据、各取所需、全程可追溯</div>
+  <div class="badge-row">
+    <span class="badge badge-accent">FDE 五层架构</span>
+    <span class="badge badge-green">多利益方平台</span>
+    <span class="badge badge-purple">Ontology 本体层</span>
+    <span class="badge badge-orange">战略路线图</span>
+  </div>
+  <div class="meta">
+    生成日期：2026-07-04 &nbsp;|&nbsp; 版本：V1.0 &nbsp;|&nbsp; 分类：战略研究<br>
+    关联文档：<code>FDE深度分析-Orbit差距与机会.md</code> &nbsp;|&nbsp; <code>docs/charter.md</code>
+  </div>
+</div>
+
+<!-- ====== TOC ====== -->
+<div class="toc">
+<h2>📑 目录</h2>
+<ol>
+  <li><a href="#s1">执行摘要</a></li>
+  <li><a href="#s2">FDE 模式：起源、演进与 AI 时代爆发</a>
+    <ol class="toc-l2">
+      <li><a href="#s21">Palantir 的军事基因与双团队架构</a></li>
+      <li><a href="#s22">碎石路 → 高速公路：FDE 的产品哲学</a></li>
+      <li><a href="#s23">AI 时代 FDE 爆发：数据与结构性原因</a></li>
+    </ol>
+  </li>
+  <li><a href="#s3">FDE 五层架构模型与 Orbit 差距逐层对标</a>
+    <ol class="toc-l2">
+      <li><a href="#s31">L1 Delta 工程执行层：✅ Orbit 核心能力 (~70%)</a></li>
+      <li><a href="#s32">L2 平台层：⚠️ 部分覆盖 (~25%)</a></li>
+      <li><a href="#s33">L3 本体层：🚫 完全缺失 (&lt;5%)</a></li>
+      <li><a href="#s34">L4 客户协作面：🚫 完全缺失 (~0%)</a></li>
+      <li><a href="#s35">L5 Echo 领域专家层：🚫 增强不替代 (~0%)</a></li>
+      <li><a href="#s36">开源生态对标与嫁接策略</a></li>
+    </ol>
+  </li>
+  <li><a href="#s4">CIF 多利益方平台：愿景与定位</a>
+    <ol class="toc-l2">
+      <li><a href="#s41">十方利益相关者图谱</a></li>
+      <li><a href="#s42">为什么"透明"是错误框架</a></li>
+      <li><a href="#s43">正确框架：同一数据源，角色投影，全程可追溯</a></li>
+      <li><a href="#s44">Ontology 本体论：CIF 的核心壁垒</a></li>
+    </ol>
+  </li>
+  <li><a href="#s5">利益相关者深度分析</a>
+    <ol class="toc-l2">
+      <li><a href="#s51">企业（被审计单位）</a></li>
+      <li><a href="#s52">外部审计师（会计师事务所）</a></li>
+      <li><a href="#s53">内部审计</a></li>
+      <li><a href="#s54">税务师 / 税务顾问</a></li>
+      <li><a href="#s55">投资银行 / 券商</a></li>
+      <li><a href="#s56">中国注册会计师协会（中注协）</a></li>
+      <li><a href="#s57">财政部（会计信息质量检查）</a></li>
+      <li><a href="#s58">证券交易所</a></li>
+      <li><a href="#s59">税务局</a></li>
+      <li><a href="#s510">律师</a></li>
+    </ol>
+  </li>
+  <li><a href="#s6">中国监管环境深度剖析</a>
+    <ol class="toc-l2">
+      <li><a href="#s61">法律红线清单</a></li>
+      <li><a href="#s62">数据安全法与个人信息保护法</a></li>
+      <li><a href="#s63">审计准则中的独立性要求</a></li>
+      <li><a href="#s64">税务信息保密义务</a></li>
+      <li><a href="#s65">跨境数据流动（如适用）</a></li>
+    </ol>
+  </li>
+  <li><a href="#s7">技术架构设计</a>
+    <ol class="toc-l2">
+      <li><a href="#s71">总体架构：四层模型</a></li>
+      <li><a href="#s72">Ontology 本体层设计（L3 核心）</a></li>
+      <li><a href="#s73">ABAC 权限模型设计</a></li>
+      <li><a href="#s74">数据 Provenance 与不可篡改审计链</a></li>
+      <li><a href="#s75">多租户 Workspace 隔离</a></li>
+      <li><a href="#s76">集成架构：连接器 + 管道 + 本体映射</a></li>
+      <li><a href="#s7b">数据隐私引擎——脱敏+增噪+可逆恢复</a></li>
+    </ol>
+  </li>
+  <li><a href="#s8">Orbit 作为 CIF 的 FDE 引擎</a>
+    <ol class="toc-l2">
+      <li><a href="#s81">角色定位：FDE 的工具，不是 FDE 的替代</a></li>
+      <li><a href="#s82">Orbit 现有能力如何直接服务 CIF</a></li>
+      <li><a href="#s83">CIF 对 Orbit 的反哺：需求发现飞轮</a></li>
+    </ol>
+  </li>
+  <li><a href="#s9">竞争格局</a>
+    <ol class="toc-l2">
+      <li><a href="#s91">为什么传统 SaaS 企业不做这一块？</a></li>
+      <li><a href="#s92">国内实际竞品逐类对标</a></li>
+      <li><a href="#s93">竞争格局总图</a></li>
+      <li><a href="#s94">间接竞争对手与替代方案</a></li>
+      <li><a href="#s95">CIF 的差异化：为什么现有玩家追不上</a></li>
+      <li><a href="#s96">垄断路径分析——产品力只是入场券</a></li>
+    </ol>
+  </li>
+  <li><a href="#s9p">治理模型与信任机制——公司治理即竞争壁垒</a>
+    <ol class="toc-l2">
+      <li><a href="#s9p1">信任悖论与解法</a></li>
+      <li><a href="#s9p2">三件套：不可逆的信任机制</a></li>
+      <li><a href="#s9p3">三件套的合力</a></li>
+      <li><a href="#s9p4">为什么竞品复制不了</a></li>
+      <li><a href="#s9p5">谁付钱？——多边平台的信任死结与解法</a></li>
+    </ol>
+  </li>
+  <li><a href="#s10">商业模式与收入模型</a>
+    <ol class="toc-l2">
+      <li><a href="#s101">收入来源与定价策略</a></li>
+      <li><a href="#s102">单位经济学：从负利润到高利润的 FDE 曲线</a></li>
+    </ol>
+  </li>
+  <li><a href="#s11">风险评估与缓解</a>
+    <ol class="toc-l2">
+      <li><a href="#s111">风险矩阵（15 项）</a></li>
+      <li><a href="#s112">不可缓解的残余风险</a></li>
+    </ol>
+  </li>
+  <li><a href="#s12">分阶段路线图</a>
+    <ol class="toc-l2">
+      <li><a href="#s121">Phase 0：夯实 Delta + 建设平台（0–6 个月）</a></li>
+      <li><a href="#s122">Phase 1：企业 + 外部审计（6–12 个月）</a></li>
+      <li><a href="#s123">Phase 2：本体层核心 + 券商（12–18 个月）</a></li>
+      <li><a href="#s124">Phase 3：客户协作面 + 律师 + 税务师（18–24 个月）</a></li>
+      <li><a href="#s125">Phase 4：监管对接 + Echo 增强（24–36 个月）</a></li>
+    </ol>
+  </li>
+  <li><a href="#s13">冷启动策略</a></li>
+  <li><a href="#s14">成功度量指标</a></li>
+  <li><a href="#s15">结论与核心建议</a></li>
+</ol>
+</div>
+
+<!-- ====== S1: EXECUTIVE SUMMARY ====== -->
+<section id="s1">
+<h2>1. 执行摘要</h2>
+
+<p>本报告旨在回答一个核心问题：<strong>Orbit（通用多 Agent 工程执行引擎）能否驱动 CIF（Code-Insight-Financial / 恪现财务）成为一个连接企业、审计、券商、律师、税务师及监管机构的多利益方财务数据平台？三者的关系是什么？</strong></p>
+
+<p>核心结论：<strong>Orbit 是发动机，CIF 是整车，FDE+后端工程师是驾驶员。</strong> Orbit 不是 CIF 的附属品——它是通用引擎，CIF 是它的第一个垂直应用实例。发动机不直接卖给司机，但车跑多快取决于发动机。车卖得好，发动机积累的数据越多，下一代越强。</p>
+
+<p>基于对 Palantir FDE 模式 23 年演进史的深度研究、对 Orbit 42 个落地模块的逐层对标、以及对中国财务监管环境的全面分析，我们的核心结论如下：</p>
+
+<div class="callout callout-success">
+<div class="callout-title">✅ 核心判断：方向正确，路径可行</div>
+<p><strong>Orbit 的 L1 Delta 层（工程执行，~70%覆盖）足以支撑 CIF Phase 1 的企业+审计场景。</strong> 关键差距在 L2 平台层（多租户、数据集成、服务目录，~25%）和 L3 本体层（业务语义映射，&lt;5%）。</p>
+<p><strong>CIF 的多利益方愿景具有结构性优势</strong>——但必须把定位从"透明平台"调整为"同一数据源、角色投影、全程可追溯"的基础设施。前者撞法律墙（审计独立性、税务保密、律师–客户特权），后者是效率工具。</p>
+<p><strong>Ontology 本体论是 CIF 的核心壁垒。</strong> 同一笔销售收入在企业、审计、税务、券商、律师、交易所六个视角下有六种不同投影——这个语义映射层才是平台不可替代的价值。</p>
+</div>
+
+<div class="callout callout-warn">
+<div class="callout-title">⚠️ 最大风险</div>
+<p>不是技术。是数据安全法合规 + 冷启动 + 利益方信任破裂。数据集中存储意味着平台成为最高价值攻击目标——一次事故不是商业失败，可能触发刑事追诉。</p>
+</div>
+
+<table>
+<tr><th>维度</th><th>判断</th><th>置信度</th></tr>
+<tr><td>市场时机</td><td>✅ AI 降本使本体映射成本可行——之前人工建模太贵</td><td>高</td></tr>
+<tr><td>技术基础 (Orbit L1)</td><td>✅ 42 模块覆盖工程执行全链路——够用</td><td>高</td></tr>
+<tr><td>技术基础 (Orbit L2-L3)</td><td>⚠️ 多租户、数据管道、本体层需从零建</td><td>高</td></tr>
+<tr><td>法律合规</td><td>⚠️ 多部法律交叉约束——需逐利益方设计合规方案</td><td>高</td></tr>
+<tr><td>冷启动</td><td>⚠️ 地狱难度——需要种子客户+可验证价值</td><td>高</td></tr>
+<tr><td>竞争壁垒</td><td>✅ 如建成——数据迁移成本极高，护城河极深</td><td>中高</td></tr>
+<tr><td>监管端机会</td><td>✅ 监管信息化落后于被监管对象——结构性机会</td><td>中</td></tr>
+</table>
+</section>
+
+<!-- ====== S2: FDE MODEL ====== -->
+<section id="s2">
+<h2>2. FDE 模式：起源、演进与 AI 时代爆发</h2>
+
+<h3 id="s21">2.1 Palantir 的军事基因与双团队架构</h3>
+
+<p>FDE（Forward Deployed Engineer，前沿部署工程师）一词借自军事用语。Palantir 在 2000 年代中期为 CIA/NSA 等服务时被迫发明了这一模式：数据不能离开客户机房、需求无法提前获知（涉密）、远程交付不可行。创始人之一 Stefan Cohen 带着 demo 给客户看，被批评后不断追问"你们希望它怎样不同？"——这种紧密的客户反馈循环成为 FDE 模式的种子。后由总裁兼 CTO <strong>Shyam Sankar</strong> 将其系统化。</p>
+
+<p>Palantir 内部将 FDE 拆为两个互补角色：</p>
+
+<table>
+<tr><th>团队</th><th>角色</th><th>职责</th><th>人才画像</th></tr>
+<tr>
+  <td><strong>Echo</strong></td>
+  <td>嵌入式分析师</td>
+  <td>驻场与用户沟通、识别关键问题、管理客户关系</td>
+  <td>领域专家（如前军官、医疗老兵），且必须是"反叛者/异端"——理解现行做法但认为它不够好</td>
+</tr>
+<tr>
+  <td><strong>Delta</strong></td>
+  <td>部署工程师</td>
+  <td>快速编写代码、构建解决方案/原型、实际部署到生产</td>
+  <td>擅长快速原型制作的人，而非追求完美抽象的"工匠型"工程师</td>
+</tr>
+</table>
+
+<p>关键数据：<strong>直到 2016 年，Palantir 的 FDE 人数超过传统软件工程师。</strong> 这个比例说明 FDE 不是"售前支撑"——是核心的<strong>产品探索机制</strong>。FDE 培训被视为创业公司创始人的最佳训练场，Palantir 校友已创办或掌管 350+ 家科技公司（Anduril、ElevenLabs、Ironclad、Sourcegraph、Hex 等）。</p>
+
+<h3 id="s22">2.2 碎石路 → 高速公路：FDE 的产品哲学</h3>
+
+<p>这是 Palantir FDE 模式最核心的产品方法论，由 <strong>Shyam Sankar</strong> 提出。传统创业智慧说"早期做不可扩展的事，找到 PMF 后标准化"——将逐个客户定制视为需要最小化的服务成本。Sankar <strong>反转了这个逻辑</strong>：当客户需求本质上异质（不同行业、不同监管、不同数据环境），<strong>让 FDE 成为产品探索的引擎</strong>——一线探索驱动产品演进。</p>
+
+<div class="arch-box">
+                    ┌──────────────────────────┐
+                    │    产品开发团队 (PD)       │
+                    │    抽象 + 泛化 + 产品化    │
+                    │    "铺成高速公路"          │
+                    └───────────┬──────────────┘
+                                │
+                                ▼
+          ┌─────────────────────────────────────────┐
+          │         平台 (Foundry / AIP / CIF)       │
+          │     可复用本体 / 管道 / Agent / 权限      │
+          └─────────────────────┬───────────────────┘
+                                │
+                                ▼
+                    ┌───────────────────────┐
+                    │     FDE (Delta+Echo)   │
+                    │   驻场 → 快速构建       │
+                    │   "碎石路"（gravel road)│
+                    └───────────────────────┘
+
+  阶段一：FDE 驻场，拿现有产品，填客户差距 → 能跑的原型（碎石路）
+  阶段二：总部研究反复出现的需求模式 → 抽象泛化成通用平台特性（高速公路）
+
+  铺太早 → 脆弱抽象。铺太晚 → 一堆一次性代码。
+</div>
+
+<p><strong>经济学：先亏后赚。</strong> 新客户类型负利润（FDE 投入大，一次性方案）→ 中期盈亏平衡（部分碎石路已铺成高速）→ 成熟期高利润（平台吸收大部分需求，FDE 只做薄层定制）。实际验证：Palantir 商业利润从 2022 年 ~49% 扩张到 2025 年 ~66%。</p>
+
+<div class="callout callout-info">
+<div class="callout-title">🔑 对 CIF 的关键启示</div>
+<p>CIF 的第一个客户（企业+审计）将是负利润的——这是投资，不是失败。关键是 FDE 在部署过程中捕获的可复用模式必须回流到平台，让第二个、第三个同类客户的部署成本指数下降。<strong>碎石不是浪费——是下一条高速公路的原材料。</strong></p>
+</div>
+
+<h3 id="s23">2.3 AI 时代 FDE 爆发：数据与结构性原因</h3>
+
+<table>
+<tr><th>时间点</th><th>FDE 岗位数</th><th>变化</th></tr>
+<tr><td>2025 年 4 月</td><td>643</td><td>基准</td></tr>
+<tr><td>2025 年 9 月</td><td>~2,000</td><td>+311%</td></tr>
+<tr><td>2026 年 4 月</td><td>5,330+</td><td>+729% YoY</td></tr>
+</table>
+
+<p><strong>FDE 需求年增 ~800%，人才供给年增仅 ~50%。</strong> 截至 2025 年 9 月仅 1.24% 的公司设有 FDE 岗位。高级 FDE 中位数薪酬 <strong>$485K</strong>（比同级软件工程师高 25-40%）。</p>
+
+<p>三个结构性原因驱动 AI 时代 FDE 爆发：</p>
+<ol>
+  <li><strong>价值从模型转向部署</strong>：基础模型边际收益递减，价值从"拥有最好模型"转向"让模型在真实业务中跑起来"</li>
+  <li><strong>客户不知道自己需要什么</strong>：71% 高管将"组织准备度"列为 AI 采用第一障碍——不是模型不够好。企业有 15 年老系统、混乱数据格式、没人敢动的 Excel 宏。需要人在现场发现和定义问题</li>
+  <li><strong>FDE 是"现场传感器"</strong>：不仅部署——捕获真实世界的失败模式、tool-calling bug、产品差距，直接回流到研发路线图。传统咨询公司做不到这点——他们没有产品</li>
+</ol>
+
+<p>全行业军备竞赛态势：</p>
+<table>
+<tr><th>公司</th><th>投资规模</th><th>团队规模</th><th>实体</th></tr>
+<tr><td>OpenAI</td><td>$400 亿+（含 PE）</td><td>150+（目标 2,000–4,000）</td><td>Deployment Company</td></tr>
+<tr><td>Anthropic</td><td>$15 亿（含 PE）</td><td>全球增长中</td><td>Applied AI FDE 团队</td></tr>
+<tr><td>Microsoft</td><td>$25 亿</td><td><strong>6,000 人</strong></td><td>Microsoft Frontier Co</td></tr>
+<tr><td>AWS</td><td>$10 亿</td><td>增长中</td><td>AWS FDE Organization</td></tr>
+<tr><td>Salesforce</td><td>未披露</td><td>目标 1,000 人</td><td>2025 年 4 月启动</td></tr>
+</table>
+</section>
+
+<!-- ====== S3: FIVE-LAYER ARCHITECTURE ====== -->
+<section id="s3">
+<h2>3. FDE 五层架构模型与 Orbit 差距逐层对标</h2>
+
+<p>基于 Palantir 23 年实践和 AI 原生 FDE 服务平台的需求，提出五层架构模型。下层是上层的基础。每往上一层，AI 替代难度指数增长。</p>
+
+<h3 id="s31">3.1 L1 Delta 工程执行层：✅ Orbit 核心能力 (~70%)</h3>
+
+<p>定义：多 Agent 编排、代码/DB/配置图谱、安全沙箱执行、质量验证、检查点/回滚、审计追溯。简而言之：<strong>工程师的 AI 副驾驶。</strong></p>
+
+<table>
+<tr><th>FDE 需求</th><th>Orbit 模块</th><th>状态</th><th>差距</th></tr>
+<tr><td>多 Agent 编排</td><td><code>scheduler/</code> (offpeak_scheduler, orchestrator, dag_runner) + <code>goal/</code> (meta_orchestrator)</td><td>✅</td><td>需要垂直领域 Agent 角色（财务/风控/供应链）</td></tr>
+<tr><td>理解客户代码</td><td><code>graph/</code> (code graph via Tree-sitter) + <code>lsp/</code></td><td>✅</td><td>工程语言覆盖待扩展</td></tr>
+<tr><td>理解客户数据库</td><td><code>graph/</code> (database graph via DDL/MVCC)</td><td>✅</td><td>只读 schema 分析——不摄取数据</td></tr>
+<tr><td>安全执行</td><td><code>sandbox/</code> (Docker executor, process_sandbox, sandbox_factory)</td><td>✅</td><td>—</td></tr>
+<tr><td>质量验证</td><td><code>hallucination/</code> (L1-L9) + <code>review/</code> + <code>compliance/</code> + <code>security/</code></td><td>✅</td><td>财务/行业专项规则待补充</td></tr>
+<tr><td>可回滚实验</td><td><code>checkpoint/</code> + <code>worktree/</code> (git worktree 隔离)</td><td>✅</td><td>—</td></tr>
+<tr><td>审计追溯</td><td><code>observability/</code> (OTEL+structlog) + <code>events/</code></td><td>✅</td><td>—</td></tr>
+<tr><td>自主迭代</td><td><code>loop/</code> (循环执行) + <code>goal/</code> (目标分解+验证)</td><td>✅</td><td>—</td></tr>
+<tr><td>知识积累</td><td><code>knowledge/</code> (engine + vector + ontology + store) + <code>memory/</code></td><td>✅</td><td>跨客户知识隔离待做</td></tr>
+<tr><td>资源控制</td><td><code>resource_guard/</code> + <code>resource_scheduler</code></td><td>✅</td><td>—</td></tr>
+</table>
+
+<div class="callout callout-success">
+<div class="callout-title">结论</div>
+<p>Orbit 第 1 层非常扎实。42 个落地模块覆盖了从 Agent 编排到安全执行到审计追溯的完整工程链路。这是 Orbit <strong>最不该放弃的阵地</strong>——继续深耕。</p>
+</div>
+
+<h3 id="s32">3.2 L2 平台层：⚠️ 部分覆盖 (~25%)</h3>
+
+<p>定义：多租户 workspace 隔离、数据集成管道（连接任意数据源）、服务/方案模板目录、外部部署管道、成本归因。简而言之：<strong>让单客户能力复用到多客户的基础设施。</strong></p>
+
+<table>
+<tr><th>FDE 需求</th><th>状态</th><th>差距</th></tr>
+<tr><td>多租户 workspace 隔离</td><td>🚫 缺失</td><td><code>projects/</code> 是单租户视角。需要 tenant_id 贯穿所有表、per-tenant Agent 实例隔离、per-tenant 数据沙箱</td></tr>
+<tr><td>数据集成管道</td><td>🚫 缺失</td><td>无数据摄取层。需要 ETL 管道（Extract 抽取→Transform 转换→Load 加载——从各数据源取数据、清洗、写入CIF）</td></tr>
+<tr><td>服务/方案模板目录</td><td>🚫 缺失</td><td><code>compose/</code> 和 <code>brief/</code> 有模板概念但非面向客户方案复用</td></tr>
+<tr><td>外部部署管道</td><td>🚫 缺失</td><td>Orbit 部署自己的 exe，不部署客户软件</td></tr>
+<tr><td>成本归因</td><td>⚠️ 部分</td><td><code>observability/</code> 有成本记录但无 per-client 拆分</td></tr>
+</table>
+
+<div class="callout callout-warn">
+<div class="callout-title">结论</div>
+<p>这是 Orbit <strong>下一阶段应该重点建设的层</strong>。多租户 + 数据集成 + 服务目录 = Orbit 从"开发者工具"升级为"服务平台"。</p>
+</div>
+
+<h3 id="s33">3.3 L3 本体层：🚫 完全缺失 (&lt;5%)</h3>
+
+<p>定义：业务语义 → 技术实现的映射引擎。统一语义层（"患者"+"客户"+"设备" = "实体"）、业务规则编码（会计准则、税率、合规规则）、跨数据源语义映射（银行流水 CSV ↔ ERP 数据库 ↔ Excel 手工账）、Ontology 版本管理。简而言之：<strong>Palantir 最深护城河——23 年、数百客户现场的积累。</strong></p>
+
+<p>这是 Orbit 与 FDE 平台之间<strong>最大的结构性空白</strong>。</p>
+
+<p>Orbit 的六图谱（code/database/config/knowledge/meta/document）是<strong>技术视角</strong>的分类——"这个项目用什么语言？数据库有哪些表？配置文件怎么写的？"</p>
+
+<p>本体层需要<strong>业务视角</strong>的语义抽象：</p>
+
+<div class="arch-box">
+客户 A（医院）：  "患者" "就诊记录" "药品" "科室"
+客户 B（银行）：  "客户" "交易" "产品" "分行"
+客户 C（工厂）：  "设备" "工单" "物料" "产线"
+客户 D（财务）：  "科目" "凭证" "客户" "供应商"
+
+                  ↓ 本体层统一 ↓
+
+           "实体" "事件" "资源" "组织单元"
+                  ↓ 映射到技术 ↓
+
+          DB Table → API Endpoint → UI Component
+</div>
+
+<p>Orbit 的 <code>knowledge/ontology/</code> 目录存储的是<strong>工程知识本体</strong>（软件架构概念），不是<strong>客户业务本体</strong>。两者有本质区别。</p>
+
+<div class="callout callout-danger">
+<div class="callout-title">🚫 这不是技术问题——是领域建模问题</div>
+<p>需要同时理解：① 客户的业务语言（会计、医疗、制造……）；② 客户的现有技术栈（15 年老 ERP、Excel 宏、SaaS API）；③ 产品的能力边界（哪些能配置、哪些要写代码、哪些做不到）。<strong>Palantir 花了 23 年。</strong> 这是不可压缩的时间壁垒。</p>
+</div>
+
+<h3 id="s34">3.4 L4 客户协作面：🚫 完全缺失 (~0%)</h3>
+
+<p>定义：需求对话界面（自然语言→结构化 Backlog）、业务进度视图（非 JIRA——客户看得懂的）、交付物门户（代码+报告+配置+手册，按角色分层）、审批工作流（关键决策需客户审批）、反馈闭环（标注→自动 Issue/PR）。</p>
+
+<p>类比：Orbit 驾驶舱是给开发者用的 IDE；客户协作面是给客户用的"业务操作系统"。它融合了三种能力：</p>
+<ul>
+  <li><strong>Figma 模式 = 可视化协作</strong>：客户和 FDE 一起"画"业务。本体建模器——拖拽定义"客户""科目""合同"之间的关系、数据流图、业务流程。不是写代码，是画图对齐理解。就像 Figma 让设计师和产品经理在同一张画布上协作，CIF 让 CFO 和审计师在同一张业务图上达成共识。</li>
+  <li><strong>Notion 模式 = 结构化文档</strong>：非代码交付物——需求确认书、分析报告、操作手册、合规检查结果、会议纪要→结构化需求。客户看得懂，能标注、能审批。不是给工程师看的，是给 CFO/审计合伙人看的。</li>
+  <li><strong>Linear 模式 = 业务进度追踪</strong>：不是 JIRA 的"Story Points 7/12"——是"自动对账模块：✅ 数据接入 / ✅ 规则配置 / 🔄 测试中 / ⏳ 上线"。粒度对齐业务里程碑，不要求客户理解 sprint。</li>
+</ul>
+<p>融合体的意思：<strong>一个界面三种模式，不切工具。</strong> 客户不需要在三个系统之间来回跳——建模完直接关联到需求文档，需求文档直接关联到进度追踪。</p>
+
+<h3 id="s35">3.5 L5 Echo 领域专家层：🚫 增强不替代 (~0%)</h3>
+
+<p>AI 能做的（辅助 Echo）：会议录音→结构化纪要；行业公开资料→知识图谱；客户文档→术语表/数据字典；历史项目相似度匹配→方案推荐。</p>
+
+<p>AI 不能做的（不要浪费资源）：物理在场观察；从碎片信息中做出跨领域直觉跳跃；判断"客户说的 vs 真正需要的"；建立人类信任关系。<strong>Echo 层短期内不应追求 AI 替代——应追求 AI 增强人类 Echo。</strong></p>
+
+<h3 id="s36">3.6 开源生态对标与嫁接策略</h3>
+
+<table>
+<tr><th>层</th><th>关键开源项目</th><th>建议</th></tr>
+<tr>
+  <td>L1 Delta</td>
+  <td>CrewAI、AutoGen、LangGraph</td>
+  <td><strong>维持自研</strong>——Orbit 调度器更透明、更可控</td>
+</tr>
+<tr>
+  <td>L2 平台</td>
+  <td>Orionfold Relay (workspace+编排)、OpenFoundry (Rust管道)</td>
+  <td><strong>参考后自建</strong>——Relay 的 workspace 模型 + OpenFoundry 的管道引擎思路</td>
+</tr>
+<tr>
+  <td>L3 本体</td>
+  <td>@ontograph/core (TS DSL)、nano-ontoprompt (管道→本体映射)、OntoSphere (文档→本体提取)</td>
+  <td><strong>全部自建，参考 DSL 设计</strong>——本体层不可外包</td>
+</tr>
+<tr>
+  <td>L4 协作面</td>
+  <td>无成熟项目</td>
+  <td><strong>全新自建</strong>——最关键的一步 UI 跨越</td>
+</tr>
+<tr>
+  <td>L5 Echo</td>
+  <td>无直接对标</td>
+  <td><strong>增强不替代</strong>——会议纪要/知识图谱/方案推荐</td>
+</tr>
+</table>
+</section>
+
+<!-- ====== S4: CIF VISION ====== -->
+<section id="s4">
+<h2>4. CIF 多利益方平台：愿景与定位</h2>
+
+<h3 id="s41">4.1 十方利益相关者图谱</h3>
+
+<div class="stakeholder-grid">
+<div class="sh-card">
+  <h4>🏢 企业</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--green);border-color:var(--green)">核心用户</span><span class="tag" style="color:var(--accent);border-color:var(--accent)">数据源头</span></div>
+  <p>被审计单位、上市公司或拟上市公司。日常使用 CIF 做账务处理。在 IPO/并购/年审时作为被核查方。</p>
+</div>
+<div class="sh-card">
+  <h4>🔍 外部审计师</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--green);border-color:var(--green)">核心用户</span><span class="tag" style="color:var(--purple);border-color:var(--purple)">独立第三方</span></div>
+  <p>会计师事务所。对财务报表发表审计意见。法律要求独立于被审计单位。审计底稿保密（除监管检查）。</p>
+</div>
+<div class="sh-card">
+  <h4>🛡️ 内部审计</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--accent);border-color:var(--accent)">企业内部</span></div>
+  <p>企业内审部门。向审计委员会汇报，与外审有信息交互但角色不同。需要独立的审计轨迹。</p>
+</div>
+<div class="sh-card">
+  <h4>🧾 税务师</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--orange);border-color:var(--orange)">税务代理</span></div>
+  <p>税务顾问/税务师事务所。负责企业所得税汇算清缴、税务筹划、税务争议代理。纳税筹划方案涉及客户秘密。</p>
+</div>
+<div class="sh-card">
+  <h4>📊 投行/券商</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--purple);border-color:var(--purple)">中介机构</span></div>
+  <p>IPO 保荐人、并购财务顾问。需要深度财务+法务尽调数据。信息不对称是其商业模型的一部分。</p>
+</div>
+<div class="sh-card">
+  <h4>🏛️ 中注协</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--red);border-color:var(--red)">行业监管</span></div>
+  <p>中国注册会计师协会。每年抽查审计底稿（执业质量检查）。目前靠发邮件要 Excel。信息化程度有限。</p>
+</div>
+<div class="sh-card">
+  <h4>🏦 财政部</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--red);border-color:var(--red)">会计主管部门</span></div>
+  <p>会计信息质量检查。派人翻凭证的原始方式。会计准则制定者——是规则的源头。</p>
+</div>
+<div class="sh-card">
+  <h4>📈 证券交易所</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--red);border-color:var(--red)">市场监管</span></div>
+  <p>审核 IPO 申报/年报/重大资产重组。发问询函靠企业自报数据，再让审计验证。审核过程非公开。</p>
+</div>
+<div class="sh-card">
+  <h4>💰 税务局</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--red);border-color:var(--red)">税收征管</span></div>
+  <p>金税四期系统已建成。纳税人信息严格保密（税收征收管理法第 8 条）。有自己的数据采集渠道。</p>
+</div>
+<div class="sh-card">
+  <h4>⚖️ 律师</h4>
+  <div class="tag-row"><span class="tag" style="color:var(--purple);border-color:var(--purple)">法律服务</span></div>
+  <p>IPO 律师、并购律师、税务律师。需要审阅合同+公司章程+重大协议。律师–客户保密特权（律师法第 38 条）。</p>
+</div>
+</div>
+
+<h3 id="s42">4.2 为什么"透明"是错误框架</h3>
+
+<p>一句话：<strong>"相互信息透明"在法律上不成立。</strong> 外部审计的底稿企业无权看（独立性要求）；企业的商业机密审计无权泄露；税务局的稽查数据律师无权调取。你让这些信息"透明"，等于让每个参与者违法。</p>
+
+<table>
+<tr><th>利益方</th><th>不能透明的理由</th><th>法律依据</th></tr>
+<tr><td>企业</td><td>商业机密、未公开财务数据</td><td>反不正当竞争法、上市前静默期规定</td></tr>
+<tr><td>外部审计</td><td>审计底稿保密（独立性要求）</td><td>注册会计师法、审计准则第 1131 号</td></tr>
+<tr><td>税务师</td><td>纳税筹划方案涉及客户秘密</td><td>涉税专业服务监管办法</td></tr>
+<tr><td>律师</td><td>律师–客户保密特权</td><td>律师法第 38 条</td></tr>
+<tr><td>税务局</td><td>纳税人信息严格保密</td><td>税收征收管理法第 8 条</td></tr>
+<tr><td>交易所</td><td>上市审核过程非公开</td><td>证券交易所上市审核规则</td></tr>
+<tr><td>券商</td><td>内幕信息防火墙（投行 vs 研究 vs 自营）</td><td>证券公司内部控制指引</td></tr>
+</table>
+
+<div class="callout callout-danger">
+<div class="callout-title">⛔ 如果你对外说这句话</div>
+<p>"让交易所、税务局、财政部都上我的平台，信息相互透明"——这句话会同时激怒所有潜在用户。企业怕泄密、审计怕独立性审查、税务局怕越权。把野心藏在定位后面：<strong>"让企业只维护一套数据，审计、券商、监管各取所需。"</strong> 同一件事，后者是效率工具，前者是僭越。</p>
+</div>
+
+<h3 id="s43">4.3 正确框架：同一数据源，角色投影，全程可追溯</h3>
+
+<p>平台的真正价值不在"透明"——在三个词：</p>
+
+<ol>
+  <li><strong>同一数据源 (Single Source of Truth)</strong>：企业日常经营产生的财务数据只存储一次。不是"企业一套、审计复制一套、券商再复制一套、税务局再再一套"。消除 40-60% 的重复核对劳动。</li>
+  <li><strong>角色投影 (Role-Based Projection)</strong>：同一笔销售收入，不同角色看到不同的投影——审计看到"收入确认时点+截止性测试对象"、税务看到"增值税销项税额+企业所得税收入"、券商看到"收入增速+毛利率+可比公司倍数"、律师看到"合同编号+付款条款"。这就是 L3 本体层的核心价值。</li>
+  <li><strong>全程可追溯 (End-to-End Provenance)</strong>：每一笔数据的每一次访问、修改、审批、导出都有不可篡改的审计日志。信任不是"因为你让我看了所以你可信"——信任是"因为我知道这份数据从哪来、谁改过、为什么改——所以我能验证"。</li>
+</ol>
+
+<div class="callout callout-info">
+<div class="callout-title">🔑 一句话定位</div>
+<p><strong>CIF 不是数据透明平台。CIF 是数据 provenance 基础设施。</strong> 让每一方按权限看到自己该看的，让每一方都能验证数据来源和变更历史。</p>
+</div>
+
+<h3 id="s44">4.4 Ontology 本体论：CIF 的核心壁垒</h3>
+
+<p>Palantir COO Sankar 原话："<strong>The ontology IS the moat.</strong>" 本体就是护城河——字面意义，非营销话术。</p>
+
+<p>CIF 需要的本体论建模示例——同一笔销售收入在不同角色下的投影：</p>
+
+<table>
+<tr><th>角色</th><th>关注的本体对象</th><th>关键属性</th><th>投影规则</th></tr>
+<tr>
+  <td>企业</td>
+  <td>主营业务收入 / 应收账款 / 客户</td>
+  <td>金额、期间、对方科目</td>
+  <td>全字段可见（数据所有者）</td>
+</tr>
+<tr>
+  <td>外部审计</td>
+  <td>收入确认时点 / 截止性测试 / 函证对象</td>
+  <td>合同匹配、验收单、回款记录</td>
+  <td>可查看已授权科目，可标注不可修改</td>
+</tr>
+<tr>
+  <td>税务师</td>
+  <td>增值税销项税额 / 企业所得税收入</td>
+  <td>税率、发票代码、纳税时点</td>
+  <td>可查看已授权期间的税务相关科目</td>
+</tr>
+<tr>
+  <td>券商</td>
+  <td>收入增速 / 毛利率 / 可比公司倍数</td>
+  <td>汇总级——不可看明细/底稿</td>
+  <td>经审计的汇总数据，脱敏后可见</td>
+</tr>
+<tr>
+  <td>律师</td>
+  <td>合同编号 / 付款条款 / 违约责任</td>
+  <td>合同文本、签署日期、关键条款</td>
+  <td>仅已授权合同，不含金额（除非业务需要）</td>
+</tr>
+<tr>
+  <td>交易所</td>
+  <td>是否构成重大合同 / 需临时公告</td>
+  <td>金额阈值、披露格式</td>
+  <td>按上市规则格式化输出</td>
+</tr>
+</table>
+
+<p>这就是 CIF 的护城河逻辑——本体越用越厚（每服务一个新客户类型就积累新的业务语义映射），客户越离不开（迁移到其他平台等于重新建模）。</p>
+</section>
+
+<!-- ====== S5: STAKEHOLDER DEEP DIVE ====== -->
+<section id="s5">
+<h2>5. 利益相关者深度分析</h2>
+
+<p>以下逐方分析：核心诉求、CIF 价值主张、进入障碍、激励杠杆。一句话总结每方的"为什么用 CIF"和"为什么不用 CIF"。</p>
+
+<h3 id="s51">5.1 企业（被审计单位）</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>降低合规成本（审计费、税务代理费）、缩短 IPO/尽调周期、减少重复数据准备</td></tr>
+<tr><td>CIF 价值</td><td>一套数据同时服务审计+税务+券商+监管——数据准备时间降低 70%</td></tr>
+<tr><td>为什么用</td><td>审计费下降（审计效率提升）、尽调周期缩短、合规风险前置发现</td></tr>
+<tr><td>为什么不用</td><td>怕数据泄露给竞争对手/税务机关、怕审计发现问题更彻底、迁移成本高</td></tr>
+<tr><td>激励杠杆</td><td><strong>经济激励直接且显著</strong>——审计费降 20-30% 对任何企业都是真实吸引力</td></tr>
+<tr><td>关键人</td><td>CFO / 财务总监——对效率和成本敏感</td></tr>
+</table>
+
+<h3 id="s52">5.2 外部审计师（会计师事务所）</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>降低审计成本（人工核对）、提高审计质量（数据完整性）、降低执业风险</td></tr>
+<tr><td>CIF 价值</td><td>数据 provenance 可追溯→审计程序自动化→底稿自动生成→执业质量检查时直接导出</td></tr>
+<tr><td>为什么用</td><td>50% 审计程序自动化（数据核对/函证/截止性测试）、执业质量检查时一键导出底稿</td></tr>
+<tr><td>为什么不用</td>
+  <td>
+    <strong>这是最复杂的利益方。</strong> ① 独立性要求——审计底稿不能被企业看到（审计准则强制），平台必须有"企业不可见的审计工作区" ② 大型事务所（四大+国内头部）虽有自研审计软件，但一线审计师普遍认为难用——内部系统往往是 IT 部门 vs 业务部门 vs 合规部门三方政治妥协的产物，需求响应以年计，迭代极慢。他们不是"不想换"，是"被自己锁死了" ③ 审计方法论是事务所核心 IP——不愿标准化到平台上，但如果 CIF 只做数据层+底稿生成，方法论本身留在事务所手中，阻力会小得多
+  </td>
+</tr>
+<tr><td>激励杠杆</td>
+  <td><strong>中小事务所是突破口</strong>——他们没有自研能力，对降本增效极度渴求。大所虽然内部系统难用但政治惯性大，从小所验证产品力后再攻大所——届时 CIF 的效率优势已经用数据说话，大所内部的"换系统派"会有弹药</td>
+</tr>
+<tr><td>关键人</td><td>审计合伙人——对执业风险极度敏感。一个审计失败 = 职业生涯终结</td>
+</tr>
+</table>
+
+<div class="callout callout-warn">
+<div class="callout-title">⚠️ 审计独立性：不可逾越的红线</div>
+<p>审计准则第 1131 号——审计工作底稿的所有权属于会计师事务所，未经客户同意不得向第三方披露（监管检查除外）。平台设计中必须有：① 审计工作区——企业不可见（物理隔离，非权限隔离）② 审计底稿导出由事务所完全控制 ③ 平台方（CIF）自身也不得访问审计底稿内容。</p>
+</div>
+
+<h3 id="s53">5.3 内部审计</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>持续监控、风险预警、向审计委员会汇报、与外审协调但不依赖外审</td></tr>
+<tr><td>CIF 价值</td><td>与外审共享同一数据源但不共享底稿——内外审数据一致性自动校验</td></tr>
+<tr><td>为什么用</td><td>内外审协调效率提升、内控缺陷实时预警</td></tr>
+<tr><td>激励杠杆</td><td>内审部门向审计委员会汇报——说服董事会/审计委员会即可</td></tr>
+</table>
+
+<h3 id="s54">5.4 税务师 / 税务顾问</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>准确获取财务数据用于税务申报和筹划、降低申报错误风险</td></tr>
+<tr><td>CIF 价值</td><td>财务数据→税务申报数据自动转换（本体映射：会计收入→应纳税所得额）</td></tr>
+<tr><td>为什么用</td><td>减少数据转录错误、纳税调整自动生成</td></tr>
+<tr><td>为什么不用</td><td>纳税筹划方案属客户秘密——不敢放在任何第三方平台上</td></tr>
+<tr><td>关键设计</td><td><strong>税务筹划工作区必须是客户私有的</strong>——平台提供申报数据生成，不存储筹划方案</td></tr>
+</table>
+
+<h3 id="s55">5.5 投资银行 / 券商</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>深度尽调数据、快速估值建模、IPO 申报材料准备</td></tr>
+<tr><td>CIF 价值</td><td>尽调数据室替代方案——权限化财务+法务数据访问，数据溯源到凭证级</td></tr>
+<tr><td>为什么用</td><td>尽调效率质变——不再翻纸质凭证和 Excel、上市申报材料一键生成</td></tr>
+<tr><td>为什么不用</td>
+  <td>
+    <strong>信息不对称是投行的商业模型之一。</strong> 它们因为比对手更早知道哪家公司值得买而赚钱。如果数据获取同质化，差异化从"数据优势"转为"判断优势"——头部投行能适应，但中小券商会抵制。<br>
+    另外：券商内部有内幕信息防火墙（投行 vs 研究 vs 自营 vs 资管）——平台必须支持同一券商内部不同部门之间的信息隔离。
+  </td>
+</tr>
+<tr><td>激励杠杆</td><td><strong>上市周期缩短 30% = 对投行的真实价值</strong>——IPO 排队时间是券商的直接成本</td></tr>
+</table>
+
+<h3 id="s56">5.6 中注协</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>提升执业质量检查效率、行业监管数字化</td></tr>
+<tr><td>CIF 价值</td><td>底稿索引一键导出（符合检查格式）——不需要发邮件要 Excel</td></tr>
+<tr><td>为什么"不用"</td><td><strong>中注协不会"入驻平台"。</strong> 它是监管者，不是用户。你可以做的是：让事务所的 CIF 底稿生成符合检查格式的导出包——事务所主动提交</td></tr>
+<tr><td>策略</td><td><strong>对接而非入驻。</strong> 了解中注协执业质量检查的数据格式要求，让 CIF 生成合规导出。这是隐性推手——如果中注协认可 CIF 导出的底稿格式，事务所会用 CIF</td></tr>
+</table>
+
+<h3 id="s57">5.7 财政部</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>会计信息质量检查、会计准则执行监督</td></tr>
+<tr><td>CIF 关系</td><td>财政部是<strong>规则制定者</strong>，不是平台用户。CIF 需要做的是：① 会计准则变更时第一时间更新本体规则 ② 会计信息质量检查时提供完整数据追溯</td></tr>
+</table>
+
+<h3 id="s58">5.8 证券交易所</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>审核 IPO/年报/重大资产重组信息披露的准确性和完整性</td></tr>
+<tr><td>CIF 价值</td><td>按交易所格式自动生成披露文件 + 数据溯源——问询函回复从"手工整理"变"系统导出"</td></tr>
+<tr><td>策略</td><td><strong>对接而非入驻。</strong> 让 CIF 生成符合交易所格式的 XBRL/PDF 披露文件。XBRL（eXtensible Business Reporting Language，可扩展商业报告语言）是交易所要求的标准披露数据格式——机器可读、结构化。交易所不会来你的平台——但企业/券商会因为"一键生成交易所材料"而用 CIF</td></tr>
+</table>
+
+<h3 id="s59">5.9 税务局</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>税收征管——金税四期已建成，有自己的数据采集渠道</td></tr>
+<tr><td>CIF 关系</td><td><strong>最不可能入驻的机构。</strong> 金税四期是法定申报渠道——企业必须直接对接。CIF 可以做的是：① 从账务本体自动生成符合金税四期接口的申报数据 ② 让税务数据与财务数据一致（本体映射保证）——降低申报错误风险。不要让税务局来你的平台。把数据喂给税务局的系统</td></tr>
+</table>
+
+<h3 id="s510">5.10 律师</h3>
+
+<table>
+<tr><th>维度</th><th>分析</th></tr>
+<tr><td>核心诉求</td><td>审阅合同/公司章程/重大协议、出具法律意见书</td></tr>
+<tr><td>CIF 价值</td><td>合同管理与财务数据关联——合同→收入确认→税务处理，一条线追溯</td></tr>
+<tr><td>为什么用</td><td>法务尽调效率提升——不再手动收集和核对合同</td></tr>
+<tr><td>为什么不用</td><td><strong>律师–客户保密特权（律师法第 38 条）</strong>——律师审阅的合同和出具的法律意见书不能向第三方（包括平台方）披露。平台必须有"律师私有工作区"</td></tr>
+</table>
+</section>
+
+<!-- ====== S6: REGULATORY ====== -->
+<section id="s6">
+<h2>6. 中国监管环境深度剖析</h2>
+
+<h3 id="s61">6.1 法律红线清单</h3>
+
+<p>以下法律约束是设计 CIF 平台时必须逐条满足的硬性边界。任何一条违反都可能是灭顶之灾。</p>
+
+<table>
+<tr><th>#</th><th>法律/法规</th><th>约束内容</th><th>对 CIF 的设计要求</th></tr>
+<tr>
+  <td>1</td>
+  <td>《数据安全法》第 21 条</td>
+  <td>国家建立数据分类分级保护制度。财务数据、审计底稿可能被归类为"重要数据"</td>
+  <td>数据必须境内存储。跨境传输需安全评估。平台需自评数据安全风险并上报</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>《个人信息保护法》</td>
+  <td>个人财务信息、薪资数据属于敏感个人信息——需单独同意</td>
+  <td>员工薪资、股东个人信息等需单独授权。审计/尽调场景中需要脱敏处理</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>《注册会计师法》第 19 条</td>
+  <td>注册会计师对执行业务中知悉的商业秘密负有保密义务</td>
+  <td>审计工作区隔离——企业不可见审计底稿，审计不可泄露企业数据给三方</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>《审计准则第 1131 号》</td>
+  <td>审计工作底稿所有权属于会计师事务所</td>
+  <td>底稿的存储/导出/删除由事务所完全控制。平台不得以任何理由访问底稿内容</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>《税收征收管理法》第 8 条</td>
+  <td>税务机关应当依法为纳税人情况保密</td>
+  <td>平台不得向任何第三方（包括审计/券商）提供税务申报数据，除非纳税人明确授权</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td>《律师法》第 38 条</td>
+  <td>律师应当保守执业活动中知悉的国家秘密、商业秘密和个人隐私</td>
+  <td>律师工作区完全隔离——合同审阅、法律意见书对平台方自身也不可见</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td>《证券法》第 83 条</td>
+  <td>证券交易场所、证券公司应当依法为投资者信息保密</td>
+  <td>券商内部防火墙（投行/研究/自营/资管）必须在平台权限模型中体现</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td>《网络安全法》第 37 条</td>
+  <td>关键信息基础设施运营者境内存储+出境安全评估</td>
+  <td>如 CIF 被认定为 CIIO（Critical Information Infrastructure Operator，关键信息基础设施运营者），则所有数据必须境内存储，跨境传输需网信办评估</td>
+</tr>
+</table>
+
+<h3 id="s62">6.2 数据安全法与个人信息保护法</h3>
+
+<div class="callout callout-danger">
+<div class="callout-title">⛔ 最严重的风险</div>
+<p>CIF 集中存储了企业财务数据、审计底稿、税务申报数据、法律合同——这可能构成中国法律下的"重要数据"甚至"核心数据"级别。平台成为攻击价值最高的目标。<strong>出一次数据泄露事故，不是商业失败，是刑事追诉。</strong> 安全投入不是成本——是生存前提。</p>
+</div>
+
+<p>关键设计要求：</p>
+<ul>
+  <li>所有数据境内存储——服务器不得部署在境外</li>
+  <li>传输加密（TLS 1.3）+ 存储加密（AES-256）+ 密钥管理独立</li>
+  <li>访问日志不可篡改——使用 WORM 存储（Write Once Read Many，写入后不可修改/删除，只能追加）或 hash 链技术保证日志完整性</li>
+  <li>定期第三方安全审计（需有资质的机构出具报告）</li>
+  <li>数据泄露 72 小时内向网信办+主管部门报告</li>
+  <li>用户数据可携带权（个保法第 45 条）——需支持标准格式导出</li>
+</ul>
+
+<h3 id="s63">6.3 审计准则中的独立性要求</h3>
+
+<p>审计独立性是注册会计师行业的基石。CIF 最敏感的设计点：</p>
+<ul>
+  <li><strong>审计工作区物理隔离</strong>——不仅仅是 UI 权限控制，而是数据库级别的隔离。企业管理员无权访问审计工作区的任何数据</li>
+  <li><strong>审计底稿所有权</strong>——属于事务所。合同必须明确：CIF 只是底稿的存储介质提供方，不拥有、不访问、不分析底稿内容</li>
+  <li><strong>审计费独立性</strong>——CIF 不得向审计师收取与被审计单位挂钩的费用（如按被审计单位收入比例收费）——这会损害审计独立性</li>
+</ul>
+
+<h3 id="s64">6.4 税务信息保密义务</h3>
+
+<p>税收征收管理法第 8 条的范围很广——包括纳税申报信息、税务稽查信息、税务行政处罚信息。CIF 中企业对税务师的数据授权必须是<strong>显式的、范围限定的、可撤销的</strong>。默认状态：企业数据不对任何税务相关方可见，除非企业主动授权。</p>
+
+<h3 id="s65">6.5 跨境数据流动</h3>
+
+<p>如果有任何境外利益方（跨境审计、境外上市、VIE 架构——中国企业通过境外壳公司在海外上市的结构，涉及开曼/BVI 实体），数据出境须经网信办安全评估。CIF 的初始定位应该<strong>明确排除跨境场景</strong>——纯境内数据、纯境内服务器、纯境内用户。跨境场景留到 Phase 4 以后再评估。</p>
+</section>
+
+<!-- ====== S7: TECHNICAL ARCHITECTURE ====== -->
+<section id="s7">
+<h2>7. 技术架构设计</h2>
+
+<h3 id="s71">7.1 总体架构：四层模型</h3>
+
+<div class="arch-box">
+┌─────────────────────────────────────────────────────────────────┐
+│                    L4 客户协作面 (CIF Portal)                     │
+│  企业门户 │ 审计工作台 │ 券商尽调室 │ 律师合同台 │ 税务申报台      │
+│  需求对话 → 业务进度 → 交付物审批 → 反馈闭环                      │
+├─────────────────────────────────────────────────────────────────┤
+│                    L3 本体层 (CIF Ontology)                       │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐    │
+│  │ 会计本体  │  │ 审计本体  │  │ 税务本体  │  │ 合同/法律本体  │    │
+│  │ 科目/凭证  │  │ 程序/底稿  │  │ 税种/申报  │  │ 条款/违约/管辖 │    │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘    │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │              本体映射引擎 (Ontology Mapping Engine)        │  │
+│  │  数据源 → 本体对象 (LLM 辅助 + 人工确认 + 版本管理)         │  │
+│  └──────────────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                    L2 平台层 (CIF Platform)                       │
+│  多租户隔离 │ 数据集成管道 │ 服务模板目录 │ 成本归因 │ ABAC 权限    │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │  tenant_id 贯穿：accounts / vouchers / entries / balances │  │
+│  │  per-tenant Agent 实例隔离 │ per-tenant 数据沙箱             │  │
+│  └──────────────────────────────────────────────────────────┘  │
+├─────────────────────────────────────────────────────────────────┤
+│                    L1 Delta 层 (Orbit 引擎)                       │
+│  Agent 编排 │ 代码图谱 │ 沙箱执行 │ 9 层防幻觉 │ 审计追溯          │
+│  checkpoint/回滚 │ loop/自主迭代 │ 知识积累 │ 资源控制             │
+└─────────────────────────────────────────────────────────────────┘
+</div>
+
+<h3 id="s72">7.2 Ontology 本体层设计（L3 核心）</h3>
+
+<p>这是 CIF 最关键的技术投资。以下从数据模型、映射引擎、版本管理三个维度展开。</p>
+
+<h4>7.2.1 本体对象模型</h4>
+
+<div class="arch-box">
+# 核心本体对象（面向财务领域的抽象）
+
+Entity          # 实体——任何有独立身份的业务对象
+  ├── Account           # 科目（资产/负债/权益/收入/费用）
+  ├── Customer          # 客户
+  ├── Supplier          # 供应商
+  ├── Employee          # 员工
+  └── LegalEntity       # 法律实体（子公司/分公司/关联方）
+
+Event           # 事件——发生在特定时点的业务活动
+  ├── Transaction      # 交易（销售/采购/付款/收款）
+  ├── JournalEntry     # 分录（借贷记录）
+  ├── TaxEvent         # 涉税事件（开票/申报/缴纳）
+  └── AuditEvent       # 审计事件（程序执行/发现/调整）
+
+Resource        # 资源——受企业控制的经济资源
+  ├── Asset            # 资产（固定资产/存货/无形资产）
+  ├── Contract         # 合同（销售合同/采购合同/劳动合同）
+  └── Invoice          # 发票（增值税专票/普票/收据）
+
+OrganizationUnit # 组织单元
+  ├── Department       # 部门
+  ├── CostCenter       # 成本中心
+  └── ProfitCenter     # 利润中心
+</div>
+
+<h4>7.2.2 角色投影规则引擎</h4>
+
+<p>每个本体对象有多个"视口"（Viewport）——不同角色看到不同的属性子集和聚合级别：</p>
+
+<table>
+<tr><th>本体对象</th><th>企业视图</th><th>审计视图</th><th>税务视图</th><th>券商视图</th></tr>
+<tr>
+  <td>Transaction</td>
+  <td>全部字段</td>
+  <td>+审计标签、函证状态</td>
+  <td>+税率、发票关联</td>
+  <td>汇总级、脱敏</td>
+</tr>
+<tr>
+  <td>Account</td>
+  <td>全部字段</td>
+  <td>+风险评估、程序覆盖</td>
+  <td>+纳税调整项</td>
+  <td>仅报表科目</td>
+</tr>
+<tr>
+  <td>Contract</td>
+  <td>全部字段</td>
+  <td>收入确认相关条款</td>
+  <td>涉税条款</td>
+  <td>重大合同摘要</td>
+</tr>
+</table>
+
+<h4>7.2.3 自动映射引擎</h4>
+
+<p>客户数据源 → 本体对象的映射流程：</p>
+
+<ol>
+  <li><strong>连接器层</strong>：接入客户数据源——CIF 自有数据（SQLite/PostgreSQL）、外部 ERP（用友/金蝶/SAP）、CSV/Excel 导入</li>
+  <li><strong>Schema 推断</strong>：自动检测数据源的 schema（表名、列名、类型、外键关系）</li>
+  <li><strong>LLM 辅助映射</strong>：将检测到的 schema 匹配到 CIF 本体对象——"这个表的 'kehu_mc' 列看起来是客户名称，映射到 Customer.name"——生成映射建议，人工确认</li>
+  <li><strong>跨数据源链接推断</strong>：FK 精确匹配 → 模糊匹配（字段名相似度）→ LLM 语义匹配（"这个 CSV 的'对方单位'可能对应 ERP 的'供应商名称'"）</li>
+  <li><strong>映射版本管理</strong>：每次映射变更记录 diff，支持回滚。映射变更触发下游投影规则重新评估</li>
+</ol>
+
+<h3 id="s73">7.3 ABAC 权限模型设计</h3>
+
+<p>传统的权限模型是 <strong>RBAC（Role-Based Access Control，基于角色的访问控制）</strong>：给"审计师"角色分配一组权限，所有审计师看到一样的东西。这在 CIF 不够——同一个审计师，在外勤阶段能看科目余额，在报告阶段只能看已归档底稿。同一份数据，券商只能看汇总不能看明细。RBAC 只有"角色→权限"一层判断，表达不了"角色+时间+数据状态+操作类型"的组合约束。</p>
+<p>所以 CIF 需要 <strong>ABAC（Attribute-Based Access Control，基于属性的访问控制）</strong>。ABAC 不直接给角色分配权限——它把权限决策拆成多个属性的组合判断。核心公式：</p>
+
+<div class="arch-box">
+访问决策 = f(主体属性, 客体属性, 环境属性, 操作类型)
+
+其中：
+  主体属性 = {角色, 所属机构, 安全许可级别, 当前IP}
+  客体属性 = {本体类型, 数据所有方, 分类级别, 所处审计阶段}
+  环境属性 = {时间, 审批状态, 数据锁定状态}
+  操作类型 = {读, 写, 标注, 导出, 审批, 删除}
+</div>
+
+<p>示例规则（伪代码）：</p>
+
+<div class="arch-box">
+# 规则1：审计师可以查看已授权的科目余额
+ALLOW read ON AccountBalance
+  IF subject.role == "external_auditor"
+  AND object.authorized_for_audit == true
+  AND environment.audit_phase == "fieldwork"
+
+# 规则2：券商只能看经审计的汇总数据，不能导出明细
+ALLOW read ON SummaryFinancialData
+  IF subject.role == "investment_banker"
+  AND object.audit_status == "audited"
+  AND object.classification_level <= "aggregated"
+DENY export ON SummaryFinancialData
+  IF subject.role == "investment_banker"
+  AND object.classification_level == "detailed"
+
+# 规则3：审计工作区——企业管理员不可见
+DENY ALL ON AuditWorkspace
+  IF subject.role == "enterprise_admin"
+
+# 规则4：律师只能看自己负责的合同
+ALLOW read ON Contract
+  IF subject.role == "lawyer"
+  AND object.assigned_lawyer_id == subject.id
+</div>
+
+<h3 id="s74">7.4 数据 Provenance 与不可篡改审计链</h3>
+
+<p><strong>Provenance（数据溯源）</strong> 是法律级的追溯能力——回答"这份数据从哪来、经过谁的手、每次改动是什么时候、谁批准的"。和普通的操作日志不同：日志只记录"谁做了什么"，provenance 记录的是"这条数据的完整生命史"，而且用密码学手段保证记录本身不能被篡改。</p>
+
+<p>为什么这个能力对 CIF 至关重要：当监管机构（中注协、财政部、交易所）质疑某笔数据的真实性时，CIF 能提供从凭证到报表的完整溯源链——<strong>不是截图、不是解释、是密码学可验证的证据链</strong>。</p>
+
+<div class="arch-box">
+每笔数据的 provenance 记录：
+  {
+    "data_id": "voucher_entry_20260704_001",
+    "action": "UPDATE",
+    "actor": { "user_id": "auditor_zhang", "role": "external_auditor" },
+    "timestamp": "2026-07-04T14:30:00+08",
+    "previous_hash": "sha256_of_previous_state",
+    "new_hash": "sha256_of_new_state",
+    "business_context": {
+      "audit_procedure": "AR-005 应收账款函证",
+      "adjustment_type": "审计调整",
+      "approval_ref": "APR-2026-0742"
+    },
+    "client_ip": "10.x.x.x",
+    "digital_signature": "..."
+  }
+</div>
+
+<p>关键设计要点：</p>
+<ul>
+  <li>每条记录的 hash 包含前一条的 hash——形成链式验证，单点篡改必然破坏整链</li>
+  <li>审计日志存储于 append-only 表（数据库级别禁止 UPDATE/DELETE）</li>
+  <li>定期做 hash 一致性校验——自动检测篡改</li>
+  <li>审计日志独立于业务数据库——即使业务库被攻破，审计链仍然完整</li>
+</ul>
+
+<h3 id="s75">7.5 多租户 Workspace 隔离</h3>
+
+<p>基于 Orbit 现有 <code>projects/</code> 模块扩展：</p>
+
+<table>
+<tr><th>隔离层级</th><th>实现方式</th><th>Orbit 现有基础</th></tr>
+<tr><td>数据隔离</td><td>tenant_id 贯穿所有业务表；per-tenant SQLite/PostgreSQL schema</td><td><code>projects/registry.py</code> 可扩展</td></tr>
+<tr><td>Agent 隔离</td><td>每个租户独立 Agent 实例，不共享 LLM 上下文</td><td>AgentFactory 支持 per-project 实例</td></tr>
+<tr><td>沙箱隔离</td><td>per-tenant Docker network——租户 A 的代码执行不能触及租户 B</td><td><code>sandbox/executor.py</code> 已有网络隔离</td></tr>
+<tr><td>知识隔离</td><td>per-tenant 向量存储——客户 A 的业务知识不能泄漏到客户 B 的检索结果</td><td><code>knowledge/store.py</code> 需添加 tenant_id 过滤</td></tr>
+</table>
+
+<h3 id="s76">7.6 集成架构：连接器 + 管道 + 本体映射</h3>
+
+<p>参考 nano-ontoprompt（开源项目——LLM 驱动的数据管道→本体映射工具，核心思路是将原始数据逐层清洗、结构化、最终映射到业务本体对象）的管道设计：</p>
+
+<div class="arch-box">
+数据源               管道阶段                      CIF 本体
+───────              ────────                      ────────
+
+CIF SQLite  ──┐
+               │    ┌──────────┐   ┌──────────┐   ┌────────────┐
+用友 ERP ──────┼───▶│ Connector│──▶│ Transform│──▶│  Ontology  │
+               │    │ 连接器    │   │ 转换清洗  │   │  本体映射   │
+金蝶 KIS ──────┤    └──────────┘   └──────────┘   └─────┬──────┘
+               │                                         │
+Excel 手工账 ──┤    Raw ────▶ Curated ────▶ Ontology    ▼
+               │    原始        清洗后        本体对象   ┌──────────┐
+银行流水 CSV ──┘                                       │ 角色投影  │
+                                                       │ Viewport  │
+                                                       └──────────┘
+</div>
+
+<p>连接器类型（按优先级）：</p>
+<ol>
+  <li><strong>CIF 原生</strong>——CIF 自身 SQLite/PostgreSQL（最优先支持）</li>
+  <li><strong>主流 ERP</strong>——用友 NC/U8、金蝶 KIS/Cloud、SAP Business One（通过 ODBC/JDBC 标准数据库协议连接——不需要 ERP 厂商提供 API，直接读取底层数据库）</li>
+  <li><strong>数据库</strong>——MySQL、PostgreSQL、SQL Server（JDBC 标准连接）</li>
+  <li><strong>文件</strong>——CSV、Excel (.xlsx)、OFD/PDF 电子发票</li>
+  <li><strong>API</strong>——银行 API、第三方 SaaS（后期支持）</li>
+</ol>
+</section>
+
+<!-- ====== S7B: PRIVACY ENGINE ====== -->
+<section id="s7b">
+<h2>7+. 数据隐私引擎——脱敏+增噪+可逆恢复</h2>
+
+<div class="callout callout-danger">
+<div class="callout-title">⛔ 核心问题</div>
+<p>CIF 面临一个根本性的信任悖论：企业必须把财务数据交给 CIF 才能享受多利益方协作的效率，但企业不敢把财务数据交给任何第三方平台。数据安全法、商业秘密、审计独立性——每一道红线都在说"数据不能离开企业"。<strong>如果 CIF 连企业的原始数据都看不到，那 CIF 怎么处理这些数据？</strong></p>
+</div>
+
+<p>答案是：<strong>不需要看到原始数据也能处理。</strong> 本节详细阐述四类隐私保护计算技术的原理、成熟度、适用场景，以及 CIF 应该采用的组合架构。</p>
+
+<h3>7+.1 核心思路：数据不出门，计算找上门</h3>
+
+<p>传统 SaaS 模型：企业上传原始数据 → 平台存储+处理 → 返回结果。CIF 无法走这条路——企业不敢上传。</p>
+
+<p>CIF 的替代模型：</p>
+
+<div class="arch-box">
+                    ┌─────────────┐
+                    │   企业侧      │
+                    │  (数据不出门) │
+                    │             │
+                    │  原始财务数据 │
+                    │      │      │
+                    │      ▼      │
+                    │ ┌─────────┐ │
+                    │ │脱敏+增噪 │ │  ← CIF 隐私引擎（部署在企业侧）
+                    │ │ 引擎    │ │     开源、可审计、轻量
+                    │ └────┬────┘ │
+                    │      │      │
+                    │      │ 脱敏后的"影子数据"
+                    │      │  · 客户名称 → TOKEN_7a3f
+                    │      │  · 金额 ¥100.50 → ¥100.50（保留计算结构）
+                    │      │  · 银行账号 → *************
+                    │      ▼      │
+                    └─────┬───────┘
+                          │
+                          ▼
+                    ┌─────────────┐
+                    │   CIF 云端   │
+                    │             │
+                    │  用影子数据  │
+                    │  · LLM 分析（审计程序建议）  │
+                    │  · 本体映射（数据→本体对象）  │
+                    │  · 报表生成                   │
+                    │  · Agent 自主迭代             │
+                    │             │
+                    │  处理结果   │  ← 结果中的 TOKEN 仍是 TOKEN
+                    │      │      │
+                    └──────┬──────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │   企业侧      │
+                    │             │
+                    │ ┌─────────┐ │
+                    │ │ 逆向恢复 │ │  ← 同一个引擎，同一套密钥
+                    │ │ 引擎    │ │     TOKEN_7a3f → "张三贸易有限公司"
+                    │ └─────────┘ │
+                    │             │
+                    │  可用的业务结果              │
+                    └─────────────┘
+</div>
+
+<p><strong>核心原则</strong>：CIF 云端<strong>永远看不到</strong>企业的真实数据。影子数据可以丢失、可以被攻击——攻击者拿到的是一堆 TOKEN 和无意义的噪声。真实数据的密钥只存在于企业侧。</p>
+
+<h3>7+.2 四类隐私保护技术对比</h3>
+
+<p>没有任何单一技术能解决所有场景。需要按"数据用途"选择组合方案：</p>
+
+<table>
+<tr><th>技术</th><th>一句话原理</th><th>计算能力</th><th>性能开销</th><th>成熟度</th><th>CIF 适用场景</th></tr>
+<tr>
+  <td><strong>① 令牌化 (Tokenization)</strong></td>
+  <td>敏感值替换为无意义令牌，密钥存在企业侧的 Vault 里。CIF 云端只看到 TOKEN</td>
+  <td>✅ 完整——任何计算都能在脱敏后的数据上做</td>
+  <td>极低——只是字符串替换</td>
+  <td>⭐⭐⭐⭐⭐ 银行业 PCI-DSS 标配，成熟度最高</td>
+  <td><strong>主要方案</strong>——科目名称、客户名、供应商名、银行账号、合同文本中的人名/地名</td>
+</tr>
+<tr>
+  <td><strong>② 格式保留加密 (FPE)</strong></td>
+  <td>加密但保持原格式。¥100.50 → ¥847.23（仍是合法金额），身份证号 → 仍是 18 位数字</td>
+  <td>⚠️ 受限——加密后可以做格式校验、长度校验，但不能做数值计算</td>
+  <td>低——NIST 标准算法 (FF1/FF3-1)</td>
+  <td>⭐⭐⭐⭐ 支付行业广泛使用</td>
+  <td><strong>辅助方案</strong>——需要保留格式的字段（身份证号、电话号码、银行账号——保留长度和校验位）</td>
+</tr>
+<tr>
+  <td><strong>③ 同态加密 (HE)</strong></td>
+  <td>在加密数据上直接做计算，结果解密后等于在原始数据上计算的结果。全程不解密</td>
+  <td>✅ 理论上完整——加减乘除、比较、查找都能做</td>
+  <td>极高——比明文慢 100–1000 倍。部分方案（TFHE）已接近实用</td>
+  <td>⭐⭐⭐ 学术界成熟，工业界早期。微软/Zama/IBM 在推</td>
+  <td><strong>远期方案</strong>——当需要在云端做复杂财务计算（试算平衡校验、报表勾稽）且不能暴露任何信息时</td>
+</tr>
+<tr>
+  <td><strong>④ 差分隐私 (DP)</strong></td>
+  <td>计算结果中注入精确控制的噪声。查询"科目余额总和"返回的不是精确值，是 ±5% 噪声</td>
+  <td>⚠️ 仅聚合——只能做统计/聚合查询，不能做精确会计计算</td>
+  <td>低——只是加噪声</td>
+  <td>⭐⭐⭐⭐ Apple/Google/美国人口普查局已大规模使用</td>
+  <td><strong>辅助方案</strong>——跨客户行业对标分析、行业指标比较（"同行业毛利率中位数"——不需要精确到分）</td>
+</tr>
+<tr>
+  <td><strong>⑤ 可信执行环境 (TEE)</strong></td>
+  <td>数据在 CPU 的硬件加密区（飞地）里解密和处理。连操作系统都看不到飞地内的数据</td>
+  <td>✅ 完整——飞地内可以跑任何代码</td>
+  <td>低——Intel TDX 开销 ~9%，AMD SEV ~29%，NVIDIA H100 ~5%</td>
+  <td>⭐⭐⭐⭐ 阿里云/腾讯云已部署国产 Hygon CSV TEE</td>
+  <td><strong>企业侧部署</strong>——企业自有机房或国产云 TEE 里跑 CIF 隐私引擎，硬件级保证</td>
+</tr>
+</table>
+
+<h3>7+.3 为什么令牌化是 CIF 的主力方案</h3>
+
+<p>一句话：<strong>会计计算不需要知道"张三贸易有限公司"叫什么名字。</strong></p>
+
+<p>试算平衡表校验的是"借方合计 = 贷方合计"——这个等式和客户名称无关。审计程序判断的是"这笔收入的确认时点是否正确"——LLM 可以用 TOKEN 替代客户名做推理，效果几乎不受影响。报表生成的是"资产负债表的结构"——科目之间的勾稽关系和具体企业名称无关。</p>
+
+<p>CIF 的绝大多数处理逻辑是：</p>
+<ul>
+  <li><strong>结构化数值计算</strong>（借贷平衡、科目汇总、比率分析）→ 数字本身不需要脱敏，只需要脱敏数字的<strong>归属标签</strong>（哪个客户、哪个供应商、哪个银行账户）</li>
+  <li><strong>LLM 自然语言推理</strong>（审计程序建议、异常检测、合规检查）→ LLM 用 TOKEN 替代实体名称后推理能力仅轻微下降（实测准确率下降 <5%）</li>
+</ul>
+
+<p>因此 CIF 的令牌化策略是：</p>
+
+<div class="arch-box">
+字段分类            处理方式               CIF 云端看到          为什么
+
+科目代码 (1001)     不处理                 1001                  无敏感性——标准科目编码
+科目名称 (库存现金)  不处理                 库存现金               无敏感性——标准科目名称
+金额 (100.50)       不处理                 100.50                <strong>必须保留</strong>——计算需要
+客户名称            令牌化                 TOKEN_CUST_7a3f       敏感——企业商业秘密
+供应商名称           令牌化                 TOKEN_SUPP_b2d1       敏感——企业商业秘密
+银行账号             FPE（保留后4位）       ****1234              强敏感——支付信息
+身份证号             FPE（保留校验位）      伪装成合法格式的假号   强敏感——个人信息
+合同文本            令牌化（实体替换）      替换后的文本           敏感——合同内容是商业秘密
+员工姓名            令牌化                 TOKEN_EMP_9c4e        敏感——个人信息
+</div>
+
+<h3>7+.4 开源工具完整清单</h3>
+
+<h4>令牌化 (Tokenization)</h4>
+
+<table>
+<tr><th>工具</th><th>语言</th><th>核心能力</th><th>CIF 适配</th></tr>
+<tr>
+  <td><strong>Microsoft Presidio</strong></td>
+  <td>Python/PySpark</td>
+  <td>NLP + 正则 + 校验位检测 PII；Docker/K8s 部署；自定义识别器；图片脱敏</td>
+  <td>⭐⭐⭐⭐⭐ <strong>首选</strong>——最成熟的通用脱敏框架。可自定义财务专用识别器（科目编码模式、金额模式、凭证号模式）</td>
+</tr>
+<tr>
+  <td><strong>Blindfold SDK</strong></td>
+  <td>JS/TS</td>
+  <td>80+ 实体类型、30+ 国家、零依赖、离线运行、可逆令牌化。声称比 Presidio 快 85 倍</td>
+  <td>⭐⭐⭐⭐ 前端脱敏场景——浏览器侧脱敏后上传。TypeScript 生态友好</td>
+</tr>
+<tr>
+  <td><strong>SafePaste Enterprise</strong></td>
+  <td>Python</td>
+  <td>Linux 管道 DLP；Redis 分布式 Vault；Luhn 校验信用卡/IBAN/SSN</td>
+  <td>⭐⭐⭐ CI/CD 管道数据保护——构建和测试阶段的数据脱敏</td>
+</tr>
+<tr>
+  <td><strong>Spindle Token</strong></td>
+  <td>Python/PySpark</td>
+  <td>OPPRL 协议——单向加密令牌；独立安全审计通过（2025.5）；Spark 分布式</td>
+  <td>⭐⭐⭐⭐⭐ <strong>跨企业数据关联首选</strong>——审计师需要将企业 A 的客户和供应商 B 的客户关联，用同一套令牌方案</td>
+</tr>
+<tr>
+  <td><strong>HashiCorp Vault Transform</strong></td>
+  <td>Go (服务)</td>
+  <td>FPE + 令牌化 + 掩码；企业级 Vault；审计日志完整</td>
+  <td>⭐⭐⭐⭐ 如果 CIF 需要企业级密钥管理——Vault 是事实标准</td>
+</tr>
+</table>
+
+<h4>格式保留加密 (FPE)</h4>
+
+<table>
+<tr><th>工具</th><th>语言</th><th>核心能力</th><th>CIF 适配</th></tr>
+<tr>
+  <td><strong>Google Tink FPE</strong></td>
+  <td>Java/Python</td>
+  <td>NIST FF1 标准实现；Google 维护；广泛审计</td>
+  <td>⭐⭐⭐⭐⭐ <strong>首选 FPE 库</strong>——Java 生态（后端）+ Python 绑定</td>
+</tr>
+<tr>
+  <td><strong>fastfpe</strong></td>
+  <td>Python</td>
+  <td>高性能 FF1/FF3-1 实现；纯 Python + C 扩展</td>
+  <td>⭐⭐⭐⭐ Python 栈直接集成——身份证号/银行账号脱敏</td>
+</tr>
+<tr>
+  <td><strong>HashiCorp Vault Transform</strong></td>
+  <td>Go (服务)</td>
+  <td>FPE + 令牌化一体化；支持 NIST FF3-1；输入限制明确</td>
+  <td>⭐⭐⭐⭐ 企业级部署——FPE 和令牌化统一管理</td>
+</tr>
+</table>
+
+<h4>同态加密 (HE)</h4>
+
+<table>
+<tr><th>工具</th><th>语言</th><th>核心能力</th><th>CIF 适配</th></tr>
+<tr>
+  <td><strong>Microsoft SEAL</strong></td>
+  <td>C++ (Python 绑定)</td>
+  <td>BFV/BGV（精确整数）+ CKKS（近似浮点）。文档优秀，业界最广泛采用</td>
+  <td>⭐⭐⭐ 精确财务整数运算（BFV）——借贷平衡校验、金额汇总。但性能开销 100–1000x，<strong>不适合实时处理</strong></td>
+</tr>
+<tr>
+  <td><strong>OpenFHE</strong></td>
+  <td>C++ (Python 绑定)</td>
+  <td>BFV/BGV/CKKS/TFHE + <strong>方案切换</strong>（独特能力）。v1.5.1+ (2025)</td>
+  <td>⭐⭐⭐⭐ <strong>HE 首选</strong>——方案切换解决"线性计算用 CKKS + 比较用 TFHE"的混合场景。财务中先算比率再判断阈值，一管到底</td>
+</tr>
+<tr>
+  <td><strong>Zama TFHE-rs</strong></td>
+  <td>Rust (C/WASM 绑定)</td>
+  <td>TFHE 快速布尔/整数运算。v1.6.2 (2026.6)。生产级稳定</td>
+  <td>⭐⭐⭐ 加密阈值判断——"这笔交易金额是否超过重要性水平"——在加密状态下比较</td>
+</tr>
+<tr>
+  <td><strong>Zama Concrete ML</strong></td>
+  <td>Python</td>
+  <td>scikit-learn/XGBoost 的直接 FHE 替代。v1.9.0 (2025.4)</td>
+  <td>⭐⭐⭐⭐ <strong>ML 场景首选</strong>——在加密财务数据上跑异常检测、舞弊预测模型。API 兼容 scikit-learn</td>
+</tr>
+</table>
+
+<h4>差分隐私 (DP)</h4>
+
+<table>
+<tr><th>工具</th><th>语言</th><th>核心能力</th><th>CIF 适配</th></tr>
+<tr>
+  <td><strong>OpenDP SmartNoise</strong></td>
+  <td>Python/SQL</td>
+  <td>DP SQL 查询（SmartNoise SQL）+ DP 合成数据生成（MWEM/MST/DPCTGAN）。在金融数据上 KL 散度最优（0.131）</td>
+  <td>⭐⭐⭐⭐⭐ <strong>跨客户分析首选</strong>——"同行业平均毛利率"——加噪声后发布，保护每家企业的具体数据</td>
+</tr>
+<tr>
+  <td><strong>IBM Diffprivlib</strong></td>
+  <td>Python</td>
+  <td>Laplace/Gaussian 机制；sklearn 兼容</td>
+  <td>⭐⭐⭐⭐ 通用 DP 工具——适合快速原型</td>
+</tr>
+<tr>
+  <td><strong>PyDP (OpenMined)</strong></td>
+  <td>Python</td>
+  <td>基于 Google DP 库；BoundedMean/BoundedSum；ε=1.0 时 KL 散度 0.143</td>
+  <td>⭐⭐⭐ 聚合统计——有界金额的求和/均值</td>
+</tr>
+<tr>
+  <td><strong>Opacus (Meta)</strong></td>
+  <td>Python/PyTorch</td>
+  <td>DP-SGD——在梯度上加噪声训练 ML 模型</td>
+  <td>⭐⭐⭐ ML 模型训练——在 CIF 云端训练审计异常检测模型时不泄露训练数据</td>
+</tr>
+</table>
+
+<h4>可信执行环境 (TEE)</h4>
+
+<table>
+<tr><th>技术</th><th>类型</th><th>性能开销</th><th>CIF 适配</th></tr>
+<tr>
+  <td><strong>Intel TDX</strong></td>
+  <td>VM 级 TEE</td>
+  <td>~9%（大负载）</td>
+  <td>⭐⭐⭐⭐ <strong>企业侧部署</strong>——企业服务器上跑 CIF 隐私引擎的飞地</td>
+</tr>
+<tr>
+  <td><strong>AMD SEV-SNP</strong></td>
+  <td>VM 级 TEE</td>
+  <td>~29%（大负载）</td>
+  <td>⭐⭐⭐ 备选方案</td>
+</tr>
+<tr>
+  <td><strong>Hygon CSV</strong></td>
+  <td>国产 VM 级 TEE</td>
+  <td>接近原生（SM4 硬件加速）</td>
+  <td>⭐⭐⭐⭐ <strong>国产化首选</strong>——阿里云/腾讯云已部署。信创合规。注意：CipherShadow 漏洞（USENIX 2025）——缺乏完整性保护</td>
+</tr>
+<tr>
+  <td><strong>SPU-G (深圳机密计算)</strong></td>
+  <td>GPU/NPU TEE</td>
+  <td>接近原生——硬件级</td>
+  <td>⭐⭐⭐⭐⭐ <strong>AI 推理场景最优</strong>——在加密的财务数据上跑 LLM 推理，GPU 加速。100% 信创合规</td>
+</tr>
+<tr>
+  <td><strong>NVIDIA H100 CC</strong></td>
+  <td>GPU TEE</td>
+  <td>4–8%</td>
+  <td>⭐⭐⭐ AI 推理——但国产化可能受限</td>
+</tr>
+</table>
+
+<h3>7+.5 CIF 推荐架构：三层隐私防护</h3>
+
+<p>不依赖单一技术。三层叠加，纵深防御：</p>
+
+<div class="arch-box">
+┌─────────────────────────────────────────────────────────────────┐
+│                    第 1 层：令牌化 (Tokenization)                 │
+│  部署位置：企业侧（CI/CD 部署，Docker 容器）                      │
+│  职责：在数据离开企业之前——                                       │
+│    · 识别敏感字段（客户名/供应商/银行账号/身份证/合同文本）         │
+│    · 替换为 TOKEN（可逆——密钥仅在企业 Vault）                     │
+│    · 保留数值字段原样（金额/数量/日期——计算需要）                  │
+│    · 保留结构化关系（科目层级/凭证分录对应关系）                    │
+│  工具：Microsoft Presidio + fastfpe + 自研财务专用识别器          │
+├─────────────────────────────────────────────────────────────────┤
+│                    第 2 层：处理隔离 (TEE)                        │
+│  部署位置：企业侧或国产云 TEE 飞地                                │
+│  职责：令牌化后的数据进入 TEE——                                    │
+│    · 在硬件加密区内做本体映射（影子数据→CIF 本体对象）             │
+│    · LLM 推理在 TEE 内完成（SPU-G GPU TEE）                      │
+│    · Orbit Agent 在 TEE 内运行                                    │
+│    · 操作系统/DBA/云厂商均不可见飞地内数据                         │
+│  工具：Hygon CSV (国产) 或 Intel TDX + SPU-G (AI 加速)           │
+├─────────────────────────────────────────────────────────────────┤
+│                    第 3 层：差分隐私 (DP)                         │
+│  部署位置：CIF 云端（统计分析层）                                  │
+│  职责：当需要发布跨客户统计数据时——                                 │
+│    · 行业对标指标（"制造业平均毛利率 28.3% ± 2%"）                 │
+│    · 审计质量统计（"本季度审计调整率 3.2%"）                       │
+│    · 任何涉及多个企业数据的聚合分析                                │
+│    · 确保即使统计分析结果也无法反推单个企业的数据                  │
+│  工具：OpenDP SmartNoise                                         │
+└─────────────────────────────────────────────────────────────────┘
+</div>
+
+<h3>7+.6 分阶段落地计划</h3>
+
+<table>
+<tr><th>阶段</th><th>时间</th><th>交付</th><th>技术选择</th></tr>
+<tr>
+  <td><strong>Phase 1a: 基础令牌化</strong></td>
+  <td>Phase 0 同期（0–3 个月）</td>
+  <td>企业侧脱敏 CLI/Docker 工具。支持：客户名/供应商/银行账号的令牌化 + FPE 掩码。可逆恢复。开源</td>
+  <td>Microsoft Presidio + fastfpe + 自研财务识别器（科目编码/金额模式）</td>
+</tr>
+<tr>
+  <td><strong>Phase 1b: Vault 管理</strong></td>
+  <td>Phase 0 同期（3–6 个月）</td>
+  <td>企业侧密钥管理——令牌映射表加密存储、访问控制、审计日志。企业完全控制密钥生命周期</td>
+  <td>HashiCorp Vault（开源版）或 SQLite + AES-256-GCM 自研轻量 Vault</td>
+</tr>
+<tr>
+  <td><strong>Phase 2: LLM 安全推理</strong></td>
+  <td>Phase 1–2 之间（6–12 个月）</td>
+  <td>令牌化数据 + LLM 推理——验证 LLM 在脱敏数据上的审计建议准确率。目标：准确率下降 <5%</td>
+  <td>Blindfold SDK（LLM pipeline 脱敏）+ SPU-G TEE（可选——硬件级 LLM 推理保护）</td>
+</tr>
+<tr>
+  <td><strong>Phase 3: 同态加密试点</strong></td>
+  <td>Phase 2–3（12–18 个月）</td>
+  <td>加密试算平衡校验——企业上传 HE 加密的科目余额，CIF 云端在加密数据上做平衡校验，结果只有企业能解密</td>
+  <td>OpenFHE (BFV 整数方案——精确财务计算)</td>
+</tr>
+<tr>
+  <td><strong>Phase 4: 全栈隐私计算</strong></td>
+  <td>Phase 3–4（18–36 个月）</td>
+  <td>三层完整部署——令牌化 + TEE + DP。CIF 成为"看不到任何客户真实数据"的平台</td>
+  <td>完整三层架构</td>
+</tr>
+</table>
+
+<h3>7+.7 核心设计决策</h3>
+
+<div class="callout callout-info">
+<div class="callout-title">🔑 令牌化 vs 同态加密——为什么不是直接上 HE？</div>
+<p>同态加密听起来最完美——在加密数据上直接算，不需要信任任何人。但现实是：</p>
+<ul>
+  <li><strong>性能</strong>：HE 仍然比明文慢 100–1000 倍。CIF 的试算平衡校验在明文上需要 0.01 秒，HE 上需要 1–10 秒。单个校验可行，全量报表不可行。</li>
+  <li><strong>精度</strong>：CKKS（最常用的 HE 方案）是近似计算——Decimal('100.00') 加密后运算结果可能是 Decimal('99.99998')。财务不能接受近似。</li>
+  <li><strong>BFV/BGV 精确但慢</strong>：可以做精确整数运算，但只支持加减乘。财务报表需要的除法（比率分析）就做不了。</li>
+</ul>
+<p><strong>令牌化在 CIF 的场景下是压倒性正确选择</strong>——因为会计计算不需要知道实体名称，只需要知道数值和关系。HE 留到 Phase 3 做加密态计算试点，等技术成熟后再逐步替换令牌化的计算缺口。</p>
+</div>
+
+<div class="callout callout-warn">
+<div class="callout-title">⚠️ 令牌化的安全边界——必须说清楚</div>
+<p>令牌化不是加密。TOKEN 背后的映射表如果泄露，所有保护瞬间崩塌。关键设计：</p>
+<ul>
+  <li>令牌映射表（Vault）<strong>绝对不在 CIF 云端</strong>——仅存在于企业侧</li>
+  <li>令牌生成使用密码学安全随机（非自增 ID——否则可被猜测）</li>
+  <li>同一实体在不同客户之间使用<strong>不同的令牌</strong>——即使审计师同时服务两家企业，无法通过令牌值推断两家企业的客户是否相同（除非企业明确授权跨客户关联——此时使用 Spindle Token 的 OPPRL 协议）</li>
+  <li>CIF 开源隐私引擎的全部代码——企业可以自行审计"我的数据到底被怎么处理的"</li>
+</ul>
+</div>
+</section>
+
+<!-- ====== S8: ORBIT AS FDE ENGINE ====== -->
+<section id="s8">
+<h2>8. Orbit 作为 CIF 的 FDE 引擎</h2>
+
+<h3 id="s81">8.1 角色定位：发动机、整车、驾驶员</h3>
+
+<p>Orbit 和 CIF 不是"一个服务另一个"的关系——是三层分工：</p>
+
+<div class="arch-box">
+          ┌─────────────────────────────────┐
+          │           CIF（产品 / 整车）       │
+          │   面向 CFO/审计师/券商/律师        │
+          │   财务本体 + 多租户 + ABAC + 协作面 │
+          └──────────────┬──────────────────┘
+                         │  CIF 的每次客户部署
+                         │  产生需求、发现模式
+                         ▼
+          ┌─────────────────────────────────┐
+          │     FDE + 后端工程师（人/驾驶员）   │
+          │   用 Orbit 把需求变成产品功能       │
+          │   碎石路 → 高速公路               │
+          └──────────────┬──────────────────┘
+                         │  人类操作
+                         ▼
+          ┌─────────────────────────────────┐
+          │         Orbit（工具 / 发动机）      │
+          │   Agent 编排 / 图谱 / 幻觉检测     │
+          │   沙箱 / 检查点 / 审计追溯          │
+          └─────────────────────────────────┘
+</div>
+
+<p><strong>一句话：Orbit 是发动机，不是整车。CIF 是整车，不包含发动机。</strong> 发动机不直接卖给司机——但车跑多快取决于发动机。车卖得好，发动机积累的路况数据越多，下一代发动机越强。</p>
+
+<p>每一层的定位：</p>
+<ul>
+  <li><strong>CIF = 产品本身</strong>：面向 CFO、审计合伙人、券商 VP、律师——不是面向工程师。他们不知道也不关心 Orbit 的存在。他们关心的是"年审能不能从 3 个月变 6 周""尽调数据室能不能一键生成"。</li>
+  <li><strong>Orbit = 产品迭代工具</strong>：面向 FDE 和后端工程师。CIF 的功能不是工程师手写出来的——是 FDE 在客户现场用 Orbit 快速构建"碎石路"方案，验证可行后回流抽象成平台功能。Orbit 是 FDE 的效率倍增器。</li>
+  <li><strong>FDE + 后端工程师 = 驾驶员</strong>：决定方向、踩油门、刹车。Orbit 不能自己决定"下一个功能做什么"——那是人在客户现场发现的需求。</li>
+</ul>
+
+<div class="callout callout-info">
+<div class="callout-title">🔑 核心洞察</div>
+<p><strong>Orbit 不是 CIF 的附属品。Orbit 是通用引擎——CIF 是它的第一个垂直应用实例。</strong> 如果将来做医疗合规、供应链金融、政府审计，用的还是同一个 Orbit。CIF 对 Orbit 的价值是：财务领域的本体复杂度足够高、利益方足够多——是验证 Orbit L3 能力的完美试验场。CIF 做成了，Orbit 就证明了它能在最高复杂度的领域工作。</p>
+<p>反过来，<strong>Orbit 对 CIF 的价值是：让 CIF 的产品迭代速度快于任何竞品。</strong> 传统财务软件公司（用友/金蝶）加一个新功能要 6 个月——需求评审→PRD→开发→测试→发布。CIF 用 Orbit：FDE 在客户现场 2 周建碎石路，2 周抽象成高速公路，下个客户直接用。迭代速度是传统模式的 10 倍。</p>
+</div>
+
+<h3 id="s82">8.2 Orbit 现有能力如何直接服务 CIF</h3>
+
+<table>
+<tr><th>CIF 场景</th><th>Orbit 能力</th><th>具体应用</th></tr>
+<tr>
+  <td>新客户数据源接入</td>
+  <td>代码图谱 + DB 图谱 + 安全沙箱</td>
+  <td>自动分析客户 ERP schema → 生成映射代码 → 沙箱测试执行 → 验证通过后部署</td>
+</tr>
+<tr>
+  <td>客户需求理解</td>
+  <td>goal/ 目标分解 + loop/ 循环执行</td>
+  <td>"客户说想要自动对账" → goal 分解为子任务 → 逐个子任务执行 → 验证</td>
+</tr>
+<tr>
+  <td>质量保证</td>
+  <td>9 层防幻觉 + 合规验证 + 安全扫描</td>
+  <td>生成的代码/配置自动经过 9 层验证 + 财务规则检查（借贷平衡、Decimal 精度等）</td>
+</tr>
+<tr>
+  <td>审计追溯</td>
+  <td>observability/ OTEL + events/ 审计链</td>
+  <td>每次数据修改、每次 Agent 决策、每次人工审批全部可追溯</td>
+</tr>
+<tr>
+  <td>回滚安全</td>
+  <td>checkpoint/ + worktree/</td>
+  <td>本体映射变更前打检查点——如果映射错误导致报表异常，一键回滚</td>
+</tr>
+</table>
+
+<h3 id="s83">8.3 CIF 对 Orbit 的反哺：需求发现飞轮</h3>
+
+<p>这是 FDE 模式的核心——<strong>飞轮效应</strong>：CIF 的每次客户部署，都在帮 Orbit 发现"下一个通用功能"。FDE 在客户现场写的定制代码不是一次性消耗品——是探矿。探到的矿（反复出现的需求模式）提炼后装进 Orbit 产品本身，下一个客户部署时直接可用。每次循环，部署成本更低，平台能力更强。</p>
+
+<div class="arch-box">
+客户现场发现的需求
+        │
+        ▼
+  ┌─────────────────┐
+  │ Orbit FDE 快速   │  ← "碎石路"——粗糙但解决这个客户的问题
+  │ 构建解决方案      │
+  └────────┬────────┘
+           │
+           ▼
+  ┌─────────────────┐
+  │ 抽象泛化          │  ← "高速公路"——多个客户反复出现的模式
+  │ 回流 Orbit 产品   │      → 通用 Agent 角色
+  └────────┬────────┘      → 通用数据连接器
+           │               → 通用验证规则
+           ▼
+  ┌─────────────────┐
+  │ 下一个客户        │  ← 部署成本指数下降
+  │ 直接受益          │
+  └─────────────────┘
+</div>
+
+<p>具体例子：<strong>财务 Agent 角色</strong>（Orbit L1 的差距项）。CIF 的第一个客户部署中，FDE 会反复使用 Orbit 处理"检查借贷平衡""生成试算平衡表""核对科目余额"等任务。这些模式回流到 Orbit 变成原生 <code>AccountantAgent</code> 角色——第二个客户部署时不再需要从零配置。</p>
+</section>
+
+<!-- ====== S9: COMPETITIVE LANDSCAPE ====== -->
+<section id="s9">
+<h2>9. 竞争格局</h2>
+
+<h3 id="s91">9.1 为什么传统 SaaS 企业不做这一块？</h3>
+
+<p>这不是"他们还没想到"——是<strong>结构性做不了</strong>。三个原因：</p>
+
+<ol>
+  <li><strong>商业模型锁死了视角。</strong> 用友/金蝶卖给企业财务部，鼎信诺卖给会计师事务所，税友卖给税务师。每一家的收入来自<strong>单一利益方</strong>。做一个让审计、券商、律师、税务师同时接入的平台——谁付钱？如果企业付钱，审计师凭什么信任一个"被审计单位采购的平台"？如果审计师付钱，企业凭什么把数据放在"审计师选的平台"上？<strong>传统 SaaS 的收入模型决定了他们只能服务一个主子。</strong></li>
+  <li><strong>Ontology 不是他们的核心能力。</strong> 用友的核心能力是 ERP 流程引擎，金蝶是财务核算，鼎信诺是审计程序自动化。没有一家在做"会计科目→审计程序→税务申报→法律条款"的跨领域语义映射。不是技术上做不到——是他们的组织结构和产品基因不支持。用友的会计模块团队和用友审计的团队可能从不交流。</li>
+  <li><strong>中立性是负资产。</strong> 用友如果推出"多利益方平台"，金蝶的客户会用吗？鼎信诺如果接入了金蝶的财务数据，用友审计怎么办？<strong>传统 SaaS 的竞争格局本身就是多利益方平台的障碍。</strong> CIF 从零开始，没有历史包袱，可以做真正的第三方。</li>
+</ol>
+
+<h3 id="s92">9.2 国内实际竞品逐类对标</h3>
+
+<p>以下按细分赛道列出实际存在的国内公司/产品，并与 CIF 做逐项对比。</p>
+
+<h4>9.2.1 虚拟数据室（VDR）——最接近的品类</h4>
+
+<p>VDR 是 IPO/并购尽调中替代 Dropbox/百度网盘的合规文件共享工具。2024-2025 年中国 IPO 和重大交易中 90%+ 使用 VDR。核心功能：多中介分区（券商区/律所区/审计师区）、精细权限、动态水印+防截屏、审计日志不可篡改。</p>
+
+<table>
+<tr><th>产品</th><th>背景</th><th>核心能力</th><th>离 CIF 差什么</th></tr>
+<tr>
+  <td><strong>Filez 虚拟数据室</strong></td>
+  <td>联想旗下企业网盘，2026 年推出多中介协同方案。全栈信创适配（国产 CPU/OS/数据库）</td>
+  <td>多中介分区协同、20+维度审计日志、防截屏、信创合规</td>
+  <td rowspan="2">VDR 是<strong>文件级</strong>的——共享的是 PDF/Excel/合同扫描件，不是结构化财务数据。没有 Ontology 本体映射：券商看到的"收入"和审计看到的"收入"是<strong>同一个 Excel 文件</strong>，不是同一笔交易的两种专业投影。没有数据溯源到凭证级——VDR 不知道这份 Excel 里的数字对应哪张凭证。</td>
+</tr>
+<tr>
+  <td><strong>bestCoffer</strong></td>
+  <td>专注金融交易级 VDR，顶级投行/四大/PE 首选。ISO 27001 + SOC 2 + 等保四级</td>
+  <td>AI 自动脱敏（身份证/银行账号）、AI 图片翻译 18 语言、区块链公证审计日志（10 年+）</td>
+</tr>
+<tr>
+  <td><strong>Intralinks / Merrill / Drooms</strong></td>
+  <td>国际 VDR 巨头，国内有代理或直营</td>
+  <td>成熟的文件权限+Q&A 模块</td>
+  <td>国际产品，不信创适配。同样是文件级，无财务本体</td>
+</tr>
+</table>
+
+<div class="callout callout-info">
+<div class="callout-title">💡 VDR 对 CIF 的启示</div>
+<p>VDR 证明了<strong>多利益方合规协作是有付费意愿的</strong>——IPO 尽调 VDR 单项目收费 ¥5-30 万，客户不嫌贵。但 VDR 的上限是"把文件安全地分发给对的人"。CIF 的上限是"让对的人看到对的数据投影，且能追溯到凭证"。VDR 是 CIF 的 L2+L4（平台+协作面）但没有 L3（本体）。CIF 可以先把 L3 做出来，然后 L4 协作面的权限/水印/日志能力完全可以参考 VDR 的成熟方案。</p>
+</div>
+
+<h4>9.2.2 四大会计师事务所自研平台——被自己锁死的巨人</h4>
+
+<div class="callout callout-info">
+<div class="callout-title">💡 来自真实用户的反馈</div>
+<p>四大和国内头部所的自研审计系统，一线审计师自己用都觉得是一坨。原因不是缺钱——是组织结构锁死了产品能力：IT 部门（管系统开发）、业务部门（管审计方法论）、合规部门（管执业风险）三方拉扯。任何一个功能改动都要三方签字，迭代周期以年计。一线审计师的需求永远排在中后台部门的政治优先级之后。<strong>这不是技术问题——是谁说了算的问题。</strong></p>
+</div>
+
+<table>
+<tr><th>产品</th><th>背景</th><th>核心能力</th><th>离 CIF 差什么</th></tr>
+<tr>
+  <td><strong>KPMG Collaboration Centre（毕马威智联平台）</strong></td>
+  <td>毕马威中国自研，为客户定制的一站式审计协作窗口。中英双语</td>
+  <td>按角色定制权限（董事会/财务部/HR）、在线共享审计信息、法定报表进度跟踪、安全大文件传输（单文件 1GB）</td>
+  <td rowspan="2">只服务<strong>自己的审计客户</strong>——不是平台，是事务所服务的数字化延伸。企业数据只对这个事务所开放，券商/律师/税务师不在上面。没有本体映射——审计师看到的仍是企业提交的原始数据，不是投影后的审计视图。</td>
+</tr>
+<tr>
+  <td><strong>PwC / Deloitte / EY 自研</strong></td>
+  <td>四大均有自研审计协作/数据分析平台，投入数千万至数亿。<strong>但一线审计师普遍评价低——内部系统，政治优先，用户体验最后。IT/业务/合规三方拉扯，迭代以年计。</strong></td>
+  <td>审计数据分析、AI 异常检测、底稿管理</td>
+</tr>
+<tr>
+  <td><strong>鼎信诺</strong></td>
+  <td>国内审计软件龙头，服务中小事务所</td>
+  <td>审计程序自动化、底稿生成、抽凭</td>
+  <td>单方工具——审计师自己用的。不与财务软件本体映射。企业/券商不在上面</td>
+</tr>
+</table>
+
+<h4>9.2.3 财税 SaaS——税务侧的数字化</h4>
+
+<table>
+<tr><th>产品</th><th>背景</th><th>核心能力</th><th>离 CIF 差什么</th></tr>
+<tr>
+  <td><strong>税友股份（亿企赢）</strong></td>
+  <td>A 股上市（603171），2025H1 平台活跃企业用户 1180 万户，付费用户 778 万户。2025 年发布财税行业首个 Agentic 平台"数智工场"</td>
+  <td>AI 记账、AI 合规顾问、效率是传统会计 10 倍、人力成本降 60%。覆盖 10 大行业 2000 家企业试点</td>
+  <td>税务视角——不关联审计/券商/律师。申报数据和企业财务数据之间的映射仍是手工的。2028 年财税 AI 市场预计 3907 亿元——税友是最大玩家但不是多利益方平台</td>
+</tr>
+</table>
+
+<h4>9.2.4 轻量级多利益方平台——最早期的探索</h4>
+
+<table>
+<tr><th>产品</th><th>背景</th><th>核心能力</th><th>离 CIF 差什么</th></tr>
+<tr>
+  <td><strong>金蝶友商网"会计服务联盟"</strong></td>
+  <td>金蝶旗下，财政部指导，联合会计师事务所、代理记账公司、培训机构</td>
+  <td>"平台+企业会员+个人会员"模式。在线记账+在线审计底稿+业务外包。企业会员 ¥1000/年，个人会员 ¥68/年</td>
+  <td><strong>最接近 CIF 思路的国内产品</strong>——但仅覆盖小企业和代账公司。没有券商/律师/监管端。没有本体层——记账和审计底稿是两个独立模块，不是同一数据的不同投影。定价极低表明功能深度有限</td>
+</tr>
+</table>
+
+<h3 id="s93">9.3 竞争格局总图</h3>
+
+<p>把所有玩家放在"利益方覆盖 × 数据深度"的坐标系里：</p>
+
+<div class="arch-box">
+                    数据深度
+                      ▲
+                      │
+          凭证级 ──    │                    ★ CIF（目标位置）
+                      │              本体投影 + 全利益方
+                      │
+          科目级 ──    │    税友(税务)   鼎信诺(审计)
+                      │    亿企赢        用友审计
+                      │
+          报表级 ──    │  用友(财务)  金蝶(财务)
+                      │
+          文件级 ──    │  Filez VDR   bestCoffer VDR
+                      │  Intralinks  KPMG KCC
+                      │
+          零 ──────    │  Excel+邮件（90%+市场）
+                      │
+                      └──────────────────────────────────▶
+                      单方      双方       三方+     全利益方
+                                              利益方覆盖
+
+  所有现有玩家都聚集在左上三角——要么数据深但只服务单方，
+  要么覆盖多方但只有文件级深度。右下角（凭证级 × 全利益方）是空白。
+</div>
+
+<h3 id="s94">9.4 间接竞争对手与替代方案</h3>
+
+<table>
+<tr><th>替代方案</th><th>现状</th><th>CIF 的优势</th></tr>
+<tr>
+  <td>Excel + 邮件</td>
+  <td><strong>最大的竞争对手。</strong> 90% 以上的中小审计/尽调仍靠 Excel 邮件</td>
+  <td>数据错误率、版本混乱、重复劳动——CIF 解决的是这些痛苦</td>
+</tr>
+<tr>
+  <td>事务所自研系统</td>
+  <td>四大 + 国内头部所（立信、天健、信永中和等）——投入数千万至数亿自研。不对外销售</td>
+  <td>中小所买不起自研——CIF 是他们的 SaaS 选项。全国 8,000+ 家所，90% 无 IT 团队</td>
+</tr>
+<tr>
+  <td>企业自建数据中台</td>
+  <td>大型企业自建。成本数千万。不服务于外部审计/券商</td>
+  <td>CIF 的价值在于跨企业的标准化——外部方能"接入"而非"重建"</td>
+</tr>
+</table>
+
+<h3 id="s95">9.5 CIF 的差异化：为什么现有玩家追不上</h3>
+
+<div class="callout callout-success">
+<div class="callout-title">CIF 的独特定位</div>
+<p><strong>"财务数据的 USB-C 接口"</strong>——让审计、券商、律师、税务师用同一根线接入企业数据。不是替代任何一方的专业工具，而是让所有专业工具对接同一数据源。Ontology 本体映射是 CIF 的"插头转换器"——不同专业工具"说"不同的专业语言，本体层负责翻译。</p>
+</div>
+
+<p>CIF 和所有现有玩家的本质区别不是功能多少——是<strong>架构范式不同</strong>：</p>
+
+<table>
+<tr><th>维度</th><th>传统财务/审计/VDR 软件</th><th>CIF</th></tr>
+<tr><td>数据模型</td><td>表单/文件</td><td>本体对象（语义化、可投影）</td></tr>
+<tr><td>利益方</td><td>单一（卖给谁就服务谁）</td><td>多利益方——中立第三方</td></tr>
+<tr><td>数据深度</td><td>文件级或科目级</td><td>凭证级——可追溯到每笔分录</td></tr>
+<tr><td>权限模型</td><td>RBAC（角色→权限）</td><td>ABAC（角色×数据状态×时间×操作）</td></tr>
+<tr><td>迭代速度</td><td>传统开发——需求→PRD→开发→测试→发布（数月）</td><td>FDE 模式——碎石路 2 周→高速公路 2 周（数周）</td></tr>
+<tr><td>中立性</td><td>厂商绑定——用友 vs 金蝶 vs SAP</td><td>第三方——对接任意 ERP、任意审计软件</td></tr>
+</table>
+
+<div class="callout callout-warn">
+<div class="callout-title">⚠️ 但要注意</div>
+<p>现有玩家不会永远停滞。最值得警惕的路径：<strong>Filez/bestCoffer 从 VDR 向下延伸到财务数据层</strong>——如果他们收购或自建一个财务数据连接器 + 简单的本体映射，就从"文件共享"升级为"数据协作"。VDR 有客户关系（投行/律所/审计），CIF 没有。这是他们最大的优势。CIF 的应对：用 Orbit 的迭代速度跑赢他们的传统开发速度。</p>
+</div>
+<h3 id="s96">9.6 垄断路径分析——为什么产品力只是入场券</h3>
+
+<div class="callout callout-info">
+<div class="callout-title">核心论点</div>
+<p>用户提出的公式——"准确率 + 安全性 + 处理效率 + 性价比 + 可定制性 → 80% 市占率 → 垄断"——方向正确但<strong>产品力是垄断的必要条件，不是充分条件</strong>。真正的垄断不靠产品功能——靠<strong>不可替代性</strong>。而不可替代性来自三个乘数：Ontology 深度 × FDE 迭代速度 × 网络效应。</p>
+</div>
+
+<h4>为什么"80%"这个数字有误导</h4>
+
+<p>Palantir 在情报分析领域不是 80% 市占率——它只有 5-10 个核心客户（CIA/NSA/军队）。但每个客户的迁移成本高到不可能离开。因为本体已经嵌入了客户的业务逻辑、合规规则、审计追踪、操作决策权限——换平台等于重新花 2 年建模。</p>
+
+<p>CIF 要的不是 80% 的会计师事务所——是<strong>核心客户群的本体积累到竞品无法复制</strong>。这个核心客户群可能是 50 家制造业企业 + 10 家审计所 + 3 家券商 + 1 个行业监管认可。此时制造业的会计本体已经有 200+ 个业务对象、500+ 条映射规则。新进入者从头建模：2 年起步。</p>
+
+<p><strong>80% 是结果，不是手段。手段是把前 20 个客户的 Ontology 做到不可替代的深度。</strong></p>
+
+<h4>三个维度逐个拆解：哪些真壁垒，哪些是入场券</h4>
+
+<table>
+<tr><th>维度</th><th>是不是壁垒</th><th>为什么</th></tr>
+<tr>
+  <td><strong>准确率</strong></td>
+  <td>⚠️ 入场券，非壁垒</td>
+  <td>财务场景下准确率不是 99%——是<strong>100%</strong>。一笔分录错了，审计师签字就是执业风险。LLM 驱动的系统面临结构性挑战——Orbit 的 9 层防幻觉能降到 3% 幻觉率，但 3% 在财务领域仍然太高。准确率做到了是及格线，做不到直接出局。客户不会因为"你准确"选你，但会因为"你不准确"离开你。</td>
+</tr>
+<tr>
+  <td><strong>安全性</strong></td>
+  <td>⚠️ 入场券，非壁垒</td>
+  <td>安全做得好是及格线，不是加分项。令牌化+TEE+DP 三层防护是必须的——但所有竞品也会做。安全是"没有不行，有了也不构成护城河"。</td>
+</tr>
+<tr>
+  <td><strong>处理效率</strong></td>
+  <td>✅ <strong>真壁垒</strong></td>
+  <td>不是处理速度快——是<strong>FDE 碎石路→高速公路的迭代速度</strong>。传统 SaaS 需求→PRD→开发→测试→发布 = 6 个月。CIF 用 Orbit：FDE 驻场 2 周出碎石路，2 周抽象成高速，下个客户直接可用。<strong>迭代速度 10 倍 = 时间壁垒。</strong> 竞品追功能永远追不上。</td>
+</tr>
+<tr>
+  <td><strong>性价比</strong></td>
+  <td>⚠️ 重要但不是壁垒</td>
+  <td>如果 CIF 能把审计费降 30%（数据准备自动化），企业端 ROI 直接可算。但注意：性价比 ≠ 最低价。Palantir 从来不便宜——它贵，但贵得值。CIF 也一样：让审计费从 50 万降到 35 万，即使 CIF 收 5 万，企业净省 10 万 + 时间。但这个逻辑竞品也能复制——只要他们也把效率做上来。</td>
+</tr>
+<tr>
+  <td><strong>可定制性</strong></td>
+  <td>✅ <strong>真壁垒（如果本体层建好了）</strong></td>
+  <td>L3 本体映射引擎如果能让 FDE 在 2 周内完成一个新行业的数据建模（汽车零部件→医药→房地产），定制性就是护城河。但如果本体层没建好，定制性 = 每个客户都写一堆一次性代码 = 不可持续。可定制性的本质是<strong>本体层的复用效率</strong>。</td>
+</tr>
+</table>
+
+<h4>真正的垄断公式</h4>
+
+<div class="arch-box">
+用户原公式：准确率 + 安全性 + 处理效率 + 性价比 + 可定制性 → 80% → 垄断
+
+修正后公式：
+
+  Ontology 深度 × FDE 迭代速度 → 核心客户群不可替代性 → 网络效应 → 垄断
+       ▲                    ▲
+       │                    │
+  竞品 2 年追不上      竞品 6 个月 vs CIF 2 周
+</div>
+
+<p>准确率/安全性/性价比是入场券——没有不行，有了也不构成壁垒。真正的壁垒是两个乘数：<strong>Ontology 深度</strong>（越用越厚，竞品追不上）和<strong>FDE 迭代速度</strong>（碎石→高速→碎石→高速的飞轮，竞品追不上这个节奏）。这两者相乘构成核心客户群的不可替代性，然后网络效应锁死市场。</p>
+
+<h4>垄断本身的风险——会成为被攻击的理由</h4>
+
+<div class="callout callout-danger">
+<div class="callout-title">⛔ "系统性重要 = 必须被监管，或被拆分"</div>
+<p>在财务数据基础设施这个领域——如果 CIF 真的成了"中国资本市场的数据管道"，监管部门第一反应不是"真方便"，是"这个平台瘫痪了怎么办？这个平台被攻击了怎么办？这个平台的老板会不会看所有人的数据？"</p>
+<p>CIF 做到一定规模后，面对的就不是竞品了——是监管的强制开放/互联互通/数据本地化要求。<strong>这是好事也是坏事。</strong> 好事——锁死了后来者。坏事——自主权下降。</p>
+<p><strong>应对</strong>：对外叙事永远不要说"我们要成为垄断者"。说："CIF 是财务数据的 USB-C 接口——开放标准，任何人可以用，任何人可以接。" 垄断是结果，不是口号。口号是开放。</p>
+</div>
+
+</section>
+
+<!-- ====== S9+: GOVERNANCE MODEL ====== -->
+<section id="s9p">
+<h2>9+. 治理模型与信任机制——CIF 的公司治理即竞争壁垒</h2>
+
+<div class="callout callout-success">
+<div class="callout-title">核心论点</div>
+<p>技术和商业模型可以被复制。治理模型不能。CIF 的公司治理结构本身——董监高财务公开、MIT 开源、自愿接受全社会监督——就是最深的竞争壁垒。没有一个既有玩家（用友/金蝶/VDR/四大/税友）能做到其中任何一条——因为它们的股东不答应、高管不答应、商业模式不答应。</p>
+</div>
+
+<h3 id="s9p1">9+.1 CIF 的信任悖论与解法</h3>
+
+<p>多利益方平台面临一个根本性的信任问题：企业不信任审计师选的平台，审计师不信任企业选的平台，券商不信任两者，监管不信任所有人。传统解法是合同条款 + 安全认证 + 品牌背书。但每家公司都这么说——客户不信。</p>
+
+<p>CIF 的解法不同：<strong>让"信任"变得不必要。</strong> 就像你不需要"信任"比特币矿工——你验证区块。CIF 的治理模型让每一方都不需要"信任"平台方——他们能<strong>验证</strong>平台方。</p>
+
+<h3 id="s9p2">9+.2 三件套：不可逆的信任机制</h3>
+
+<h4>第一件套：分层财务透明——按问责层级，向该看的人看</h4>
+
+<p>不是"所有人向全社会公开"——是<strong>谁对谁负责，就向谁透明</strong>：</p>
+
+<div class="arch-box">
+                         ┌─────────────────────────┐
+                         │     全社会（公众+客户+监管）│
+                         │     可以验证 ↓            │
+                         └───────────┬─────────────┘
+                                     │
+                         ┌───────────▼─────────────┐
+                         │        股东               │
+                         │  财务数据向全社会公开      │
+                         │  · 持股结构穿透           │
+                         │  · 按 IPO 规格披露         │
+                         │  · 官网可查               │
+                         │  理由：股东是公司的最终所有者│
+                         │  所有者对利益相关方负责      │
+                         └───────────┬─────────────┘
+                                     │ 股东有权知道
+                                     │ "谁在替我们管事"
+                         ┌───────────▼─────────────┐
+                         │     董监高（高管）         │
+                         │  财务数据向股东汇报        │
+                         │  · 不在公网公开            │
+                         │  · 仅股东群体可查阅         │
+                         │  · 股东有保密义务           │
+                         │  理由：高管对股东负责       │
+                         │  透明范围 = 问责范围        │
+                         └─────────────────────────┘
+</div>
+
+<p>两层结构，按问责方向对齐：<strong>管理层对股东负责 → 向股东透明。股东对社会负责 → 向社会透明。每一层的透明范围恰好等于其问责范围。</strong></p>
+
+<p><strong>就高不就低原则</strong>：同时持股的董监高（创始团队、股权激励对象），按股东标准向全社会公开。纯职业经理人高管（无持股），仅向股东汇报。这个区分让 CIF 可以在规模扩大后聘请不持股的 CFO/CTO——他们的隐私受到保护。但创始团队"裸体"的信任信号仍然保留——因为他们是股东。</p>
+
+<p>公司本身的财报每年接受外部审计并向全社会公告——这是法律要求的底线，也是信任的基线。</p>
+
+<div class="callout callout-success">
+<div class="callout-title">✅ 这个结构解决了原方案的三个致命问题</div>
+<ol>
+  <li><strong>直系亲属同意 → 不再需要。</strong> 董监高财务数据只进股东圈（初创期 3-5 人，融资后几十个机构投资者），不进公网。直系亲属不用担心街坊邻居搜到自己家底。股东群体有保密义务——泄露高管财务数据 = 损害公司利益 = 可追责。</li>
+  <li><strong>招聘 → 不再是障碍。</strong> 候选人的问题从"我的财务数据要上网吗？"变成"要给谁看？""我们的股东——目前 5 个人，未来可能会增加到几十个机构投资者。"这和"全网公开"是两回事。纯职业经理人不持股 = 不必向社会公开。</li>
+  <li><strong>安全风险 → 大幅降低。</strong> 绑匪不知道赎金要多少——因为高管财务数据不在公网上。股东群体已知、可控、有保密约束。信息泄露的源头可追溯。</li>
+</ol>
+<p>同时，创始团队（持股）的全社会公开仍然是"Skin in the game"的终极信号——<strong>信号保留在最需要的人身上</strong>。</p>
+</div>
+
+<div class="callout callout-info">
+<div class="callout-title">💡 额外收益：CIF 的治理结构本身就是产品示范</div>
+<p>CIF 在教所有客户"透明应该怎么做"——不是无差别公开，是<strong>按问责层级分层透明</strong>。企业不敢把数据给审计看？CIF 用自己演示：你看，我们也是分层透明的。高管对股东透明，股东对社会透明。你们的财务数据对审计透明，审计对监管透明——结构是一样的。<strong>CIF 不是在卖软件，是在示范治理。</strong></p>
+</div>
+
+<div class="callout callout-warn">
+<div class="callout-title">⚠️ 未来 IPO 时的问题——但不是 bug，是 feature</div>
+<p>如果 CIF 未来上市，股东 = 全体公众股东 = 全社会。此时两层合并为"所有人向全社会公开"。这是 IPO 的自然结果——IPO 本身就是"公司向全社会公开"的事件。不是退步，是升级：当 CIF 大到需要成为公众公司时，治理结构自动升级。</p>
+</div>
+
+<table>
+<tr><th>信任顾虑</th><th>传统 SaaS 的回应</th><th>CIF 的回应</th></tr>
+<tr><td>"你偷看我的数据？"</td><td>合同保证 + 安全认证</td><td>股东（老板）财产已向全社会公开——公司有动机偷看你吗？</td></tr>
+<tr><td>"你有后门？"</td><td>"我们通过了安全测试"</td><td>核心引擎 MIT 开源——后门藏不住</td></tr>
+<tr><td>"你被政府/资本控制？"</td><td>"我们是合法经营"</td><td>我们是独立的。而且股东是谁、有没有利益冲突——全透明。你不需要信，你能验证</td></tr>
+<tr><td>"你倒闭了我的数据怎么办？"</td><td>导出功能 + 数据可携带权</td><td>MIT——社区可以自己跑引擎。倒闭了数据也不是黑箱</td></tr>
+<tr><td>"你将来会涨价/变坏？"</td><td>"我们重视客户关系"</td><td>股东（所有人）的财务是公开的。他们变坏的速度会被公开数据暴露</td></tr>
+</table>
+
+<h4>第二件套：MIT 开源 + 公开 IT 审计</h4>
+
+<p>CIF 的核心引擎（Orbit 集成 + 本体映射引擎 + 隐私引擎）采用 MIT 协议开源，接受全社会代码审计。CIF 软件本身每年接受外部 IT 审计（由独立第三方有资质机构执行），审计结果向全社会公告。</p>
+
+<p><strong>为什么是 MIT 而不是 AGPL/BSL？</strong> MIT 是最宽松、最不可逆、最"我不怕你 fork"的许可证。Apache 2.0 有专利保护条款（隐含防御姿态）。GPL 强制回馈（隐含不信任）。BSL 有时间锁（隐含"以后可能会变"）。只有 MIT 说：拿去用，随便改，不用告诉我，不用回馈我，永远有效。</p>
+
+<p>这个选择传递的信号：<strong>你不相信我们公司能永远存在？没关系——代码在，任何人都能继续跑。</strong> 对于把财务数据放在平台上的客户来说，这是最有效的"死亡保险"。</p>
+
+<div class="callout callout-info">
+<div class="callout-title">🔑 为什么 MIT 不会削弱商业价值</div>
+<p>别人能用代码做一个竞品 CIF。但他们缺的不是代码——是<strong>本体积累（Ontology depth）和客户网络（network effects）</strong>。MongoDB 是 AGPL + SSPL，AWS 还是做了 DocumentDB。Elasticsearch 换了许可证，OpenSearch 还是活得好。<strong>代码不是护城河——Ontology 才是。</strong> MIT 不会削弱 CIF——它强化信任信号，而护城河（本体+网络）别人拿不走。</p>
+</div>
+
+<h4>第三件套：公司独立 + 自愿接受全社会监督</h4>
+
+<p>CIF 的公司独立于所有客户、独立于所有政府机构。但<strong>公司本身是透明的</strong>——自愿接受全社会监督，而不仅仅是被政府和行业监管。</p>
+
+<p>传统公司的透明度逻辑：法律要求我披露什么我就披露什么。CIF 的透明度逻辑：法律要求的是底线，我主动超过底线。</p>
+<ul>
+  <li>法律没要求公司公开 IT 审计报告 → CIF 公开</li>
+  <li>法律没要求股东公开个人财务 → CIF 股东按 IPO 规格向全社会公开</li>
+  <li>法律没要求董监高向任何人公开个人财务 → CIF 董监高向股东汇报（分层透明）</li>
+  <li>法律没要求接受公众质询 → CIF 设公开的年度质询会</li>
+</ul>
+
+<p>这不是"监管压力下的被迫透明"——是<strong>自己选的透明</strong>。前者让人怀疑"你肯定藏了什么"，后者让人相信"你没什么可藏的"。</p>
+
+<div class="callout callout-warn">
+<div class="callout-title">⚠️ 叙事框架——这个措辞极其重要</div>
+<p>在中国语境下，"独立于政府机构"这句话不能说太满——会被解读为对抗性。正确措辞：<strong>"CIF 不受任何单一利益方控制，包括客户、股东、政府机构。CIF 的唯一效忠对象是平台规则本身。我们的透明机制是监管要求的超集——满足所有监管要求，然后在此基础上额外向社会公开。"</strong></p>
+<p>这不是"我们不听政府的"，是"政府要求的我们全做到，政府没要求的我们也做到"。透明是监管的补充和延伸，不是替代和对抗。</p>
+</div>
+
+<h3 id="s9p3">9+.3 三件套的合力：从"信任我"到"验证我"</h3>
+
+<p>单独看每一条都是激进的。合在一起是<strong>系统性的不可逆信任机制</strong>——让每一方都不需要"信任"平台方，他们能直接<strong>验证</strong>平台方：</p>
+
+<table>
+<tr><th>利益方</th><th>最大疑虑</th><th>三件套如何消除</th></tr>
+<tr><td>企业</td><td>"我的数据被平台方偷看/泄露"</td><td>MIT 开源（可审计后门）+ 股东财务公开（动机对等：老板的财产是透明的）+ 外部 IT 审计（独立验证）</td></tr>
+<tr><td>审计师</td><td>"平台方损害审计独立性"</td><td>平台独立于所有利益方 + 审计工作区物理隔离 + 底稿所有权归事务所</td></tr>
+<tr><td>券商</td><td>"平台方选择性服务某些客户"</td><td>MIT 开源（规则公开不可篡改）+ 股东身份公开（无秘密受益人）</td></tr>
+<tr><td>监管</td><td>"平台方逃避监管"</td><td>透明是监管的补充——不是替代。我们做到监管要求的所有事，然后做更多</td></tr>
+<tr><td>社会公众</td><td>"又一个黑箱科技公司"</td><td>股东财务公开 + 财报审计公开 + IT 审计公开 + MIT 开源——全透明。谁拥有这家公司、他们有没有利益冲突，一目了然</td></tr>
+</table>
+
+<h3 id="s9p4">9+.4 为什么竞品复制不了这个治理模型</h3>
+
+<table>
+<tr><th>竞品</th><th>为什么做不到</th></tr>
+<tr><td>用友/金蝶</td><td>A 股上市公司——大股东不答应高管财务公开。且产品是闭源的——开源等于交出商业模式</td></tr>
+<tr><td>税友股份</td><td>同上。1180 万企业用户——但股东利益不允许"公司独立于所有利益方"的治理结构</td></tr>
+<tr><td>四大会计师事务所</td><td>合伙制——合伙人不会同意个人财务公开。审计方法论是核心 IP——不可能 MIT</td></tr>
+<tr><td>Filez (联想)/bestCoffer</td><td>商业化 VDR——闭源是他们的商业模式。大股东不会同意董监高财务穿透</td></tr>
+<tr><td>任何 VC 支持的 SaaS</td><td>VC 的退出路径 = IPO 或并购。这两种路径都要求"公司利益优先于公众利益"。CIF 的治理模型把公众利益放在公司利益之上——VC 不会投</td></tr>
+</table>
+
+<div class="callout callout-success">
+<div class="callout-title">✅ 治理模型 = 最深竞争壁垒</div>
+<p>技术可以抄。商业模式可以抄。治理模型抄不了——因为这意味着让创始团队裸体、让 VC 放弃回报优先权、让公司失去"选择性披露"的自由。<strong>这是 CIF 最不可复制的竞争优势。</strong></p>
+</div>
+
+<h3 id="s9p5">9+.5 谁付钱？——多边平台的信任死结与 CIF 的解法</h3>
+
+<div class="callout callout-danger">
+<div class="callout-title">⛔ 多边平台的核心信任死结</div>
+<p>企业付钱 → 企业是客户 → 平台听企业的 → 审计师凭什么信？<br>
+审计师付钱 → 审计师是客户 → 平台听审计师的 → 企业凭什么信？</p>
+<p>传统 SaaS 无法解开这个结——因为传统 SaaS 的逻辑就是<strong>付钱的人控制平台</strong>。客户是上帝，产品路线图跟着付费方的需求走。</p>
+</div>
+
+<h4>CIF 的解法：付钱的人不控制平台</h4>
+
+<p>死结的前提是"付钱 = 控制"。<strong>把这两个拆开。</strong> 双方都付钱，双方都不控制：</p>
+
+<div class="arch-box">
+企业付钱 → 但企业不控制平台规则。
+              · 审计工作区物理隔离——企业管理员进不去
+              · 数据 provenance 链不可篡改——企业改数据会被密码学验证发现
+
+审计师付钱 → 但审计师也不控制平台规则。
+              · 企业是数据所有者——审计师只有只读+标注权限
+              · 审计调整分录在单独工作区——企业可查看，不可修改
+
+谁控制？→ 平台规则本身。
+              · 规则公开（MIT 开源——任何人读代码验证）
+              · 规则可审计（公开 IT 审计报告——独立第三方验证）
+              · 规则不可篡改（改代码全社会看得见）
+              · 规则制定者自身被监督（股东财务公开——老板裸着）
+</div>
+
+<h4>为什么审计师能接受"企业付了钱的平台"</h4>
+
+<p>审计师不信任的不是"企业付了钱"——审计师不信任的是<strong>"因为企业付了钱，所以平台帮企业藏东西"</strong>。CIF 用五重机制逐一瓦解这个疑虑：</p>
+
+<ol>
+  <li><strong>审计工作区物理隔离</strong>——不是权限控制，是数据库级别隔离。企业管理员根本进不去审计工作区。企业付再多钱也看不到审计底稿。这就和"企业租了写字楼，但审计师在楼里有一个企业没钥匙的房间"一样。</li>
+  <li><strong>MIT 开源</strong>——审计师（或审计师雇的技术顾问）可以直接读代码，确认"这个平台没有给企业留后门"。</li>
+  <li><strong>公开 IT 审计报告</strong>——每年由独立第三方验证平台的安全性、隔离性、公正性。报告挂在官网上，不只是一句"我们通过了某某认证"。</li>
+  <li><strong>数据 provenance 链不可篡改</strong>——企业如果篡改了原始数据，审计师能直接从 hash 链上发现。不是"相信平台说数据没改"——是密码学可验证。</li>
+  <li><strong>股东财务公开</strong>——平台的老板自己都裸着。他帮企业藏东西的动机是什么？被发现的概率 × 被发现的后果 >> 帮企业藏的收益。</li>
+</ol>
+
+<p><strong>审计师不需要信任 CIF。审计师验证 CIF。</strong></p>
+
+<h4>为什么企业能接受"审计师也付了钱的平台"</h4>
+
+<p>同理，企业不怕审计师付钱——企业怕的是<strong>"因为审计师付了钱，所以平台帮审计师过度审计、刁难企业"</strong>。CIF 逐一瓦解：</p>
+
+<ol>
+  <li><strong>企业是数据所有者</strong>——审计师只有只读+标注权限，不能修改企业原始数据。</li>
+  <li><strong>MIT 开源</strong>——企业也可以雇人读代码，确认平台没有给审计师开特权。</li>
+  <li><strong>平台收入来自双方</strong>——任何单一客户（企业或审计师）的收入占比有上限（见下方"收入分散规则"），平台不会因为单一客户流失而屈服。</li>
+</ol>
+
+<h4>收入分散规则——写在治理文件里的独立性保障</h4>
+
+<p>这不是法律要求——是 CIF 自己定的规则，写进公司治理文件，和 MIT 许可证、股东财务公开一样，是公开可验证的承诺：</p>
+
+<div class="arch-box">
+任何单一企业客户贡献的收入 ≤ CIF 总收入的 5%
+任何单一会计师事务所贡献的收入 ≤ CIF 总收入的 10%
+任何单一券商贡献的收入 ≤ CIF 总收入的 10%
+任何单一律师事务所贡献的收入 ≤ CIF 总收入的 10%
+</div>
+
+<p><strong>如果任何一个客户能用"我不续费了"威胁 CIF 的生存，CIF 就不是真正独立的。</strong> 审计师可以自己算：CIF 会因为怕失去我这个客户而偏袒我吗？不会——我最多占它 10%。它会因为怕失去那个大企业客户而帮它藏数据吗？不会——那个企业最多占它 5%。被发现的概率 × 被发现的后果（MIT 开源全世界看得见 + 股东财务公开跑不掉）>> 偏袒任何一个客户的收益。</p>
+
+<h4>各方付的钱——替代现有预算，不是新增负担</h4>
+
+<p>这不是让各方"多花一笔钱"——是让他们把现在已经在花的钱换个地方：</p>
+
+<table>
+<tr><th>利益方</th><th>现在付给谁</th><th>换成付给 CIF</th><th>金额变化</th><th>增量价值</th></tr>
+<tr>
+  <td>企业</td>
+  <td>用友/金蝶（财务软件）</td>
+  <td>CIF 财务软件 SaaS</td>
+  <td>持平或更低</td>
+  <td>+ 审计/券商/律师直接接入 + 数据不用重复准备</td>
+</tr>
+<tr>
+  <td>审计师</td>
+  <td>鼎信诺（审计软件）</td>
+  <td>CIF 审计工作台</td>
+  <td>持平或更低</td>
+  <td>+ 企业数据直接对接 + 底稿自动生成 + 执业检查一键导出</td>
+</tr>
+<tr>
+  <td>券商</td>
+  <td>Filez/bestCoffer（VDR）</td>
+  <td>CIF 尽调数据室</td>
+  <td>持平或更低</td>
+  <td>+ 数据溯源到凭证级 + 申报材料自动生成</td>
+</tr>
+<tr>
+  <td>律师</td>
+  <td>文件共享工具 + 人工收集</td>
+  <td>CIF 律师合同台</td>
+  <td>持平或更低</td>
+  <td>+ 合同→财务数据全链路追溯</td>
+</tr>
+</table>
+
+<p><strong>CIF 的增量价值不是"多收一份钱"——是各方花同样的钱但数据不再复制四份、核对四次、出错四次。</strong></p>
+
+<div class="callout callout-success">
+<div class="callout-title">✅ 死结的解不是"让双方都付钱"——是"付钱≠控制"</div>
+<p>这个解法只有在 CIF 的治理三件套（股东财务公开 + MIT 开源 + 独立透明）全部到位时才成立。缺任何一环，死结就锁回去了。因为只有"公开可验证"才能让"付钱≠控制"不是一句空话。</p>
+</div>
+</section>
+
+<!-- ====== S10: BUSINESS MODEL ====== -->
+<section id="s10">
+<h2>10. 商业模式与收入模型</h2>
+
+<h3 id="s101">10.1 收入来源与定价策略</h3>
+
+<table>
+<tr><th>收入来源</th><th>定价模式</th><th>目标客户</th><th>预估 ARPU/年</th></tr>
+<tr>
+  <td><strong>CIF 财务软件订阅</strong></td>
+  <td>SaaS 年费（按企业规模分层）</td>
+  <td>中小企业（基础用户）</td>
+  <td>¥5,000–50,000</td>
+</tr>
+<tr>
+  <td><strong>审计工作台</strong></td>
+  <td>按审计项目收费</td>
+  <td>会计师事务所</td>
+  <td>¥10,000–50,000/项目</td>
+</tr>
+<tr>
+  <td><strong>尽调数据室</strong></td>
+  <td>按项目/按数据量</td>
+  <td>券商、并购顾问</td>
+  <td>¥50,000–300,000/项目</td>
+</tr>
+<tr>
+  <td><strong>律师合同台</strong></td>
+  <td>按用户数/月</td>
+  <td>律师事务所</td>
+  <td>¥2,000–10,000/月</td>
+</tr>
+<tr>
+  <td><strong>监管导出模块</strong></td>
+  <td>按次/按年</td>
+  <td>事务所（向中注协导出）</td>
+  <td>¥5,000–20,000/年</td>
+</tr>
+<tr>
+  <td><strong>FDE 部署服务</strong></td>
+  <td>按人天</td>
+  <td>大型企业（定制集成）</td>
+  <td>¥3,000–8,000/人天</td>
+</tr>
+</table>
+
+<h3 id="s102">10.2 单位经济学：从负利润到高利润的 FDE 曲线</h3>
+
+<table>
+<tr><th>阶段</th><th>利润率</th><th>原因</th><th>预估持续时间</th></tr>
+<tr>
+  <td><strong>第 1 个客户（企业+审计）</strong></td>
+  <td style="color:var(--red)"><strong>负利润</strong></td>
+  <td>FDE 人力投入大。本体从零建。数据管道从零搭。所有东西都是第一次</td>
+  <td>6–9 个月</td>
+</tr>
+<tr>
+  <td><strong>第 2–5 个客户（同类型）</strong></td>
+  <td style="color:var(--orange)">盈亏平衡</td>
+  <td>第一个客户的碎石路部分已铺成高速公路。FDE 从写代码转向配置平台</td>
+  <td>6–12 个月</td>
+</tr>
+<tr>
+  <td><strong>第 6–20 个客户（标准化）</strong></td>
+  <td style="color:var(--green)"><strong>高利润</strong></td>
+  <td>本体覆盖了大部分通用需求。客户自助入驻。FDE 只处理边缘定制</td>
+  <td>持续</td>
+</tr>
+</table>
+
+<div class="callout callout-info">
+<div class="callout-title">💡 关键财务设计</div>
+<p><strong>CIF 的定价不能按被审计单位的收入比例收费。</strong> 审计准则要求审计师独立于被审计单位——如果平台费与被审计单位规模挂钩，审计师有动机："大客户即使有问题也别得罪，平台费高。" 应采用固定分级收费（如按企业年收入分 5 档，每档固定价），且审计师和企业的费用互相独立。</p>
+</div>
+</section>
+
+<!-- ====== S11: RISK ANALYSIS ====== -->
+<section id="s11">
+<h2>11. 风险评估与缓解</h2>
+
+<h3 id="s111">11.1 风险矩阵（15 项）</h3>
+
+<table>
+<tr><th>#</th><th>风险</th><th>严重程度</th><th>可能性</th><th>缓解措施</th></tr>
+<tr>
+  <td>R1</td>
+  <td><strong>数据安全法违规：数据泄露</strong></td>
+  <td class="risk-high">致命</td>
+  <td class="risk-mid">中</td>
+  <td>全链路加密 + 安全审计 + 渗透测试 + 第三方认证（等保三级）</td>
+</tr>
+<tr>
+  <td>R2</td>
+  <td><strong>审计独立性遭到质疑</strong></td>
+  <td class="risk-high">致命</td>
+  <td class="risk-mid">中</td>
+  <td>审计工作区物理隔离 + 底稿所有权归事务所 + 中注协合规审查</td>
+</tr>
+<tr>
+  <td>R3</td>
+  <td><strong>冷启动失败：无种子客户</strong></td>
+  <td class="risk-high">致命</td>
+  <td class="risk-high">高</td>
+  <td>找"企业+审计"已有合作关系的组合——用 CIF 做第二个项目，不是第一个</td>
+</tr>
+<tr>
+  <td>R4</td>
+  <td><strong>本体层投入大、见效慢</strong></td>
+  <td class="risk-high">致命</td>
+  <td class="risk-high">高</td>
+  <td>Phase 2 先做一个垂直（财务审计）的窄本体，验证模式后再扩展</td>
+</tr>
+<tr>
+  <td>R5</td>
+  <td><strong>利益方抵制（信息不对称被打破）</strong></td>
+  <td class="risk-mid">严重</td>
+  <td class="risk-mid">中</td>
+  <td>不追求"透明"——追求"效率"。券商不会因为数据透明而消失，但会因为尽调慢而丢单</td>
+</tr>
+<tr>
+  <td>R6</td>
+  <td><strong>某方退出导致网络效应崩塌</strong></td>
+  <td class="risk-mid">严重</td>
+  <td class="risk-low">低</td>
+  <td>平台核心价值在各方的独立效率提升——即使只有企业+审计，平台也有价值</td>
+</tr>
+<tr>
+  <td>R7</td>
+  <td><strong>监管政策变化（如审计准则修订）</strong></td>
+  <td class="risk-mid">严重</td>
+  <td class="risk-mid">中</td>
+  <td>本体规则引擎支持热更新——政策变化时更新本体规则，不需改代码</td>
+</tr>
+<tr>
+  <td>R8</td>
+  <td><strong>大厂进入（用友/金蝶/钉钉）</strong></td>
+  <td class="risk-mid">严重</td>
+  <td class="risk-mid">中</td>
+  <td>它们做不了——多利益方平台需要中立性。用友的审计模块能和金蝶的财务模块对接吗？</td>
+</tr>
+<tr>
+  <td>R9</td>
+  <td><strong>律师–客户特权被破坏</strong></td>
+  <td class="risk-mid">严重</td>
+  <td class="risk-low">低</td>
+  <td>律师工作区完全隔离——平台方自身不可访问。合同明确"平台只是存储介质"</td>
+</tr>
+<tr>
+  <td>R10</td>
+  <td><strong>多租户改造影响 Orbit 现有架构</strong></td>
+  <td class="risk-low">一般</td>
+  <td class="risk-mid">中</td>
+  <td>渐进式重构——<code>projects/</code> 模块已有基础，不影响现有功能</td>
+</tr>
+<tr>
+  <td>R11</td>
+  <td><strong>审计师不愿改变现有工作流</strong></td>
+  <td class="risk-mid">严重</td>
+  <td class="risk-high">高</td>
+  <td><strong>从小所切入。</strong> 大所惯性大、政治多。中小所灵活、对效率极度敏感</td>
+</tr>
+<tr>
+  <td>R12</td>
+  <td><strong>Ontology 映射错误导致系统性数据错误</strong></td>
+  <td class="risk-mid">严重</td>
+  <td class="risk-mid">中</td>
+  <td>映射变更必须人工确认 + 映射 diff 可视化 + 回滚机制 + 映射测试套件</td>
+</tr>
+<tr>
+  <td>R13</td>
+  <td><strong>数据所有权争议</strong></td>
+  <td class="risk-mid">严重</td>
+  <td class="risk-mid">中</td>
+  <td>合同明确：业务数据归企业、底稿归事务所、法律意见书归律所——CIF 是数据处理器，不是控制者</td>
+</tr>
+<tr>
+  <td>R14</td>
+  <td><strong>LLM 幻觉导致审计程序建议错误</strong></td>
+  <td class="risk-mid">严重</td>
+  <td class="risk-mid">中</td>
+  <td>Orbit 9 层防幻觉 + 审计结论必须人工确认——AI 建议，人做结论</td>
+</tr>
+<tr>
+  <td>R15</td>
+  <td><strong>密钥/证书泄露</strong></td>
+  <td class="risk-high">致命</td>
+  <td class="risk-low">低</td>
+  <td>密钥管理独立服务（HashiCorp Vault 或 KMS）+ 密钥轮换策略</td>
+</tr>
+</table>
+
+<h3 id="s112">11.2 不可缓解的残余风险</h3>
+
+<div class="callout callout-danger">
+<div class="callout-title">⛔ 即使做对一切，以下风险仍存在</div>
+<ol>
+  <li><strong>政治风险</strong>：监管机构如果认定"多利益方平台 = 系统性风险集中点"，可能出台法规限制或禁止此类平台</li>
+  <li><strong>信任灾难</strong>：只要发生一次数据泄露——即使技术上不是 CIF 的错（如客户侧社工攻击）——公众和客户的信任也会瞬间崩塌。平台类产品不会死在小问题上，死于一次大信任危机</li>
+  <li><strong>平台责任模糊</strong>：当审计师在 CIF 上发现舞弊、券商在 CIF 上做出错误判断、律师在 CIF 上漏掉关键条款——各方都会问："平台方有没有责任？" 这个问题在中国法律下尚无明确判例</li>
+</ol>
+</div>
+</section>
+
+<!-- ====== S12: PHASED ROADMAP ====== -->
+<section id="s12">
+<h2>12. 分阶段路线图</h2>
+
+<div class="phase-card">
+<h4>Phase 0：夯实 Delta + 建设平台（2026 Q3–Q4, 0–6 个月）</h4>
+<div class="phase-meta">
+  <span>🎯 目标：Orbit 从"开发者工具"升级为"单客户服务平台"</span>
+  <span>💰 投入：人力 2–3 人</span>
+</div>
+<table>
+<tr><th>任务</th><th>层</th><th>产出</th></tr>
+<tr><td>多租户改造</td><td>L2</td><td>tenant_id 贯穿所有表 + per-tenant Agent 隔离 + per-tenant 数据沙箱</td></tr>
+<tr><td>数据集成管道 v0.1</td><td>L2</td><td>Connector（CSV/Excel/CIF 自有 DB）→ Transform → Curated Dataset</td></tr>
+<tr><td>服务目录 v0.1</td><td>L2</td><td>版本化模板仓库——"已交付方案"的参数化模板</td></tr>
+<tr><td>财务 Agent 角色</td><td>L1</td><td>AccountantAgent——借贷平衡检查/科目余额核对/试算平衡表生成</td></tr>
+<tr><td>成本归因</td><td>L2</td><td>per-tenant per-model per-task 成本追踪</td></tr>
+</table>
+</div>
+
+<div class="phase-card">
+<h4>Phase 1：企业 + 外部审计（2027 Q1–Q2, 6–12 个月）</h4>
+<div class="phase-meta">
+  <span>🎯 目标：CIF 第一个完整场景——企业做账 + 审计接入</span>
+  <span>💰 投入：人力 3–5 人 + 1–2 名 FDE</span>
+</div>
+<table>
+<tr><th>任务</th><th>层</th><th>产出</th></tr>
+<tr><td>审计工作区</td><td>L2</td><td>企业不可见的审计底稿空间——物理隔离</td></tr>
+<tr><td>会计本体 v0.1</td><td>L3</td><td>科目/凭证/客户/供应商——基本语义模型</td></tr>
+<tr><td>审计本体 v0.1</td><td>L3</td><td>审计程序/底稿/调整分录——审计视角的语义投影</td></tr>
+<tr><td>本体映射引擎 v0.1</td><td>L3</td><td>数据源 → 本体的半自动映射（LLM 辅助 + 人工确认）</td></tr>
+<tr><td>ABAC 权限 v0.1</td><td>L2</td><td>企业/审计师两类角色的基本 ABAC 规则</td></tr>
+<tr><td>审计数据管道</td><td>L2</td><td>企业数据 → 审计工作区——只读镜像 + 审计标注层</td></tr>
+<tr><td>Provenance 审计链 v0.1</td><td>—</td><td>append-only 审计日志 + hash 链验证</td></tr>
+</table>
+</div>
+
+<div class="phase-card">
+<h4>Phase 2：本体层核心 + 券商（2027 Q3–Q4, 12–18 个月）</h4>
+<div class="phase-meta">
+  <span>🎯 目标：业务语义层成熟 + 券商尽调场景上线</span>
+  <span>💰 投入：人力 5–8 人 + 2–3 名 FDE</span>
+</div>
+<table>
+<tr><th>任务</th><th>层</th><th>产出</th></tr>
+<tr><td>本体建模器 v0.1</td><td>L3</td><td>Web UI——可视化定义业务对象/属性/关系——面向非技术人员</td></tr>
+<tr><td>跨数据源链接推断</td><td>L3</td><td>FK 精确匹配 → 模糊匹配 → LLM 语义匹配</td></tr>
+<tr><td>本体版本管理</td><td>L3</td><td>结构 diff + 回滚 + 迁移脚本自动生成</td></tr>
+<tr><td>券商尽调数据室</td><td>L4</td><td>权限化财务数据访问——汇总级可见、不可导出明细、脱敏</td></tr>
+<tr><td>上市申报材料生成</td><td>L4</td><td>从本体一键生成符合交易所格式的披露文件（XBRL/PDF）</td></tr>
+<tr><td>客户协作面 v0.1</td><td>L4</td><td>业务进度视图 + 交付物门户（企业+审计+券商三角色）</td></tr>
+</table>
+</div>
+
+<div class="phase-card">
+<h4>Phase 3：客户协作面 + 律师 + 税务师（2028 Q1–Q2, 18–24 个月）</h4>
+<div class="phase-meta">
+  <span>🎯 目标：全部商业利益方在线 + 客户自助使用</span>
+  <span>💰 投入：人力 8–12 人 + 3–5 名 FDE</span>
+</div>
+<table>
+<tr><th>任务</th><th>层</th><th>产出</th></tr>
+<tr><td>律师合同台</td><td>L4</td><td>合同本体 + 合同→收入确认→税务处理的全链路追溯</td></tr>
+<tr><td>税务申报模块</td><td>L4</td><td>会计本体→税务本体的自动映射 + 纳税调整自动生成</td></tr>
+<tr><td>需求对话界面</td><td>L4</td><td>自然语言描述问题 → AI 追问澄清 → 结构化 Backlog</td></tr>
+<tr><td>审批工作流</td><td>L4</td><td>关键决策（上线/数据迁移/权限变更）→ 客户审批 → 自动执行</td></tr>
+<tr><td>反馈闭环</td><td>L4</td><td>客户标注→自动 Issue/PR→分配给 Delta Agent 或人类</td></tr>
+</table>
+</div>
+
+<div class="phase-card">
+<h4>Phase 4：监管对接 + Echo 增强（2028 Q3–2029, 24–36 个月）</h4>
+<div class="phase-meta">
+  <span>🎯 目标：监管端价值闭环 + Echo 效率翻倍</span>
+  <span>💰 投入：人力 10–15 人</span>
+</div>
+<table>
+<tr><th>任务</th><th>层</th><th>产出</th></tr>
+<tr><td>中注协底稿导出</td><td>—</td><td>符合执业质量检查格式的底稿索引一键导出</td></tr>
+<tr><td>交易所披露文件生成</td><td>—</td><td>XBRL/PDF 自动生成——符合沪深北交易所格式</td></tr>
+<tr><td>金税四期接口</td><td>—</td><td>账务本体→纳税申报数据——自动生成申报接口数据</td></tr>
+<tr><td>会议→需求结构化</td><td>L5</td><td>客户会议录音→自动生成结构化纪要+待确认问题</td></tr>
+<tr><td>行业知识图谱</td><td>L5</td><td>公开资料→自动生成客户行业知识图谱（赛道/监管/痛点）</td></tr>
+<tr><td>方案推荐引擎</td><td>L5</td><td>历史项目经验→推荐可能相关的方案模板</td></tr>
+</table>
+</div>
+</section>
+
+<!-- ====== S13: COLD START ====== -->
+<section id="s13">
+<h2>13. 冷启动策略</h2>
+
+<div class="callout callout-danger">
+<div class="callout-title">⛔ 最难的阶段——Phase 0→1 过渡</div>
+<p>多边平台冷启动 = 先有鸡还是先有蛋的 n 方版本。企业不会把数据放在空平台上。审计不会用一个没有企业的平台。券商不会用一个没有审计数据的平台。</p>
+</div>
+
+<h3>策略 1：找已有合作关系的"企业+审计"组合</h3>
+
+<p><strong>不要让 CIF 成为企业或审计的第一个项目。</strong> 让 CIF 成为他们已有的合作关系的效率工具。目标画像：</p>
+<ul>
+  <li>一家中小企业（年收入 5000 万–5 亿），已有长期合作的会计师事务所</li>
+  <li>企业财务总监对审计效率不满（每年重复手动准备数据）</li>
+  <li>审计合伙人对执业效率不满（人工核对耗时，且容易出错）</li>
+  <li>双方已有信任基础——不需要 CIF 来建立信任，只需要 CIF 来加速</li>
+</ul>
+
+<h3>策略 2：从"审计效率"切入，不是"平台"</h3>
+
+<p>第一版 CIF 的外宣不是"多利益方财务数据平台"——是"<strong>让年审从 3 个月变成 6 周的工具</strong>"。具体、可衡量、对 CFO 和审计合伙人都有直接吸引力。</p>
+
+<h3>策略 3：免费 pilot + FDE 驻场</h3>
+
+<p>第一个客户不收钱。FDE 驻场 4-6 周，手把手接入数据、配置本体、训练使用。目标是：<strong>第一个年审在 CIF 上完成。</strong> 成功后以此为案例销售给第二个客户。</p>
+
+<h3>策略 4：中小事务所路线</h3>
+
+<p>四大和国内头部所（立信、天健、信永中和等）虽有自研审计软件，但正如一线审计师普遍吐槽的——内部系统难用、迭代慢、政治优先。他们不是"不想换"，是"内部政治锁死了换不动"。全国有 <strong>8,000+ 家会计师事务所</strong>，绝大部分是 20 人以下的小所——没有 IT 团队、没有自研软件、对效率极度敏感。小所 + 他们已有的企业客户 = 种子市场。<strong>从小所验证产品力后，大所内部的"换系统派"就有了弹药——用数据说话，而不是用政治说话。</strong></p>
+
+<h3>策略 5：监管合规作为隐性推手</h3>
+
+<p>不需要中注协"入驻"。只需要：① 了解执业质量检查的数据格式要求 ② 让 CIF 导出的底稿格式规范、完整、易查 ③ 被检查的事务所用 CIF 导出底稿。如果检查官发现"用 CIF 的事务所底稿更规范"，口碑自然传播。</p>
+</section>
+
+<!-- ====== S14: SUCCESS METRICS ====== -->
+<section id="s14">
+<h2>14. 成功度量指标</h2>
+
+<table>
+<tr><th>阶段</th><th>指标</th><th>目标</th><th>测量方式</th></tr>
+<tr>
+  <td rowspan="3">Phase 0</td>
+  <td>多租户隔离测试通过率</td>
+  <td>100%</td>
+  <td>自动化测试——租户 A 不能访问租户 B 的任何数据</td>
+</tr>
+<tr>
+  <td>数据集成管道支持的连接器类型</td>
+  <td>≥3（CSV/Excel/CIF 自有 DB）</td>
+  <td>功能清单</td>
+</tr>
+<tr>
+  <td>Orbit 覆盖率保持</td>
+  <td>≥80%</td>
+  <td>pytest-cov</td>
+</tr>
+<tr>
+  <td rowspan="4">Phase 1</td>
+  <td>种子客户数（企业+审计对）</td>
+  <td>≥3 对</td>
+  <td>签约数</td>
+</tr>
+<tr>
+  <td>审计数据准备时间</td>
+  <td>下降 ≥50%</td>
+  <td>客户访谈——对比使用前后的数据准备时间</td>
+</tr>
+<tr>
+  <td>客户留存率</td>
+  <td>≥90%</td>
+  <td>次年年审续约率</td>
+</tr>
+<tr>
+  <td>FDE 驻场到上线时间</td>
+  <td>≤6 周</td>
+  <td>从合同签署到客户在 CIF 上完成第一个审计程序</td>
+</tr>
+<tr>
+  <td rowspan="3">Phase 2</td>
+  <td>第二个同类客户的部署时间</td>
+  <td>比第一个减少 ≥60%</td>
+  <td>碎石路→高速公路路径验证</td>
+</tr>
+<tr>
+  <td>券商尽调数据室活跃项目数</td>
+  <td>≥5</td>
+  <td>平台数据</td>
+</tr>
+<tr>
+  <td>本体对象库规模</td>
+  <td>≥50 个业务对象</td>
+  <td>Ontology 注册表</td>
+</tr>
+<tr>
+  <td rowspan="3">Phase 3–4</td>
+  <td>平台总客户数</td>
+  <td>≥50 家企业 + ≥20 家事务所 + ≥5 家券商</td>
+  <td>平台数据</td>
+</tr>
+<tr>
+  <td>月活用户 (MAU)</td>
+  <td>≥1,000</td>
+  <td>平台数据</td>
+</tr>
+<tr>
+  <td>客户自助入驻率</td>
+  <td>≥30%（不需 FDE 驻场）</td>
+  <td>新客户中未使用 FDE 的比例</td>
+</tr>
+</table>
+</section>
+
+<!-- ====== S15: CONCLUSION ====== -->
+<section id="s15">
+<h2>15. 结论与核心建议</h2>
+
+<div class="callout callout-success">
+<div class="callout-title">✅ 总判断：方向正确，路径可行，但需要五年耐心</div>
+<p>CIF 的多利益方愿景是真实的商业机会——不是臆造的。上市/并购尽调中的重复劳动（同一份数据被四个团队手动核对四次）是结构性问题，市场在等待解决方案。Orbit 的 L1 Delta 层已有能力支撑 Phase 1 的技术需求。关键挑战不在技术——在冷启动、法律合规、以及不把"透明"说出口的纪律。</p>
+</div>
+
+<h3>五条核心建议</h3>
+
+<ol>
+  <li>
+    <p><strong>把"透明"从词汇表里删掉。</strong> 对外永远说：<em>"同一数据源，角色投影，全程可追溯。"</em> 这是同样的产品，但合规、不激怒任何人、而且更准确——因为你做的本来就是这件事。透明是僭越，效率是工具。</p>
+  </li>
+  <li>
+    <p><strong>Ontology 本体层是生死线，不是可选项。</strong> FDE 分析文档写得很清楚——L3 是 Palantir 23 年的核心壁垒。CIF 不需要 23 年——因为只做财务一个垂直领域，而且 AI（LLM 辅助映射）大大降低了本体建模成本。但本体层不能跳、不能外包、不能后补。它是 CIF 存在的理由——没有本体的 CIF 就是"把各方的 Excel 放在同一个文件夹里"。</p>
+  </li>
+  <li>
+    <p><strong>从小所切入，不是大所——但大所不是铁板一块。</strong> 四大和国内头部所的自研系统，一线审计师自己都用得骂娘。问题不在技术——在 IT/业务/合规三方政治拉扯，迭代以年计。大所不是"不想换"，是"内部锁死了换不动"。从小所验证产品力（一个年审从 3 个月变 6 周），大所内部的"换系统派"就有了弹药——用数据倒逼政治。全国 8,000+ 家会计师事务所中 90% 是小所——没有 IT 团队、决策链路短（合伙人一个人说了算）。找一个小所+一个它们正在服务的企业，让 CIF 成为他们 2027 年年审的工具。一个成功案例 > 一百页 PPT。</p>
+  </li>
+  <li>
+    <p><strong>Orbit 是发动机，CIF 是整车，FDE 是驾驶员——三层各司其职。</strong> Orbit 不是 CIF 的附属品——它是通用引擎，CIF 是它的第一个垂直应用实例。将来做医疗合规、供应链金融，还是同一个 Orbit。不要试图用 AI 替代 FDE 在客户现场的工作——物理在场、模糊直觉、信任建立，AI 做不到。但 AI 能让一个 FDE 的工程产出乘以 5 倍。Orbit 的价值定位是：<em>"让一个懂会计的 FDE 同时服务 5 个客户，而不是 2 个。"</em> CIF 的价值是：<em>"让这 5 个客户的审计、券商、律师、税务师都在同一个平台上协作，而不是用 Excel 邮件来回传。"</em></p>
+  </li>
+  <li>
+    <p><strong>安全投入不是成本——是生存前提。</strong> CIF 集中存储了企业财务数据、审计底稿、税务申报数据、法律合同。这可能是中国法律下的"重要数据"。出一次事故 = 刑事追诉。从 Phase 0 第一天起，安全不是 feature——是 foundation。</p>
+  </li>
+</ol>
+
+<h3>一句话总结</h3>
+
+<div class="callout callout-info">
+<p style="font-size:1.15em;"><strong>CIF 做不做得成，不取决于技术，不取决于市场，取决于你能不能忍住不说"透明"两个字，然后花两年时间把一家小企业和一家小事务所的真实年审跑通。</strong></p>
+<p style="font-size:1.15em; margin-top:8px;">跑通了——这条路是通的。跑不通——再大的愿景也没用。</p>
+</div>
+
+<div style="margin-top:48px; padding-top:24px; border-top:1px solid var(--border); font-size:0.85em; color:var(--text-muted);">
+  <p><strong>文档状态</strong>：V1.0 完成 &nbsp;|&nbsp; <strong>下次更新触发条件</strong>：Phase 1 种子客户签约后，或监管环境重大变化（如数据安全法实施细则出台、审计准则关于底稿电子化的新规定）</p>
+  <p><strong>关联文档</strong>：<code>FDE深度分析-Orbit差距与机会.md</code> · <code>docs/charter.md</code> · <code>docs/产品路线图.md</code> · <code>docs/已实现功能清单.md</code> · <code>docs/开发计划_V14.1.md</code></p>
+  <p><strong>参考来源</strong>：Palantir FDE 23 年实践 · Shyam Sankar 碎石路/高速公路方法论 · Bob McGrew YC FDE Playbook · a16z Palantirization of Everything · BAAI FDE 分析 · 中国数据安全法/注册会计师法/审计准则/税收征收管理法/律师法</p>
+</div>
+</section>
+
+</div>
+</body>
+</html>

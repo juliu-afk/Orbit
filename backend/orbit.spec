@@ -56,6 +56,20 @@ _INFRA_IMPORTS: list[str] = [
     # tiktoken 命名空间包（litellm 依赖，PyInstaller 不自动发现）
     "tiktoken_ext",
     "tiktoken_ext.openai_public",
+    # Phase A+B+C: 新包——auto-discover 跳过 __init__.py, PyInstaller 需显式声明
+    "orbit.metacognition",
+    "orbit.metacognition.monitor",
+    "orbit.metacognition.triggers",
+    "orbit.metacognition.classifier",
+    "orbit.metacognition.hitl",
+    "orbit.evolution",
+    "orbit.evolution.distill",
+    "orbit.evolution.anchor",
+    "orbit.agents.reflection",
+    "orbit.memory.episodic",
+    "orbit.memory.profile",
+    "orbit.observability.trajectory",
+    "orbit.hallucination.pipeline",
 ]
 
 _HIDDEN_IMPORTS = _INFRA_IMPORTS + _ORBIT_MODULES

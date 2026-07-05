@@ -69,5 +69,20 @@ async def dashboard_ws(websocket: WebSocket) -> None:
                 await manager.subscribe(websocket, task_id)
             elif msg_type == "unsubscribe" and task_id:
                 await manager.unsubscribe(websocket, task_id)
+            elif msg_type == "hitl:response" and task_id:
+                # Phase A: HITL 人工响应——从 HITLModal.vue 回传用户选择
+                action = msg.get("action", "abort")
+                reason = msg.get("reason", "")
+                from orbit.metacognition.hitl import HITLAction, HITLResponse, resolve_hitl_static
+                try:
+                    hitl_action = HITLAction(action)
+                except ValueError:
+                    await websocket.send_json({
+                        "type": "error", "payload": {"message": f"invalid HITL action: {action}"},
+                    })
+                    continue
+                resolve_hitl_static(task_id, HITLResponse(
+                    action=hitl_action, reason=reason,
+                ))
     except WebSocketDisconnect:
         await manager.disconnect(websocket)

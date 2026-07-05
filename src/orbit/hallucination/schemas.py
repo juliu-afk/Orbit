@@ -53,6 +53,52 @@ class L5ValidationResult(ValidationResult):
     counterexample: dict[str, Any] | None = None
 
 
+# ── CUA 模式迁移：反思式 CoT 结果模型 ──
+# WHY 新增而非修改现有模型：反思对比是附加信号，不改动现有 pass/fail 判定。
+# 三层各一个模型——L2 追踪函数调用预测、L4 行为预测、L5 契约自述。
+
+
+class L2ReflectionResult(ValidationResult):
+    """L2 反思式验证结果——Agent 预测函数调用 vs 实际追踪对比。
+
+    deviation_score: 0.0 = 完全匹配，1.0 = 完全偏离。
+    WHY 仅在预测非空时计算偏差：Agent 未提供预测 → 跳过对比，不阻断。
+    """
+
+    predicted_calls: list[str] = Field(default_factory=list)
+    actual_calls: list[str] = Field(default_factory=list)
+    deviation_score: float = Field(0.0, ge=0.0, le=1.0)
+    unpredicted_calls: list[str] = Field(default_factory=list)  # 预测了但没调用
+    unexpected_calls: list[str] = Field(default_factory=list)  # 调用了但没预测
+
+
+class L4BehaviorResult(ValidationResult):
+    """L4 行为反思验证结果——Agent 自述预期行为 vs 沙箱实际执行对比。
+
+    WHY 不改变 mypy 判定：mypy 结果仍在父类 passed/errors 字段。
+    本模型附加 behavior_match 和 behavior_diff 供后续分析。
+    """
+
+    predicted_behavior: str = ""
+    actual_behavior: str = ""
+    behavior_match: bool = True
+    behavior_diff: str = ""
+
+
+class L5ContractResult(L5ValidationResult):
+    """L5 契约反思验证结果——Agent 自述契约 vs Z3 验证契约对比。
+
+    WHY 继承 L5ValidationResult：保留 z3_status 和 counterexample。
+    新增自述契约字段，contract_mismatch 标记自述 vs Z3 的矛盾。
+    contract_mismatch=True 时 z3_status 仍由 Z3 独立判定，
+    矛盾作为额外信号记录，不改变 passed 字段。
+    """
+
+    self_claimed_contract: str = ""
+    z3_verified_contract: str = ""
+    contract_mismatch: bool = False
+
+
 class L6ContractMatch(BaseModel):
     """L6 单端点合约比对结果。"""
 

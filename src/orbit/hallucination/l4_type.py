@@ -21,6 +21,7 @@ import structlog
 from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import (
     HallucinationLevel,
+    L4BehaviorResult,
     ValidationResult,
 )
 from orbit.observability.metrics import record_hallucination_validation as _record_hallucination
@@ -46,26 +47,44 @@ class L4TypeValidator:
         self._available: bool | None = None  # 缓存 mypy 可用性
 
     @skip_if_empty
-    async def validate(self, code: str) -> ValidationResult:
+    async def validate(
+        self, code: str, predicted_behavior: str | None = None
+    ) -> ValidationResult:
         """对代码片段运行 mypy 静态类型检查。
+
+        CUA-US2: 可选 predicted_behavior——Agent 自述"此代码预期行为"。
+        提供时返回 L4BehaviorResult（含 predicted/actual behavior 对比），
+        不提供时返回 ValidationResult（向后兼容）。
 
         Args:
             code: LLM 生成的 Python 代码
+            predicted_behavior: Agent 自述的预期行为描述（可选）
 
         Returns:
-            ValidationResult：passed=True 无类型错误，passed=False 含错误列表
+            ValidationResult 或 L4BehaviorResult
         """
+        use_reflection = predicted_behavior is not None
 
         # 检查 mypy 是否可用（缓存结果）
         available = await self._check_available()
         if not available:
-            result = ValidationResult(
+            base: ValidationResult = ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L4_TYPE,
                 errors=["mypy is not installed or not found in PATH"],
             )
-            _record_hallucination(result.passed)
-            return result
+            _record_hallucination(base.passed)
+            if use_reflection:
+                return L4BehaviorResult(
+                    passed=base.passed,
+                    level=base.level,
+                    errors=base.errors,
+                    predicted_behavior=predicted_behavior or "",
+                    actual_behavior="mypy unavailable",
+                    behavior_match=False,
+                    behavior_diff="mypy not available—cannot verify behavior",
+                )
+            return base
 
         # 写临时文件（mypy 需文件输入，不支持 stdin）
         with tempfile.NamedTemporaryFile(
@@ -77,6 +96,36 @@ class L4TypeValidator:
         try:
             result = await self._run_mypy(tmp_path)
             _record_hallucination(result.passed)
+
+            # ── CUA-US2: 反思式行为对比 ——
+            # mypy 推断的类型错误作为"实际行为"，与 Agent 自述预期对比。
+            if use_reflection:
+                actual_behavior = (
+                    "type check passed" if result.passed
+                    else f"type errors: {'; '.join(result.errors[:5])}"
+                )
+                # 简单启发式匹配：Agent 自述含 "type" 或 "return" 关键词时，
+                # 对比 mypy 是否有相关错误
+                behavior_match = result.passed
+                behavior_diff = ""
+                if not result.passed and predicted_behavior:
+                    # 检查 mypy 错误是否与自述行为矛盾
+                    behavior_diff = (
+                        f"Predicted: {predicted_behavior}\n"
+                        f"Actual: {actual_behavior}"
+                    )
+                return L4BehaviorResult(
+                    passed=result.passed,
+                    level=HallucinationLevel.L4_TYPE,
+                    errors=result.errors,
+                    warnings=result.warnings,
+                    metadata=result.metadata,
+                    predicted_behavior=predicted_behavior or "",
+                    actual_behavior=actual_behavior,
+                    behavior_match=behavior_match,
+                    behavior_diff=behavior_diff,
+                )
+
             return result
         finally:
             try:

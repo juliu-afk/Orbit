@@ -32,17 +32,6 @@ logger = structlog.get_logger("orbit.integration.wiring")
 # 每 N 个完成任务触发一次离线蒸馏
 DISTILL_EVERY_N_TASKS = 10
 
-# 模块级单例——所有调用方共享同一实例
-_wiring_instance: OrbitWiring | None = None
-
-
-def get_wiring(db_path: str = ":memory:") -> "OrbitWiring":
-    """获取模块级单例。react_agent/task_runner 等不同调用方共享同一实例。"""
-    global _wiring_instance
-    if _wiring_instance is None:
-        _wiring_instance = OrbitWiring(db_path=db_path)
-    return _wiring_instance
-
 
 class OrbitWiring:
     """全模块集成接线器——单例，懒初始化所有可选组件。
@@ -72,52 +61,32 @@ class OrbitWiring:
         self._llm_distill: object | None = None
         self._monitor: object | None = None
         self._mcts: object | None = None
-        self._gepa: object | None = None
-        self._scope: object | None = None
 
     # ── 生命周期钩子 ───────────────────────────────────
 
     def on_task_start(self, task_id: str, goal: str, project_id: str = "") -> None:
-        """任务开始时调用——启动轨迹收集 + 自动创建用户画像。"""
+        """任务开始时调用——启动轨迹收集。"""
         self._task_count += 1
         tc = self._get_trajectory()
         if tc:
             tc.start_trajectory(task_id=task_id, goal=goal, project_id=project_id)
             logger.debug("trajectory_started", task_id=task_id, goal=goal[:60])
-        # 自动创建 ProfileStore 条目（如果不存在）
-        if project_id:
-            ps = self._get_profile()
-            if ps:
-                try:
-                    from orbit.memory.profile import UserProfile
-                    existing = ps.get_profile(project_id)
-                    if existing is None:
-                        ps.upsert_profile(UserProfile(profile_id=project_id, display_name=project_id))
-                except Exception: pass
 
     def on_task_end(self, task_id: str, outcome: str, quality_score: float = 0.0,
-                    turns: int = 0, tool_calls: int = 0, monitor_task: object = None) -> None:
-        """任务结束时调用——完成轨迹收集 + GRPO基线记录 + 取消Monitor。"""
+                    turns: int = 0, tool_calls: int = 0) -> None:
+        """任务结束时调用——完成轨迹收集。"""
         tc = self._get_trajectory()
         if tc:
-            import hashlib
+            # 需要 trajectory_id——从 task_id 推算
+            import hashlib, time
             tid = hashlib.sha256(f"{task_id}:".encode()).hexdigest()[:16]
             tc.finish_trajectory(tid, final_outcome=outcome, quality_score=quality_score,
                                   total_turns=turns, total_tool_calls=tool_calls)
             logger.debug("trajectory_finished", task_id=task_id, outcome=outcome)
-        # GRPO 基线记录——每次任务结果都记录
-        grpo = self._get_grpo()
-        if grpo:
-            category = self._infer_category_from_task(task_id)
-            grpo.record_baseline(category, outcome == "completed")
-        # 取消 Monitor——防止 task 泄露
-        if monitor_task is not None:
-            try: monitor_task.cancel()
-            except Exception: pass
 
     def record_event(self, task_id: str, title: str, outcome: str = "",
-                     tags: list[str] | None = None, category: str = "") -> None:
-        """记录情节事件 + AgenticMemory 自动记住失败模式。"""
+                     tags: list[str] | None = None) -> None:
+        """记录情节事件。"""
         em = self._get_episodic()
         if em:
             from orbit.memory.episodic import EventImportance
@@ -125,17 +94,6 @@ class OrbitWiring:
             em.record_event(task_id=task_id, title=title, outcome=outcome,
                             importance=imp, tags=tags or [])
             logger.debug("event_recorded", task_id=task_id, title=title[:60])
-        # 失败事件 → AgenticMemory 自动记住
-        if outcome == "failure":
-            am = self._get_agentic()
-            if am:
-                am.remember(trigger=title, action=f"避免: {title}",
-                            expected_outcome="下次不再重复此错误",
-                            category=category, tags=tags or [])
-        # SCOPE 战术记忆——每次事件都记录为战术规则
-        scope = self._get_scope()
-        if scope:
-            scope.add_tactical(task_id, title)
 
     def enhance_prompt(self, base_prompt: str, category: str = "",
                        keywords: list[str] | None = None) -> str:
@@ -190,28 +148,6 @@ class OrbitWiring:
         grpo = self._get_grpo()
         if grpo:
             grpo.update_utilities()
-
-        # GEPA Prompt 进化——GRPO 评分后对低效用原则进行遗传优化
-        gepa = self._get_gepa()
-        if gepa and de:
-            low_utility = [p for p in de.top_principles(50) if p.utility_score < 0.6]
-            if len(low_utility) >= 3:
-                try:
-                    await gepa.evolve_population(low_utility, failure_reason="原则效用低于0.6，需进化", category="")
-                except Exception as e:
-                    logger.debug("gepa_evolution_failed", error=str(e))
-
-        # SCOPE 战术→战略升级检查——高频战术规则自动升级
-        scope = self._get_scope()
-        if scope:
-            try:
-                from orbit.evolution.scope import ScopeMemory
-                # 触发升级检查——add_tactical已在record_event中调用
-                strategies = scope.get_strategic_all()
-                if strategies:
-                    logger.debug("scope_strategies_active", count=len(strategies))
-            except Exception as e:
-                logger.debug("scope_check_failed", error=str(e))
 
     # ── 懒初始化 ───────────────────────────────────────
 
@@ -301,8 +237,7 @@ class OrbitWiring:
             try:
                 from orbit.metacognition.monitor import MonitorAgent
                 self._monitor = MonitorAgent()
-            except Exception as e:
-                logger.debug("monitor_init_failed", error=str(e))
+            except Exception: pass
         return self._monitor
 
     def _get_mcts(self):
@@ -310,47 +245,25 @@ class OrbitWiring:
             try:
                 from orbit.agents.mcts import MCTSPlanner
                 self._mcts = MCTSPlanner()
-            except Exception as e:
-                logger.debug("mcts_init_failed", error=str(e))
+            except Exception: pass
         return self._mcts
 
     def get_mcts_planner(self):
+        """获取 MCTSPlanner——供 react_agent 在规划阶段使用。"""
         return self._get_mcts()
 
-    async def start_monitor(self, task_id: str, goal: str = "") -> object | None:
+    async def start_monitor(self, task_id: str, goal: str = "") -> asyncio.Task | None:
+        """启动 MonitorAgent 作为独立 asyncio Task。
+
+        返回 Task 对象——调用方负责在任务结束时 cancel。
+        """
         mon = self._get_monitor()
-        if mon is None: return None
+        if mon is None:
+            return None
         mon._goal = goal
         mon._task_id = task_id
-        import asyncio
         queue: asyncio.Queue = asyncio.Queue()
         task = asyncio.create_task(mon.run(queue, task_id=task_id))
-        task._monitor_queue = queue
+        task._monitor_queue = queue  # type: ignore——供主 Agent 推送事件
         logger.debug("monitor_started", task_id=task_id, goal=goal[:60])
         return task
-
-    def _get_gepa(self):
-        if self._gepa is None:
-            try:
-                from orbit.evolution.gepa import GEPAEngine
-                self._gepa = GEPAEngine(llm=None, distill=self._get_distill())
-            except Exception as e:
-                logger.debug("gepa_init_failed", error=str(e))
-        return self._gepa
-
-    def _get_scope(self):
-        if self._scope is None:
-            try:
-                from orbit.evolution.scope import ScopeMemory
-                self._scope = ScopeMemory(self._db_path)
-            except Exception as e:
-                logger.debug("scope_init_failed", error=str(e))
-        return self._scope
-
-    def _infer_category_from_task(self, task_id: str) -> str:
-        """从 task_id 推断任务类别——供 GRPO 基线分类。"""
-        tl = task_id.lower()
-        if any(kw in tl for kw in ["audit","审计","AR","底稿","函证"]): return "审计"
-        if any(kw in tl for kw in ["test","测试","pytest","coverage"]): return "测试"
-        if any(kw in tl for kw in ["code","代码","fix","bug","实现"]): return "编码"
-        return "通用"

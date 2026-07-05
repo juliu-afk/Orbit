@@ -16,12 +16,18 @@ async def test_e2e_circuit_breaker_with_failing_llm(e2e_app: Any) -> None:
     """LLM 全部失败 → 任务 FAILED + 熔断逻辑触发。
 
     AC3: 任务最终状态为 FAILED。
+
+    P0 修复：chatter agent 需返回 programming intent 才能进入
+    developer 路径触发熔断——否则 chatter 识别为 chat 直接 DONE。
     """
     scheduler: Scheduler = getattr(e2e_app, "_scheduler", None)
     assert scheduler is not None
 
     failing_llm = MockLLMClient(fail_count=999, fixed_response="should not reach")
+    # WHY: chatter 必须返回 programming intent，否则直接 chat→DONE 绕过熔断
+    chatter_mock = MockLLMClient(fail_count=0, fixed_response='{"_intent":"programming","reply":"开始编码"}')
     scheduler._agent_llms = {
+        "chatter": chatter_mock,
         "developer": failing_llm,
         "clarifier": failing_llm,
         "architect": failing_llm,

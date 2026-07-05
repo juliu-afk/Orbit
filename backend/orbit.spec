@@ -70,6 +70,12 @@ _INFRA_IMPORTS: list[str] = [
     "orbit.memory.profile",
     "orbit.observability.trajectory",
     "orbit.hallucination.pipeline",
+    "orbit.context.builders", "orbit.context.prebuilders", "orbit.context.scanners",
+    # PR#201: auto-discover 跳过 test_ 前缀模块——需显式声明
+    "orbit.context.builders.test_builder",
+    "orbit.context.scanners.test_coverage",
+    "orbit.agents.preact", "orbit.agents.mcts",
+    "orbit.memory.agentic", "orbit.metacognition.vigil", "orbit.tools.mcp_server",
 ]
 
 _HIDDEN_IMPORTS = _INFRA_IMPORTS + _ORBIT_MODULES

@@ -6,9 +6,9 @@ from typing import Any
 from orbit.context.scanners.base import BaseScanner
 
 # 匹配 create_table('xxx') / alter_table('xxx') / add_column('t', sa.Column('c', ...))
-_RE_CREATE = re.compile(r"create_table\s*\(\s*'([^']+)'", re.IGNORECASE)
-_RE_ALTER = re.compile(r"alter_table\s*\(\s*'([^']+)'", re.IGNORECASE)
-_RE_ADD_COL = re.compile(r"add_column\s*\(\s*'([^']+)'\s*,\s*sa\.Column\s*\(\s*'([^']+)'", re.IGNORECASE)
+_RE_CR = re.compile(r"create_table\s*\(\s*'([^']+)'", re.IGNORECASE)
+_RE_AL = re.compile(r"alter_table\s*\(\s*'([^']+)'", re.IGNORECASE)
+_RE_AC = re.compile(r"add_column\s*\(\s*'([^']+)'\s*,\s*sa\.Column\s*\(\s*'([^']+)'", re.IGNORECASE)
 
 
 class SchemaChangeScanner(BaseScanner):
@@ -29,15 +29,15 @@ class SchemaChangeScanner(BaseScanner):
             if not py_files:
                 return result
             result["has_migration"] = True
-            create_tables, alter_tables, add_columns = [], [], []
-            for migration_file in py_files[:10]:
-                content = migration_file.read_text(encoding="utf-8", errors="replace")
-                create_tables.extend(_RE_CREATE.findall(content))
-                alter_tables.extend(_RE_ALTER.findall(content))
-                add_columns.extend(
-                    {"table": t, "column": c}
-                    for t, c in _RE_ADD_COL.findall(content)
-                )
+            # PR#201 P2-4: 读取所有迁移文件——不只看最近一个
+            create_tables: list[str] = []
+            alter_tables: list[str] = []
+            add_columns: list[dict[str, str]] = []
+            for mf in py_files[:10]:
+                c = mf.read_text(encoding="utf-8", errors="replace")
+                create_tables.extend(_RE_CR.findall(c))
+                alter_tables.extend(_RE_AL.findall(c))
+                add_columns.extend({"table": t, "column": col} for t, col in _RE_AC.findall(c))
             result["tables_added"] = create_tables
             result["tables_modified"] = alter_tables
             result["columns_added"] = add_columns

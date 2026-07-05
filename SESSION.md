@@ -358,7 +358,6 @@ memory: orbit-coverage-sprint.md
 ### 完成
 - PR #51 关闭——内容已通过 PR #50 合并，test isolation 修复 cherry-pick 到 master (d8da444)
 
-<<<<<<< HEAD
 ## 2026-07-03 — 文档-代码对照审查 + 源码 TODO 清零
 
 ### 背景
@@ -385,7 +384,7 @@ docs/ 与 src/ 对照清查，发现 26 项未完成：12 源码 TODO、3 P2 修
 ### 待办
 - #190 覆盖率冲刺（另一会话）
 - exe 重构建（另一会话）
-=======
+
 ## 2026-07-04 — ChatterAgent 聊天路由 + PyInstaller 打包防复发体系
 
 ### PR #196: fix: ChatterAgent 首触路由 + PyInstaller 打包防复发体系 (MERGE)
@@ -425,4 +424,3 @@ docs/ 与 src/ 对照清查，发现 26 项未完成：12 源码 TODO、3 P2 修
 - litellm `collect_submodules()` 只收集 479/1727 模块（缺 tokenizers）→必须文件系统扫描
 - tiktoken 编码数据在 `tiktoken_ext` 命名空间包→PyInstaller 不自动发现→需加入 hiddenimports
 - chat.py `set_clarifier_llm` 注入只在 chat 路由加载时生效→加 `set_chatter_llm` 同步注入
->>>>>>> origin/master

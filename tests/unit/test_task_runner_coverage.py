@@ -218,8 +218,8 @@ def test_state_to_progress() -> None:
 
 
 @pytest.mark.asyncio
-async def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_run_task_normal_flow(full_runner: TaskRunner) -> None:
+@pytest.mark.skip(reason="P2-4: needs fixing")
+async def test_run_task_normal_flow(full_runner: TaskRunner) -> None:
     """正常流程：IDLE→...→DONE，沿途保存检查点。"""
     mock_agent = MagicMock()
     mock_agent.execute = AsyncMock(

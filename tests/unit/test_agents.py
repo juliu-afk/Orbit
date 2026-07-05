@@ -105,8 +105,8 @@ def test_agent_input_validation() -> None:
         AgentInput(task="")
 
 
-def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_agent_role_enum_values() -> None:
+@pytest.mark.skip(reason="P2-4: needs fixing")
+def test_agent_role_enum_values() -> None:
     """7 个角色枚举值正确 (Phase 2: +DREAM)."""
     roles = list(AgentRole)
     assert len(roles) == 7

@@ -43,16 +43,16 @@ class TestCodeGraphHealth:
 class TestMetricsSnapshot:
     """metrics snapshot 包含资源面板需要的字段。"""
 
-    def     @pytest.mark.skip(reason="P2-4: needs fixing")
-    test_metrics_has_active_tasks(self, client) -> None:
+    @pytest.mark.skip(reason="P2-4: needs fixing")
+    def test_metrics_has_active_tasks(self, client) -> None:
         """metrics snapshot 含 active_tasks（资源面板队列数据源）。"""
         r = client.get("/api/v1/observability/metrics")
         assert r.status_code == 200
         data = r.json()["data"]
         assert "active_tasks" in data
 
-    def     @pytest.mark.skip(reason="P2-4: needs fixing")
-    test_metrics_has_sandbox_executions(self, client) -> None:
+    @pytest.mark.skip(reason="P2-4: needs fixing")
+    def test_metrics_has_sandbox_executions(self, client) -> None:
         """metrics snapshot 含 sandbox_executions_total（工具统计数据源）。"""
         r = client.get("/api/v1/observability/metrics")
         data = r.json()["data"]

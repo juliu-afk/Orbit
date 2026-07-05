@@ -114,6 +114,7 @@ class TrajectoryCollector:
     """
 
     def __init__(self, db_path: str = ":memory:") -> None:
+        self.db_path = db_path
         self._db = sqlite3.connect(db_path)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(self.SCHEMA_SQL)

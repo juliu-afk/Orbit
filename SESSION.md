@@ -1,5 +1,41 @@
 # Orbit 开发会话记录
 
+## 2026-07-05 — CUA 模式迁移 Phase A (PR #199 · MERGED)
+
+**基于**：三大 CUA 项目（OpenAI CUA Sample / trycua / OpenCUA）源码解构分析。
+**报告**：`docs/research/CUA项目源码解构——Orbit可借鉴模式分析.html`
+**完整文档**：`docs/requirements/2026-07-05-CUA模式迁移/`
+
+### 交付
+
+| 层 | 内容 | 文件 |
+|----|------|------|
+| 调度器 | 循环上限 50 轮 + 步骤超时 120s/180s + 防抖 120ms + CODING 串行化 | `task_runner.py` |
+| L2 | 反思式函数调用追踪——predicted_calls vs actual 偏差分 | `l2_dynamic.py` |
+| L4 | 反思式行为对比——mypy got/expected 类型提取 + `_compare_behavior` | `l4_type.py` |
+| L5 | 反思式契约对比——自述契约 vs Z3 验证 + `_describe_contract` | `l5_z3.py` |
+| Schemas | L2ReflectionResult / L4BehaviorResult / L5ContractResult | `schemas.py` |
+| 测试 | 60 条 CUA 专项 + 99 条已有零回归 = 159 全绿 | `test_cua_*.py` |
+
+### 审查历程
+
+- **R1**: P0-1(超时值) + P1-1~5(死代码/空壳/零测试/resume) + P2-1/2 → 全修
+- **R2**: NEW-1(重复方法) + NEW-2(L4假阳性) + P1-1(实调测试) → 全修
+- **合并**: 3 轮 rebase 解决 4 文件冲突 → force-with-lease → merge
+
+### Phase B 待做
+
+MCP 双向适配 + 审计数据飞轮 + 沙箱 BYOI（P1-P2，后续迭代）
+
+### 关键决策
+
+- 反思式 CoT 只附加信号（predicted vs actual），不改变现有 pass/fail 逻辑
+- Agent 步骤超时 120s/180s（包裹整个 `agent.execute()`，非单个 tool call）
+- L4 `_compare_behavior` 用 mypy got/expected 类型提取替代关键词匹配
+- `GraphNode.serialize_tools` 死代码直接移除（CODING 状态检查已足够）
+
+---
+
 ## 2026-07-03/04 — 覆盖率冲刺 73%→82% + create_app 懒加载 + exe 构建修复
 
 ### PR #190: feat: 覆盖率冲刺 73%→82% (SQUASH MERGED)

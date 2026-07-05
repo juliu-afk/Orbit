@@ -4,8 +4,8 @@
  * 展示: text_delta 流式文本、thinking 思考过程、
  *       tool_call/tool_result 工具调用、finish_step 完成标记。
 
- * 流程: POST /api/v1/agents/{agentId}/run → taskId
- *      → EventSource(/api/v1/agents/{agentId}/stream?taskId=...)
+ * 流程: POST /api/v1/agent/{agentId}/run → taskId
+ *      → EventSource(/api/v1/agent/{agentId}/stream?taskId=...)
  */
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useEventSource } from '@/composables/useEventSource'
@@ -55,7 +55,7 @@ async function startStream() {
   let tid = props.taskId
   if (!tid) {
     try {
-      const resp = await fetch(`${apiBase.value}/api/v1/agents/${props.agentId}/run`, {
+      const resp = await fetch(`${apiBase.value}/api/v1/agent/${props.agentId}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ task: '', context: {} }),
@@ -161,7 +161,7 @@ async function startStream() {
     }
   })
 
-  const streamUrl = `${apiBase.value}/api/v1/agents/${props.agentId}/stream?task_id=${tid}`
+  const streamUrl = `${apiBase.value}/api/v1/agent/${props.agentId}/stream?task_id=${tid}`
   sse.connect(streamUrl)
 }
 
@@ -169,7 +169,7 @@ async function cancel() {
   const tid = sse.taskId.value
   if (tid) {
     try {
-      await fetch(`${apiBase.value}/api/v1/agents/${props.agentId}/cancel`, {
+      await fetch(`${apiBase.value}/api/v1/agent/${props.agentId}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ task_id: tid }),

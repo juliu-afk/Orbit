@@ -5,7 +5,6 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { apiPost } from '@/services/api'
 import type { PeakPromptData } from '@/stores/peak'
 
 export interface ChatMessage {
@@ -240,8 +239,8 @@ export const useChatStore = defineStore('chat', () => {
     }))
   }
 
-  function resubmitWithDefer() { lastPeakPrompt.value = null; return apiPost('/api/v1/goal', { description: pendingGoalText.value, defer_to_offpeak: true }) }
-  function resubmitWithUrgent() { lastPeakPrompt.value = null; return apiPost('/api/v1/goal', { description: pendingGoalText.value, urgent: true }) }
+  function resubmitWithDefer() { lastPeakPrompt.value = null; return fetch('/api/v1/goal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:pendingGoalText.value,defer_to_offpeak:true})}) }
+  function resubmitWithUrgent() { lastPeakPrompt.value = null; return fetch('/api/v1/goal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:pendingGoalText.value,urgent:true})}) }
   function reset() {
     messages.value = []
     candidates.value = []

@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from orbit.core.config import settings
 from orbit.goal.models import GoalSession
 
-router = APIRouter(prefix="/goal", tags=["goal"])
+router = APIRouter(prefix="/api/v1/goal", tags=["goal"])
 
 # 活跃 Goal 的 task 引用——供 cancel/pause/resume
 _active_task: asyncio.Task | None = None

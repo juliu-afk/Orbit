@@ -22,7 +22,37 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from orbit.agents.factory import AgentFactory
 from orbit.api.dependencies import AuthMiddleware
 
-# 路由模块懒加载——create_app() 内部按需导入，避免测试时全量加载路由模块
+# 路由模块懒加载——create_app() 内部按需导入，避免测试时全量加载 26 个路由模块
+# _ROUTE_IMPORTS 映射: route_name -> (module_import_path, router_attr)
+_ROUTE_MODULES: dict[str, tuple[str, str]] = {
+    "tasks": ("orbit.api.routes.tasks", "router"),
+    "knowledge": ("orbit.api.routes.knowledge", "router"),
+    "compliance": ("orbit.api.routes.compliance", "router"),
+    "observability": ("orbit.api.routes.observability", "router"),
+    "backup": ("orbit.api.routes.backup", "router"),
+    "versioning": ("orbit.api.routes.versioning", "router"),
+    "chat": ("orbit.api.routes.chat", "router"),
+    "sessions": ("orbit.api.routes.sessions", "router"),
+    "projects": ("orbit.api.routes.projects", "router"),
+    "agent_llm": ("orbit.api.routes.agent_llm", "router"),
+    "compose": ("orbit.api.routes.compose", "router"),
+    "dream": ("orbit.api.routes.dream", "router"),
+    "goal": ("orbit.api.routes.goal", "router"),
+    "loop": ("orbit.api.routes.loop", "router"),
+    "review": ("orbit.api.routes.review", "router"),
+    "files_routes": ("orbit.api.routes.files_routes", "router"),
+    "git_routes": ("orbit.api.routes.git_routes", "router"),
+    "codegraph_routes": ("orbit.api.routes.codegraph_routes", "router"),
+    "search_routes": ("orbit.api.routes.search_routes", "router"),
+    "tests_routes": ("orbit.api.routes.tests_routes", "router"),
+    "blame_routes": ("orbit.api.routes.blame_routes", "router"),
+    "schedule": ("orbit.api.routes.schedule", "router"),
+    "insights_routes": ("orbit.api.routes.insights_routes", "router"),
+    "compliance_routes": ("orbit.api.routes.compliance_routes", "router"),
+    "terminal_routes": ("orbit.api.routes.terminal_routes", "router"),
+    "diagnostics_ws": ("orbit.api.routes.diagnostics_ws", "router"),
+    "health": ("orbit.api.routes.health", "router"),
+}
 
 # 路由懒加载映射——create_app(routes=[...]) 按需导入
 # None = all routes (production), list = subset (testing)
@@ -39,8 +69,8 @@ _ROUTE_SPEC: dict[str, tuple[str, str, str | None]] = {
     "agent_llm":        ("orbit.api.routes.agent_llm", "router", "API_V1_STR"),
     "compose":          ("orbit.api.routes.compose", "router", "API_V1_STR"),
     "dream":            ("orbit.api.routes.dream", "router", "API_V1_STR"),
-    "goal":             ("orbit.api.routes.goal", "router", "API_V1_STR"),
-    "loop":             ("orbit.api.routes.loop", "router", "API_V1_STR"),
+    "goal":             ("orbit.api.routes.goal", "router", None),
+    "loop":             ("orbit.api.routes.loop", "router", None),
     "review":           ("orbit.api.routes.review", "router", "API_V1_STR"),
     "files_routes":     ("orbit.api.routes.files_routes", "router", "API_V1_STR"),
     "git_routes":       ("orbit.api.routes.git_routes", "router", "API_V1_STR"),
@@ -48,13 +78,12 @@ _ROUTE_SPEC: dict[str, tuple[str, str, str | None]] = {
     "search_routes":    ("orbit.api.routes.search_routes", "router", "API_V1_STR"),
     "tests_routes":     ("orbit.api.routes.tests_routes", "router", "API_V1_STR"),
     "blame_routes":     ("orbit.api.routes.blame_routes", "router", "API_V1_STR"),
-    "schedule":         ("orbit.api.routes.schedule", "router", "API_V1_STR"),
+    "schedule":         ("orbit.api.routes.schedule", "router", None),
     "insights_routes":  ("orbit.api.routes.insights_routes", "router", "API_V1_STR"),
     "compliance_routes":("orbit.api.routes.compliance_routes", "router", "API_V1_STR"),
     "terminal_routes":  ("orbit.api.routes.terminal_routes", "router", "API_V1_STR"),
     "config_routes":    ("orbit.api.routes.config_routes", "router", "API_V1_STR"),
-    "ponytail_debt":    ("orbit.api.routes.ponytail_debt", "router", "API_V1_STR"),
-    "diagnostics_ws":   ("orbit.api.routes.diagnostics_ws", "router", "API_V1_STR"),
+    "diagnostics_ws":   ("orbit.api.routes.diagnostics_ws", "router", None),
     "health":           ("orbit.api.routes.health", "router", None),
 }
 

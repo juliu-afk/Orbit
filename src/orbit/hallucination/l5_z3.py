@@ -19,6 +19,7 @@ import structlog
 
 from orbit.hallucination.schemas import (
     HallucinationLevel,
+    L5ContractResult,
     L5ValidationResult,
 )
 from orbit.observability.metrics import record_hallucination_validation as _record_hallucination
@@ -42,42 +43,114 @@ class L5Z3Validator:
     def __init__(self, timeout_ms: int = Z3_TIMEOUT_MS):
         self._timeout_ms = timeout_ms
 
-    async def validate(self, func_code: str) -> L5ValidationResult:
+    async def validate(
+        self, func_code: str, self_claimed_contract: str | None = None
+    ) -> L5ValidationResult:
         """对 @formal 函数运行 Z3 验证。
+
+        CUA-US2: 可选 self_claimed_contract——Agent 自述"此代码满足什么契约"。
+        提供时返回 L5ContractResult（含自述契约 vs Z3 验证契约对比），
+        不提供时返回 L5ValidationResult（向后兼容）。
 
         Args:
             func_code: 包含 @formal 装饰器的函数代码
+            self_claimed_contract: Agent 自述的契约描述（可选）
 
         Returns:
-            L5ValidationResult(z3_status="unsat"|"sat"|"skipped"|"timeout")
+            L5ValidationResult 或 L5ContractResult
         """
+        use_reflection = self_claimed_contract is not None
+
         # 解析 @formal 装饰器提取契约
         contract = self._parse_contract(func_code)
         if contract is None:
-            result = L5ValidationResult(
+            base: L5ValidationResult = L5ValidationResult(
                 passed=True,
                 level=HallucinationLevel.L5_Z3,
                 z3_status="skipped",
                 warnings=["No @formal decorator found, skipped"],
             )
-            _record_hallucination(result.passed)
-            return result
+            _record_hallucination(base.passed)
+            if use_reflection:
+                return L5ContractResult(
+                    passed=base.passed,
+                    level=base.level,
+                    z3_status=base.z3_status,
+                    warnings=base.warnings,
+                    self_claimed_contract=self_claimed_contract or "",
+                    z3_verified_contract="no @formal decorator",
+                    contract_mismatch=False,
+                )
+            return base
 
         # 构造 Z3 公式并求解
         try:
             result = await self._solve(contract)
             _record_hallucination(result.passed)
+
+            # ── CUA-US2: 契约反思对比 ——
+            # Z3 实际验证的契约（来自 @requires/@ensures）vs Agent 自述契约。
+            if use_reflection:
+                z3_contract = self._describe_contract(contract)
+                # 简单启发式匹配：自述契约含 requires/ensures 关键词时，
+                # 检查是否与 Z3 解析的契约一致
+                contract_mismatch = False
+                if self_claimed_contract and z3_contract:
+                    # 对比关键词：pre/post conditions 的数量是否匹配
+                    mismatch = (
+                        self_claimed_contract not in z3_contract
+                        and z3_contract not in self_claimed_contract
+                    )
+                    contract_mismatch = mismatch
+
+                return L5ContractResult(
+                    passed=result.passed,
+                    level=result.level,
+                    z3_status=result.z3_status,
+                    errors=result.errors,
+                    warnings=result.warnings,
+                    counterexample=result.counterexample,
+                    self_claimed_contract=self_claimed_contract or "",
+                    z3_verified_contract=z3_contract,
+                    contract_mismatch=contract_mismatch,
+                )
+
             return result
         except Exception as e:
             logger.warning("l5_z3_error", error=str(e))
-            result = L5ValidationResult(
+            base = L5ValidationResult(
                 passed=True,
                 level=HallucinationLevel.L5_Z3,
                 z3_status="unknown",
                 warnings=[f"Z3 solver error: {e}"],
             )
-            _record_hallucination(result.passed)
-            return result
+            _record_hallucination(base.passed)
+            if use_reflection:
+                return L5ContractResult(
+                    passed=base.passed,
+                    level=base.level,
+                    z3_status=base.z3_status,
+                    warnings=base.warnings,
+                    self_claimed_contract=self_claimed_contract or "",
+                    z3_verified_contract="Z3 solver error",
+                    contract_mismatch=False,
+                )
+            return base
+
+    def _describe_contract(self, contract: dict[str, Any]) -> str:
+        """将解析出的契约描述为人类可读字符串。
+
+        WHY 需要此方法：Z3 验证的是结构化契约（pre/post 列表），
+        需要转成字符串与 Agent 自述的契约文本对比。
+        """
+        pre = contract.get("pre", [])
+        post = contract.get("post", [])
+        parts: list[str] = []
+        if pre:
+            parts.append("requires: " + "; ".join(pre))
+        if post:
+            parts.append("ensures: " + "; ".join(post))
+        return " | ".join(parts) if parts else "empty contract"
 
     def _parse_contract(self, func_code: str) -> dict[str, Any] | None:
         """从 @formal 装饰器提取 pre/post conditions。

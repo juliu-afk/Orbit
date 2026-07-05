@@ -17,7 +17,7 @@ import structlog
 
 from orbit.graph.engines.code_graph import CodeGraphEngine
 from orbit.hallucination.base import skip_if_empty
-from orbit.hallucination.schemas import HallucinationLevel, ValidationResult
+from orbit.hallucination.schemas import HallucinationLevel, L2ReflectionResult, ValidationResult
 from orbit.sandbox.executor import Sandbox
 
 logger = structlog.get_logger("orbit.hallucination.l2")
@@ -72,23 +72,41 @@ class L2DynamicTracer:
         self._engine = code_engine
 
     @skip_if_empty
-    async def validate(self, code: str) -> ValidationResult:
+    async def validate(
+        self, code: str, predicted_calls: list[str] | None = None
+    ) -> ValidationResult:
         """在沙箱中执行带追踪包装的代码，验证所有函数调用是否在代码图谱中。
+
+        CUA-US2: 可选 predicted_calls——Agent 自述"将调用哪些函数"。
+        提供时返回 L2ReflectionResult（含 predicted/actual/deviation 对比），
+        不提供时返回 ValidationResult（向后兼容）。
 
         Args:
             code: LLM 生成的 Python 代码
+            predicted_calls: Agent 自述将调用的函数列表（可选）
 
         Returns:
-            ValidationResult：passed=True 所有调用均在图谱中
+            ValidationResult 或 L2ReflectionResult
         """
+        use_reflection = predicted_calls is not None
 
         # 检查沙箱可用性
         if not await self._sandbox.is_available():
-            return ValidationResult(
+            base = ValidationResult(
                 passed=True,
                 level=HallucinationLevel.L2_DYNAMIC,
                 warnings=["sandbox unavailable, L2 skipped"],
             )
+            if use_reflection:
+                return L2ReflectionResult(
+                    passed=base.passed,
+                    level=base.level,
+                    warnings=base.warnings,
+                    predicted_calls=predicted_calls or [],
+                    actual_calls=[],
+                    deviation_score=1.0,
+                )
+            return base
 
         # 注入追踪包装
         wrapped_code = _TRACE_WRAPPER.format(user_code=code)
@@ -96,16 +114,23 @@ class L2DynamicTracer:
         try:
             stdout = await self._sandbox.run(wrapped_code, language="python")
         except Exception as e:
-            # 沙箱执行失败（语法错误/超时/运行时异常）→ 记录但不阻断
-            # WHY 不阻断：L2 是运行时验证，代码语法错误应该被 L1/L4 拦下，
-            # L2 不做重复拦截。
             logger.info("l2_sandbox_execution_failed", error=str(e))
-            return ValidationResult(
+            base = ValidationResult(
                 passed=True,
                 level=HallucinationLevel.L2_DYNAMIC,
                 warnings=[f"Sandbox execution failed (L2 cannot verify): {e}"],
                 metadata={"execution_error": str(e)},
             )
+            if use_reflection:
+                return L2ReflectionResult(
+                    passed=base.passed,
+                    level=base.level,
+                    warnings=base.warnings,
+                    predicted_calls=predicted_calls or [],
+                    actual_calls=[],
+                    deviation_score=1.0,
+                )
+            return base
 
         # 提取追踪结果
         traced = self._parse_trace_result(stdout)
@@ -121,9 +146,40 @@ class L2DynamicTracer:
                     untracked.append(call)
             except Exception as e:
                 logger.warning("l2_graph_query_failed", call=call, error=str(e))
-                # 查询失败不阻断，记录 warning
-                pass
 
+        # ── CUA-US2: 反思式对比 ——
+        # 计算预测 vs 实际的偏差分。不改变 passed 判定，仅作为附加信号。
+        if use_reflection:
+            pred_set = set(predicted_calls or [])
+            actual_set = set(user_calls)
+            unpredicted = sorted(pred_set - actual_set)  # 预测了但没调用
+            unexpected = sorted(actual_set - pred_set)   # 调用了但没预测
+            # 偏差分：意外调用占比
+            total = max(len(pred_set), 1)
+            deviation = min(len(unexpected) / total, 1.0)
+
+            result = L2ReflectionResult(
+                passed=len(untracked) == 0,
+                level=HallucinationLevel.L2_DYNAMIC,
+                errors=[f"Dynamic calls not found in code graph: {', '.join(untracked)}"] if untracked else [],
+                metadata={
+                    "untracked_calls": untracked,
+                    "traced_calls": user_calls,
+                    "call_count": len(user_calls),
+                },
+                predicted_calls=predicted_calls or [],
+                actual_calls=user_calls,
+                deviation_score=deviation,
+                unpredicted_calls=unpredicted,
+                unexpected_calls=unexpected,
+            )
+            if untracked:
+                logger.info("l2_untracked_calls", calls=untracked, deviation=deviation)
+            else:
+                logger.info("l2_trace_complete", call_count=len(user_calls), deviation=deviation)
+            return result
+
+        # 原有逻辑——无反思式对比
         if untracked:
             logger.info("l2_untracked_calls", calls=untracked)
             return ValidationResult(

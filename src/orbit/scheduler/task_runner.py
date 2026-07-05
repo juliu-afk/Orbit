@@ -130,7 +130,8 @@ class TaskRunner:
         await self._save_checkpoint(task_id, state, {"prd": prd})
         context: dict[str, Any] = {"prd": prd, "artifacts": {}, "mode": "auto"}
         # Phase F: 接线——任务开始
-        self._wire("on_task_start", task_id, prd[:100], project_id=context.get("project_path",""))
+        # project_id 从 task_id 推导——context["project_path"]尚未设置
+        self._wire("on_task_start", task_id, prd[:100], project_id=task_id)
         # 减熵闭环-2 B4: 检查目标文件编辑稳定性
         try:
             target_file = context.get("target_file", "")

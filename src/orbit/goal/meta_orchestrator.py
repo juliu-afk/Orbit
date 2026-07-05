@@ -325,9 +325,49 @@ class MetaOrchestrator:
         return await session.run_full_pipeline()
 
     async def _run_single_task(self, goal: GoalSession) -> GoalResult:
-        """单任务模式——无拆解，直接执行。"""
-        # 创建虚拟 Task
+        """单任务模式——无拆解，直接执行。
+
+        v0.21: 接入 TaskShardingEngine——PRD > 8000 字符时分片并发执行。
+        WHY: Sharding 引擎已在 PR #201 实现但从未集成到调度流程。
+        """
         from orbit.compose.models import Task as ComposeTask
+
+        # v0.21: 大 PRD 分片——按段落边界切分后并发执行子任务
+        try:
+            from orbit.sharding.engine import TaskShardingEngine
+
+            engine = TaskShardingEngine()
+            if engine.should_shard(goal.description):
+                plan = engine.shard(goal.description, goal.id)
+                logger.info(
+                    "goal_sharding",
+                    goal_id=goal.id,
+                    shards=plan.total,
+                    prd_chars=len(goal.description),
+                )
+                # 并发执行所有分片——复用 _run_subtask 管线
+                results = await asyncio.gather(*[
+                    self._run_subtask(
+                        ComposeTask(id=s.shard_id, description=s.content),
+                        "main",
+                        goal,
+                        goal.total_token_budget // max(plan.total, 1),
+                    )
+                    for s in plan.shards
+                ])
+                ok = sum(1 for r in results if r.status == "ok")
+                failed = plan.total - ok
+                total_tokens = sum(r.tokens_used for r in results)
+                return GoalResult(
+                    status="done" if failed == 0 else ("partial" if ok > 0 else "failed"),
+                    tasks_completed=ok,
+                    tasks_failed=failed,
+                    total_tokens=total_tokens,
+                )
+        except ImportError:
+            pass  # Sharding 引擎不可用——降级为单任务执行
+        except Exception:
+            logger.warning("sharding_failed_fallback_single", goal_id=goal.id)
 
         task = ComposeTask(id="task-0", description=goal.description)
         result = await self._run_subtask(task, "main", goal, goal.total_token_budget)

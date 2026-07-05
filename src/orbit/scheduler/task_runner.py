@@ -193,6 +193,28 @@ class TaskRunner:
                 if prev_state == TaskState.CODING and observation:
                     self._wire("record_event", task_id, f"CODING完成", "success" if "error" not in str(observation)[:200].lower() else "failure", category="编码")
 
+                    # v0.21: CODING 完成后跑全量防幻觉验证 (L1-L8)
+                    # WHY: validate_quick() 仅在 react_agent 工具调用后跑 L1+L3+L4，
+                    # validate_full() 跑全部 8 层——commit 级别的完整检查。
+                    try:
+                        from orbit.hallucination.pipeline import HallucinationPipeline  # noqa: F811
+                        pipeline = HallucinationPipeline()
+                        full_result = await pipeline.validate_full(str(observation))
+                        if not full_result.passed:
+                            logger.warning(
+                                "hallucination_full_failed",
+                                task_id=task_id,
+                                errors=full_result.errors[:5],
+                            )
+                            context.setdefault("l2", {})["hallucination_full"] = {
+                                "passed": False,
+                                "errors": full_result.errors[:10],
+                            }
+                        else:
+                            context.setdefault("l2", {})["hallucination_full"] = {"passed": True}
+                    except Exception:
+                        logger.debug("hallucination_full_skipped", task_id=task_id)
+
                 # 意图路由: IDLE 状态由 chatter 接管——
                 # chat → 结束, programming → 正常进入 PARSING
                 if state == TaskState.IDLE and context.get("chatter_intent") == "chat":
@@ -359,6 +381,32 @@ class TaskRunner:
         context["scope_report"] = scope_report
         # 注入 L2——供 Architect/Developer/Reviewer/QA 消费
         context.setdefault("l2", {})["scope_report"] = scope_report
+
+        # v0.21: 接入 Context Builder 链——消费 scope_report 产出多维度上下文
+        # WHY: PR #201 新增 9 个 Builder 但从未集成——scoping 后有结构化数据可消费
+        try:
+            from orbit.context.builders import build_all
+
+            builder_inputs: dict[str, Any] = {
+                "prd": context.get("prd", ""),
+                "brief": context.get("brief", ""),
+                "project_root": project_path,
+                "affected_files": scope_report.get("affected_files", {}),
+                "import_deps": scope_report.get("import_deps", {}),
+                "test_scope": scope_report.get("test_scope", "unit_integration"),
+                "keywords": context.get("keywords", []),
+                "design": scope_report.get("design", {}),
+            }
+            builder_output = build_all(builder_inputs)
+            scope_report["builder_context"] = builder_output
+            context.setdefault("l2", {})["builder_context"] = builder_output
+            logger.debug(
+                "context_builders_complete",
+                task_id=task_id,
+                builders=len(builder_output),
+            )
+        except Exception:
+            logger.debug("context_builders_failed", task_id=task_id)
 
         logger.info(
             "scoping_complete",

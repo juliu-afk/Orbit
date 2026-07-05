@@ -40,6 +40,7 @@ logger = structlog.get_logger("orbit.scheduler.runner")
 ROLE_MAP: dict[TaskState, str] = {
     TaskState.IDLE: "chatter",  # 首触点——通用对话，检测到编程意图后路由到 clarifier
     TaskState.PARSING: "clarifier",
+    TaskState.SCOPING: "__scoping__",  # Phase 2 Token节省: 变更范围分析（规则引擎，非LLM）
     TaskState.PLANNING: "architect",
     TaskState.CODING: "developer",
     TaskState.VERIFYING: "reviewer",
@@ -49,6 +50,7 @@ ROLE_MAP: dict[TaskState, str] = {
 _TASK_TYPE_MAP: dict[TaskState, str] = {
     TaskState.IDLE: "summarization",              # 闲聊/首触点
     TaskState.PARSING: "structured_output",       # 需求解析需结构化输出
+    TaskState.SCOPING: "summarization",           # Phase 2: 规则引擎——不需要 LLM 推理
     TaskState.PLANNING: "reasoning",              # 架构设计需最强推理
     TaskState.CODING: "reasoning",                # 代码生成需推理
     TaskState.VERIFYING: "structured_output",     # 审查结果结构化
@@ -57,12 +59,15 @@ _TASK_TYPE_MAP: dict[TaskState, str] = {
 TERMINAL_STATES = {TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED}
 
 # ── CUA-US1: Agent 循环鲁棒性配置（来源：OpenAI CUA Sample App responses-loop.ts）──
-# WHY 工具级超时 20s：OpenAI CUA 每个动作有硬超时，防止单步卡死。
-# CODING 状态用 60s（代码生成更耗时），其他状态用 20s。
-TOOL_TIMEOUT_SECONDS: dict[TaskState, int] = {
-    TaskState.CODING: 60,
+# WHY Agent 步骤超时：每个状态对应一次完整 Agent 执行（含 LLM API 调用），
+# 不是单个 tool call 超时。默认 120s——GLM-5 reasoning 调用 10-40s，留足余量。
+# CODING 状态用 180s（代码生成最耗时），其他用 120s。
+# REVIEW-FIX P0-1: 原值 20s/60s 过短——PLANNING 架构推理 40s+ 几乎必然超时。
+AGENT_STEP_TIMEOUT_SECONDS: dict[TaskState, int] = {
+    TaskState.CODING: 180,
+    TaskState.SCOPING: 30,  # Phase 2: 规则引擎——git diff + AST 扫描很快
 }
-TOOL_TIMEOUT_DEFAULT = 20
+AGENT_STEP_TIMEOUT_DEFAULT = 120
 
 # WHY 动作间延迟 120ms：OpenAI CUA 动作间延迟模拟人类操作节奏，防止 DOM/文件系统
 # 渲染追赶不上。Orbit 在写文件→跑测试等关键转换间插入延迟，防止文件系统未刷盘。
@@ -213,6 +218,9 @@ class TaskRunner:
         if state in TERMINAL_STATES:
             return state
         context = data.context
+        # REVIEW-FIX P1-5: resume 时重置循环计数器，
+        # 避免 checkpoint 中的旧计数导致 resume 后立即触发上限。
+        context["_cycle_count"] = 0
         return await self._continue_from(task_id, state, context)
 
     # ── Agent 循环 ──────────────────────────────────────
@@ -224,6 +232,11 @@ class TaskRunner:
         "chat" → 结束任务, "programming" → 继续进入 PARSING (clarifier).
         """
         role = ROLE_MAP.get(state)
+
+        # Phase 2 Token节省: SCOPING 走规则引擎——非 LLM Agent
+        if role == "__scoping__":
+            return await self._run_scoping(task_id, context)
+
         if role and self._agent_factory is not None:
             context["state"] = state.value
             context["agent_name"] = role
@@ -231,9 +244,9 @@ class TaskRunner:
             task_type = _TASK_TYPE_MAP.get(state, "reasoning")
             context["task_type"] = task_type
 
-            # CUA-US1: 注入工具级超时——CODING 用 60s，其他状态用 20s
-            tool_timeout = TOOL_TIMEOUT_SECONDS.get(state, TOOL_TIMEOUT_DEFAULT)
-            context["tool_timeout"] = tool_timeout
+            # CUA-US1: 注入 Agent 步骤超时——CODING 180s，其他 120s
+            step_timeout = AGENT_STEP_TIMEOUT_SECONDS.get(state, AGENT_STEP_TIMEOUT_DEFAULT)
+            context["agent_step_timeout"] = step_timeout
 
             if state == TaskState.PLANNING and self.router is not None:
                 try:
@@ -289,16 +302,18 @@ class TaskRunner:
     ) -> str:
         """拉起 Agent 协程——AgentFactory 创建 + 注入依赖 + 超时保护.
 
-        CUA-US1: timeout 按状态分级——CODING 60s，其他 20s。
-        可通过 context['tool_timeout'] 覆盖。
+        CUA-US1: timeout 按状态分级——CODING 180s，其他 120s。
+        可通过 context['agent_step_timeout'] 覆盖。
+        REVIEW-FIX P0-1: 从 _agent_cycle 调用时默认 None → 读 context 超时配置。
+        timeout 包裹整个 agent.execute()（含 LLM API），非单个 tool call。
         """
         t_start = time.monotonic()
         if self._agent_factory is None:
             raise RuntimeError("AgentFactory 未配置")
 
-        # CUA-US1: 工具级超时——按任务状态取不同阈值
+        # CUA-US1: Agent 步骤超时——按任务状态取不同阈值
         if timeout is None:
-            timeout = context.get("tool_timeout", TOOL_TIMEOUT_DEFAULT)
+            timeout = context.get("agent_step_timeout", AGENT_STEP_TIMEOUT_DEFAULT)
 
         agent_llm = self._agent_llms.get(role) if self._agent_llms else None
 
@@ -326,6 +341,20 @@ class TaskRunner:
             return f"[error] Agent {role} 创建失败: {e}"
 
         agent_context = self._build_context(task_id, context)
+
+        # Phase 2 Token节省: 前置 context 裁剪——确定性预处理，节省 LLM token
+        # fail-open: 裁剪失败不阻塞 Agent 执行
+        try:
+            from orbit.context.prebuilder import ContextPrebuilder
+            prebuilder = ContextPrebuilder.build_for_role(role)
+            pruned = prebuilder.build(agent_context.to_dict())
+            # 重建 TaskContext——保持 to_dict() 截断能力
+            agent_context = type(agent_context)(**{
+                k: v for k, v in pruned.items()
+                if k in {f.name for f in type(agent_context).__dataclass_fields__.values()}
+            })
+        except Exception:
+            logger.debug("prebuilder_failed_fail_open", role=role, exc_info=True)
 
         if self._audit_logger:
             self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, role=role)

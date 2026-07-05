@@ -1,14 +1,16 @@
-"""自进化与对齐模块 (Phase C).
+"""自进化与对齐模块 (Phase C+E).
 
 对标: EvolveR (2025), ANCHOR, AgentEvolver (阿里通义 2025)
 
-Phase C (Agent 五大能力追赶): v0.30-v0.31
-  - C1. 离线自蒸馏引擎——执行轨迹 → 可复用策略原则
-  - C2. ANCHOR 对齐护栏——自进化各阶段注入人工监督检查点
+Phase C: 离线自蒸馏 + 对齐护栏
+Phase E: LLM语义蒸馏 + GRPO评分 + 策略注入
 """
 
+from orbit.evolution.anchor import AnchorCheckpoint, AnchorGuard, SupervisionResult
 from orbit.evolution.distill import DistillationEngine, StrategyPrinciple
-from orbit.evolution.anchor import AnchorGuard, AnchorCheckpoint, SupervisionResult
+from orbit.evolution.grpo import GRPOScorer
+from orbit.evolution.inject import PromptInjector
+from orbit.evolution.llm_distill import LLMDistiller
 
 __all__ = [
     "DistillationEngine",
@@ -16,4 +18,7 @@ __all__ = [
     "AnchorGuard",
     "AnchorCheckpoint",
     "SupervisionResult",
+    "LLMDistiller",
+    "GRPOScorer",
+    "PromptInjector",
 ]

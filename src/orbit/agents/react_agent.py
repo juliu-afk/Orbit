@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
+from orbit.agents.preact import PreActEngine
+from orbit.agents.reflection import ReflectionEngine
 from orbit.events.schemas import DashboardEvent
 from orbit.gateway.schemas import LLMRequest
 from orbit.memory.decision_log import DecisionLog, parse_decision_marker
@@ -91,6 +93,8 @@ class ReActAgent(BaseAgent):
         compressor: ContextCompressor | None = None,  # Phase 2 AC7: 上下文压缩
         budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7: Token 预算
         task_keywords: list[str] | None = None,  # 模板匹配关键词（模板库减熵）
+        reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
+        preact_engine: PreActEngine | None = None,  # Phase D: PreAct
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
@@ -107,6 +111,9 @@ class ReActAgent(BaseAgent):
         self._task_keywords = task_keywords or []
         # US-B5: 决策日志（懒初始化，fail-open）
         self._decision_log: DecisionLog | None = None
+        # Phase A: ReflAct 反思引擎
+        self._reflection_engine = reflection_engine
+        self._preact_engine = preact_engine
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——向后兼容 wrapper。
@@ -222,6 +229,14 @@ class ReActAgent(BaseAgent):
         if decision_history_block:
             system += "\n\n" + decision_history_block
 
+        # Phase F: 接线——注入策略原则 + AgenticMemory 建议（单例）
+        try:
+            from orbit.integration.wiring import get_wiring
+            wiring = get_wiring()
+            kw = getattr(self, "_task_keywords", None) or []
+            system = wiring.enhance_prompt(system, category="", keywords=kw)
+        except Exception: pass
+
         # 2. 初始化消息历史
         messages: list[dict] = [
             {"role": "system", "content": system},
@@ -303,6 +318,8 @@ class ReActAgent(BaseAgent):
                     system_prompt=system,
                     messages=messages if len(messages) > 2 else None,
                     tools=tools_schema if tools_schema else None,
+                    # Inkeep 借鉴 #1: 注入 task_type 用于模型路由
+                    task_type=input_data.context.get("task_type"),
                 )
 
                 # 流式接收 text_delta + tool_call
@@ -337,6 +354,21 @@ class ReActAgent(BaseAgent):
                                 data={"tool_calls": tool_calls},
                             )
 
+                            # Phase D: PreAct——执行前预测，跳过高风险Action
+                            if self._preact_engine and self._goal:
+                                goal_str = self._goal.description if hasattr(self._goal,"description") else str(self._goal)
+                                for tc in list(tool_calls):
+                                    fn = tc.get("function",{})
+                                    tn = fn.get("name","")
+                                    try:
+                                        args = json.loads(fn.get("arguments","{}"))
+                                        pred = await self._preact_engine.predict(
+                                            goal=goal_str, action_name=tn, action_args=args,
+                                            observation="", use_llm=(turn>0))
+                                        if pred.should_skip() and pred.alternative:
+                                            logger.info("preact_skip", task_id=task_id, tool=tn, alt=pred.alternative[:80])
+                                            tool_calls.remove(tc)
+                                    except Exception: pass  # fail-open
                             # 执行每个工具
                             for tc in tool_calls:
                                 func = tc.get("function", {})
@@ -427,6 +459,17 @@ class ReActAgent(BaseAgent):
                                 tool_call_count += 1
                                 self._budget.consume()
 
+                                # Phase A: 代码生成工具调用后运行防幻觉快速检查
+                                if tool_name in ("write_file", "edit_file") and "code" in str(tool_args)[:200]:
+                                    try:
+                                        from orbit.hallucination.pipeline import HallucinationPipeline
+                                        pipeline = HallucinationPipeline(graph=self.graph, sandbox=self.sandbox)
+                                        result = await pipeline.validate_quick(str(tool_args))
+                                        if not result.passed:
+                                            logger.warning("hallucination_in_react", task_id=task_id, tool=tool_name, errors=result.errors)
+                                    except Exception:
+                                        pass  # fail-open
+
                         elif event_type == StreamEventType.ERROR:
                             yield StreamEvent(
                                 type=StreamEventType.ERROR,
@@ -447,6 +490,38 @@ class ReActAgent(BaseAgent):
                         data={"message": str(e), "code": "LLM_ERROR"},
                     )
                     return
+
+                # Phase A: ReflAct Reflection——每轮 LLM 返回后自我反思
+                if self._reflection_engine and self._goal:
+                    last_action_info = ""
+                    last_obs_info = ""
+                    if reasoning_chain:
+                        last_step = reasoning_chain[-1]
+                        last_action_info = last_step.get("action", "")
+                        last_obs_info = last_step.get("result_preview", "")
+                    try:
+                        reflection = await self._reflection_engine.reflect(
+                            goal=self._goal.description
+                            if hasattr(self._goal, "description")
+                            else str(self._goal),
+                            thought="".join(content_parts)[:500],
+                            action=last_action_info,
+                            observation=last_obs_info,
+                            quick=(turn % 3 != 0),
+                        )
+                        yield StreamEvent(
+                            type=StreamEventType.THINKING,
+                            agent_id=agent_id, task_id=task_id, turn=turn,
+                            data={"content": f"[Reflection] goal_alignment={reflection.goal_alignment}, confidence={reflection.confidence}"},
+                        )
+                        if reflection.is_drifting():
+                            logger.info("reflact_drift_detected", task_id=task_id, turn=turn,
+                                         alignment=reflection.goal_alignment, confidence=reflection.confidence)
+                            if reflection.correction_needed:
+                                messages.append({"role": "user", "content": f"任务可能偏离目标——{reflection.correction_needed}。请重新对准原始目标: {self._goal.description if hasattr(self._goal, 'description') else str(self._goal)}"})
+                                continue
+                    except Exception:
+                        logger.debug("reflection_step_failed", task_id=task_id, exc_info=True)
 
                 # Phase 4 AC-B1: GoalJudge 自检——每轮 LLM 返回后判定
                 if not has_tool_calls and self._goal_judge and self._goal:

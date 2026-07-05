@@ -7,7 +7,22 @@ if sys.stdout is None: sys.stdout = _log
 if sys.stderr is None: sys.stderr = _log
 print("Orbit launcher starting...", flush=True)
 try:
+    # PyInstaller 隐式导入清单——懒加载路由模块需静态 import 才能被 PyInstaller 发现
     import orbit.api.routes.files_routes, orbit.api.routes.git_routes, orbit.api.routes.review  # noqa
+    import orbit.api.routes.tasks, orbit.api.routes.knowledge  # noqa
+    import orbit.api.routes.compliance, orbit.api.routes.observability  # noqa
+    import orbit.api.routes.backup, orbit.api.routes.versioning  # noqa
+    import orbit.api.routes.chat, orbit.api.routes.agent_llm  # noqa
+    import orbit.api.routes.compose, orbit.api.routes.dream  # noqa
+    import orbit.api.routes.goal, orbit.api.routes.loop  # noqa
+    import orbit.api.routes.sessions, orbit.api.routes.projects  # noqa
+    import orbit.api.routes.schedule  # noqa
+    import orbit.api.routes.codegraph_routes, orbit.api.routes.search_routes  # noqa
+    import orbit.api.routes.tests_routes, orbit.api.routes.blame_routes  # noqa
+    import orbit.api.routes.insights_routes, orbit.api.routes.compliance_routes  # noqa
+    import orbit.api.routes.terminal_routes, orbit.api.routes.diagnostics_ws  # noqa
+    import orbit.api.routes.config_routes  # noqa
+    import orbit.api.routes.health  # noqa
     import orbit.files.service, orbit.lsp.service  # noqa
     import orbit.review.models, orbit.review.service  # noqa
     import orbit.brief  # noqa

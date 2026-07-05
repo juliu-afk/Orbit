@@ -40,12 +40,47 @@ logger = structlog.get_logger("orbit.scheduler.runner")
 ROLE_MAP: dict[TaskState, str] = {
     TaskState.IDLE: "chatter",  # 首触点——通用对话，检测到编程意图后路由到 clarifier
     TaskState.PARSING: "clarifier",
+    TaskState.SCOPING: "__scoping__",  # Phase 2 Token节省: 变更范围分析（规则引擎，非LLM）
     TaskState.PLANNING: "architect",
     TaskState.CODING: "developer",
     TaskState.VERIFYING: "reviewer",
 }
 
+# Inkeep 借鉴 #1: TaskState → task_type 映射（三层模型路由）
+_TASK_TYPE_MAP: dict[TaskState, str] = {
+    TaskState.IDLE: "summarization",              # 闲聊/首触点
+    TaskState.PARSING: "structured_output",       # 需求解析需结构化输出
+    TaskState.SCOPING: "summarization",           # Phase 2: 规则引擎——不需要 LLM 推理
+    TaskState.PLANNING: "reasoning",              # 架构设计需最强推理
+    TaskState.CODING: "reasoning",                # 代码生成需推理
+    TaskState.VERIFYING: "structured_output",     # 审查结果结构化
+}
+
 TERMINAL_STATES = {TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED}
+
+# ── CUA-US1: Agent 循环鲁棒性配置（来源：OpenAI CUA Sample App responses-loop.ts）──
+# WHY Agent 步骤超时：每个状态对应一次完整 Agent 执行（含 LLM API 调用），
+# 不是单个 tool call 超时。默认 120s——GLM-5 reasoning 调用 10-40s，留足余量。
+# CODING 状态用 180s（代码生成最耗时），其他用 120s。
+# REVIEW-FIX P0-1: 原值 20s/60s 过短——PLANNING 架构推理 40s+ 几乎必然超时。
+AGENT_STEP_TIMEOUT_SECONDS: dict[TaskState, int] = {
+    TaskState.CODING: 180,
+    TaskState.SCOPING: 30,  # Phase 2: 规则引擎——git diff + AST 扫描很快
+}
+AGENT_STEP_TIMEOUT_DEFAULT = 120
+
+# WHY 动作间延迟 120ms：OpenAI CUA 动作间延迟模拟人类操作节奏，防止 DOM/文件系统
+# 渲染追赶不上。Orbit 在写文件→跑测试等关键转换间插入延迟，防止文件系统未刷盘。
+ACTION_DEBOUNCE_SECONDS = 0.12
+
+# WHY 循环上限 50 轮：OpenAI CUA 默认 24 轮可配。Orbit 任务更复杂，设 50 轮硬上限，
+# 防止 Agent 死循环。超限 → FAILED + audit 记录。
+MAX_AGENT_CYCLES = 50
+
+# 需要防抖延迟的状态转换（写文件后→验证前）
+_DEBOUNCE_TRANSITIONS: set[tuple[TaskState, TaskState]] = {
+    (TaskState.CODING, TaskState.VERIFYING),
+}
 
 
 class TaskRunner:
@@ -84,6 +119,8 @@ class TaskRunner:
         self._fast_lane = fast_lane
         # 减熵闭环-2: 编辑摇摆检测器（全局单例）
         self._edit_detector = EditStabilityDetector()
+        # Phase F: 全模块集成接线器（懒初始化）
+        self._wiring = None
 
     # ── 公共入口 ────────────────────────────────────────
 
@@ -92,6 +129,9 @@ class TaskRunner:
         state = TaskState.IDLE
         await self._save_checkpoint(task_id, state, {"prd": prd})
         context: dict[str, Any] = {"prd": prd, "artifacts": {}, "mode": "auto"}
+        # Phase F: 接线——任务开始
+        # project_path 由上游 Scheduler 设置——未设置时传空，ProfileStore 跳过
+        self._wire("on_task_start", task_id, prd[:100], project_id=context.get("project_path", ""))
         # 减熵闭环-2 B4: 检查目标文件编辑稳定性
         try:
             target_file = context.get("target_file", "")
@@ -115,11 +155,43 @@ class TaskRunner:
 
         while state not in TERMINAL_STATES:
             try:
+                # CUA-US1: 循环硬上限——防止 Agent 死循环
+                cycle_count = context.get("_cycle_count", 0)
+                cycle_count += 1
+                context["_cycle_count"] = cycle_count
+                if cycle_count > MAX_AGENT_CYCLES:
+                    logger.error(
+                        "max_cycles_exceeded",
+                        task_id=task_id,
+                        cycles=cycle_count,
+                        max_cycles=MAX_AGENT_CYCLES,
+                    )
+                    state = TaskState.FAILED
+                    context["error"] = f"max_cycles_exceeded: {cycle_count} > {MAX_AGENT_CYCLES}"
+                    await self._save_checkpoint(task_id, state, context)
+                    if self._audit_logger:
+                        self._audit_logger.log(
+                            "task_runner", "max_cycles_exceeded",
+                            task_id=task_id, status="error",
+                            detail={"cycles": cycle_count, "max": MAX_AGENT_CYCLES},
+                        )
+                    return state
+
+                # CUA-US1: CODING 状态强制串行化——防止并发编辑冲突
+                if state == TaskState.CODING:
+                    context["parallel_tool_calls"] = False
+
                 observation = await self._agent_cycle(task_id, state, context)
                 context["artifacts"][state.value] = observation
                 self._publish_task_update(
                     task_id, state.value, _state_to_progress(state), context=context
                 )
+
+                prev_state = state
+
+                # Phase F: 接线——记录状态变迁事件
+                if prev_state == TaskState.CODING and observation:
+                    self._wire("record_event", task_id, f"CODING完成", "success" if "error" not in str(observation)[:200].lower() else "failure", category="编码")
 
                 # 意图路由: IDLE 状态由 chatter 接管——
                 # chat → 结束, programming → 正常进入 PARSING
@@ -129,6 +201,10 @@ class TaskRunner:
                 else:
                     state = _transition(state, self._fast_lane)
 
+                # CUA-US1: 关键状态转换间插入防抖延迟
+                if (prev_state, state) in _DEBOUNCE_TRANSITIONS:
+                    await asyncio.sleep(ACTION_DEBOUNCE_SECONDS)
+
                 await self._save_checkpoint(task_id, state, context)
             except asyncio.CancelledError:
                 raise  # P0-1: 不吞取消信号，保持协作式取消语义
@@ -136,8 +212,15 @@ class TaskRunner:
                 logger.error("task_failed", task_id=task_id, state=state.value, error=str(e))
                 state = TaskState.FAILED
                 await self._save_checkpoint(task_id, state, {**context, "error": str(e)})
+                self._wire("on_task_end", task_id, "failed", 0.0, turns=cycle_count)
                 return state
 
+        # Phase F: 接线——任务完成 + 周期蒸馏
+        self._wire("on_task_end", task_id, "completed" if state == TaskState.DONE else str(state.value), 0.8, turns=cycle_count)
+        try:
+            w = self._get_wiring()
+            if w: asyncio.create_task(w.maybe_distill())
+        except Exception: pass
         return state
 
     async def resume(self, task_id: str) -> TaskState | None:
@@ -151,6 +234,9 @@ class TaskRunner:
         if state in TERMINAL_STATES:
             return state
         context = data.context
+        # REVIEW-FIX P1-5: resume 时重置循环计数器，
+        # 避免 checkpoint 中的旧计数导致 resume 后立即触发上限。
+        context["_cycle_count"] = 0
         return await self._continue_from(task_id, state, context)
 
     # ── Agent 循环 ──────────────────────────────────────
@@ -162,9 +248,21 @@ class TaskRunner:
         "chat" → 结束任务, "programming" → 继续进入 PARSING (clarifier).
         """
         role = ROLE_MAP.get(state)
+
+        # Phase 2 Token节省: SCOPING 走规则引擎——非 LLM Agent
+        if role == "__scoping__":
+            return await self._run_scoping(task_id, context)
+
         if role and self._agent_factory is not None:
             context["state"] = state.value
             context["agent_name"] = role
+            # Inkeep 借鉴 #1: 注入 task_type 供 Agent 选择模型
+            task_type = _TASK_TYPE_MAP.get(state, "reasoning")
+            context["task_type"] = task_type
+
+            # CUA-US1: 注入 Agent 步骤超时——CODING 180s，其他 120s
+            step_timeout = AGENT_STEP_TIMEOUT_SECONDS.get(state, AGENT_STEP_TIMEOUT_DEFAULT)
+            context["agent_step_timeout"] = step_timeout
 
             if state == TaskState.PLANNING and self.router is not None:
                 try:
@@ -210,18 +308,83 @@ class TaskRunner:
             return data.get("_intent", "chat")
         except (_json.JSONDecodeError, ValueError, TypeError):
             pass
-        match = _re.search(r'"__?intent__?"\s*:\s*"(chat|programming)"', output)
+        # REVIEW-FIX: 原 regex "__?intent__?" 要求 intent 前后均有 _，
+        # 不匹配 "_intent"（仅前缀有 _）。改为 _{0,2} 使前后 _ 均可选。
+        match = _re.search(r'"_{0,2}intent_{0,2}"\s*:\s*"(chat|programming)"', output)
         if match:
             return match.group(1)
         return "chat"
 
+    async def _run_scoping(self, task_id: str, context: dict[str, Any]) -> str:
+        """SCOPING 状态——确定性变更范围分析 (Phase 2 Token节省).
+
+        纯规则引擎——git diff + Python AST，0 LLM 调用。
+        输出变更范围报告，决定后续测试粒度。
+        fail-open: 任何异常返回 generic 报告，不阻塞任务。
+        """
+        import json as _json
+
+        try:
+            from orbit.context.scanners.affected_files import AffectedFilesScanner
+            from orbit.context.scanners.import_deps import ImportDependencyScanner
+        except ImportError:
+            logger.warning("scoping_scanner_import_failed", task_id=task_id)
+            return _json.dumps({"test_scope": "unit_integration", "note": "scanner_unavailable"})
+
+        project_path = context.get("project_path", ".")
+        scope_report: dict[str, Any] = {}
+
+        # 扫描 1: git diff → 受影响文件
+        try:
+            af_scanner = AffectedFilesScanner()
+            scope_report["affected_files"] = af_scanner.scan(project_path)
+        except Exception as e:
+            logger.warning("scoping_affected_files_failed", error=str(e))
+            scope_report["affected_files"] = {"error": str(e), "total": 0}
+
+        # 扫描 2: Python AST → import 依赖
+        try:
+            deps_scanner = ImportDependencyScanner()
+            affected = scope_report.get("affected_files", {})
+            changed = affected.get("changed", []) + affected.get("added", [])
+            scope_report["import_deps"] = deps_scanner.scan(project_path, affected_files=changed)
+        except Exception as e:
+            logger.warning("scoping_import_deps_failed", error=str(e))
+            scope_report["import_deps"] = {"error": str(e)}
+
+        # 决策测试粒度
+        affected = scope_report.get("affected_files", {})
+        scope_report["test_scope"] = _decide_test_scope(affected)
+
+        context["scope_report"] = scope_report
+        # 注入 L2——供 Architect/Developer/Reviewer/QA 消费
+        context.setdefault("l2", {})["scope_report"] = scope_report
+
+        logger.info(
+            "scoping_complete",
+            task_id=task_id,
+            files=affected.get("total", 0),
+            test_scope=scope_report["test_scope"],
+        )
+        return _json.dumps(scope_report)
+
     async def _run_agent(
-        self, role: str, task_id: str, context: dict[str, Any], timeout: int = 300
+        self, role: str, task_id: str, context: dict[str, Any], timeout: int | None = None
     ) -> str:
-        """拉起 Agent 协程——AgentFactory 创建 + 注入依赖 + 超时保护."""
+        """拉起 Agent 协程——AgentFactory 创建 + 注入依赖 + 超时保护.
+
+        CUA-US1: timeout 按状态分级——CODING 180s，其他 120s。
+        可通过 context['agent_step_timeout'] 覆盖。
+        REVIEW-FIX P0-1: 从 _agent_cycle 调用时默认 None → 读 context 超时配置。
+        timeout 包裹整个 agent.execute()（含 LLM API），非单个 tool call。
+        """
         t_start = time.monotonic()
         if self._agent_factory is None:
             raise RuntimeError("AgentFactory 未配置")
+
+        # CUA-US1: Agent 步骤超时——按任务状态取不同阈值
+        if timeout is None:
+            timeout = context.get("agent_step_timeout", AGENT_STEP_TIMEOUT_DEFAULT)
 
         agent_llm = self._agent_llms.get(role) if self._agent_llms else None
 
@@ -249,6 +412,20 @@ class TaskRunner:
             return f"[error] Agent {role} 创建失败: {e}"
 
         agent_context = self._build_context(task_id, context)
+
+        # Phase 2 Token节省: 前置 context 裁剪——确定性预处理，节省 LLM token
+        # fail-open: 裁剪失败不阻塞 Agent 执行
+        try:
+            from orbit.context.prebuilder import ContextPrebuilder
+            prebuilder = ContextPrebuilder.build_for_role(role)
+            pruned = prebuilder.build(agent_context.to_dict())
+            # 重建 TaskContext——保持 to_dict() 截断能力
+            agent_context = type(agent_context)(**{
+                k: v for k, v in pruned.items()
+                if k in {f.name for f in type(agent_context).__dataclass_fields__.values()}
+            })
+        except Exception:
+            logger.debug("prebuilder_failed_fail_open", role=role, exc_info=True)
 
         if self._audit_logger:
             self._audit_logger.log("orchestrator", "agent_start", task_id=task_id, role=role)
@@ -415,83 +592,6 @@ class TaskRunner:
         )
 
     @staticmethod
-    @staticmethod
-    def _extract_keywords(prd_text: str) -> list[str]:
-        """从 PRD 文本提取技术关键词——减熵闭环-1. P2-PRE-1: +@staticmethod."""
-        if not prd_text:
-            return []
-        _stop = {
-            "的",
-            "是",
-            "在",
-            "和",
-            "了",
-            "有",
-            "不",
-            "要",
-            "可以",
-            "需要",
-            "应该",
-            "能够",
-            "使用",
-            "通过",
-            "进行",
-            "实现",
-            "添加",
-            "修改",
-            "删除",
-            "支持",
-            "提供",
-            "包括",
-            "用于",
-            "the",
-            "a",
-            "an",
-            "is",
-            "are",
-            "be",
-            "to",
-            "of",
-            "in",
-            "for",
-            "and",
-            "or",
-            "not",
-            "this",
-            "that",
-            "with",
-            "from",
-            "it",
-            "we",
-            "you",
-            "as",
-            "if",
-            "but",
-            "so",
-            "all",
-            "no",
-        }
-        keywords: list[str] = []
-        for word in prd_text.replace("\n", " ").split():
-            word = word.strip(".,;:()[]{}<>\"'`/\\|!@#$%^&*+-=~")
-            if len(word) < 2:
-                continue
-            if any(c.isupper() for c in word) or "_" in word:
-                if word.lower() not in _stop:
-                    keywords.append(word)
-        cn_terms = re.findall(r"[一-鿿]{2,6}", prd_text)
-        for t in cn_terms:
-            if t not in _stop and t not in keywords:
-                keywords.append(t)
-        seen: set[str] = set()
-        uniq = []
-        for k in keywords:
-            if k.lower() not in seen:
-                seen.add(k.lower())
-                uniq.append(k)
-        return uniq[:20]
-
-    @staticmethod
     def _extract_keywords(prd_text: str) -> list[str]:
         """从 PRD 文本提取技术关键词——减熵闭环-1.
 
@@ -593,12 +693,29 @@ class TaskRunner:
         # 最多 20 个关键词，避免 prompt 膨胀
         return uniq[:20]
 
+    # Phase F: 接线辅助方法
+    def _wire(self, method: str, *args, **kwargs) -> None:
+        """调用 OrbitWiring 方法——fail-open。"""
+        try:
+            w = self._get_wiring()
+            if w: getattr(w, method)(*args, **kwargs)
+        except Exception: pass
+
+    def _get_wiring(self):
+        if self._wiring is None:
+            try:
+                from orbit.integration.wiring import OrbitWiring
+                self._wiring = OrbitWiring()
+            except Exception: pass
+        return self._wiring
+
 
 # ── 共享工具函数 ────────────────────────────────────────
 
 STATE_TRANSITIONS: dict[TaskState, TaskState] = {
     TaskState.IDLE: TaskState.PARSING,
-    TaskState.PARSING: TaskState.PLANNING,
+    TaskState.PARSING: TaskState.SCOPING,     # Phase 2: PARSING → SCOPING → PLANNING
+    TaskState.SCOPING: TaskState.PLANNING,
     TaskState.PLANNING: TaskState.CODING,
     TaskState.CODING: TaskState.VERIFYING,
     TaskState.VERIFYING: TaskState.DONE,
@@ -606,7 +723,7 @@ STATE_TRANSITIONS: dict[TaskState, TaskState] = {
 
 FAST_LANE_TRANSITIONS: dict[TaskState, TaskState] = {
     TaskState.IDLE: TaskState.PARSING,
-    TaskState.PARSING: TaskState.CODING,
+    TaskState.PARSING: TaskState.CODING,       # 快车道跳过 SCOPING+PLANNING
     TaskState.CODING: TaskState.DONE,
     TaskState.DONE: TaskState.DONE,
 }
@@ -635,6 +752,7 @@ def _state_to_progress(state: TaskState) -> float:
     mapping = {
         TaskState.IDLE: 0.0,
         TaskState.PARSING: 0.2,
+        TaskState.SCOPING: 0.3,    # Phase 2: PARSING(0.2) < SCOPING(0.3) < PLANNING(0.4)
         TaskState.PLANNING: 0.4,
         TaskState.CODING: 0.7,
         TaskState.VERIFYING: 0.9,
@@ -644,6 +762,43 @@ def _state_to_progress(state: TaskState) -> float:
     }
     return mapping.get(state, 0.0)
 
-# ── 状态流转图 (ChatterAgent 意图路由) ─────────────────
+# ── 状态流转图 (ChatterAgent 意图路由 + Phase 2 SCOPING) ─────────────────
 # IDLE(chatter) → chat intent → DONE
-# IDLE(chatter) → programming intent → PARSING(clarifier) → PLANNING(architect) → CODING(developer) → VERIFYING(reviewer) → DONE
+# IDLE(chatter) → programming intent → PARSING(clarifier) → SCOPING(规则引擎) → PLANNING(architect) → CODING(developer) → VERIFYING(reviewer) → DONE
+# 快车道: PARSING → CODING → DONE（跳过 SCOPING+PLANNING）
+
+
+def _decide_test_scope(affected: dict[str, Any]) -> str:
+    """变更范围 → 测试粒度决策 (Phase 2 Token节省).
+
+    WHY 确定性规则而非 LLM: 文件路径 → 测试粒度的映射是机械的，
+    不需要推理能力。LLM 判断反而慢且不稳定。
+
+    规则:
+      - 0 文件或无变更 → "smoke"
+      - 仅 frontend/ → "smoke"
+      - 触及核心模块 → "full_regression"
+      - 其他 → "unit_integration"
+    """
+    files: list[str] = affected.get("changed", []) + affected.get("added", [])
+    if not files:
+        return "smoke"
+
+    # 核心模块——改动影响面大，需全量回归
+    _core_modules = {
+        "src/orbit/agents/",
+        "src/orbit/scheduler/",
+        "src/orbit/gateway/",
+        "src/orbit/compression/",
+        "src/orbit/hallucination/",
+        "src/orbit/checkpoint/",
+        "src/orbit/sandbox/",
+    }
+    if any(any(f.startswith(m) for m in _core_modules) for f in files):
+        return "full_regression"
+
+    # 纯前端变更——冒烟够用
+    if all(f.startswith("frontend/") for f in files):
+        return "smoke"
+
+    return "unit_integration"

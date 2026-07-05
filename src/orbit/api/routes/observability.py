@@ -236,6 +236,59 @@ _probe_engine: StartupProbeEngine | None = None
 _probe_lock = asyncio.Lock()
 
 
+# ── Trace 链路追踪（Inkeep 借鉴 #4） ──────────────────────
+
+from orbit.observability.trace import TraceCollector, TraceStore
+
+_trace_store: TraceStore | None = None
+
+
+def _get_trace_store() -> TraceStore:
+    """惰性初始化 TraceStore——需要 DB 路径。"""
+    global _trace_store
+    if _trace_store is None:
+        from orbit.core.config import settings
+
+        db_path = getattr(settings, "DATABASE_PATH", "orbit.db")
+        _trace_store = TraceStore(db_path)
+    return _trace_store
+
+
+@router.get("/trace/{task_id}", summary="查询任务 Trace")
+async def trace_tree(task_id: str) -> dict[str, Any]:
+    """返回任务的完整 trace tree——调度决策→Agent→工具→验证。"""
+    store = _get_trace_store()
+    tree = await store.get_trace_tree(task_id)
+    if tree is None:
+        return {"code": 0, "data": None, "message": f"task {task_id} 无 trace 数据"}
+    return {
+        "code": 0,
+        "data": tree.model_dump(),
+        "message": "ok",
+    }
+
+
+@router.get("/trace/{task_id}/export", summary="导出 Trace 为 OTEL JSON")
+async def trace_export(task_id: str) -> dict[str, Any]:
+    """导出任务 trace 为 OTEL JSON 格式。"""
+    store = _get_trace_store()
+    otel_json = await store.export_otel_json(task_id)
+    if otel_json is None:
+        return {"code": 0, "data": None, "message": "无数据可导出"}
+    return {"code": 0, "data": otel_json, "message": "ok"}
+
+
+@router.get("/trace/recent", summary="最近 Trace 任务列表")
+async def trace_recent(limit: int = 20) -> dict[str, Any]:
+    """返回最近有 trace 的任务列表。"""
+    store = _get_trace_store()
+    tasks = await store.get_recent_tasks(limit=limit)
+    return {"code": 0, "data": tasks, "message": "ok"}
+
+
+# ── 启动预检（Session PR 后续） ────────────────────────────
+
+
 @router.get("/startup-probe", summary="启动预检探针")
 async def startup_probe() -> dict[str, Any]:
     """返回启动探针执行状态。首次请求触发异步执行。"""

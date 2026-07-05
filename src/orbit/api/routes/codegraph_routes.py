@@ -40,16 +40,24 @@ class OutlineNode(BaseModel):
 
 @router.get("/definition")
 async def go_to_definition(symbol: str = Query(...), file: str = Query("")):
-    """Go to Definition——搜索符号定义。"""
+    """Go to Definition——搜索符号定义，返回文件路径+行号。"""
     if _code_graph is None:
         raise HTTPException(status_code=503, detail="CodeGraph not available")
     try:
-        defs = await _code_graph.find_definitions_cross_file(symbol)
+        defs = await _code_graph.find_definitions_with_positions(symbol)
         if defs:
-            return {"file": defs[0], "line": 1, "name": symbol, "kind": "function"}
+            d = defs[0]
+            return {
+                "file": d["file_path"],
+                "line": d["start_line"],
+                "end_line": d["end_line"],
+                "name": d["name"],
+                "kind": d["kind"],
+            }
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return None
+    # 符号未找到——返回 null，前端据此显示"未找到定义"
+    return {"file": "", "line": 0, "name": symbol, "kind": "unknown"}
 
 
 @router.get("/references")

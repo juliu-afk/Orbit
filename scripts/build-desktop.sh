@@ -19,6 +19,9 @@ taskkill //F //IM Orbit.exe 2>/dev/null || true
 taskkill //F //IM orbit-backend.exe 2>/dev/null || true
 sleep 2
 
+echo "=== 0.5 PyInstaller spec check ==="
+python scripts/check_spec.py || { echo "FAIL: spec check failed, fix before build"; exit 1; }
+
 echo "=== 1. 前端构建 ==="
 cd frontend
 CI=true pnpm build
@@ -47,6 +50,19 @@ cd "$ROOT"
 echo "=== 6. 输出桌面版 ==="
 cp src-tauri/target/release/orbit.exe Deliverables/Orbit.exe
 ls -lh Deliverables/Orbit.exe
+
+echo "=== 7. API smoke test ==="
+# 启动 exe → 等待就绪 → 测探针+health+chat → 杀进程
+start "" "Deliverables/Orbit.exe"
+sleep 5
+python scripts/smoke_test.py --timeout 60
+SMOKE_EXIT=$?
+taskkill //F //IM Orbit.exe 2>/dev/null || true
+taskkill //F //IM orbit-backend.exe 2>/dev/null || true
+if [ $SMOKE_EXIT -ne 0 ]; then
+    echo "FAIL: smoke test failed, check logs"
+    exit 1
+fi
 
 echo ""
 echo "✅ 构建完成: Deliverables/Orbit.exe"

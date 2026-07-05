@@ -15,7 +15,6 @@ import MonacoPanel from '@/components/editor/MonacoPanel.vue'
 import AgentInfoPanel from '@/components/resources/AgentInfoPanel.vue'
 import FileTreePanel from '@/components/editor/FileTreePanel.vue'
 import type { FileNode } from '@/components/editor/FileTreePanel.vue'
-import SettingsDialog from '@/components/layout/SettingsDialog.vue'
 import DAGDrawer from '@/components/dag/DAGDrawer.vue'
 import TokenChartDrawer from '@/components/charts/TokenChartDrawer.vue'
 import SearchDrawer from '@/components/editor/SearchDrawer.vue'
@@ -24,7 +23,7 @@ import ShortcutPanel from '@/components/layout/ShortcutPanel.vue'
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
 const chat = useChatStore(); const task = useTaskStore(); const editor = useEditorStore()
 const settings = useSettingsStore(); const ws = useWebSocket()
-const fileTree = ref<FileNode[]>([]); const showSettings = ref(false); const showShortcuts = ref(false)
+const fileTree = ref<FileNode[]>([]); const showShortcuts = ref(false)
 
 function buildTree(files: Array<{ path: string }>): FileNode[] {
   const root: FileNode[] = []; const dirMap = new Map<string, FileNode>()
@@ -58,9 +57,8 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
   <main class="panel-center flex flex-col overflow-hidden"><TerminalChat /></main>
   <div class="resize-handle resize-right" @pointerdown="handleRightResize" />
   <aside class="panel-right" style="border-left:1px solid var(--color-orbit-border);overflow-y:auto"><MonacoPanel v-if="shell.showMonaco" /><AgentInfoPanel v-else /></aside>
-  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @open-settings="showSettings=true" />
+  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" />
   <DAGDrawer v-model:show="shell.showDAG" /><TokenChartDrawer v-model:show="shell.showChart" /><SearchDrawer v-model:show="shell.showSearch" @open-file="shell.openFileReview" />
-  <SettingsDialog v-model:show="showSettings" />
   <ShortcutPanel v-model:show="showShortcuts" />
 </div>
 </template>
@@ -68,7 +66,7 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
 <style scoped>
 .terminal-shell { display:grid; grid-template-columns:var(--spacing-filetree) 1fr var(--spacing-right-panel); grid-template-rows:1fr var(--spacing-statusbar); grid-template-areas:v-bind(gridAreas()); height:100vh; overflow:hidden }
 .terminal-shell[data-filetree-collapsed="true"] { grid-template-columns:0 1fr var(--spacing-right-panel) }
-.panel-left{grid-area:filetree}.panel-center{grid-area:chat}.panel-right{grid-area:right}.panel-bottom{grid-area:statusbar}
+.panel-left{grid-area:filetree;background:var(--color-orbit-glass);backdrop-filter:blur(var(--glass-blur,12px))}.panel-center{grid-area:chat}.panel-right{grid-area:right;background:var(--color-orbit-glass);backdrop-filter:blur(var(--glass-blur,12px))}.panel-bottom{grid-area:statusbar}
 .resize-handle{width:4px;cursor:col-resize;background:transparent;transition:background 0.15s;z-index:10}
 .resize-handle:hover,.resize-handle:active{background:var(--color-orbit-accent)}
 .resize-left{grid-area:filetree;justify-self:end}

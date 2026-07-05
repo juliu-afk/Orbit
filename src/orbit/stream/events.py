@@ -23,6 +23,9 @@ class StreamEventType(StrEnum):
     FINISH_STEP = "finish_step"  # Agent 完成一步
     ERROR = "error"  # 错误
     CANCELLED = "cancelled"  # 用户取消
+    REFLECTION = "reflection"  # Phase A: ReflAct
+    METACOG_ALERT = "metacog_alert"  # Phase A: Monitor
+    HITL_REQUEST = "hitl_request"  # Phase A: HITL
 
 
 class StreamEvent(BaseModel):

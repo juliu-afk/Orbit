@@ -210,19 +210,26 @@ class PromptBuilder:
         guides: list[str] = []
         for prefix, tools in mcp_by_prefix.items():
             tool_list = "`, `".join(tools[:6])
-            guides.append(f"""## {prefix} 语义代码工具（MCP）
+            guides.append(f"""## {prefix} 语义代码工具（MCP）——强制使用
 
-你拥有 **{prefix}**——LSP 驱动的语义代码导航工具。**优先使用 {prefix} 而非 grep/read_file 做代码定位：**
+你拥有 **{prefix}**——LSP 驱动的语义代码导航工具。以下规则是**硬约束**，违反即缺陷：
 
-| 任务 | ❌ 旧方式 | ✅ 用 {prefix} |
-|------|----------|-------------|
-| 定位函数/类定义 | `grep` 猜位置 | `{prefix}/find_symbol` 精确到行 |
-| 查调用者/引用 | `grep` 搜函数名 | `{prefix}/find_referencing_symbols` 100% 准确 |
-| 读文件结构 | `read_file` 整文件（~15K tokens） | `{prefix}/get_symbols_overview` ~300 tokens |
-| 跨文件重命名 | 手工 `edit_file` 逐个改 | `{prefix}/rename_symbol` 原子操作 |
-| 替换函数体 | `edit_file` 字符串匹配（脆弱） | `{prefix}/replace_symbol_body` 手术级 |
+**强制规则**：
+1. 查找函数/类/变量定义时，**必须**用 `{prefix}/find_symbol`，**禁止**用 `grep` 猜行号
+2. 了解文件结构时，**必须**先用 `{prefix}/get_symbols_overview`，**禁止**直接 `read_file` 全文件
+3. 查找调用者/引用时，**必须**用 `{prefix}/find_referencing_symbols`，**禁止**用 `grep` 搜函数名
+4. 重命名符号时，**必须**用 `{prefix}/rename_symbol`，**禁止**逐个 `edit_file`
+5. 修改函数体时，**必须**用 `{prefix}/replace_symbol_body`，**禁止**用 `edit_file` 盲替换
 
-**原则**：先 `get_symbols_overview` → `find_symbol` → 再动代码。
+| 场景 | ✅ 正确 | ❌ 错误 |
+|------|--------|--------|
+| 定位代码 | `{prefix}/find_symbol` | `grep` + `read_file` |
+| 了解结构 | `{prefix}/get_symbols_overview` | `read_file` 全文件 |
+| 查引用 | `{prefix}/find_referencing_symbols` | `grep` 函数名 |
+| 重命名符号 | `{prefix}/rename_symbol` | 手工 `edit_file`×N |
+| 修改函数体 | `{prefix}/replace_symbol_body` | `edit_file` 盲替换 |
+
+**工作流**：`get_symbols_overview` → `find_symbol`(按需含 body) → `replace_symbol_body` 或 `insert_after/before_symbol`。
 可用工具：`{tool_list}` 等。""")
         return "\n\n".join(guides)
 

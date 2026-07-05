@@ -128,6 +128,26 @@ class KnowledgeEngine:
             mode_used="semantic",
         )
 
+    def query_structured(self, domain: str, concept: str) -> dict[str, Any]:
+        """返回结构化 dict——供 tool handler 使用（Inkeep 借鉴 #3）。
+
+        WHY 独立方法: 现有 query() 返回 QueryResult 对象（内部用），
+        tool handler 需要 JSON-serializable dict 直接返回给 Agent。
+        """
+        result = self.query(domain, concept, mode="hybrid")
+        if result is None:
+            return {
+                "found": False,
+                "message": f"概念 '{concept}' 在领域 '{domain}' 中未找到",
+            }
+        return {
+            "found": True,
+            "content": result.content,
+            "source_uri": result.source_uri,
+            "confidence": result.confidence,
+            "mode_used": result.mode_used,
+        }
+
     def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
         """开放语义搜索——直接暴露 VectorStore.search。"""
         return self._get_vector().search(query, top_k=top_k)

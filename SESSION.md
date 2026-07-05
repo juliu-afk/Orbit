@@ -1,5 +1,169 @@
 # Orbit 开发会话记录
 
+## 2026-07-05 — CUA 模式迁移 Phase A (PR #199 · MERGED)
+
+**基于**：三大 CUA 项目（OpenAI CUA Sample / trycua / OpenCUA）源码解构分析。
+**报告**：`docs/research/CUA项目源码解构——Orbit可借鉴模式分析.html`
+**完整文档**：`docs/requirements/2026-07-05-CUA模式迁移/`
+
+### 交付
+
+| 层 | 内容 | 文件 |
+|----|------|------|
+| 调度器 | 循环上限 50 轮 + 步骤超时 120s/180s + 防抖 120ms + CODING 串行化 | `task_runner.py` |
+| L2 | 反思式函数调用追踪——predicted_calls vs actual 偏差分 | `l2_dynamic.py` |
+| L4 | 反思式行为对比——mypy got/expected 类型提取 + `_compare_behavior` | `l4_type.py` |
+| L5 | 反思式契约对比——自述契约 vs Z3 验证 + `_describe_contract` | `l5_z3.py` |
+| Schemas | L2ReflectionResult / L4BehaviorResult / L5ContractResult | `schemas.py` |
+| 测试 | 60 条 CUA 专项 + 99 条已有零回归 = 159 全绿 | `test_cua_*.py` |
+
+### 审查历程
+
+- **R1**: P0-1(超时值) + P1-1~5(死代码/空壳/零测试/resume) + P2-1/2 → 全修
+- **R2**: NEW-1(重复方法) + NEW-2(L4假阳性) + P1-1(实调测试) → 全修
+- **合并**: 3 轮 rebase 解决 4 文件冲突 → force-with-lease → merge
+
+### Phase B 待做
+
+MCP 双向适配 + 审计数据飞轮 + 沙箱 BYOI（P1-P2，后续迭代）
+
+### 关键决策
+
+- 反思式 CoT 只附加信号（predicted vs actual），不改变现有 pass/fail 逻辑
+- Agent 步骤超时 120s/180s（包裹整个 `agent.execute()`，非单个 tool call）
+- L4 `_compare_behavior` 用 mypy got/expected 类型提取替代关键词匹配
+- `GraphNode.serialize_tools` 死代码直接移除（CODING 状态检查已足够）
+
+---
+
+## 2026-07-03/04 — 覆盖率冲刺 73%→82% + create_app 懒加载 + exe 构建修复
+
+### PR #190: feat: 覆盖率冲刺 73%→82% (SQUASH MERGED)
+
+**46 文件，+5,354 行，25+ 测试文件，~500 tests。**
+
+- **9 源码 Bug 修复**：跨午夜窗口判定、isfuture→iscoroutine、.pem 匹配、git 白名单、python -c 无空格等
+- **新增测试文件**：`test_template_selector.py`(0%→71%)、`test_route_mocks.py`(35 mock 路由)、`test_verifier.py`、`test_dag_runner.py`、`test_shell.py` 等
+- **扩展测试**：`test_merge_engine.py`、`test_offpeak_scheduler.py`、`test_tool_registry.py`
+- **踩坑**：squash merge 只合了 6 个冲突文件——25 个测试文件丢失
+
+### PR #193: feat: lazy create_app + SQLite 集成测试 + PR#190 测试补遗 (SQUASH MERGED)
+
+**10 文件，+1,181/-1,016。**
+
+- **create_app 懒加载**：`create_app(routes=[...])` 只导入指定路由——测试不再全量加载 27 个路由模块
+- **SQLite 集成测试**：`test_session_integration.py` 26 tests（CRUD/messages/fork），参照 `test_review.py` 模式
+- **测试补遗**：25 个测试文件从 feat/tests-from-190 合入（PR #190 squash 遗漏）
+- **审查**：P0/P1/P2 各一轮全修（merge conflict markers、test_verifier.py 语法破坏、sqlite3 import 等）
+
+### exe 构建修复 (master 直接 push)
+
+- **PyInstaller 27 路由漏打包**：懒加载 `importlib.import_module()` 不能被 PyInstaller 静态分析→`launcher.py` 显式 import 全部 27 路由+`orbit.spec` hiddenimports 补充
+- **peak_windows.yaml 24:00→23:59**：`datetime(hour=24)` ValueError
+- **最终产物**：`Deliverables/Orbit.exe` 52MB（Tauri v2 GUI + WebView2 embedBootstrapper + PyInstaller 49MB 后端），10 端点全 200 验证通过
+
+## 2026-07-04 — Inkeep 竞品借鉴 5 项 (PR #195)
+
+### PR #195: feat(gateway): Inkeep 借鉴 5 项——模型路由+分级存储+按需加载+Trace+Git配置 (MERGED)
+
+**30 文件，+4,766/-850。47 单元测试，0 回归。2 P1 + 4 P2 审查修复。**
+
+基于 `docs/research/research-inkeep-analysis.md` 竞品分析，5 项设计模式自建增强：
+
+- **US-1 TaskModelRouter**（P0）：reasoning→Pro, structured_output→Flash, summarization→nano——预计节省 40-60% token 成本
+- **US-2 ArtifactTierManager**（P0）：preview/full/oversized 三级 + 动态阈值调整 + UTF-8 安全截断
+- **US-3 load_knowledge tool**（P1）：Agent 按需拉取知识，AST 自注册，KnowledgeEngine 单例复用
+- **US-4 TraceSpan**（P2 后端）：异步批量 flush（500ms/50条）+ 三层保留（7d/30d/OTEL导出）
+- **US-5 ConfigStore**（P2 后端）：YAML+Git，branch/merge/rollback/diff/clash resolve——全部复用 git
+
+**审查修复（0b4f824）**：
+- P1-1: _flush_batch bare except → structlog.warning(exc_info=True)
+- P1-2: start_worker 竞态 → asyncio.Lock
+- P2-1~4: to_dict() 注释 + max(0,) 保护 + CREATE_NO_WINDOW + 单例
+- 边缘: Alembic migration (003_trace_spans.sql) + orbit.spec hiddenimports ×2
+
+**待后续 PR**：US-4/5 前端（TraceViewer.vue + ConfigView.vue + YamlEditor.vue + VersionHistory.vue）——后端 API 已就绪。
+
+### 关键决策
+
+- US-1 模型映射：Phase 1 Task-Type 硬编码 + YAML 可配置（4 方案中选 A），Phase 2 Agent 显式声明 Tier
+- US-5 配置后端：真 Git（方案 A）而非 SQLite 线性历史——配置存 YAML 文件 + git 仓库，branch/merge/conflict 免费
+- US-4/5 前端拆分：P2 优先级，后端先行交付（API 可通过 curl/Postman 测试），前端下个 PR 补齐
+
+### 旧分支清理
+
+删除 12 个 feat/* 分支（sla-wiring、tests-from-190、integration-tests-lazy-app 等）——内容已全部合入 master
+
+### 覆盖率结果
+
+- 起始：73.17% / 3,433 缺失
+- 峰值：82.3% / 2,295 缺失
+- 当前：~73%（分母膨胀后回落）
+- 9 源码 bug 修复 / 25+ 测试文件 / 500+ tests / 0 测试失败
+
+### 踩坑
+
+- hook/linter 反复 revert Edit/Write 修改 → commit 前必须 git add + commit 冻结
+- agent 生成测试 ~30% 失败率，且拉高分母（import 新模块）→ 后续用手写
+- squash merge 丢新文件 → 需单独 cherry-pick
+- 分支被自动切换（feat/sla-wiring→feat/chatter-agent→feat/serena-hardening）→ 频繁 git checkout -f
+- gh CLI TLS/网络间歇故障
+- PyInstaller 不能静态分析 `importlib.import_module()` → launcher.py 显式 import 兜底
+
+### Serena 强化 + 偷师清单 A/B/C (master 直接 push)
+
+- **Prompt 加固**：Serena 从建议升级为硬约束——5 条强制规则，禁止 grep/read_file 替代
+- **A: hover 修复**：`code_graph.py` +`get_symbol_meta()`，/hover 不再 500
+- **C: Go to Def 行号**：`find_definitions_with_positions()` 返回 `{file, line, end_line}`
+- **B: CodeGraph → MCP**：`mcp_server.py` +3 代码导航工具（`find_symbol`/`find_referencing_symbols`/`get_symbols_overview`）
+
+### 偷师清单状态
+
+| 项 | 状态 | 说明 |
+|----|------|------|
+| A. hover bug | ✅ | get_symbol_meta |
+| B. CodeGraph → MCP | ✅ | 3 代码工具 |
+| C. Go to Def 行号 | ✅ | find_definitions_with_positions |
+| D-H | 不搞 | MCP 桥借 Serena 轮子 |
+
+## 2026-07-03 — MCP 客户端桥 + Serena 语义代码工具集成
+
+### PR #188: feat: MCP 客户端桥——Orbit 消费外部 MCP 工具 (MERGED)
+
+**背景**：调研 Serena (oraios/serena)，开源 LSP 驱动的语义代码导航工具，通过 MCP 协议暴露。
+决定将 MCP 客户端能力集成到 Orbit，让 Agent 能调用外部 MCP 工具。
+
+**交付**：
+- `src/orbit/tools/mcp_client.py`: MCPClientConnection——JSON-RPC 2.0 over stdio，后台线程解决 Windows 管道阻塞
+- `src/orbit/tools/registry.py`: connect_mcp_server() + schema 转换 + handler 工厂
+- `src/orbit/api/main.py`: 启动时加载 configs/mcp_clients.yaml
+- `configs/mcp_clients.yaml`: Serena 配置
+- `tests/unit/test_mcp_client.py`: 13 单元测试
+
+**审查修复**：
+- R1: 3 致命 + 7 风险全部修复（stderr 死锁/readline 超时/disconnect 竞态等）
+- R2: 5 P2 细节优化
+
+### PR #191: feat: Serena 集成闭环——Agent 能实际使用 MCP 工具 (MERGED)
+
+**问题**：PR #188 只建了基础设施。Agent 不知道 Serena 存在——ROLE_TOOLS 白名单没配，prompt 没教。
+
+**交付**：
+- `tools/registry.py`: MCP_ROLES 自动授予 architect/developer/reviewer/qa
+- `prompt/builder.py`: _build_mcp_guide() 教会 Agent 优先用 Serena 做代码导航
+- `api/main.py`: shutil.which() 检测安装状态+提示
+- `mcp_clients.yaml`: enabled=true
+
+**R3 修复**：f.txt 删除/import shutil 提顶/builder.py 前缀动态化
+
+### Serena 验证
+- `pip install serena-agent` → 22 工具可被发现
+- 首次启动需下载 LSP 后端 (>90s)，后续秒级
+
+### 文档
+- `docs/research/serena-vs-orbit-comparison.md` — 调研对比分析
+- `docs/requirements/2026-07-03-MCP-Client-Bridge/` — 阶段 1-4 完整文档
+
 ## 2026-07-03 — Clarifier .env 路径修复
 
 ### PR #185: fix: Clarifier LLM 调用失败——.env 路径 + PyInstaller 漏打包 (MERGED)
@@ -194,6 +358,7 @@ memory: orbit-coverage-sprint.md
 ### 完成
 - PR #51 关闭——内容已通过 PR #50 合并，test isolation 修复 cherry-pick 到 master (d8da444)
 
+<<<<<<< HEAD
 ## 2026-07-03 — 文档-代码对照审查 + 源码 TODO 清零
 
 ### 背景
@@ -220,3 +385,44 @@ docs/ 与 src/ 对照清查，发现 26 项未完成：12 源码 TODO、3 P2 修
 ### 待办
 - #190 覆盖率冲刺（另一会话）
 - exe 重构建（另一会话）
+=======
+## 2026-07-04 — ChatterAgent 聊天路由 + PyInstaller 打包防复发体系
+
+### PR #196: fix: ChatterAgent 首触路由 + PyInstaller 打包防复发体系 (MERGE)
+
+**9 文件，+539/-312。**
+
+**问题**：打开 exe 聊天框发消息，ClarifierAgent 直接回 "暂时无法分析（FileNotFoundError）"——两个根因：
+1. chat.py 硬编码 ClarifierAgent，忽略已写好的 ChatterAgent（用户首触点）
+2. PyInstaller 打包漏 litellm 1727 子模块 + tiktoken 命名空间包 + DeepSeek api_key 未显式传
+
+**修复**：
+- `chat.py`：ChatterAgent 首触 → 意图路由(intent="chat"→直接回复 / intent="programming"→ClarifierAgent)
+- `client.py`：DeepSeek 模型显式传 `settings.DEEPSEEK_API_KEY`，不再让 litellm 自己找
+- `orbit.spec`：合并重复 Analysis 块 → `_discover_orbit_modules()` 自动发现 209 模块 + `THIRD_PARTY_DATAS` 集中管理
+- `hook-litellm.py`：PyInstaller hook 文件系统扫描 1727 模块 + 38 JSON 数据文件
+- `tiktoken_ext` + `tiktoken_ext.openai_public`：命名空间包加入 `_INFRA_IMPORTS`
+
+### PyInstaller 打包防复发体系（7 层）
+
+| 层 | 脚本 | 检查内容 |
+|---|------|---------|
+| 0 | check_spec | 结构——重复 Analysis/EXE |
+| 1 | check_spec | 数据文件——cacert/litellm json |
+| 2 | check_spec | 自动发现——209 orbit 模块 |
+| 3 | check_spec | 路由对齐——29 api.routes |
+| 4 | check_spec | Hook 验证——litellm 1727模块+38json |
+| 4.5 | check_spec | 命名空间包——tiktoken_ext |
+| 5 | check_spec | 关键依赖——6 库可导入 |
+| 7 | smoke_test | 运行时——探针+health+chat WS |
+
+- `build-desktop.sh` 步骤 0.5 强制运行 check_spec（失败阻断）+ 步骤 7 smoke_test
+- 防住了 8/8 个本轮问题（含 3 个之前漏掉的第三方库问题，已补层 4/4.5/7）
+
+### 踩坑
+- `orbit.spec` 有两个 Analysis 块→PyInstaller 用最后一个→第一个的 datas 修复完全无效
+- `SPECPATH` 是目录路径不是文件路径→check_spec 设错了导致 ROOT 偏移到 backend/，自动发现返回空
+- litellm `collect_submodules()` 只收集 479/1727 模块（缺 tokenizers）→必须文件系统扫描
+- tiktoken 编码数据在 `tiktoken_ext` 命名空间包→PyInstaller 不自动发现→需加入 hiddenimports
+- chat.py `set_clarifier_llm` 注入只在 chat 路由加载时生效→加 `set_chatter_llm` 同步注入
+>>>>>>> origin/master

@@ -12,7 +12,7 @@ providers:
       - days: [Mon, Tue, Wed, Thu, Fri]
         hours: "23:00-09:00"
       - days: [Sat, Sun]
-        hours: "00:00-24:00"
+        hours: "00:00-23:59"
     peak_price_multiplier: 1.0
     offpeak_price_multiplier: 0.7
 
@@ -25,7 +25,7 @@ providers:
       - days: [Mon, Tue, Wed, Thu, Fri]
         hours: "18:00-08:00"
       - days: [Sat, Sun]
-        hours: "00:00-24:00"
+        hours: "00:00-23:59"
     peak_price_multiplier: 1.0
     offpeak_price_multiplier: 0.85
 
@@ -38,7 +38,7 @@ providers:
       - days: [Mon, Tue, Wed, Thu, Fri]
         hours: "18:00-08:00"
       - days: [Sat, Sun]
-        hours: "00:00-24:00"
+        hours: "00:00-23:59"
     peak_price_multiplier: 1.0
     offpeak_price_multiplier: 1.0   # OpenAI 暂无分时定价
 
@@ -51,6 +51,6 @@ providers:
       - days: [Mon, Tue, Wed, Thu, Fri]
         hours: "23:00-09:00"
       - days: [Sat, Sun]
-        hours: "00:00-24:00"
+        hours: "00:00-23:59"
     peak_price_multiplier: 1.0
     offpeak_price_multiplier: 1.0   # GLM Coding Plan 免费，不分峰

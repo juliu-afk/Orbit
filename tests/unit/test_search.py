@@ -115,8 +115,8 @@ async def test_grep_case_insensitive(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def @pytest.mark.skip(reason="P2-4: needs fixing")
-test_grep_truncated(tmp_path: Path) -> None:
+@pytest.mark.skip(reason="P2-4: needs fixing")
+async def test_grep_truncated(tmp_path: Path) -> None:
     """结果超过 head_limit 应截断."""
     (tmp_path / "big.py").write_text("line0\n" + "\n".join(f"match line {i}" for i in range(100)), encoding="utf-8")
     result = await grep("match", path=".", head_limit=5)

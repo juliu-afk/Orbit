@@ -21,6 +21,7 @@ import structlog
 from orbit.hallucination.base import skip_if_empty
 from orbit.hallucination.schemas import (
     HallucinationLevel,
+    L4BehaviorResult,
     ValidationResult,
 )
 from orbit.observability.metrics import record_hallucination_validation as _record_hallucination
@@ -46,26 +47,44 @@ class L4TypeValidator:
         self._available: bool | None = None  # 缓存 mypy 可用性
 
     @skip_if_empty
-    async def validate(self, code: str) -> ValidationResult:
+    async def validate(
+        self, code: str, predicted_behavior: str | None = None
+    ) -> ValidationResult:
         """对代码片段运行 mypy 静态类型检查。
+
+        CUA-US2: 可选 predicted_behavior——Agent 自述"此代码预期行为"。
+        提供时返回 L4BehaviorResult（含 predicted/actual behavior 对比），
+        不提供时返回 ValidationResult（向后兼容）。
 
         Args:
             code: LLM 生成的 Python 代码
+            predicted_behavior: Agent 自述的预期行为描述（可选）
 
         Returns:
-            ValidationResult：passed=True 无类型错误，passed=False 含错误列表
+            ValidationResult 或 L4BehaviorResult
         """
+        use_reflection = predicted_behavior is not None
 
         # 检查 mypy 是否可用（缓存结果）
         available = await self._check_available()
         if not available:
-            result = ValidationResult(
+            base: ValidationResult = ValidationResult(
                 passed=False,
                 level=HallucinationLevel.L4_TYPE,
                 errors=["mypy is not installed or not found in PATH"],
             )
-            _record_hallucination(result.passed)
-            return result
+            _record_hallucination(base.passed)
+            if use_reflection:
+                return L4BehaviorResult(
+                    passed=base.passed,
+                    level=base.level,
+                    errors=base.errors,
+                    predicted_behavior=predicted_behavior or "",
+                    actual_behavior="mypy unavailable",
+                    behavior_match=False,
+                    behavior_diff="mypy not available—cannot verify behavior",
+                )
+            return base
 
         # 写临时文件（mypy 需文件输入，不支持 stdin）
         with tempfile.NamedTemporaryFile(
@@ -77,6 +96,37 @@ class L4TypeValidator:
         try:
             result = await self._run_mypy(tmp_path)
             _record_hallucination(result.passed)
+
+            # ── CUA-US2: 反思式行为对比 ——
+            # mypy 推断的类型错误作为"实际行为"，与 Agent 自述预期对比。
+            # REVIEW-FIX P1-3: 原 behavior_match = result.passed 是空壳——
+            # 现在从 predicted_behavior 提取类型声明，与 mypy 错误做关键词交叉对比。
+            if use_reflection:
+                actual_behavior = (
+                    "type check passed" if result.passed
+                    else f"type errors: {'; '.join(result.errors[:5])}"
+                )
+                behavior_match = self._compare_behavior(
+                    predicted_behavior or "", result
+                )
+                behavior_diff = ""
+                if not behavior_match:
+                    behavior_diff = (
+                        f"Predicted: {predicted_behavior}\n"
+                        f"Actual: {actual_behavior}"
+                    )
+                return L4BehaviorResult(
+                    passed=result.passed,
+                    level=HallucinationLevel.L4_TYPE,
+                    errors=result.errors,
+                    warnings=result.warnings,
+                    metadata=result.metadata,
+                    predicted_behavior=predicted_behavior or "",
+                    actual_behavior=actual_behavior,
+                    behavior_match=behavior_match,
+                    behavior_diff=behavior_diff,
+                )
+
             return result
         finally:
             try:
@@ -148,3 +198,82 @@ class L4TypeValidator:
         if not self._available:
             logger.debug("l4_mypy_not_found", path=self._mypy_path)
         return self._available
+
+    @staticmethod
+    def _compare_behavior(predicted: str, result: ValidationResult) -> bool:
+        """对比 Agent 自述行为与 mypy 实际结果。
+
+        REVIEW-FIX P1-3 + NEW-2: 从 mypy 错误提取 got/expected 类型，
+        与 Agent 自述的返回/接受类型做精确匹配。
+
+        WHY 不直接用关键词共现：Agent 自述"returns str" + mypy 报
+        "got str, expected int" → 关键词 "str" 共现 → 旧逻辑误判矛盾。
+        实际上 Agent 正确预测了实际返回类型(str)，新逻辑识别为匹配。
+
+        算法：
+        1. mypy passed → True（无矛盾）
+        2. 从 mypy 错误提取 got/expected 类型
+        3. 从 predicted 提取 returns/accepts 类型声明
+        4. 自述类型 = mypy "got" 类型 → Agent 正确预测实际行为 → True
+        5. 自述类型 = mypy "expected" 类型 → Agent 正确预测期望类型 → True
+        6. 自述类型与 mypy 类型不重叠 → 矛盾 → False
+        7. 无法提取 → fail-open → True
+        """
+        if result.passed:
+            return True
+        if not predicted.strip():
+            return result.passed
+
+        import re as _re
+
+        # Step 1: 从 mypy 错误提取 got/expected 类型
+        error_text = ' '.join(result.errors)
+        mypy_types: set[str] = set()
+        # 格式1: "got str, expected int" / "got \"str\", expected \"int\""
+        for m in _re.finditer(
+            r'got\s+"?\'?(\w+(?:\[[^\]]+\])?)',
+            error_text, _re.IGNORECASE,
+        ):
+            mypy_types.add(m.group(1).lower())
+        for m in _re.finditer(
+            r'expected\s+"?\'?(\w+(?:\[[^\]]+\])?)',
+            error_text, _re.IGNORECASE,
+        ):
+            mypy_types.add(m.group(1).lower())
+        # 格式2: "has type \"X\"" / "incompatible type \"X\"" / "type \"X\""
+        for m in _re.finditer(r'(?:has|incompatible|return)?\s*type\s+"(\w+)', error_text):
+            mypy_types.add(m.group(1).lower())
+        # 格式3: 直接的类型名（fallback）
+        if not mypy_types:
+            for m in _re.finditer(
+                r'\b(int|str|float|bool|list|dict|None|tuple|set)\b',
+                error_text,
+            ):
+                mypy_types.add(m.group(1).lower())
+
+        if not mypy_types:
+            return True  # 无法提取 mypy 类型 → fail-open
+
+        # Step 2: 从 Agent 自述提取类型声明
+        predicted_types: set[str] = set()
+        for m in _re.finditer(
+            r'(returns?|accepts?|takes?|expects?|outputs?)\s+'
+            r'(\w+(?:\s*\|\s*\w+)*)',
+            predicted, _re.IGNORECASE,
+        ):
+            types = _re.split(r'\s*\|\s*', m.group(2))
+            predicted_types.update(t.lower() for t in types)
+        # fallback: 直接匹配内置类型名
+        if not predicted_types:
+            for m in _re.finditer(
+                r'\b(int|str|float|bool|list|dict|None|tuple|set)\b',
+                predicted,
+            ):
+                predicted_types.add(m.group(1).lower())
+
+        if not predicted_types:
+            return True  # 无类型声明可提取 → fail-open
+
+        # Step 3: 对比——自述类型与 mypy 提及的类型有交集 → 匹配
+        overlap = predicted_types & mypy_types
+        return len(overlap) > 0

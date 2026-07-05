@@ -26,6 +26,7 @@ from orbit.gateway.adapters.openai import OpenAIAdapter
 from orbit.gateway.circuit_breaker import CircuitBreaker, CircuitOpenError
 from orbit.gateway.routing import RoutingStrategy, select_model
 from orbit.gateway.schemas import LLMRequest, LLMResponse, LLMUsage
+from orbit.gateway.task_router import TaskModelRouter, TaskType
 
 logger = structlog.get_logger("orbit.gateway.client")
 
@@ -56,6 +57,8 @@ class LLMClient:
         self.fallback_model = fallback_model
         self.resolver = resolver  # Step 2.3: 智能路由
         self._usage_log: dict[str, list[LLMUsage]] = {}
+        # Inkeep 借鉴 #1: 按任务类型路由模型
+        self.task_router = TaskModelRouter()
         # Phase 3: provider adapter 缓存（按 provider name）
         self._adapters: dict[str, ProviderAdapter] = {
             "anthropic": AnthropicAdapter(),
@@ -83,6 +86,7 @@ class LLMClient:
         agent_name: str = "",  # Step 2.3: Agent 名称
         router_decision=None,  # Step 2.3: RouterDecision
         routing_strategy: RoutingStrategy | None = None,  # Phase 3: 路由策略
+        task_type: str | None = None,  # Inkeep 借鉴 #1: 任务类型路由
     ) -> LLMResponse:
         # Step 2.3: 通过 Resolver 获取实际模型（而非硬编码 default_model）
         model = self.default_model
@@ -100,6 +104,22 @@ class LLMClient:
                 model=model,
                 reason=decision.reason,
             )
+
+        # Inkeep 借鉴 #1: 按 task_type 路由（优先于 Resolver，次于 RoutingStrategy）
+        elif task_type or req.task_type:
+            tt = task_type or req.task_type or ""
+            try:
+                task_decision = self.task_router.select(tt)
+                model = task_decision.model
+                model_source = f"task_type_{task_decision.task_type.value}"
+                logger.info(
+                    "task_type_routing",
+                    task_type=tt,
+                    model=model,
+                    reason=task_decision.reason,
+                )
+            except Exception as e:
+                logger.warning("task_type_routing_failed", task_type=tt, error=str(e))
 
         elif self.resolver and agent_name:
             try:
@@ -192,6 +212,10 @@ class LLMClient:
             kwargs["api_base"] = GLM_API_BASE
             kwargs["api_key"] = settings.ZAI_API_KEY
 
+        # DeepSeek 模型——显式传 api_key（避免 litellm 自行查找失败 FileNotFoundError）
+        if model.startswith("deepseek/"):
+            kwargs["api_key"] = settings.DEEPSEEK_API_KEY
+
         # Phase 1: 工具调用支持——传递 tools schema 给 LLM
         if tools_schema:
             kwargs["tools"] = tools_schema
@@ -243,8 +267,22 @@ class LLMClient:
         """
         from orbit.stream.events import StreamEventType
 
+        # Inkeep 借鉴 #1: 按 task_type 路由模型（流式）
         model = self.default_model
         model_source = "default"
+        if req.task_type:
+            try:
+                task_decision = self.task_router.select(req.task_type)
+                model = task_decision.model
+                model_source = f"task_type_{task_decision.task_type.value}"
+                logger.info(
+                    "stream_task_type_routing",
+                    task_type=req.task_type,
+                    model=model,
+                )
+            except Exception as e:
+                logger.warning("stream_task_type_routing_failed", error=str(e))
+
         # Phase 3: 流式调用也经过熔断器
         try:
             await self.cb.before_call(model)

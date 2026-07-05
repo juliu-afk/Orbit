@@ -28,8 +28,8 @@ const fileCount = computed(() => {
 </script>
 
 <style scoped>
-.file-tree-panel { height: 100%; display: flex; flex-direction: column; background: var(--el-bg-color); }
-.tree-header { padding: 8px 12px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--el-border-color-light); display: flex; justify-content: space-between; }
-.file-count { color: var(--el-text-color-secondary); font-size: 12px; }
+.file-tree-panel { height: 100%; display: flex; flex-direction: column; background: transparent; }
+.tree-header { padding: 8px 12px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--color-orbit-border); display: flex; justify-content: space-between; color: var(--color-orbit-text); }
+.file-count { color: var(--color-orbit-text-secondary); font-size: 12px; }
 .tree-body { flex: 1; overflow-y: auto; padding: 4px 0; }
 </style>

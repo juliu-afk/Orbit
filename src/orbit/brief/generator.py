@@ -227,6 +227,24 @@ def _detect_dependencies(file_names: set[str], root: Path) -> list[str]:
     return deps[:30]  # 最多 30 个，避免 token 爆炸
 
 
+def _extract_section(text: str, section_title: str) -> str:
+    """从 markdown 文本中提取指定段落内容。
+
+    WHY 简单字符串操作: brief.md 是 LLM 生成的固定格式，
+    不需要完整 markdown 解析器。
+    """
+    # 支持 "## N. 标题" 和 "## 标题" 两种格式
+    for prefix in (f"## {section_title}", f"##{section_title}"):
+        if prefix in text:
+            idx = text.index(prefix)
+            start = idx + len(prefix)
+            # 取到下一个 ## 或文末
+            end_idx = text.find("\n## ", start)
+            section = text[start:] if end_idx == -1 else text[start:end_idx]
+            return section.strip()
+    return ""
+
+
 def _build_directory_tree(
     project_path: str, ignore_dirs: set[str], max_lines: int = 80
 ) -> list[str]:
@@ -499,6 +517,54 @@ class BriefGenerator:
 
         parts.append("请输出完整的项目说明书（6 个段落，Markdown 格式）：")
         return "\n".join(parts)
+
+    @staticmethod
+    def generate_strategy_md(project_root: str) -> Path | None:
+        """从已有 brief.md 生成 STRATEGY.md——无需 LLM，纯文本提取。
+
+        读取 .orbit/brief.md → 提取 5 段战略结构 → 写入 STRATEGY.md。
+        Compound 对标: STRATEGY.md 是项目策略锚点，所有 Agent 自动对齐。
+
+        Args:
+            project_root: 项目根目录
+
+        Returns:
+            写入的 STRATEGY.md 路径，brief.md 不存在则返回 None
+        """
+        root = Path(project_root)
+        brief_path = root / ".orbit" / "brief.md"
+        if not brief_path.exists():
+            return None
+
+        try:
+            brief_text = brief_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+
+        # 从 brief 6 段中提取战略相关段落
+        extract = _extract_section
+
+        strategy_parts = [
+            "## Target Problem",
+            extract(brief_text, "1. 摘要") or "（待补充——从项目说明书自动生成）",
+            "",
+            "## Approach",
+            extract(brief_text, "2. 技术栈") or "（待补充）",
+            "",
+            "## Persona",
+            "（待补充——请在 STRATEGY.md 中描述目标用户）",
+            "",
+            "## Key Metrics",
+            "（待补充——请定义成功衡量标准）",
+            "",
+            "## Tracks",
+            "（待补充——请列出产品迭代路线优先级）",
+        ]
+
+        strategy_text = "\n".join(strategy_parts)
+        strategy_path = root / "STRATEGY.md"
+        strategy_path.write_text(strategy_text, encoding="utf-8")
+        return strategy_path
 
     @staticmethod
     def _fill_missing_sections(brief: BriefRecord, analysis: ProjectAnalysis) -> BriefRecord:

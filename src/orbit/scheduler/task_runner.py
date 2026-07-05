@@ -56,6 +56,27 @@ _TASK_TYPE_MAP: dict[TaskState, str] = {
 
 TERMINAL_STATES = {TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED}
 
+# ── CUA-US1: Agent 循环鲁棒性配置（来源：OpenAI CUA Sample App responses-loop.ts）──
+# WHY 工具级超时 20s：OpenAI CUA 每个动作有硬超时，防止单步卡死。
+# CODING 状态用 60s（代码生成更耗时），其他状态用 20s。
+TOOL_TIMEOUT_SECONDS: dict[TaskState, int] = {
+    TaskState.CODING: 60,
+}
+TOOL_TIMEOUT_DEFAULT = 20
+
+# WHY 动作间延迟 120ms：OpenAI CUA 动作间延迟模拟人类操作节奏，防止 DOM/文件系统
+# 渲染追赶不上。Orbit 在写文件→跑测试等关键转换间插入延迟，防止文件系统未刷盘。
+ACTION_DEBOUNCE_SECONDS = 0.12
+
+# WHY 循环上限 50 轮：OpenAI CUA 默认 24 轮可配。Orbit 任务更复杂，设 50 轮硬上限，
+# 防止 Agent 死循环。超限 → FAILED + audit 记录。
+MAX_AGENT_CYCLES = 50
+
+# 需要防抖延迟的状态转换（写文件后→验证前）
+_DEBOUNCE_TRANSITIONS: set[tuple[TaskState, TaskState]] = {
+    (TaskState.CODING, TaskState.VERIFYING),
+}
+
 
 class TaskRunner:
     """单任务生命周期——状态机驱动 Agent 循环.
@@ -124,11 +145,39 @@ class TaskRunner:
 
         while state not in TERMINAL_STATES:
             try:
+                # CUA-US1: 循环硬上限——防止 Agent 死循环
+                cycle_count = context.get("_cycle_count", 0)
+                cycle_count += 1
+                context["_cycle_count"] = cycle_count
+                if cycle_count > MAX_AGENT_CYCLES:
+                    logger.error(
+                        "max_cycles_exceeded",
+                        task_id=task_id,
+                        cycles=cycle_count,
+                        max_cycles=MAX_AGENT_CYCLES,
+                    )
+                    state = TaskState.FAILED
+                    context["error"] = f"max_cycles_exceeded: {cycle_count} > {MAX_AGENT_CYCLES}"
+                    await self._save_checkpoint(task_id, state, context)
+                    if self._audit_logger:
+                        self._audit_logger.log(
+                            "task_runner", "max_cycles_exceeded",
+                            task_id=task_id, status="error",
+                            detail={"cycles": cycle_count, "max": MAX_AGENT_CYCLES},
+                        )
+                    return state
+
+                # CUA-US1: CODING 状态强制串行化——防止并发编辑冲突
+                if state == TaskState.CODING:
+                    context["parallel_tool_calls"] = False
+
                 observation = await self._agent_cycle(task_id, state, context)
                 context["artifacts"][state.value] = observation
                 self._publish_task_update(
                     task_id, state.value, _state_to_progress(state), context=context
                 )
+
+                prev_state = state
 
                 # 意图路由: IDLE 状态由 chatter 接管——
                 # chat → 结束, programming → 正常进入 PARSING
@@ -137,6 +186,10 @@ class TaskRunner:
                     logger.info("task_chat_complete", task_id=task_id)
                 else:
                     state = _transition(state, self._fast_lane)
+
+                # CUA-US1: 关键状态转换间插入防抖延迟
+                if (prev_state, state) in _DEBOUNCE_TRANSITIONS:
+                    await asyncio.sleep(ACTION_DEBOUNCE_SECONDS)
 
                 await self._save_checkpoint(task_id, state, context)
             except asyncio.CancelledError:
@@ -177,6 +230,10 @@ class TaskRunner:
             # Inkeep 借鉴 #1: 注入 task_type 供 Agent 选择模型
             task_type = _TASK_TYPE_MAP.get(state, "reasoning")
             context["task_type"] = task_type
+
+            # CUA-US1: 注入工具级超时——CODING 用 60s，其他状态用 20s
+            tool_timeout = TOOL_TIMEOUT_SECONDS.get(state, TOOL_TIMEOUT_DEFAULT)
+            context["tool_timeout"] = tool_timeout
 
             if state == TaskState.PLANNING and self.router is not None:
                 try:
@@ -228,12 +285,20 @@ class TaskRunner:
         return "chat"
 
     async def _run_agent(
-        self, role: str, task_id: str, context: dict[str, Any], timeout: int = 300
+        self, role: str, task_id: str, context: dict[str, Any], timeout: int | None = None
     ) -> str:
-        """拉起 Agent 协程——AgentFactory 创建 + 注入依赖 + 超时保护."""
+        """拉起 Agent 协程——AgentFactory 创建 + 注入依赖 + 超时保护.
+
+        CUA-US1: timeout 按状态分级——CODING 60s，其他 20s。
+        可通过 context['tool_timeout'] 覆盖。
+        """
         t_start = time.monotonic()
         if self._agent_factory is None:
             raise RuntimeError("AgentFactory 未配置")
+
+        # CUA-US1: 工具级超时——按任务状态取不同阈值
+        if timeout is None:
+            timeout = context.get("tool_timeout", TOOL_TIMEOUT_DEFAULT)
 
         agent_llm = self._agent_llms.get(role) if self._agent_llms else None
 

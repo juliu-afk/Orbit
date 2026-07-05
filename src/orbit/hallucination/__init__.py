@@ -9,6 +9,7 @@ L5 Z3 形式化 → L6 合约验证 → L7 沙箱执行 → L8 配置漂移
 
 from orbit.hallucination.l1_graph import L1GraphValidator
 from orbit.hallucination.l2_dynamic import L2DynamicTracer
+from orbit.hallucination.pipeline import HallucinationPipeline
 from orbit.hallucination.l3_entropy import L3EntropyMonitor
 from orbit.hallucination.l4_type import L4TypeValidator
 from orbit.hallucination.l5_z3 import L5Z3Validator

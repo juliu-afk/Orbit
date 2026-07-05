@@ -28,6 +28,7 @@ from orbit.agents.chatter import ChatterAgent
 from orbit.agents.clarifier import ClarifierAgent
 from orbit.agents.dream_agent import DreamAgent
 from orbit.agents.react_agent import ReActAgent
+from orbit.agents.reflection import ReflectionEngine
 from orbit.knowledge.templates import get_registry
 from orbit.prompt.ponytail_rules import determine_mode, get_ladder
 
@@ -206,20 +207,14 @@ class AgentFactory:
         task_keywords: list[str] | None = None,  # 模板匹配关键词
         goal: Goal | None = None,  # Phase 4 AC-B1: Goal
         goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge
+        reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
     ) -> BaseAgent:
         """create = get_agent alias for orchestrator."""
         return cls.get_agent(
-            role,
-            llm=llm,
-            graph=graph,
-            sandbox=sandbox,
-            tools=tools,
-            event_bus=event_bus,
-            goal=goal,
-            goal_judge=goal_judge,
-            compressor=compressor,
-            budget_tracker=budget_tracker,
-            task_keywords=task_keywords,
+            role, llm=llm, graph=graph, sandbox=sandbox, tools=tools,
+            event_bus=event_bus, goal=goal, goal_judge=goal_judge,
+            compressor=compressor, budget_tracker=budget_tracker,
+            task_keywords=task_keywords, reflection_engine=reflection_engine,
         )
 
     @classmethod
@@ -236,6 +231,7 @@ class AgentFactory:
         compressor: ContextCompressor | None = None,  # Phase 2 AC7
         budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7
         task_keywords: list[str] | None = None,  # 模板匹配关键词
+        reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
     ) -> BaseAgent:
         """按角色创建 Agent 实例。
 
@@ -275,6 +271,7 @@ class AgentFactory:
                 compressor=compressor,  # Phase 2 AC7
                 budget_tracker=budget_tracker,  # Phase 2 AC7
                 task_keywords=task_keywords,  # 模板匹配关键词
+                reflection_engine=reflection_engine,  # Phase A: ReflAct
             )
         return agent_cls(llm=llm, graph=graph, sandbox=sandbox)
 

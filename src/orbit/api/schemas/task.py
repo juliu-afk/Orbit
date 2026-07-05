@@ -23,6 +23,7 @@ class TaskState(StrEnum):
 
     IDLE = "IDLE"
     PARSING = "PARSING"
+    SCOPING = "SCOPING"  # Phase 2 Token节省: 变更范围分析（规则引擎，非LLM）
     PLANNING = "PLANNING"
     CODING = "CODING"
     VERIFYING = "VERIFYING"

@@ -358,6 +358,33 @@ memory: orbit-coverage-sprint.md
 ### 完成
 - PR #51 关闭——内容已通过 PR #50 合并，test isolation 修复 cherry-pick 到 master (d8da444)
 
+## 2026-07-03 — 文档-代码对照审查 + 源码 TODO 清零
+
+### 背景
+docs/ 与 src/ 对照清查，发现 26 项未完成：12 源码 TODO、3 P2 修复、3 Charter SLA、5 覆盖率 AC、Ponytail A5/A7/C4。
+
+### 完成 PR
+- #175-#182: 8 个 PR 清零 12 处源码 TODO
+  - 前端：TerminalChat 历史导航、AgentLLMStatus 详情弹窗、middleware 模板默认
+  - 调度：dag_runner AgentFactory 路由、meta_orchestrator budget_tracker
+  - 算法：ensemble LLM 3D 评分 + 真正融合逻辑
+  - 存储：memory HyDE async、compressor session cold storage
+  - 安全：沙箱外部路径 allowlist、code_graph 方法级命名空间
+  - 流程：Ponytail A5 ComposeOrchestrator brief 检查
+  - 可观测：Charter SLA 指标定义 + L4-L7/dag_runner/task_runner 埋点接线
+  - 测试：circuit_breaker xfail 移除 + HyDE 异步测试
+- #186: UI 修复——窗口拖动 + 项目选择器
+- #189: ChatterAgent——通用对话首触点 + 意图路由（chat→DONE / programming→Clarifier）
+- #184: SLA 指标接线
+- #183: 文档同步（charter / Ponytail 步骤 / 代码审查 P2）
+
+### 审查结论
+26 项全部闭环。源码 TODO 清零。Charter 三项 SLA 全部仪表化。UI 三问题修复。
+
+### 待办
+- #190 覆盖率冲刺（另一会话）
+- exe 重构建（另一会话）
+
 ## 2026-07-04 — ChatterAgent 聊天路由 + PyInstaller 打包防复发体系
 
 ### PR #196: fix: ChatterAgent 首触路由 + PyInstaller 打包防复发体系 (MERGE)

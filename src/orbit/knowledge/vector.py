@@ -183,22 +183,6 @@ class VectorStore:
         """
         if not query.strip():
             return []
-        if self._use_turbovec and self._index is not None:
-            return self._search_turbovec(query, top_k)
-        return self._search_tfidf(query, top_k)
-
-    def _search_turbovec(self, query: str, top_k: int) -> list[dict[str, Any]]:
-        """turbovec 语义搜索。"""
-        import numpy as np
-
-        try:
-            query_vec = np.array(
-                [self._embedder.encode_query(query)], dtype=np.float32
-            )
-            scores, indices = self._index.search(query_vec, k=min(top_k, len(self._concepts)))
-            # turbovec returns 2D results for batch queries
-            scores = scores[0] if scores.ndim == 2 else scores
-            indices = indices[0] if indices.ndim == 2 else indices
         except Exception as e:
             logger.warning("turbovec_search_failed_fallback_tfidf", error=str(e))
             return self._search_tfidf(query, top_k)

@@ -399,6 +399,13 @@ async def _app_lifespan(app: FastAPI) -> None:
     except Exception:
         logger.exception("mcp_init_failed")
 
+    # 执行轨迹收集器——供 FeedbackEngine 分析使用
+    from orbit.observability.trajectory import TrajectoryCollector
+
+    _trajectory_collector = TrajectoryCollector(db_path="data/trajectories.db")
+    app.state.trajectory_collector = _trajectory_collector
+    logger.info("trajectory_collector_initialized", db_path="data/trajectories.db")
+
     yield  # 应用运行中
 
     # ── 关闭阶段 ──

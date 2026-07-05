@@ -65,5 +65,16 @@ if [ $SMOKE_EXIT -ne 0 ]; then
 fi
 
 echo ""
+echo "=== 7. 代码签名（可选）==="
+if [ -n "$CODE_SIGN_CERT" ] && [ -n "$CODE_SIGN_PASSWORD" ]; then
+  signtool sign /fd SHA256 /f "$CODE_SIGN_CERT" /p "$CODE_SIGN_PASSWORD" \
+    /tr http://timestamp.digicert.com /td SHA256 \
+    "Deliverables/Orbit.exe"
+  echo "✅ 代码签名完成"
+else
+  echo "⚠️  跳过代码签名（CODE_SIGN_CERT 未设置，见 docs/SOP-代码签名.md）"
+fi
+
+echo ""
 echo "✅ 构建完成: Deliverables/Orbit.exe"
 echo "   Tauri 桌面壳 (内嵌 orbit-backend.exe + WebView 窗口)"

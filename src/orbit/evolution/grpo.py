@@ -101,8 +101,7 @@ class GRPOScorer:
             # 更新原则效用
             if delta > 0.05:       # 显著优于基线
                 self._engine.apply_feedback(p.id, True)
-            elif delta < -0.05:    # 显著差于基线
-                self._engine.apply_feedback(p.id, False)
+            elif delta < -0.05:    # 显著差于基线——单次降权
                 self._engine.apply_feedback(p.id, False)
 
             # 记录统计
@@ -115,10 +114,8 @@ class GRPOScorer:
                 utility_delta=delta,
             )
 
-        # 自动剪枝
-        if len(trials) >= 10:
-            removed = self._engine.prune(min_score=0.15, min_applied=3)
-
+        # 自动剪枝——基于全局原则数，不依赖最后迭代的局部变量
+        removed = self._engine.prune(min_score=0.15, min_applied=3)
         if removed:
             logger.info("grpo_pruned", removed=removed)
         logger.debug("grpo_update", category=category, baseline_rate=baseline_rate,

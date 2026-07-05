@@ -229,10 +229,10 @@ class ReActAgent(BaseAgent):
         if decision_history_block:
             system += "\n\n" + decision_history_block
 
-        # Phase F: 接线——注入策略原则 + AgenticMemory 建议
+        # Phase F: 接线——注入策略原则 + AgenticMemory 建议（单例）
         try:
-            from orbit.integration.wiring import OrbitWiring
-            wiring = OrbitWiring()
+            from orbit.integration.wiring import get_wiring
+            wiring = get_wiring()
             kw = getattr(self, "_task_keywords", None) or []
             system = wiring.enhance_prompt(system, category="", keywords=kw)
         except Exception: pass

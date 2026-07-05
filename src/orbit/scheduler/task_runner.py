@@ -130,7 +130,8 @@ class TaskRunner:
         await self._save_checkpoint(task_id, state, {"prd": prd})
         context: dict[str, Any] = {"prd": prd, "artifacts": {}, "mode": "auto"}
         # Phase F: 接线——任务开始
-        self._wire("on_task_start", task_id, prd[:100], project_id=context.get("project_path",""))
+        # project_path 由上游 Scheduler 设置——未设置时传空，ProfileStore 跳过
+        self._wire("on_task_start", task_id, prd[:100], project_id=context.get("project_path", ""))
         # 减熵闭环-2 B4: 检查目标文件编辑稳定性
         try:
             target_file = context.get("target_file", "")
@@ -190,7 +191,7 @@ class TaskRunner:
 
                 # Phase F: 接线——记录状态变迁事件
                 if prev_state == TaskState.CODING and observation:
-                    self._wire("record_event", task_id, f"CODING完成", "success" if "error" not in str(observation)[:200].lower() else "failure")
+                    self._wire("record_event", task_id, f"CODING完成", "success" if "error" not in str(observation)[:200].lower() else "failure", category="编码")
 
                 # 意图路由: IDLE 状态由 chatter 接管——
                 # chat → 结束, programming → 正常进入 PARSING

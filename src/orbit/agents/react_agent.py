@@ -235,7 +235,8 @@ class ReActAgent(BaseAgent):
             wiring = get_wiring()
             kw = getattr(self, "_task_keywords", None) or []
             system = wiring.enhance_prompt(system, category="", keywords=kw)
-        except Exception: pass
+        except Exception:
+            logger.warning("prompt_enhance_failed", exc_info=True)
 
         # 2. 初始化消息历史
         messages: list[dict] = [
@@ -368,7 +369,8 @@ class ReActAgent(BaseAgent):
                                         if pred.should_skip() and pred.alternative:
                                             logger.info("preact_skip", task_id=task_id, tool=tn, alt=pred.alternative[:80])
                                             tool_calls.remove(tc)
-                                    except Exception: pass  # fail-open
+                                    except Exception:
+                                        logger.debug("preact_skip_error", tool_name=tn, exc_info=True)  # fail-open
                             # 执行每个工具
                             for tc in tool_calls:
                                 func = tc.get("function", {})

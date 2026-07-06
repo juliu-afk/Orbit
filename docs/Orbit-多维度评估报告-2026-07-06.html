@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit 多维度评估报告 — 2026-07-06</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d2991d;
+    --orange: #db6d28;
+    --red: #f85149;
+    --purple: #a371f7;
+  }
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { background:var(--bg); color:var(--text); font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; max-width:960px; margin:0 auto; padding:40px 20px }
+  h1 { font-size:28px; margin-bottom:4px }
+  h2 { font-size:18px; margin:32px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--border) }
+  h3 { font-size:15px; margin:16px 0 8px; color:var(--accent) }
+  .subtitle { color:var(--muted); font-size:14px; margin-bottom:24px }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:20px; margin-bottom:16px }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px }
+  table { width:100%; border-collapse:collapse; margin:8px 0 }
+  th, td { text-align:left; padding:8px 12px; border-bottom:1px solid var(--border) }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase }
+  .score { font-weight:700; font-size:16px }
+  .bar { height:8px; border-radius:4px; background:var(--border); margin-top:4px }
+  .bar-fill { height:100%; border-radius:4px }
+  .g5 { background:var(--green) } .g4 { background:#56d364 } .g3 { background:var(--yellow) }
+  .g2 { background:var(--orange) } .g1 { background:var(--red) }
+  .tag { display:inline-block; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600 }
+  .tag-ok { background:#1a3a2a; color:var(--green) }
+  .tag-warn { background:#3a2a0a; color:var(--yellow) }
+  .tag-err { background:#3a0a0a; color:var(--red) }
+  .radar-container { display:flex; justify-content:center; margin:16px 0 }
+  .summary-box { background:linear-gradient(135deg,#1a2a3a,#0d1a2a); border:1px solid var(--accent); border-radius:8px; padding:16px 20px; margin:16px 0 }
+  .metric { text-align:center }
+  .metric .val { font-size:28px; font-weight:700 }
+  .metric .lbl { font-size:12px; color:var(--muted); margin-top:4px }
+  .rec { padding:8px 12px; border-left:3px solid var(--border); margin:8px 0 }
+  .rec-p0 { border-color:var(--red) } .rec-p1 { border-color:var(--yellow) } .rec-p2 { border-color:var(--accent) }
+  hr { border:none; border-top:1px solid var(--border); margin:20px 0 }
+  a { color:var(--accent) }
+  .discrepancy-table td:first-child { font-family:monospace; font-size:13px }
+</style>
+</head>
+<body>
+
+<h1>Orbit 多维度评估报告</h1>
+<p class="subtitle">评估日期：2026-07-06 &nbsp;|&nbsp; 代码基线：83f0431 &nbsp;|&nbsp; 评估者：Claude Code</p>
+
+<div class="summary-box">
+  <div class="grid3">
+    <div class="metric"><div class="val" style="color:var(--accent)">3.7</div><div class="lbl">综合评分 / 5.0</div></div>
+    <div class="metric"><div class="val" style="color:var(--yellow)">69%</div><div class="lbl">测试覆盖率</div></div>
+    <div class="metric"><div class="val" style="color:var(--green)">48K</div><div class="lbl">Python 源码行数</div></div>
+  </div>
+</div>
+
+<h2>1. 评估方法</h2>
+<div class="card">
+<p>从 10 个维度对 Orbit 项目进行客观评估，每个维度 1-5 分。数据来源：源码静态分析（325 Python 文件）、coverage.json 全量统计、Git 历史（873 commits）、CI 配置、文档体系。</p>
+</div>
+
+<h2>2. 维度评分</h2>
+
+<div class="radar-container">
+<svg width="440" height="440" viewBox="0 0 440 440">
+  <defs>
+    <radialGradient id="bg"><stop offset="0%" stop-color="#161b22"/><stop offset="100%" stop-color="#0d1117"/></radialGradient>
+    <linearGradient id="fill" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="rgba(88,166,255,0.3)"/><stop offset="100%" stop-color="rgba(88,166,255,0.05)"/></linearGradient>
+  </defs>
+  <rect width="440" height="440" fill="url(#bg)" rx="12"/>
+  <!-- Grid circles -->
+  <circle cx="220" cy="215" r="180" fill="none" stroke="#21262d" stroke-width="1"/>
+  <circle cx="220" cy="215" r="135" fill="none" stroke="#21262d" stroke-width="1"/>
+  <circle cx="220" cy="215" r="90" fill="none" stroke="#21262d" stroke-width="1"/>
+  <circle cx="220" cy="215" r="45" fill="none" stroke="#21262d" stroke-width="1"/>
+  <!-- Axis lines + labels -->
+  <!-- Architecture 4.0, Code 3.5, Test 2.5, Docs 4.5, Process 4.0, Innovation 5.0, Frontend 3.0, DevOps 3.0, PM 4.0 -->
+  <g text-anchor="middle" font-size="11" fill="#8b949e" font-family="system-ui">
+    <!-- Angles at 0,40,80,...,320 degrees -->
+    <line x1="220" y1="215" x2="220" y2="35" stroke="#30363d"/><text x="220" y="24">架构</text>
+    <line x1="220" y1="215" x2="378" y2="65" stroke="#30363d"/><text x="390" y="62">代码质量</text>
+    <line x1="220" y1="215" x2="398" y2="215" stroke="#30363d"/><text x="415" y="219">测试</text>
+    <line x1="220" y1="215" x2="378" y2="365" stroke="#30363d"/><text x="390" y="375">文档</text>
+    <line x1="220" y1="215" x2="220" y2="395" stroke="#30363d"/><text x="220" y="416">流程</text>
+    <line x1="220" y1="215" x2="62" y2="365" stroke="#30363d"/><text x="50" y="375">创新性</text>
+    <line x1="220" y1="215" x2="42" y2="215" stroke="#30363d"/><text x="10" y="219">前端</text>
+    <line x1="220" y1="215" x2="62" y2="65" stroke="#30363d"/><text x="50" y="62">DevOps</text>
+    <line x1="220" y1="215" x2="220" y2="215" stroke="#30363d"/><text x="198" y="202" font-size="9" fill="#58a6ff">项目管理</text>
+  </g>
+  <!-- Data polygon: 架构4.0(180*0.8=144), 代码3.5(180*0.7=126), 测试2.5(90), 文档4.5(162), 流程4.0(144), 创新5.0(180), 前端3.0(108), DevOps3.0(108), PM4.0(144) -->
+  <!-- Actually let me use a simpler approach: draw the polygon with coordinates -->
+  <!-- Angle 0(top): 架构=0.8*180=144 → (220,215-144)=(220,71) -->
+  <!-- Angle 40: 代码=0.7*180=126 → x=220+126*sin(40)=220+81=301, y=215-126*cos(40)=215-96=119 -->
+  <!-- Angle 80: 测试=0.5*180=90 → x=220+90*sin(80)=220+89=309, y=215-90*cos(80)=215-16=199 -->
+  <!-- Angle 120: 文档=0.9*180=162 → x=220+162*sin(120)=220+140=360, y=215-162*cos(120)=215+81=296 -->
+  <!-- Angle 160: 流程=0.8*180=144 → x=220+144*sin(160)=220+49=269, y=215-144*cos(160)=215+135=350 -->
+  <!-- Angle 200: 创新=1.0*180=180 → x=220+180*sin(200)=220-62=158, y=215-180*cos(200)=215+169=384 -->
+  <!-- Angle 240: 前端=0.6*180=108 → x=220+108*sin(240)=220-94=126, y=215-108*cos(240)=215+54=269 -->
+  <!-- Angle 280: DevOps=0.6*180=108 → x=220+108*sin(280)=220-106=114, y=215-108*cos(280)=215-19=196 -->
+  <!-- Angle 320: PM=0.8*180=144 → x=220+144*sin(320)=220-93=127, y=215-144*cos(320)=215-110=105 -->
+  <polygon points="220,71 301,119 309,199 360,296 269,350 158,384 126,269 114,196 127,105"
+           fill="url(#fill)" stroke="#58a6ff" stroke-width="2"/>
+  <!-- Data points -->
+  <circle cx="220" cy="71" r="4" fill="#58a6ff"/><text x="220" y="60" font-size="10" fill="#58a6ff" text-anchor="middle">4.0</text>
+  <circle cx="301" cy="119" r="4" fill="#58a6ff"/><text x="316" y="116" font-size="10" fill="#58a6ff">3.5</text>
+  <circle cx="309" cy="199" r="4" fill="#f85149"/><text x="322" y="203" font-size="10" fill="#f85149">2.5</text>
+  <circle cx="360" cy="296" r="4" fill="#3fb950"/><text x="375" y="303" font-size="10" fill="#3fb950">4.5</text>
+  <circle cx="269" cy="350" r="4" fill="#58a6ff"/><text x="282" y="360" font-size="10" fill="#58a6ff">4.0</text>
+  <circle cx="158" cy="384" r="4" fill="#3fb950"/><text x="142" y="398" font-size="10" fill="#3fb950">5.0</text>
+  <circle cx="126" cy="269" r="4" fill="#d2991d"/><text x="108" y="276" font-size="10" fill="#d2991d">3.0</text>
+  <circle cx="114" cy="196" r="4" fill="#d2991d"/><text x="90" y="200" font-size="10" fill="#d2991d">3.0</text>
+  <circle cx="127" cy="105" r="4" fill="#58a6ff"/><text x="108" y="100" font-size="10" fill="#58a6ff">4.0</text>
+</svg>
+</div>
+
+<table>
+<tr><th>维度</th><th>评分</th><th>分布</th><th>一句话评价</th></tr>
+<tr><td>1. 架构设计</td><td class="score" style="color:var(--accent)">4.0</td><td><div class="bar"><div class="bar-fill g4" style="width:80%"></div></div></td><td>五图谱体系 + 9层防幻觉原创性强，但文档图谱仅设计未实现</td></tr>
+<tr><td>2. 代码质量</td><td class="score" style="color:#56d364">3.5</td><td><div class="bar"><div class="bar-fill g4" style="width:70%"></div></div></td><td>mypy strict + 类型标注完整，但超大文件+232处宽泛异常捕获</td></tr>
+<tr><td>3. 测试</td><td class="score" style="color:var(--red)">2.5</td><td><div class="bar"><div class="bar-fill g1" style="width:50%"></div></div></td><td>269个测试文件但覆盖率69%，CI不跑pytest——最大短板</td></tr>
+<tr><td>4. 文档</td><td class="score" style="color:var(--green)">4.5</td><td><div class="bar"><div class="bar-fill g5" style="width:90%"></div></div></td><td>16+ PRD+ADR + 章程 + 路线图 + 功能清单 + SESSION.md——专业级</td></tr>
+<tr><td>5. 流程纪律</td><td class="score" style="color:var(--accent)">4.0</td><td><div class="bar"><div class="bar-fill g4" style="width:80%"></div></div></td><td>四阶段工作流严格执行，行为拦截清单有效，但测-试门禁未执行到位</td></tr>
+<tr><td>6. 创新性</td><td class="score" style="color:var(--green)">5.0</td><td><div class="bar"><div class="bar-fill g5" style="width:100%"></div></div></td><td>自研调度框架 + 五图谱 + 9层防幻觉 + Tauri桌面壳——业界独有组合</td></tr>
+<tr><td>7. 前端</td><td class="score" style="color:var(--yellow)">3.0</td><td><div class="bar"><div class="bar-fill g3" style="width:60%"></div></div></td><td>Vue3+Pinia+TypeScript strict，20+组件目录，但驾驶舱复杂度高待验证</td></tr>
+<tr><td>8. DevOps</td><td class="score" style="color:var(--yellow)">3.0</td><td><div class="bar"><div class="bar-fill g3" style="width:60%"></div></div></td><td>Docker+Helm+K8s三套部署，但CI缺测试、GHCR推送不完整</td></tr>
+<tr><td>9. 项目管理</td><td class="score" style="color:var(--accent)">4.0</td><td><div class="bar"><div class="bar-fill g4" style="width:80%"></div></div></td><td>路线图+功能清单可追溯，版本历史完整——但单人项目 Bus Factor=1</td></tr>
+<tr style="font-weight:700;background:#1a2530"><td>综合评分</td><td class="score" style="color:var(--accent)">3.7</td><td colspan="2">设计文档和架构理念达到专业水准，但工程执行（测试+CI）落后于设计野心</td></tr>
+</table>
+
+<h2>3. 核心发现</h2>
+
+<div class="card">
+<h3>3.1 文档与代码不一致（已修复）</h3>
+<table class="discrepancy-table">
+<tr><th>指标</th><th>文档声称</th><th>代码实际</th><th>状态</th></tr>
+<tr><td>图谱数量</td><td>三图谱 / 六图谱 说法不一</td><td>3 引擎 + 知识图谱 + 元图谱</td><td><span class="tag tag-ok">已统一</span></td></tr>
+<tr><td>防幻觉层数</td><td>8 层 / 9 层 说法不一</td><td>9 层 (L1-L8 + L9 compliance)</td><td><span class="tag tag-ok">已统一</span></td></tr>
+<tr><td>源码模块数</td><td>24 / 65+ 说法不一</td><td>45 个</td><td><span class="tag tag-ok">已统一</span></td></tr>
+<tr><td>覆盖率</td><td>≥80% (badge)</td><td>69% (coverage.json)</td><td><span class="tag tag-ok">已更新</span></td></tr>
+<tr><td>Python 版本</td><td>3.14 (CLAUDE.md)</td><td>3.11+ (pyproject.toml)</td><td><span class="tag tag-ok">已修正</span></td></tr>
+<tr><td>文档图谱</td><td>列为已实现图谱</td><td>仅设计文档，无代码</td><td><span class="tag tag-warn">已标注</span></td></tr>
+<tr><td>CI 测试</td><td>门禁描述完善</td><td>CI 不跑 pytest</td><td><span class="tag tag-ok">已修复</span></td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>3.2 代码质量热点</h3>
+<table>
+<tr><th>问题</th><th>严重程度</th><th>数量</th><th>状态</th></tr>
+<tr><td>沉默吞异常 (except:pass)</td><td><span class="tag tag-err">致命</span></td><td>8 处</td><td><span class="tag tag-ok">已加日志</span></td></tr>
+<tr><td>超大文件 (>500行)</td><td><span class="tag tag-err">致命</span></td><td>6 个</td><td><span class="tag tag-warn">clarifier 已拆</span></td></tr>
+<tr><td>宽泛异常捕获 (except Exception)</td><td><span class="tag tag-warn">严重</span></td><td>232 处</td><td><span class="tag tag-warn">P0 核心链路已分层</span></td></tr>
+<tr><td>0% 覆盖率模块</td><td><span class="tag tag-warn">严重</span></td><td>17 个文件</td><td>待测试补充</td></tr>
+<tr><td>type: ignore 注解</td><td><span class="tag tag-warn">一般</span></td><td>40 处</td><td><span class="tag tag-warn">16 处已消除，22 处合法保留</span></td></tr>
+<tr><td>dead dream/scheduler.py</td><td><span class="tag tag-err">致命</span></td><td>1 个</td><td><span class="tag tag-ok">已删除</span></td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>3.3 模块规模 Top 10</h3>
+<table>
+<tr><th>文件</th><th>行数</th><th>覆盖率</th><th>建议</th></tr>
+<tr><td>agents/clarifier.py</td><td>986</td><td>49%</td><td><span class="tag tag-ok">已拆为 4 文件</span></td></tr>
+<tr><td>scheduler/task_runner.py</td><td>932</td><td>48%</td><td>建议拆为 task_runner + task_context + task_checkpoint</td></tr>
+<tr><td>scheduler/offpeak_scheduler.py</td><td>927</td><td>41%</td><td>三合一文件——拆分会导致循环引用，暂缓</td></tr>
+<tr><td>tools/registry.py</td><td>833</td><td>32%</td><td>建议拆 registry + permissions</td></tr>
+<tr><td>agents/react_agent.py</td><td>661</td><td>—</td><td>建议拆 ReAct 循环 + 工具调用</td></tr>
+<tr><td>brief/generator.py</td><td>586</td><td>—</td><td>项目说明书生成，逻辑内聚</td></tr>
+<tr><td>goal/meta_orchestrator.py</td><td>552</td><td>56%</td><td>元编排器——子任务调度 + 依赖分析</td></tr>
+<tr><td>api/routes/chat.py</td><td>504</td><td>64%</td><td>WebSocket 聊天端点——逻辑内聚</td></tr>
+<tr><td>observability/probes.py</td><td>476</td><td>33%</td><td>健康探针——功能集中</td></tr>
+<tr><td>api/main.py</td><td>476</td><td>45%</td><td>应用组装——路由注册集中</td></tr>
+</table>
+</div>
+
+<h2>4. 改进建议</h2>
+
+<div class="rec rec-p0">
+<strong>[P0] 拆分 task_runner.py (932行)</strong><br>
+拆为 task_runner.py (350行, _agent_cycle + _run_agent) + task_context.py (300行, _build_context) + task_checkpoint.py (250行, save/resume)。当前上帝类倾向明显。
+</div>
+
+<div class="rec rec-p0">
+<strong>[P0] CI mypy 改为硬门禁</strong><br>
+当前 <code>continue-on-error: true</code> 导致类型检查不阻塞 PR。改为 <code>continue-on-error: false</code>（建议先修完预存错误再改）。
+</div>
+
+<div class="rec rec-p1">
+<strong>[P1] 补齐 context/builders/ 测试 (8 文件, 169 语句, 0% 覆盖)</strong><br>
+全部是纯函数/确定性逻辑（无 LLM 调用，无 DB 写入），天然适合单元测试。每个文件 1 个测试，30 分钟内覆盖率 +1.5%。
+</div>
+
+<div class="rec rec-p1">
+<strong>[P1] 拆分 tools/registry.py (833行)</strong><br>
+拆为 registry.py (400行, 核心注册/查询) + permissions.py (400行, 权限+限流+版本)。
+</div>
+
+<div class="rec rec-p2">
+<strong>[P2] 收紧剩余 P1 层 except Exception (~200处)</strong><br>
+路由层已有 FastAPI 全局异常处理，Agent 层应区分 LLM API 错误 vs 代码 bug。
+</div>
+
+<div class="rec rec-p2">
+<strong>[P2] 实现文档图谱引擎</strong><br>
+已有 4 份设计文档描述 Schema 和 API。实现后五图谱体系真正完整。
+</div>
+
+<h2>5. 数据总览</h2>
+
+<div class="grid3">
+  <div class="metric"><div class="val">873</div><div class="lbl">Git Commits</div></div>
+  <div class="metric"><div class="val">45</div><div class="lbl">源码模块</div></div>
+  <div class="metric"><div class="val">325</div><div class="lbl">Python 文件</div></div>
+  <div class="metric"><div class="val">269</div><div class="lbl">测试文件</div></div>
+  <div class="metric"><div class="val">31</div><div class="lbl">API 路由文件</div></div>
+  <div class="metric"><div class="val">216+</div><div class="lbl">已合并 PR</div></div>
+  <div class="metric"><div class="val">20+</div><div class="lbl">前端组件目录</div></div>
+  <div class="metric"><div class="val">9</div><div class="lbl">Agent 角色</div></div>
+  <div class="metric"><div class="val">9</div><div class="lbl">防幻觉层</div></div>
+</div>
+
+<hr>
+
+<h2>6. 项目定位</h2>
+<div class="card">
+<p>Orbit 是<strong>多智能体软件开发自循环系统</strong>，锚定在编排层。不是单智能体执行工具，而是让一群 AI 协作完成软件开发全流程的治理系统。</p>
+<br>
+<p><strong>核心矛盾</strong>：架构广度相当于一个小团队的产品（45 模块、48K行、9 层防幻觉、五图谱），但只有一个人维护。测试覆盖率 69%，CI 刚接入 pytest。设计野心领先于工程执行。</p>
+</div>
+
+<hr>
+<p style="color:var(--muted);font-size:12px">本报告基于 2026-07-06 代码基线（HEAD: 83f0431）生成。所有数据从源码静态分析和 coverage.json 提取。评分为相对评估，非绝对值。</p>
+
+</body>
+</html>

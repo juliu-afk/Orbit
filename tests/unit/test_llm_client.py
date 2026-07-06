@@ -135,7 +135,7 @@ async def test_fallback_on_primary_failure(client, monkeypatch):
     async def fake_do(self, model, req):
         call_log.append(model)
         if model == client.default_model:
-            raise Exception("主力 API 错误")
+            raise TimeoutError("主力 API 超时")
         from orbit.gateway.schemas import LLMResponse
 
         return LLMResponse(

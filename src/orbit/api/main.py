@@ -280,7 +280,7 @@ _scheduler = Scheduler(
     graph=_code_graph_engine,  # G2: 图谱引擎——Stage 2 符号存在性查询
 )
 # Phase 4: 注入 Compose + ActorSpawn
-_scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-defined]
+_scheduler._compose_orchestrator = _compose_orchestrator
 
 _review_service = ReviewService(_review_session_factory)
 _ws_dir = settings.WORKSPACE_DIR or os.getcwd()  # P0-7: 优先使用配置

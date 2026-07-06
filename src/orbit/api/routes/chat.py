@@ -14,7 +14,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from orbit.agents.base import AgentInput
+from orbit.agents.base import AgentInput, AgentRole
 from orbit.agents.chatter import ChatterAgent  # 通用对话——首触点
 from orbit.agents.clarifier import ClarifierAgent, StructuredPRD, validate_prd
 from orbit.context.matcher import ContextMatcher
@@ -260,7 +260,7 @@ async def _handle_chat(
             "session_id": session_id,
             "project_name": project_name,
         },
-        role="chatter",  # type: ignore[arg-type]
+        role=AgentRole.CHATTER,
     )
     chatter_agent = get_chatter()
     chatter_output = await chatter_agent.execute(chatter_input)
@@ -301,7 +301,7 @@ async def _handle_chat(
             "session_id": session_id,
             "project_name": project_name,
         },
-        role="clarifier",  # type: ignore[arg-type]
+        role=AgentRole.CLARIFIER,
     )
     agent = get_clarifier()
     output = await agent.execute(agent_input)

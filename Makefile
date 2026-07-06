@@ -40,15 +40,15 @@ test-e2e:
 	docker compose -f docker-compose.test.yml down -v 2>/dev/null || true; \
 	exit $$EXIT
 
-# 代码检查（Step 0.2 SC3：make lint 无错误）
+# 代码检查（与 CI + pre-commit 一致：ruff + mypy）
 lint:
-	poetry run black --check src/ tests/
-	poetry run isort --check-only src/ tests/
+	poetry run ruff check src/ tests/
+	poetry run ruff format --check src/ tests/
 	poetry run mypy src/
 
 format:
-	poetry run black src/ tests/
-	poetry run isort src/ tests/
+	poetry run ruff check --fix src/ tests/
+	poetry run ruff format src/ tests/
 
 typecheck:
 	poetry run mypy src/

@@ -205,10 +205,11 @@ class PermissionEngine:
 
     def _is_global_deny(self, tool_name: str, path: str, command: str) -> bool:
         """Layer 5: 全局硬拒绝检查。"""
-        # P1-6: 统一到 security/constants.py
+        # P1-6: 统一到 security/constants.py，保持前缀匹配语义
         fname = path.split("/")[-1] if path else ""
-        if fname in SENSITIVE_FILE_NAMES:
-            return True
+        for sensitive in SENSITIVE_FILE_NAMES:
+            if fname == sensitive or fname.startswith(sensitive):
+                return True
 
         # 禁止 eval/exec
         return bool(command and ("eval(" in command or "exec(" in command))

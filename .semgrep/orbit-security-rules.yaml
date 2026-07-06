@@ -1,0 +1,50 @@
+# Orbit 自定义 semgrep 安全规则 (P2-1)
+# 用法: semgrep --config .semgrep/ src/
+
+rules:
+  # R1: WorkspaceGuard.validate 调用检测——文件操作前必须路径校验
+  - id: orbit-workspace-guard-missing
+    pattern-either:
+      - pattern: |
+          open($PATH, ...)
+      - pattern: |
+          Path($PATH).read_text(...)
+      - pattern: |
+          Path($PATH).write_text(...)
+    message: |
+      文件操作前必须调用 WorkspaceGuard.validate() 做路径校验。
+      参考 src/orbit/security/guard.py
+    severity: ERROR
+    languages: [python]
+    paths:
+      include:
+        - "src/orbit/tools/*.py"
+
+  # R2: shell=True 检测——禁止 create_subprocess_shell
+  - id: orbit-no-subprocess-shell
+    pattern: asyncio.create_subprocess_shell(...)
+    message: |
+      禁止使用 create_subprocess_shell(shell=True)，改用 create_subprocess_exec。
+      P0-3 已修复 src/orbit/tools/shell.py，确保新代码不再引入。
+    severity: ERROR
+    languages: [python]
+
+  # R3: 硬编码密钥检测——API key / password / token 字面量
+  - id: orbit-no-hardcoded-secrets
+    pattern-either:
+      - pattern: |
+          $VAR = "$VALUE"
+    metavariable-regex:
+      metavariable: $VAR
+      regex: '(?i)(api_key|api_secret|secret_key|password|token|auth_token)'
+    message: |
+      疑似硬编码密钥。API key / password / token 必须从环境变量读取。
+      使用 orbit.core.config.settings 中的配置项。
+    severity: WARNING
+    languages: [python]
+    paths:
+      include:
+        - "src/"
+      exclude:
+        - "src/orbit/core/config.py"
+        - "tests/"

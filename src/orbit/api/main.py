@@ -21,6 +21,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from orbit.agents.factory import AgentFactory
 from orbit.api.dependencies import AuthMiddleware
+from orbit.api.middleware.body_limit import BodySizeLimitMiddleware  # P2-7
 
 # 路由模块懒加载——create_app() 内部按需导入，避免测试时全量加载 26 个路由模块
 # _ROUTE_IMPORTS 映射: route_name -> (module_import_path, router_attr)
@@ -144,6 +145,9 @@ def create_app(
     if enable_auth and settings.AUTH_ENABLED:
         app.add_middleware(AuthMiddleware)
 
+    # P2-7: 请求体大小限制——防止超大请求耗尽内存
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=10 * 1024 * 1024)  # 10 MB
+
     # CORS——Tauri 桌面壳跨域请求后端 API
     # WHY 从settings读取而非硬编码"*": P0-1 修复——收紧跨域来源
     _origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
@@ -177,10 +181,18 @@ def create_app(
     if getattr(sys, "frozen", False):
         static_dir = os.path.join(sys._MEIPASS, "static")  # type: ignore[attr-defined]
     if os.path.isdir(static_dir):
+        # WHY NoCacheStaticFiles: Tauri WebView2 会缓存 index.html，导致新版本前端不生效
+        class NoCacheStaticFiles(StaticFiles):
+            def file_response(self, *args, **kwargs):
+                resp = super().file_response(*args, **kwargs)
+                resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+                resp.headers["Pragma"] = "no-cache"
+                resp.headers["Expires"] = "0"
+                return resp
         app.mount(
             "/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets"
         )
-        app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+        app.mount("/", NoCacheStaticFiles(directory=static_dir, html=True), name="static")
 
     # ChatterAgent + ClarifierAgent 用 Flash 轻量模型（仅当 chat 路由被加载时）
     from orbit.gateway.client import LLMClient as _LLMClient

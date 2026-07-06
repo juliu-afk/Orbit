@@ -7,11 +7,16 @@ WHY 4 级降级而非二元 pass/fail:
 - L4 人工挂起: 前 3 级全失败时安全兜底, 不丢任务
 
 各级独立验证——降级失败自动跳下一级。
+
+P2-4: L3 stale cache SQLite 持久化——替代 Redis，不可用时降级内存。
 """
 
 from __future__ import annotations
 
+import sqlite3
+import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -84,22 +89,90 @@ class DegradationPath:
             data={"action": "template_response", "message": message, "error_type": error_type},
         )
 
+    # P2-4: SQLite 缓存数据库路径
+    _CACHE_DB: str | None = None  # 类级别，延迟初始化
+
+    @classmethod
+    def _get_cache_db(cls) -> str:
+        """获取 SQLite 缓存路径——延迟初始化，不可写时降级内存."""
+        if cls._CACHE_DB is not None:
+            return cls._CACHE_DB
+        cache_dir = Path.home() / ".orbit" / "cache"
+        try:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            db_path = str(cache_dir / "degradation_cache.db")
+            # 初始化表
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS stale_cache ("
+                    "  key TEXT PRIMARY KEY,"
+                    "  response TEXT,"
+                    "  cached_at REAL"
+                    ")"
+                )
+                conn.commit()
+            cls._CACHE_DB = db_path
+            return db_path
+        except (OSError, PermissionError):
+            cls._CACHE_DB = ""  # 空字符串 = 不可用
+            return ""
+
     def _l3_stale_cache(self, ctx: dict[str, Any]) -> DegradationResult:
         """L3: 缓存数据——返回上次成功结果（标记 stale）。
 
-        MVP 阶段返回占位缓存, 后续接入 Redis 真实缓存。
+        P2-4: SQLite 持久化缓存，不可写时降级到传入的 ctx cached_response。
         """
+        task_id = ctx.get("task_id", "")
+        db_path = self._get_cache_db()
+
+        # 尝试从 SQLite 读取缓存
+        cached_response = ""
+        cached_at = ""
+        if db_path:
+            try:
+                with sqlite3.connect(db_path) as conn:
+                    row = conn.execute(
+                        "SELECT response, cached_at FROM stale_cache WHERE key=?",
+                        (task_id,),
+                    ).fetchone()
+                    if row:
+                        cached_response = row[0]
+                        cached_at = str(row[1])
+            except sqlite3.Error:
+                pass
+
+        # SQLite 未命中 → 使用 ctx 传入的缓存
+        if not cached_response:
+            cached_response = ctx.get("cached_response", "")
+            cached_at = ctx.get("cached_at", "")
+
         return DegradationResult(
             path="L3_STALE_CACHE",
             level=3,
             data={
                 "action": "stale_cache",
-                "cached_response": ctx.get("cached_response", ""),
-                "cached_at": ctx.get("cached_at", ""),
-                "task_id": ctx.get("task_id", ""),
+                "cached_response": cached_response,
+                "cached_at": cached_at,
+                "task_id": task_id,
             },
             stale=True,
         )
+
+    def cache_result(self, key: str, response: str) -> None:
+        """P2-4: 写入成功结果到 L3 缓存——供后续降级读取."""
+        db_path = self._get_cache_db()
+        if not db_path:
+            return
+        try:
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO stale_cache (key, response, cached_at)"
+                    " VALUES (?, ?, ?)",
+                    (key, response, time.time()),
+                )
+                conn.commit()
+        except sqlite3.Error:
+            pass
 
     def _l4_human_escalation(self, ctx: dict[str, Any]) -> DegradationResult:
         """L4: 转人工挂起——任务状态设为 SUSPENDED。

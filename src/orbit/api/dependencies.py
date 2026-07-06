@@ -7,7 +7,7 @@ WHY 统一认证中间件: 审计 Issue #126 发现整个API层无鉴权，
 
 from __future__ import annotations
 
-from fastapi import HTTPException, Query, Request
+from fastapi import Header, HTTPException, Query, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from orbit.core.config import settings
@@ -65,6 +65,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
         token = request.headers.get("X-Orbit-Token", "")
         if token != settings.ORBIT_AUTH_TOKEN:
             # P0-1: 安全——不泄露预期token格式
+            # P2-6: 认证失败记录日志
+            import structlog as _sl
+            _sl.get_logger("orbit.auth").warning(
+                "auth_failed",
+                path=request.url.path,
+                client=request.client.host if request.client else "unknown",
+            )
             raise HTTPException(status_code=401, detail="未授权访问")
 
         return await call_next(request)

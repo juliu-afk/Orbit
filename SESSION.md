@@ -1,5 +1,40 @@
 # Orbit 开发会话记录
 
+## 2026-07-06 — 代码依赖图可视化 + 微信集成 (PR #216 MERGED)
+
+### 交付
+- **代码依赖图可视化**：Cytoscape.js 图谱渲染(cose/breadthfirst/concentric)+搜索+节点详情
+  - 入口：StatusBar → Graph 按钮 → 85% 宽大抽屉
+  - API：GET /codegraph/graph-data (Cytoscape elements 格式)
+- **微信集成**：iLink Bot API + cc-weixin 桥接，双向对话模型
+  - 绑定：bind_token 一次性+5分钟过期 + QR 码
+  - 路由：7 条纯规则正则（零 LLM 幻觉风险）
+  - 出站：TokenBucket（5条/分钟 30条/小时）+ 事件订阅
+- **前端**：7 组件 + 2 stores + StatusBar 改
+- **后端**：6 文件 wechat 模块 + API 路由 + 依赖(dependencies.py)
+
+### 审查
+- R1: P1×1 (qrcode 依赖缺失) + P2×2 (send_message 桩/QR 占位) + qa 路由移除 → 全修
+- 合并: squash merge (a42d32d → 07a83ba 修复 → 83f0431 merge)
+
+### 修复 PR #217 — CodeGraph 手动构建触发 (MERGED)
+- **根因**：get_all_nodes()/get_all_edges() 从未实现——graph-data 端点一直 501
+  - CodeGraphEngine 补充 2 个查询方法 + build_index 先 clear_all 防跨项目混合
+- **前端**：空状态「构建索引」按钮 + session store currentProjectPath
+- **审查**：P1×1 (build_index 参数不一致) + P2×1 (异常暴露路径) → 全修
+- 合并: squash merge (8d91f4c → 83e2a7c)
+
+### 关键决策
+- 可视化选型 Cytoscape.js > vis-network（图分析能力强，elements 格式与 Edge 表天然映射）
+- 微信路由纯规则匹配不用 LLM（确定性 100%，延迟 <1ms）
+- Orbit 单用户架构 → wechat 绑定固定 user_id=1
+- CodeGraph 构建改为手动触发（启动时目录是 exe 路径，无源码）
+
+### 踩坑
+- Poetry tz3-solver 依赖冲突 → qrcode/pillow 用 pip 直装 + 手动改 pyproject.toml
+- wechat_routes.py 最初 import 不存在的 get_current_user_id → 改为单用户固定 ID
+- outbound.py surrogate pair 检测是 Python 3 死代码 → 简化为直接切片
+
 ## 2026-07-06 — 覆盖率冲刺：5修+集成测试+模块审计
 
 ### 1. 5 失败测试修复 ✅

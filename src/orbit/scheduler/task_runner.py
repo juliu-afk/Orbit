@@ -283,7 +283,8 @@ class TaskRunner:
         try:
             w = self._get_wiring()
             if w: asyncio.create_task(w.maybe_distill())
-        except Exception: pass
+        except Exception:
+            logger.warning("distill_schedule_failed", exc_info=True)
         return state
 
     async def resume(self, task_id: str) -> TaskState | None:
@@ -547,7 +548,7 @@ class TaskRunner:
                 agent_input = AgentInput(
                     task=ctx_dict.get("l3", {}).get("prd", ""),
                     context=ctx_dict,
-                    role=role,  # type: ignore[arg-type]
+                    role=AgentRole(role),
                 )
                 output_obj = await asyncio.wait_for(agent.execute(agent_input), timeout=timeout)
                 if output_obj.status == "ok":
@@ -827,14 +828,16 @@ class TaskRunner:
         try:
             w = self._get_wiring()
             if w: getattr(w, method)(*args, **kwargs)
-        except Exception: pass
+        except Exception:
+            logger.warning("wire_call_failed", method=method, exc_info=True)
 
     def _get_wiring(self):
         if self._wiring is None:
             try:
                 from orbit.integration.wiring import OrbitWiring
                 self._wiring = OrbitWiring()
-            except Exception: pass
+            except Exception:
+                logger.warning("wiring_init_failed", exc_info=True)
         return self._wiring
 
 

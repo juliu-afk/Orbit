@@ -36,6 +36,7 @@ const SESSIONS_URL = '/api/v1/sessions'
 export const useSessionStore = defineStore('session', () => {
   const currentSessionId = ref<string | null>(null)
   const currentProjectName = ref<string>('')
+  const currentProjectPath = ref<string>('')
   const currentTitle = ref<string>('')
   const sessions = ref<SessionSummary[]>([])
   const messages = ref<StoredMessage[]>([])
@@ -79,6 +80,7 @@ export const useSessionStore = defineStore('session', () => {
       const detail = j.data as { session: SessionSummary; messages: StoredMessage[] }
       currentSessionId.value = detail.session.session_id
       currentProjectName.value = detail.session.project_name
+      currentProjectPath.value = detail.session.local_path || ''
       currentTitle.value = detail.session.title
       messages.value = detail.messages || []
     } catch {
@@ -116,7 +118,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   return {
-    currentSessionId, currentProjectName, currentTitle,
+    currentSessionId, currentProjectName, currentProjectPath, currentTitle,
     sessions, messages, loading,
     fetchSessions, createSession, switchToSession, archiveCurrentSession,
     clearCurrent, getMetricsFilter, reset,

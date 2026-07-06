@@ -21,7 +21,7 @@ import structlog
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, TYPE_CHECKING, get_args
+from typing import Any, TYPE_CHECKING, cast, get_args
 
 import yaml
 
@@ -598,6 +598,7 @@ class DeferredQueue:
             estimated_duration_seconds=row["estimated_duration_seconds"],
             target_window_start=row["target_window_start"],
             target_window_end=row["target_window_end"],
+            status=cast(DeferredStatus, row["status"]),
             created_at=row["created_at"],
             released_at=row["released_at"],
             completed_at=row["completed_at"],

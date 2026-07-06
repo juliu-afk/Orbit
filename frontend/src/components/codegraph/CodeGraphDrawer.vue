@@ -1,9 +1,10 @@
 <!-- 代码图谱大尺寸抽屉——85% 宽度，三区布局（工具栏 | 画布 | 详情面板）。
      WHY 85% 而非 600px：代码图谱需要大面积画布，DAG 的 600px 太窄。 -->
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, ref } from 'vue'
 import { useSessionStore } from '@/stores/session'
 import { useCodeGraphStore } from '@/stores/codegraph'
+import { apiPost } from '@/services/api'
 import CytoscapeCanvas from './CytoscapeCanvas.vue'
 import SearchBar from './SearchBar.vue'
 import LayoutSelector from './LayoutSelector.vue'
@@ -14,6 +15,7 @@ const emit = defineEmits<{ (e: 'update:show', v: boolean): void }>()
 
 const session = useSessionStore()
 const store = useCodeGraphStore()
+const building = ref(false)
 
 // 打开抽屉时加载数据
 watch(() => props.show, async (visible) => {
@@ -21,6 +23,20 @@ watch(() => props.show, async (visible) => {
     await store.fetchGraphData(session.currentProjectName)
   }
 })
+
+async function buildIndex(): Promise<void> {
+  building.value = true
+  try {
+    const dir = session.currentProjectPath || session.currentProjectName
+    await apiPost('/api/v1/codegraph/build', { directory: dir })
+    // 重新加载图谱数据
+    await store.fetchGraphData(session.currentProjectName)
+  } catch (e) {
+    store.error = e instanceof Error ? e.message : '索引构建失败'
+  } finally {
+    building.value = false
+  }
+}
 
 function onClose(): void {
   store.reset()
@@ -60,7 +76,10 @@ function onClose(): void {
         <div v-else-if="!store.loading && store.stats.node_count === 0 && !store.error" class="state-overlay">
           <div class="empty-icon">📊</div>
           <h3>尚未构建代码索引</h3>
-          <p>该项目无 Python 文件，或代码图谱尚未解析</p>
+          <p>打开项目后需手动触发解析</p>
+          <button class="retry-btn" :disabled="building" @click="buildIndex">
+            {{ building ? '正在解析…' : '构建索引' }}
+          </button>
         </div>
 
         <!-- 错误 -->

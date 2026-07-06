@@ -237,7 +237,8 @@ class OrbitWiring:
             try:
                 from orbit.metacognition.monitor import MonitorAgent
                 self._monitor = MonitorAgent()
-            except Exception: pass
+            except Exception:
+                logger.warning("monitor_init_failed", exc_info=True)
         return self._monitor
 
     def _get_mcts(self):
@@ -245,7 +246,8 @@ class OrbitWiring:
             try:
                 from orbit.agents.mcts import MCTSPlanner
                 self._mcts = MCTSPlanner()
-            except Exception: pass
+            except Exception:
+                logger.warning("mcts_init_failed", exc_info=True)
         return self._mcts
 
     def get_mcts_planner(self):

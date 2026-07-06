@@ -15,7 +15,7 @@ from pathlib import Path
 import structlog
 
 from orbit.graph.engines.base import GraphEngineBase
-from orbit.graph.models.nodes import CodeNode
+from orbit.graph.models.nodes import CodeNode, Edge
 
 logger = structlog.get_logger("orbit.graph.code")
 
@@ -34,7 +34,12 @@ class CodeGraphEngine(GraphEngineBase):
     """
 
     async def build_index(self, directory: str) -> int:
-        """全量构建目录下所有 .py 文件的索引。返回解析文件数。"""
+        """全量构建目录下所有 .py 文件的索引。返回解析文件数。
+
+        WHY 先清空旧数据：Orbit 单工作区模式，切换项目目录时
+        旧索引残留会导致图谱混合两个项目的数据。清空后全量重建。
+        """
+        await self.clear_all(CodeNode)
         root = Path(directory)
         py_files = list(root.rglob("*.py"))
         count = 0
@@ -345,3 +350,51 @@ class CodeGraphEngine(GraphEngineBase):
         if node is None:
             return None
         return node.meta or {}
+
+    async def get_all_nodes(self) -> list[dict]:
+        """返回所有代码图谱节点——供图谱可视化 API 使用。
+
+        WHY 返回 list[dict] 而非 ORM 对象：API 层不需要 ORM session 管理，
+        字典序列化直接适配 Cytoscape elements 格式。
+        """
+        from sqlalchemy import func, select as sa_select
+
+        async with self.session_factory() as session:
+            result = await session.execute(sa_select(CodeNode))
+            nodes = result.scalars().all()
+            return [
+                {
+                    "id": n.id,
+                    "name": n.name,
+                    "type": n.type,
+                    "file_path": n.file_path,
+                    "start_line": n.start_line,
+                    "end_line": n.end_line,
+                    "symbol_count": 0,  # 后续按 file_path 聚合计算
+                    "in_degree": 0,
+                    "out_degree": 0,
+                }
+                for n in nodes
+            ]
+
+    async def get_all_edges(self) -> list[dict]:
+        """返回所有代码图谱边——供图谱可视化 API 使用。"""
+        from sqlalchemy import select as sa_select
+
+        async with self.session_factory() as session:
+            result = await session.execute(
+                sa_select(Edge).where(
+                    (Edge.source_node_type == "code") | (Edge.target_node_type == "code")
+                )
+            )
+            edges = result.scalars().all()
+            return [
+                {
+                    "id": e.id,
+                    "source_id": e.source_id,
+                    "target_id": e.target_id,
+                    "edge_type": e.edge_type,
+                    "weight": e.weight or 1,
+                }
+                for e in edges
+            ]

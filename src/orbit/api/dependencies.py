@@ -126,6 +126,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
         token = request.headers.get("X-Orbit-Token", "")
         if not _verify_token(token):
             # P0-1: 安全——不泄露预期token格式
+            # P2-6: 认证失败记录日志
+            import structlog as _sl
+            _sl.get_logger("orbit.auth").warning(
+                "auth_failed",
+                path=request.url.path,
+                client=request.client.host if request.client else "unknown",
+            )
             raise HTTPException(status_code=401, detail="未授权访问")
 
         return await call_next(request)

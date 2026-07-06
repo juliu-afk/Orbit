@@ -1,4 +1,4 @@
-# 安全扫描：依赖漏洞 + 代码安全
+# 安全扫描：依赖漏洞 + 代码安全 + secrets 扫描
 name: Security
 
 on:
@@ -61,3 +61,17 @@ jobs:
         # continue-on-error：中低风险不阻塞 CI
         continue-on-error: true
         run: bandit -r src/ -lll -ii
+
+  gitleaks:
+    name: Secrets scan (Gitleaks)
+    runs-on: ubuntu-latest
+    # P2-2: 扫描仓库中的硬编码密钥/Token/凭证
+    # continue-on-error：历史泄露不阻塞 CI，仅报告
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml

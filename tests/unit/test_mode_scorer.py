@@ -118,9 +118,9 @@ def test_session_quality_empty_prd_fields() -> None:
 
 
 def test_delivery_done_with_review() -> None:
-    """DONE + 审查通过 + 无回归 → ~1.0."""
+    """DONE + 审查通过 + 无回归 → 0.9（需求变更检测占位，G6后补）."""
     result = TaskQualityScorer.score_delivery("DONE", review_passed=True, has_regression=False)
-    assert abs(result.score - 1.0) < 0.001  # 浮点: 0.4+0.3+0.2+0.1
+    assert abs(result.score - 0.9) < 0.001  # 0.4 + 0.3 + 0.2
 
 
 def test_delivery_failed() -> None:

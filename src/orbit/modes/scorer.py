@@ -199,8 +199,8 @@ class TaskQualityScorer:
         if not has_regression:
             score += 0.2
 
-        # 无需求变更（当前版本默认给分——G6 后补充）
-        score += 0.1
+        # G6 TODO: 需求变更检测——对比同 session 内是否重新 clarify。
+        # 当前版本占位，G6 自扩展模式生成器落地后补充真实判断逻辑。
 
         return DimensionScore(
             score=min(score, 1.0),

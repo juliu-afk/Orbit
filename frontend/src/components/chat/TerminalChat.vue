@@ -9,6 +9,7 @@ import MessageItem from '@/components/chat/MessageItem.vue'
 import InputBox from '@/components/chat/InputBox.vue'
 import QuoteChip from '@/components/chat/QuoteChip.vue'
 import ContextMenu from '@/components/chat/ContextMenu.vue'
+import SkeletonPanel from '@/components/common/SkeletonPanel.vue'  // UX-6
 
 const chat = useChatStore()
 const session = useSessionStore()
@@ -98,8 +99,10 @@ onMounted(() => scrollBottom())
   </div>
   <div ref="messageListRef" class="message-list flex-1 overflow-y-auto" style="scroll-behavior:smooth">
     <div v-if="enableVS" :style="{ height: Math.max(0, chat.messages.length - 100) * 28 + 'px' }" />
+    <!-- UX-6: 首次加载时骨架屏 -->
+    <SkeletonPanel v-if="chat.connecting && chat.messages.length === 0" :lines="6" height="auto" />
     <MessageItem v-for="msg in filteredMsgs" :key="msg.id" :message="msg" @contextmenu="(e:MouseEvent) => openCtx(e, msg)" @open-code="onOpenCode" />
-    <div v-if="chat.connecting" class="px-4 py-1 text-xs flex items-center gap-2" style="color:var(--color-orbit-warn)"><span class="status-dot connecting"/>connecting...</div>
+    <div v-if="chat.connecting && chat.messages.length > 0" class="px-4 py-1 text-xs flex items-center gap-2" style="color:var(--color-orbit-warn)"><span class="status-dot connecting"/>connecting...</div>
     <div v-if="chat.lastError" class="px-4 py-1 text-xs" style="color:var(--color-orbit-error)">x {{ chat.lastError }}</div>
   </div>
   <div class="input-area" style="border-top:1px solid var(--color-orbit-border)">

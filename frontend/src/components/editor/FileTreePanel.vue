@@ -3,8 +3,9 @@
   <div class="file-tree-panel">
     <div class="tree-header"><span>Files</span><span class="file-count">{{ fileCount }}</span></div>
     <div class="tree-body">
-      <FileTreeNode v-for="n in treeData" :key="n.path" :node="n" :selected="selectedFile" :depth="0" @select="$emit('select-file', $event)" />
-      <el-empty v-if="!treeData.length" description="No files" :image-size="40" />
+      <SkeletonPanel v-if="loading" :lines="8" height="auto" />
+      <FileTreeNode v-else v-for="n in treeData" :key="n.path" :node="n" :selected="selectedFile" :depth="0" @select="$emit('select-file', $event)" />
+      <el-empty v-if="!loading && !treeData.length" description="No files" :image-size="40" />
     </div>
   </div>
 </template>
@@ -12,13 +13,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import FileTreeNode from './FileTreeNode.vue'
+import SkeletonPanel from '@/components/common/SkeletonPanel.vue'  // UX-6
 
 export interface FileNode {
   name: string; path: string; isDir: boolean; children?: FileNode[]
   reviewStatus?: 'approved' | 'rejected' | 'pending' | null; coveragePct?: number
 }
 
-const props = defineProps<{ treeData: FileNode[]; selectedFile: string | null }>()
+const props = defineProps<{ treeData: FileNode[]; selectedFile: string | null; loading?: boolean }>()
 defineEmits<{ (e: 'select-file', path: string): void }>()
 
 const fileCount = computed(() => {

@@ -12,13 +12,13 @@
 import { ref, watch, onBeforeUnmount } from 'vue'
 
 const props = defineProps<{ visible: boolean }>()
-defineEmits<{ reconnect: [] }>()
+const emit = defineEmits<{ reconnect: [] }>()
 
 const countdown = ref(0)
 let _timer: ReturnType<typeof setInterval> | null = null
 
 watch(() => props.visible, (v) => {
-  if (v) { countdown.value = 30; _timer = setInterval(() => { countdown.value--; if (countdown.value <= 0 && _timer) { clearInterval(_timer); _timer = null } }, 1000) }
+  if (v) { countdown.value = 30; _timer = setInterval(() => { countdown.value--; if (countdown.value <= 0 && _timer) { clearInterval(_timer); _timer = null; emit('reconnect') } }, 1000) }
   else { countdown.value = 0; if (_timer) { clearInterval(_timer); _timer = null } }
 })
 

@@ -1,5 +1,20 @@
 # Orbit 开发会话记录
 
+## 2026-07-06 — 覆盖率实时测量
+
+**实测数据** (`pytest tests/unit/ tests/integration/ --cov=src/orbit`):
+- 行覆盖 **68.94%** (13,796/19,061), 分支覆盖 **55%** (2,697/4,862)
+- pyproject.toml 门禁 95%, 缺口 ~26%
+- 5 测试失败: test_state_sequence_correct + test_transition_normal (SCOPING 新状态), test_handler_not_found + test_query_structured_not_found (语义搜索模糊匹配), test_match_by_project_name (排序问题)
+- 15 模块 0% 覆盖, 19 模块 <30% 覆盖, 集成测试仅 4 文件
+- 已更新 `docs/已实现功能清单.md` 测试覆盖 + Agent 五大能力表
+
+### 关键发现
+- 之前自评 "Agent 五大能力 85-95%" 严重不符实测: 记忆 55%, 规划 51%, 工具 68%, 容错 70%, 进化 49%
+- 最大提升杠杆: route 层 TestClient 集成测试 (28 路由文件, 平均 43%) + 0% 僵尸模块判定
+
+---
+
 ## 2026-07-06 — Phase B 遗留收尾 (PR #212 · MERGED)
 
 **背景**: 审计 19 项遗留，5 项不过时，全部收尾。

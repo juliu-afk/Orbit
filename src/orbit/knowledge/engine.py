@@ -135,7 +135,8 @@ class KnowledgeEngine:
         tool handler 需要 JSON-serializable dict 直接返回给 Agent。
         """
         result = self.query(domain, concept, mode="hybrid")
-        if result is None:
+        if result is None or result.confidence < 0.3:
+            # 语义搜索置信度 < 0.3 → 视为未找到，避免模糊匹配误报
             return {
                 "found": False,
                 "message": f"概念 '{concept}' 在领域 '{domain}' 中未找到",

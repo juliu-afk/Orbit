@@ -163,16 +163,18 @@ def test_extract_keywords_mixed() -> None:
 
 
 def test_transition_normal() -> None:
-    """正常流水线：IDLE→PARSING→PLANNING→CODING→VERIFYING→DONE。"""
+    """正常流水线：IDLE→PARSING→SCOPING→PLANNING→CODING→VERIFYING→DONE。"""
     seq = [
         _transition(TaskState.IDLE),
         _transition(TaskState.PARSING),
+        _transition(TaskState.SCOPING),
         _transition(TaskState.PLANNING),
         _transition(TaskState.CODING),
         _transition(TaskState.VERIFYING),
     ]
     assert seq == [
         TaskState.PARSING,
+        TaskState.SCOPING,
         TaskState.PLANNING,
         TaskState.CODING,
         TaskState.VERIFYING,
@@ -181,7 +183,7 @@ def test_transition_normal() -> None:
 
 
 def test_transition_fast_lane() -> None:
-    """快车道：跳过 PLANNING 和 VERIFYING。"""
+    """快车道：跳过 SCOPING 和 PLANNING。"""
     assert _transition(TaskState.IDLE, fast_lane=True) == TaskState.PARSING
     assert _transition(TaskState.PARSING, fast_lane=True) == TaskState.CODING
     assert _transition(TaskState.CODING, fast_lane=True) == TaskState.DONE

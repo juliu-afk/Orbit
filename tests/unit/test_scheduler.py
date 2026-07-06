@@ -98,12 +98,14 @@ def test_state_sequence_correct(scheduler):
     seq = [
         _transition(TaskState.IDLE),
         _transition(TaskState.PARSING),
+        _transition(TaskState.SCOPING),
         _transition(TaskState.PLANNING),
         _transition(TaskState.CODING),
         _transition(TaskState.VERIFYING),
     ]
     assert seq == [
         TaskState.PARSING,
+        TaskState.SCOPING,
         TaskState.PLANNING,
         TaskState.CODING,
         TaskState.VERIFYING,

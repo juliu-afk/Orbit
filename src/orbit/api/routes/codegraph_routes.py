@@ -252,3 +252,32 @@ async def get_graph_snapshots(project_id: str = Query(..., min_length=1)):
         "data": {"snapshots": []},
         "message": "ok",
     }
+
+
+class BuildRequest(BaseModel):
+    directory: str
+
+
+@router.post("/build")
+async def build_code_index(body: BuildRequest):
+    """手动触发代码图谱索引构建——解析指定目录下所有 .py 文件。
+
+    WHY 手动触发：启动时构建的目录是 exe 所在路径，用户打开项目后
+    需重新索引到实际项目目录。该端点提供按需构建入口。
+    """
+    if _code_graph is None:
+        raise HTTPException(status_code=503, detail="CodeGraph not available")
+
+    import os
+    if not os.path.isdir(body.directory):
+        raise HTTPException(status_code=400, detail=f"目录不存在: {body.directory}")
+
+    try:
+        count = await _code_graph.build_index(body.directory)
+        return {
+            "code": 0,
+            "data": {"files_parsed": count, "directory": body.directory},
+            "message": f"已索引 {count} 个 Python 文件",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"索引构建失败: {e}")

@@ -41,8 +41,7 @@ jobs:
         run: poetry run ruff check src/ tests/
 
       - name: Type check (mypy)
-        continue-on-error: true
-        run: poetry run mypy src/ || true
+        run: poetry run mypy src/
 
   test:
     name: Test (3.11)

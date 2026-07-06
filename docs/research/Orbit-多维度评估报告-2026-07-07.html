@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit 多维度评估报告 — 2026-07-07（v0.35 修复后）</title>
+<style>
+  :root {--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--yellow:#d2991d;--orange:#db6d28;--red:#f85149;--purple:#a371f7}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;max-width:960px;margin:0 auto;padding:40px 20px}
+  h1{font-size:28px;margin-bottom:4px}
+  h2{font-size:18px;margin:32px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  h3{font-size:15px;margin:16px 0 8px;color:var(--accent)}
+  .subtitle{color:var(--muted);font-size:14px;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  table{width:100%;border-collapse:collapse;margin:8px 0}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase}
+  .score{font-weight:700;font-size:16px}
+  .bar{height:8px;border-radius:4px;background:var(--border);margin-top:4px}
+  .bar-fill{height:100%;border-radius:4px;transition:width .3s}
+  .g5{background:var(--green)}.g4{background:#56d364}.g3{background:var(--yellow)}.g2{background:var(--orange)}.g1{background:var(--red)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600}
+  .tag-ok{background:#1a3a2a;color:var(--green)}.tag-warn{background:#3a2a0a;color:var(--yellow)}.tag-err{background:#3a0a0a;color:var(--red)}.tag-new{background:#1a2a3a;color:var(--accent)}
+  .summary-box{background:linear-gradient(135deg,#1a2a3a,#0d1a2a);border:1px solid var(--accent);border-radius:8px;padding:16px 20px;margin:16px 0}
+  .metric{text-align:center}
+  .metric .val{font-size:28px;font-weight:700}
+  .metric .lbl{font-size:12px;color:var(--muted);margin-top:4px}
+  .delta{font-size:14px;font-weight:400}
+  .delta-up{color:var(--green)}.delta-same{color:var(--muted)}
+  hr{border:none;border-top:1px solid var(--border);margin:20px 0}
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+  .compare .old{color:var(--muted)}.compare .new{color:var(--green)}
+</style>
+</head>
+<body>
+
+<h1>Orbit 多维度评估报告</h1>
+<p class="subtitle">评估日期：2026-07-07 &nbsp;|&nbsp; v0.35.0（PR #218 修复后）&nbsp;|&nbsp; 评估者：Claude Code</p>
+
+<div class="summary-box">
+  <div class="grid3">
+    <div class="metric"><div class="val" style="color:var(--accent)">3.9 <span class="delta delta-up">+0.2</span></div><div class="lbl">综合评分 / 5.0</div></div>
+    <div class="metric"><div class="val" style="color:var(--yellow)">69%</div><div class="lbl">测试覆盖率</div></div>
+    <div class="metric"><div class="val" style="color:var(--green)">48K</div><div class="lbl">Python 源码行数</div></div>
+  </div>
+</div>
+
+<h2>1. 版本对比</h2>
+<div class="card">
+<table>
+<tr><th>指标</th><th>v0.34 修复前</th><th>v0.35 修复后</th><th>改善</th></tr>
+<tr><td>综合评分</td><td class="score">3.7</td><td class="score" style="color:var(--accent)">3.9</td><td><span class="tag tag-ok">+0.2</span></td></tr>
+<tr><td>代码质量</td><td>3.5</td><td style="color:#56d364">3.8</td><td><span class="tag tag-ok">+0.3</span></td></tr>
+<tr><td>测试</td><td>2.5</td><td style="color:var(--yellow)">3.0</td><td><span class="tag tag-ok">+0.5</span></td></tr>
+<tr><td>DevOps</td><td>3.0</td><td style="color:var(--yellow)">3.5</td><td><span class="tag tag-ok">+0.5</span></td></tr>
+<tr><td>except:pass 静默吞异常</td><td>8 处</td><td>0 处</td><td><span class="tag tag-ok">清零</span></td></tr>
+<tr><td>type:ignore 注解</td><td>40 处</td><td>26 处</td><td><span class="tag tag-ok">-14</span></td></tr>
+<tr><td>超大文件 (>500行)</td><td>6 个</td><td>5 个</td><td><span class="tag tag-ok">-1</span></td></tr>
+<tr><td>CI 跑 pytest</td><td>❌ 不跑</td><td>✅ 跑</td><td><span class="tag tag-new">新增</span></td></tr>
+</table>
+</div>
+
+<h2>2. 维度评分（修复后）</h2>
+
+<table>
+<tr><th>维度</th><th>评分</th><th>变化</th><th>一句话评价</th></tr>
+<tr><td>1. 架构设计</td><td class="score" style="color:var(--accent)">4.0</td><td class="delta-same">—</td><td>五图谱 + 9层防幻觉原创性强，文档图谱仅设计未实现</td></tr>
+<tr><td>2. 代码质量</td><td class="score" style="color:#56d364">3.8</td><td class="delta delta-up">+0.3</td><td>clarifier已拆、except:pass清零、type:ignore净减14处</td></tr>
+<tr><td>3. 测试</td><td class="score" style="color:var(--yellow)">3.0</td><td class="delta delta-up">+0.5</td><td>CI 新增 pytest job，门禁69%，不再"CI不跑测试"</td></tr>
+<tr><td>4. 文档</td><td class="score" style="color:var(--green)">4.5</td><td class="delta-same">—</td><td>16+ PRD+ADR + 章程 + 路线图 + 功能清单——专业级</td></tr>
+<tr><td>5. 流程纪律</td><td class="score" style="color:var(--accent)">4.0</td><td class="delta-same">—</td><td>四阶段工作流严格执行，行为拦截清单有效</td></tr>
+<tr><td>6. 创新性</td><td class="score" style="color:var(--green)">5.0</td><td class="delta-same">—</td><td>自研调度框架 + 五图谱 + 9层防幻觉——业界独有组合</td></tr>
+<tr><td>7. 前端</td><td class="score" style="color:var(--yellow)">3.0</td><td class="delta-same">—</td><td>Vue3+Pinia+TS strict，20+组件目录</td></tr>
+<tr><td>8. DevOps</td><td class="score" style="color:var(--yellow)">3.5</td><td class="delta delta-up">+0.5</td><td>Docker+Helm+K8s+CI test job——补齐最关键缺口</td></tr>
+<tr><td>9. 项目管理</td><td class="score" style="color:var(--accent)">4.0</td><td class="delta-same">—</td><td>路线图+功能清单可追溯，版本历史完整，Bus Factor=1</td></tr>
+<tr style="font-weight:700;background:#1a2530"><td>综合评分</td><td class="score" style="color:var(--accent)">3.9</td><td class="delta delta-up">+0.2</td><td>工程执行短板显著收窄，CI补齐最关键缺口</td></tr>
+</table>
+
+<h2>3. 本次修复成果</h2>
+
+<div class="card">
+<h3>AC1: except:pass 加日志 — 8处全部清零</h3>
+<table>
+<tr><th>文件</th><th>日志级别</th><th>日志 key</th></tr>
+<tr><td>react_agent.py:238</td><td>WARNING</td><td>prompt_enhance_failed</td></tr>
+<tr><td>react_agent.py:371</td><td>DEBUG</td><td>preact_skip_error (fail-open)</td></tr>
+<tr><td>wiring.py:240</td><td>WARNING</td><td>monitor_init_failed</td></tr>
+<tr><td>wiring.py:248</td><td>WARNING</td><td>mcts_init_failed</td></tr>
+<tr><td>task_runner.py:286</td><td>WARNING</td><td>distill_schedule_failed</td></tr>
+<tr><td>task_runner.py:830</td><td>WARNING</td><td>wire_call_failed</td></tr>
+<tr><td>task_runner.py:837</td><td>WARNING</td><td>wiring_init_failed</td></tr>
+<tr><td>schedule.py:125</td><td>WARNING</td><td>urgent_callback_error</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>AC2: clarifier.py 拆分 — 986行→4文件</h3>
+<p><code>clarifier/{agent.py (530行), models.py (32行), constants.py (73行), validators.py (151行)}</code></p>
+<p>向后兼容——<code>from orbit.agents.clarifier import ClarifierAgent</code> 路径不变。12/12 测试通过。</p>
+</div>
+
+<div class="card">
+<h3>AC3: CI 加 pytest job</h3>
+<p><code>.github/workflows/ci.yml</code> 新增 test job——门禁 69%，Python 3.11，与 lint-typecheck 并行。</p>
+</div>
+
+<div class="card">
+<h3>AC4: gateway 异常分层</h3>
+<p><code>_is_api_error()</code> 区分 LLM API 错误（可重试/降级）vs 代码 bug（不应重试，应 raise）。</p>
+</div>
+
+<div class="card">
+<h3>AC5: type:ignore 消除 — 40→26处</h3>
+<table>
+<tr><th>类型</th><th>消除数</th><th>方式</th></tr>
+<tr><td>字符串→枚举转换</td><td>7</td><td>AgentRole.CHATTER / cast(Literal) / get_args assert</td></tr>
+<tr><td>加 Optional 属性声明</td><td>4</td><td>_mode / _compose_orchestrator / db_path</td></tr>
+<tr><td>assert 窄化</td><td>3</td><td>assert self.pg/redis/_brief_llm is not None</td></tr>
+<tr><td>保留（合法）</td><td>22</td><td>PyYAML/PyInstaller/Pydantic 类型局限性</td></tr>
+</table>
+</div>
+
+<h2>4. 遗留改进项</h2>
+
+<div class="rec rec-p0">
+<strong>[P0] 拆分 task_runner.py (932行)</strong><br>
+拆为 task_runner.py (350行) + task_context.py (300行) + task_checkpoint.py (250行)
+</div>
+<div class="rec rec-p1">
+<strong>[P1] 拆分 tools/registry.py (833行) + offpeak_scheduler.py (927行)</strong><br>
+registry → registry + permissions；offpeak 三合一耦合度高，需谨慎设计
+</div>
+<div class="rec rec-p1">
+<strong>[P1] 补齐 context/builders/ 测试 (8文件, 169语句, 0%覆盖)</strong><br>
+纯函数管线，30分钟覆盖率 +1.5%
+</div>
+<div class="rec rec-p1">
+<strong>[P1] CI mypy 改为硬门禁</strong><br>
+当前 <code>continue-on-error: true</code> → 改为 false（需先修完预存 mypy 错误）
+</div>
+<div class="rec rec-p2">
+<strong>[P2] 实现文档图谱引擎</strong><br>
+4 份设计文档已描述 Schema——实现后五图谱体系真正完整
+</div>
+
+<h2>5. 数据总览</h2>
+<div class="grid3">
+  <div class="metric"><div class="val">880+</div><div class="lbl">Git Commits</div></div>
+  <div class="metric"><div class="val">45</div><div class="lbl">源码模块</div></div>
+  <div class="metric"><div class="val">325</div><div class="lbl">Python 文件</div></div>
+  <div class="metric"><div class="val">269</div><div class="lbl">测试文件</div></div>
+  <div class="metric"><div class="val">31</div><div class="lbl">API 路由文件</div></div>
+  <div class="metric"><div class="val">218</div><div class="lbl">已合并 PR</div></div>
+</div>
+
+<hr>
+<p style="color:var(--muted);font-size:12px">本报告基于 2026-07-07 master 分支（HEAD: 208fd6e）生成。PR #218 修复后评分。上次评估基线：v0.34（83f0431），综合 3.7/5.0。</p>
+
+</body>
+</html>

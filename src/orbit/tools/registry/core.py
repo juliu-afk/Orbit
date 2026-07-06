@@ -1,11 +1,6 @@
-"""工具注册中心 (Step 5.5 PR #2 + Phase 1 升级).
+"""ToolRegistry——工具注册中心核心类。
 
-声明式工具注册——权限隔离 + 滑动窗口限流 + 版本管理 + 废弃检测
-+ AST 自注册 + JSON Schema (LLM可见) + 并发安全判定 + Doom Loop 检测.
-
-对标: Hermes tools/registry.py:44 discover_builtin_tools()
-     + Claude Code leaked 43 tools
-     + OpenCode processor.ts:350 Doom Loop
+从 registry.py 拆分——models/exceptions 见 models.py。
 """
 
 from __future__ import annotations
@@ -16,83 +11,62 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import structlog
 
 from orbit.tools.models import ToolInvocation, ToolSchema
+from orbit.tools.registry.models import (
+    DoomLoopError,
+    PermissionError,
+    RateLimitError,
+    ToolCall,
+    ToolDeprecatedError,
+    ToolEntry,
+    ToolHandler,
+    ToolNotFoundError,
+    WorkspaceViolationError,
+)
 
 logger = structlog.get_logger("orbit.tools")
 
-ToolHandler = Callable[[dict[str, Any]], Any]
+# ── 全局单例 ────────────────────────────────────────────
+_registry_instance: ToolRegistry | None = None
 
 
-# ── 新增异常 ────────────────────────────────────────────
+def get_registry() -> ToolRegistry:
+    """获取全局 ToolRegistry 单例——供工具文件底部自注册使用."""
+    return ToolRegistry.get_instance()
 
 
-class PermissionError(Exception):
-    """调用方不在 allowed_agents 白名单中。"""
+def _path_to_module(file_path: str) -> str:
+    r"""文件路径 → Python 模块路径.
 
-
-class RateLimitError(Exception):
-    """超出工具调用限流。"""
-
-
-class ToolNotFoundError(Exception):
-    """工具不存在或版本不匹配。"""
-
-
-class ToolDeprecatedError(Exception):
-    """工具已废弃, 返回迁移指引。"""
-
-
-class DoomLoopError(Exception):
-    """检测到死循环——连续 3 次同工具同参数。"""
-
-
-class WorkspaceViolationError(Exception):
-    """文件路径在工作区外——对标 OpenClaw wrapToolWorkspaceRootGuard()。"""
-
-
-# ── ToolEntry——Hermes 风格工具元数据 ──────────────────────
-
-
-@dataclass
-class ToolEntry:
-    """工具完整元数据——schema + handler + 并发标记 三位一体.
-
-    对标 Hermes ToolEntry dataclass.
+    e.g. "src/orbit/tools/filesystem.py" → "orbit.tools.filesystem"
     """
-
-    name: str
-    toolset: str  # "filesystem" | "shell" | "search"
-    schema: dict  # JSON Schema (LLM 可见), OpenAI function calling 格式
-    handler: Callable  # 实际执行函数 (async)
-    check_fn: Callable[[], bool] | None = None  # 运行时可用性检查
-    concurrency: str = "safe"  # "safe" | "serial" | "never_parallel"
-    max_result_chars: int = 10000  # >10K → 截断 (AC6b)
-
-
-# ── 工具调用追踪 ─────────────────────────────────────────
-
-
-@dataclass
-class ToolCall:
-    """单次工具调用记录——Doom Loop 检测用."""
-
-    name: str
-    args: dict[str, Any]
-    result_preview: str = ""  # 截断后的结果前 200 字符
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, ToolCall):
-            return NotImplemented
-        return self.name == other.name and self.args == other.args
+    p = Path(file_path)
+    parts = list(p.parts)
+    try:
+        idx = parts.index("orbit")
+        parts = parts[idx:]
+    except ValueError:
+        try:
+            idx = parts.index("src")
+            parts = parts[idx + 1:]
+        except ValueError:
+            stem = p.stem
+            return f"orbit.tools.{stem}"
+    parts[-1] = parts[-1].replace(".py", "")
+    return ".".join(parts)
 
 
-# ── ToolRegistry ─────────────────────────────────────────
+def _version_key(version: str) -> tuple[int, ...]:
+    """semver 字符串 → 可排序元组."""
+    try:
+        return tuple(int(x) for x in version.split("."))
+    except (ValueError, AttributeError):
+        return (0,)
 
 
 class ToolRegistry:
@@ -788,46 +762,3 @@ class ToolRegistry:
 
         return handler
 
-
-# ── 模块级函数 ─────────────────────────────────────────
-
-
-def get_registry() -> ToolRegistry:
-    """获取全局 ToolRegistry 单例——供工具文件底部自注册使用."""
-    return ToolRegistry.get_instance()
-
-
-# ── 内部辅助 ───────────────────────────────────────────
-
-
-def _path_to_module(file_path: str) -> str:
-    """文件路径 → Python 模块路径.
-
-    e.g. "src/orbit/tools/filesystem.py" → "orbit.tools.filesystem"
-    如果路径不含 orbit 或 src 标记，用文件路径本身推导模块名。
-    """
-    p = Path(file_path)
-    parts = list(p.parts)
-    # 找到 "orbit" 或 "src" 的索引
-    try:
-        idx = parts.index("orbit")
-        parts = parts[idx:]  # 从 orbit 开始
-    except ValueError:
-        try:
-            idx = parts.index("src")
-            parts = parts[idx + 1 :]  # 跳过 src
-        except ValueError:
-            # 无法定位——用文件名推导（回退策略）
-            stem = p.stem
-            return f"orbit.tools.{stem}"
-    # 去掉 .py
-    parts[-1] = parts[-1].replace(".py", "")
-    return ".".join(parts)
-
-
-def _version_key(version: str) -> tuple[int, ...]:
-    """semver 字符串 → 可排序元组."""
-    try:
-        return tuple(int(x) for x in version.split("."))
-    except (ValueError, AttributeError):
-        return (0,)

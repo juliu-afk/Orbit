@@ -66,13 +66,9 @@ _PRESET_PARAMS: dict[ModePreset, dict] = {
 }
 
 # 默认参数（reset 用）
-_DEFAULT_PARAMS: dict = {
-    "max_questions_per_branch": 20,
-    "question_strategy": "depth_first",
-    "require_recommendation": True,
-    "codebase_first": True,
-    "auto_upgrade_context": True,
-}
+# P1-1 fix: 不再硬编码——各 mode 实际默认值不同（clarify=breadth_first/8, architect=mixed/10）。
+# reset 时从 mode.yaml 的 _default_behavior 字段恢复——该字段在首次 /mode fast/deep 时自动保存。
+_DEFAULT_PARAMS: dict = {}
 
 
 class ModeTuner:
@@ -138,9 +134,39 @@ class ModeTuner:
     ) -> "ModeConfig | None":
         """修改 mode.yaml 中 behavior 参数并写回.
 
-        WHY 委托 loader.update_behavior(): tuner 不直接访问文件系统。
+        P1-1: 首次修改时自动保存原始 behavior 到 _default_behavior——
+        /mode reset 时从该字段恢复，而非用硬编码默认值。
+        WHY: 各 mode 实际默认值不同（clarify=breadth_first/8, architect=mixed/10）。
         """
-        return loader.update_behavior(mode_name, params)
+        config = loader.load(mode_name)
+        if config is None:
+            return None
+
+        import yaml as _yaml  # noqa: F811
+
+        yaml_path = loader._modes_dir / mode_name / "mode.yaml"
+        try:
+            raw = _yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+            if raw is None:
+                return None
+
+            # 首次修改: 保存原始 behavior 供 reset 使用
+            if "_default_behavior" not in raw:
+                raw["_default_behavior"] = dict(raw.get("behavior", {}))
+
+            # 覆盖指定参数
+            behavior = raw.setdefault("behavior", {})
+            behavior.update(params)
+
+            yaml_path.write_text(
+                _yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False),
+                encoding="utf-8",
+            )
+            loader._cache.pop(mode_name, None)
+            return loader.load(mode_name)
+        except (OSError, _yaml.YAMLError) as e:
+            logger.warning("mode_update_failed", mode=mode_name, error=str(e))
+            return None
 
     @classmethod
     def _reset_mode(
@@ -148,5 +174,34 @@ class ModeTuner:
         loader: "ModeLoader",
         mode_name: str,
     ) -> "ModeConfig | None":
-        """恢复 mode.yaml 到默认参数."""
-        return cls._update_mode_file(loader, mode_name, _DEFAULT_PARAMS)
+        """恢复 mode.yaml 到默认参数——从 _default_behavior 字段读取.
+
+        P1-1: 不再用硬编码 _DEFAULT_PARAMS。各 mode 保留自己首次修改前的原始值。
+        """
+        import yaml as _yaml  # noqa: F811
+
+        yaml_path = loader._modes_dir / mode_name / "mode.yaml"
+        if not yaml_path.exists():
+            return None
+
+        try:
+            raw = _yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+            if raw is None:
+                return None
+
+            defaults = raw.pop("_default_behavior", None)
+            if defaults is None:
+                # 未修改过——无需重置
+                return loader.load(mode_name)
+
+            # 恢复原始 behavior
+            raw["behavior"] = defaults
+            yaml_path.write_text(
+                _yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False),
+                encoding="utf-8",
+            )
+            loader._cache.pop(mode_name, None)
+            return loader.load(mode_name)
+        except (OSError, _yaml.YAMLError) as e:
+            logger.warning("mode_reset_failed", mode=mode_name, error=str(e))
+            return None

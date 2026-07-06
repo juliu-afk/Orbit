@@ -1,12 +1,6 @@
-"""ReActAgent 基类——think→act→observe 循环.
+"""ReActAgent 类——think→act→observe 循环核心。
 
-对标: OpenCode prompt.ts:1400 runLoop()
-     + Claude Code while loop + tool_calls
-     + Hermes conversation_loop.py:496
-
-WHY ReAct 而非单次 LLM 调用:
-  单次调用只能输出文本，不能读文件/写代码/跑测试。
-  ReAct 循环让 Agent 真正干活——观察→思考→行动→验证。
+从 react_agent.py 拆分——模型/工具函数见 models.py、utils.py。
 """
 
 from __future__ import annotations
@@ -29,6 +23,8 @@ import structlog
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
 from orbit.agents.preact import PreActEngine
 from orbit.agents.reflection import ReflectionEngine
+from orbit.agents.react_agent.models import IterationBudget
+from orbit.agents.react_agent.utils import _truncate_output
 from orbit.events.schemas import DashboardEvent
 from orbit.gateway.schemas import LLMRequest
 from orbit.memory.decision_log import DecisionLog, parse_decision_marker
@@ -40,26 +36,6 @@ logger = structlog.get_logger("orbit.agents.react")
 
 # 最大 tool call 结果长度（截断前）
 MAX_RESULT_CHARS = 10000
-
-
-class IterationBudget:
-    """迭代预算——对标 Hermes iteration_budget.
-
-    WHY 独立类: 预算消耗逻辑与循环逻辑分离，方便测试。
-    """
-
-    def __init__(self, total: int = 90) -> None:
-        self.total = total
-        self._consumed = 0
-
-    def consume(self, n: int = 1) -> bool:
-        """消耗 n 个预算单位。返回是否还有剩余。"""
-        self._consumed += n
-        return self._consumed <= self.total
-
-    @property
-    def remaining(self) -> int:
-        return max(0, self.total - self._consumed)
 
 
 class ReActAgent(BaseAgent):
@@ -632,6 +608,18 @@ class ReActAgent(BaseAgent):
         except Exception:
             logger.debug("decision_log_init_failed", exc_info=True)
             return None
+    # ── 内部 ─────────────────────────────────────────────
+
+    def _get_decision_log(self) -> DecisionLog | None:
+        """懒初始化决策日志——fail-open，异常不阻塞 Agent."""
+        if self._decision_log is not None:
+            return self._decision_log
+        try:
+            self._decision_log = DecisionLog()
+            return self._decision_log
+        except Exception:
+            logger.debug("decision_log_init_failed", exc_info=True)
+            return None
 
     async def _emit(self, task_id: str, event_type: str, data: dict) -> None:
         """推送事件到 EventBus——对标 OpenCode fullStream events。
@@ -651,13 +639,3 @@ class ReActAgent(BaseAgent):
             logger.debug("event_publish_failed", exc_info=True)  # fail-open
 
 
-# ── 模块级函数 ─────────────────────────────────────────
-
-
-def _truncate_output(text: str, max_chars: int = MAX_RESULT_CHARS) -> str:
-    """截断超长输出——头尾 + 摘要。对标 Claude Code Tool Output Truncation。"""
-    if len(text) <= max_chars:
-        return text
-    half = max_chars // 2
-    cut = len(text) - max_chars
-    return text[:half] + f"\n\n... [截断 {cut} 字符] ...\n\n" + text[-half:]

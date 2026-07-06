@@ -23,6 +23,8 @@ echo "=== 0.5 PyInstaller spec check ==="
 python scripts/check_spec.py || { echo "FAIL: spec check failed, fix before build"; exit 1; }
 
 echo "=== 1. 前端构建 ==="
+# WHY 清缓存: Vite 可能缓存旧版本 source，导致构建产物不含最新改动
+rm -rf "$ROOT/frontend/dist" "$ROOT/frontend/node_modules/.vite" "$ROOT/backend/static/assets"
 cd frontend
 CI=true pnpm build
 cd "$ROOT"

@@ -257,11 +257,15 @@ async def exec_command(
 
     import time as _time
 
+    # P0-3: 改用 create_subprocess_exec 直接 exec，不经过 shell 解释器
+    # WHY: create_subprocess_shell(cmd) 走 /bin/sh -c，存在变量展开/命令替换攻击面。
+    # 白名单已验证命令合法性，shlex.split 结果可直接传给 exec。
+    parts = shlex.split(cmd)
     start = _time.time()
     try:
         proc = await asyncio.wait_for(
-            asyncio.create_subprocess_shell(
-                cmd,
+            asyncio.create_subprocess_exec(
+                *parts,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(work_dir),

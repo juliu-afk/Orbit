@@ -132,6 +132,52 @@ class TestProjectRegistry:
             reg.close()
             _cleanup()
 
+    # ── 覆盖缺口 ──
+
+    def test_get_by_path(self) -> None:
+        """按 local_path 查询项目（lines 156-164）。"""
+        reg = ProjectRegistry()
+        try:
+            reg.register("PathProject", local_path="D:/test/pathproj")
+            p = reg.get_by_path("D:/test/pathproj")
+            assert p is not None
+            assert p.name == "PathProject"
+            # 不存在的路径
+            assert reg.get_by_path("/no/such/path") is None
+        finally:
+            reg.close()
+            _cleanup()
+
+    def test_find_by_path_prefix(self) -> None:
+        """路径前缀匹配（lines 168-177）。"""
+        reg = ProjectRegistry()
+        try:
+            reg.register("Child", local_path="D:/parent/child")
+            results = reg.find_by_path_prefix("D:/parent/child/subdir")
+            assert len(results) >= 1
+            assert results[0].name == "Child"
+        finally:
+            reg.close()
+            _cleanup()
+
+    def test_row_to_record_json_error_handling(self) -> None:
+        """_json_list 和 _json_dict 的 JSONDecodeError 路径（lines 243-244, 250-251）。"""
+        reg = ProjectRegistry()
+        # 注册一个项目，然后手动改 DB 写入坏 JSON 来触发异常路径
+        try:
+            reg.register("JsonErr", tags=["ok"])
+            import sqlite3
+            conn = sqlite3.connect(reg._db_path)
+            conn.execute("UPDATE projects SET tags='[[[' WHERE name='JsonErr'")
+            conn.commit()
+            conn.close()
+            p = reg.get("JsonErr")
+            assert p is not None
+            assert p.tags == []  # 坏 JSON → 返回空列表
+        finally:
+            reg.close()
+            _cleanup()
+
 
 def _cleanup() -> None:
     # WHY 不删 DB 文件: 多模块共享 projects.db 连接，删文件 → PermissionError

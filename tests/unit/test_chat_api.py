@@ -99,9 +99,14 @@ class TestChatWebSocket:
 
     def test_ws_auth_rejected_no_token(self) -> None:
         """P0-1: AUTH_ENABLED=True 时无 token 的 WS 连接被拒绝."""
-        with patch("orbit.api.routes.chat.settings") as mock_settings:
+        with (
+            patch("orbit.api.routes.chat.settings") as mock_settings,
+            patch("orbit.api.dependencies.settings") as mock_dep_settings,
+        ):
             mock_settings.AUTH_ENABLED = True
             mock_settings.ORBIT_AUTH_TOKEN = "test-secret-token"
+            mock_dep_settings.AUTH_ENABLED = True
+            mock_dep_settings.ORBIT_AUTH_TOKEN = "test-secret-token"
             app = create_app(enable_auth=True)
             client = TestClient(app)
             with pytest.raises(Exception):  # TestClient 对非 101 响应抛异常
@@ -110,9 +115,14 @@ class TestChatWebSocket:
 
     def test_ws_auth_rejected_wrong_token(self) -> None:
         """P0-1: AUTH_ENABLED=True 时错误 token 的 WS 连接被拒绝."""
-        with patch("orbit.api.routes.chat.settings") as mock_settings:
+        with (
+            patch("orbit.api.routes.chat.settings") as mock_settings,
+            patch("orbit.api.dependencies.settings") as mock_dep_settings,
+        ):
             mock_settings.AUTH_ENABLED = True
             mock_settings.ORBIT_AUTH_TOKEN = "test-secret-token"
+            mock_dep_settings.AUTH_ENABLED = True
+            mock_dep_settings.ORBIT_AUTH_TOKEN = "test-secret-token"
             app = create_app(enable_auth=True)
             client = TestClient(app)
             with pytest.raises(Exception):
@@ -121,9 +131,14 @@ class TestChatWebSocket:
 
     def test_ws_auth_accepted_valid_token(self) -> None:
         """P0-1: AUTH_ENABLED=True 时正确 token 的 WS 连接正常."""
-        with patch("orbit.api.routes.chat.settings") as mock_settings:
+        with (
+            patch("orbit.api.routes.chat.settings") as mock_settings,
+            patch("orbit.api.dependencies.settings") as mock_dep_settings,
+        ):
             mock_settings.AUTH_ENABLED = True
             mock_settings.ORBIT_AUTH_TOKEN = "test-secret-token"
+            mock_dep_settings.AUTH_ENABLED = True
+            mock_dep_settings.ORBIT_AUTH_TOKEN = "test-secret-token"
             app = create_app(enable_auth=True)
             client = TestClient(app)
             with client.websocket_connect("/api/v1/chat?token=test-secret-token") as ws:

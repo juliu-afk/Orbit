@@ -11,6 +11,8 @@ from __future__ import annotations
 import fnmatch
 from pathlib import Path
 
+from orbit.security.constants import SENSITIVE_FILE_GLOB  # P1-6: 统一常量
+
 
 class WorkspaceGuard:
     """工作区路径守卫。
@@ -21,17 +23,8 @@ class WorkspaceGuard:
         guard.validate("/etc/passwd")                   # raises ValueError
     """
 
-    # 始终拒绝的文件模式
-    ALWAYS_DENY_PATTERNS = [
-        ".env",
-        ".env.*",
-        "*.pem",
-        "*.key",
-        "credentials",
-        "secrets",
-        "id_rsa",
-        "id_ed25519",
-    ]
+    # P1-6: 统一到 security/constants.py
+    ALWAYS_DENY_PATTERNS = SENSITIVE_FILE_GLOB
 
     def __init__(self, project_root: str | Path | None = None) -> None:
         self._root = Path(project_root).resolve() if project_root else None

@@ -1,0 +1,22 @@
+# Gitleaks 配置 (P2-2)
+# 扫描硬编码密钥/Token/凭证，默认规则 + Orbit 自定义
+
+title = "Orbit Gitleaks Config"
+
+# 扩展默认规则，额外允许：
+[allowlist]
+  description = "Orbit 安全扫描允许列表"
+
+  # 测试文件中的假密钥
+  paths = [
+    '''tests/''',
+    '''test_''',
+    '''.semgrep/''',
+  ]
+
+  # Python 变量名含 "secret" 但值来自环境变量（如 secrets.token_urlsafe(32)）
+  regexes = [
+    '''secrets\.token_urlsafe''',
+    '''os\.environ\[["']''',
+    '''_get\("''',
+  ]

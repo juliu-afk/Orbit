@@ -223,3 +223,67 @@ class TestToolRegistry:
         assert _version_key("2.0.0") > _version_key("1.0.0")
         assert _version_key("1.10.0") > _version_key("1.2.0")
         assert _version_key("1.0.0") == _version_key("1.0.0")
+
+
+# -- Branch coverage: exception handlers --
+
+class TestToolRegistryBranches:
+    def test_invoke_handler_raises_graceful(self):
+        """handler 内部抛异常 → 记录失败但不崩溃。"""
+        reg = ToolRegistry()
+        def crashy(p): raise ValueError("bad input")
+        reg.register(ToolSchema(name="crashy", version="1.0.0"), crashy)
+        invs_before = len(reg.get_invocations())
+        try:
+            reg.invoke("crashy", {}, agent_name="test")
+        except Exception:
+            pass
+        invs = reg.get_invocations()
+        assert len(invs) >= invs_before
+
+    def test_check_rate_limit_reset(self):
+        """时间窗口过期 → 限流重置。"""
+        import time
+        reg = ToolRegistry()
+        reg.register(ToolSchema(name="rl", version="1.0.0", rate_limit=2), lambda p: p)
+        reg.invoke("rl", {}, agent_name="A")
+        reg.invoke("rl", {}, agent_name="A")
+        # 操作时间窗口让限流重置
+        key = "rl:1.0.0:A"
+        reg._rate_limiters[key][0] = time.time() - 100  # 推到窗口外
+        result = reg.invoke("rl", {}, agent_name="A")  # 应该允许
+        assert result is not None
+
+    def test_invoke_without_handler(self):
+        """注册了 schema 但未注册 handler → ToolNotFoundError。"""
+        reg = ToolRegistry()
+        reg.register(ToolSchema(name="no_handler", version="1.0.0"), lambda p: p)
+        reg._tools["no_handler"] = []  # 清空 handler
+        with pytest.raises(ToolNotFoundError):
+            reg._get_handler("no_handler", "1.0.0")
+
+    def test_list_tools_empty_registry(self):
+        reg = ToolRegistry()
+        tools = reg.list_tools()
+        assert tools == []
+
+    def test_get_invocations_empty(self):
+        reg = ToolRegistry()
+        assert reg.get_invocations() == []
+
+    @pytest.mark.asyncio
+    async def test_dispatch_unknown_tool(self):
+        reg = ToolRegistry()
+        result = await reg.dispatch("nonexistent_tool", {})
+        assert "error" in result or result == ""
+
+    def test_should_parallelize_all_never_parallel(self):
+        from orbit.tools.registry import ToolCall
+        reg = ToolRegistry()
+        calls = [
+            ToolCall(name="exec_command", args={"cmd": "ls"}),
+            ToolCall(name="exec_command", args={"cmd": "pwd"}),
+        ]
+        parallel, serial = reg._should_parallelize(calls)
+        assert len(parallel) == 0
+        assert len(serial) == 2

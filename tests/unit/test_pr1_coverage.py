@@ -63,7 +63,8 @@ class TestRunAgentInputConstruction:
 
         from orbit.scheduler.orchestrator import Scheduler
 
-        sched = Scheduler(agent_factory=PrdFactory)
+        from unittest.mock import MagicMock
+        sched = Scheduler(agent_llms={"developer": MagicMock()}, agent_factory=PrdFactory)
         await sched._task_runner._run_agent("developer", "t1", {"prd": "write add function"})
         assert received["task"] == "write add function"
         assert received["role"] == AgentRole.DEVELOPER
@@ -86,7 +87,8 @@ class TestRunAgentInputConstruction:
 
         from orbit.scheduler.orchestrator import Scheduler
 
-        sched = Scheduler(agent_factory=CrashFactory)
+        from unittest.mock import MagicMock
+        sched = Scheduler(agent_llms={"developer": MagicMock()}, agent_factory=CrashFactory)
         with pytest.raises(RuntimeError, match="boom"):
             await sched._task_runner._run_agent("developer", "t1", {"prd": "test"})
 

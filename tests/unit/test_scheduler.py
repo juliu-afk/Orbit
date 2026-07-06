@@ -168,7 +168,13 @@ async def test_agent_cycle_through_factory():
     AgentFactory.register(AgentRole.REVIEWER, MockAgent)
     AgentFactory.register(AgentRole.CLARIFIER, MockAgent)
 
-    sched = Scheduler(agent_llms={}, agent_factory=AgentFactory)
+    from unittest.mock import MagicMock
+    mock_llm = MagicMock()
+    sched = Scheduler(
+        agent_llms={"chatter": mock_llm, "clarifier": mock_llm, "architect": mock_llm,
+                     "developer": mock_llm, "reviewer": mock_llm},
+        agent_factory=AgentFactory,
+    )
     final = await sched.run_task("task-agent", "test")
     assert final == TaskState.DONE
 

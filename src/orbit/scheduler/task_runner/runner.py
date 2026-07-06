@@ -28,7 +28,7 @@ from orbit.agents.base import AgentInput, AgentRole
 from orbit.agents.context import ContextStage, TaskContext
 from orbit.api.schemas.task import TaskState
 from orbit.checkpoint.manager import CheckpointData, CheckpointManager
-from orbit.scheduler.task_runner import (
+from orbit.scheduler.task_runner.checkpoint import (
     FAST_LANE_TRANSITIONS,
     STATE_TRANSITIONS,
     _state_to_progress,

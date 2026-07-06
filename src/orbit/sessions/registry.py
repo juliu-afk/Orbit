@@ -68,6 +68,9 @@ class SessionRegistry:
             conn.execute("ALTER TABLE sessions ADD COLUMN parent_session_id TEXT DEFAULT NULL")
         with contextlib.suppress(sqlite3.OperationalError):
             conn.execute("ALTER TABLE sessions ADD COLUMN lineage_reason TEXT DEFAULT NULL")
+        # Session PR #2: local_path 持久化——避免每次读都 JOIN projects 表
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE sessions ADD COLUMN local_path TEXT DEFAULT ''")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id)"
         )

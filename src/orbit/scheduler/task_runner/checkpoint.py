@@ -20,6 +20,36 @@ logger = structlog.get_logger("orbit.scheduler.runner")
 
 TERMINAL_STATES = {TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED}
 
+STATE_TRANSITIONS: dict[TaskState, TaskState] = {
+    TaskState.IDLE: TaskState.PARSING,
+    TaskState.PARSING: TaskState.SCOPING,
+    TaskState.SCOPING: TaskState.PLANNING,
+    TaskState.PLANNING: TaskState.CODING,
+    TaskState.CODING: TaskState.VERIFYING,
+    TaskState.VERIFYING: TaskState.DONE,
+}
+
+FAST_LANE_TRANSITIONS: dict[TaskState, TaskState] = {
+    TaskState.IDLE: TaskState.PARSING,
+    TaskState.PARSING: TaskState.CODING,
+    TaskState.CODING: TaskState.DONE,
+    TaskState.DONE: TaskState.DONE,
+}
+
+
+class InvalidStateTransitionError(Exception):
+    """非法状态转换."""
+
+
+def _transition(current: TaskState, fast_lane: bool = False) -> TaskState:
+    """执行状态转换（纯函数）。"""
+    if current in TERMINAL_STATES:
+        raise InvalidStateTransitionError(f"终态 {current.value} 不可转换")
+    transitions = FAST_LANE_TRANSITIONS if fast_lane else STATE_TRANSITIONS
+    if current not in transitions:
+        raise InvalidStateTransitionError(f"状态 {current.value} 无后继")
+    return transitions[current]
+
 
 def _state_to_progress(state: TaskState) -> float:
     """状态→进度百分比."""

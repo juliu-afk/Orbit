@@ -7,8 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from orbit.brief.generator import BriefGenerator, analyze_directory, _detect_python_framework, _detect_js_framework, BRIEF_SYSTEM_PROMPT
-from orbit.brief.models import BriefRecord, ProjectAnalysis, REQUIRED_SECTIONS
+from orbit.brief.analyzer import analyze_directory, _detect_python_framework, _detect_js_framework
+from orbit.brief.generator import BRIEF_SYSTEM_PROMPT, BriefGenerator
+from orbit.brief.models import REQUIRED_SECTIONS, BriefRecord, ProjectAnalysis
 
 
 class TestAnalyzeDirectory:

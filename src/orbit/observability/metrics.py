@@ -209,7 +209,7 @@ def _histogram_avg(histogram: Histogram, labels: dict[str, str]) -> float:
         if count < 1:
             return 0.0
         return round(total / count, 5)
-    except KeyError:
+    except (KeyError, AttributeError):
         return 0.0
 
 

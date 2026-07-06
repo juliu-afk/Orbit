@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
-from orbit.agents.context import TaskContext
+from orbit.agents.context import ContextStage, TaskContext
 from orbit.api.schemas.task import TaskState
 from orbit.checkpoint.manager import CheckpointData
 from orbit.scheduler.task_runner import (
@@ -163,16 +163,18 @@ def test_extract_keywords_mixed() -> None:
 
 
 def test_transition_normal() -> None:
-    """正常流水线：IDLE→PARSING→PLANNING→CODING→VERIFYING→DONE。"""
+    """正常流水线：IDLE→PARSING→SCOPING→PLANNING→CODING→VERIFYING→DONE。"""
     seq = [
         _transition(TaskState.IDLE),
         _transition(TaskState.PARSING),
+        _transition(TaskState.SCOPING),
         _transition(TaskState.PLANNING),
         _transition(TaskState.CODING),
         _transition(TaskState.VERIFYING),
     ]
     assert seq == [
         TaskState.PARSING,
+        TaskState.SCOPING,
         TaskState.PLANNING,
         TaskState.CODING,
         TaskState.VERIFYING,
@@ -181,7 +183,7 @@ def test_transition_normal() -> None:
 
 
 def test_transition_fast_lane() -> None:
-    """快车道：跳过 PLANNING 和 VERIFYING。"""
+    """快车道：跳过 SCOPING 和 PLANNING。"""
     assert _transition(TaskState.IDLE, fast_lane=True) == TaskState.PARSING
     assert _transition(TaskState.PARSING, fast_lane=True) == TaskState.CODING
     assert _transition(TaskState.CODING, fast_lane=True) == TaskState.DONE
@@ -371,7 +373,7 @@ async def test_run_agent_execution_error_propagates(full_runner: TaskRunner) -> 
 
 
 def test_build_context(full_runner: TaskRunner) -> None:
-    """构建 TaskContext，L1-L5 各层正确。"""
+    """构建 TaskContext——G2 渐进式: Stage 1 仅 L1+L3，L2/L4/L5 延迟加载."""
     ctx = full_runner._build_context(
         "t1",
         {
@@ -390,7 +392,11 @@ def test_build_context(full_runner: TaskRunner) -> None:
     assert ctx.model_tier == "fast"
     assert ctx.l3["state"] == "CODING"
     assert ctx.l3["prd"] == "实现函数"
-    assert ctx.l2["code_graph"] == "..."
+    # G2: Stage 1 默认——L2/L4/L5 空，运行时通过 load_stage() 按需加载
+    assert ctx.stage == ContextStage.STAGE1
+    assert ctx.l2 == {}   # 延迟到 Stage 2
+    assert ctx.l4 == {}   # 延迟到 Stage 2
+    assert ctx.l5 == []   # 延迟到 Stage 3
     assert ctx.l1 != ""  # 固化的会计准则约束
 
 

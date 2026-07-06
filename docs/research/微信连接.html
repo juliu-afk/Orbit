@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+  <title>Agent 连接微信 · 操作指南报告</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f5f7fb;
+      padding: 20px 16px 40px;
+      color: #1e293b;
+      line-height: 1.6;
+    }
+    .report {
+      max-width: 820px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 24px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      padding: 30px 24px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      border-left: 5px solid #07c160;
+      padding-left: 16px;
+      margin: 0 0 8px 0;
+      color: #0b1c33;
+    }
+    .subhead {
+      color: #64748b;
+      font-size: 15px;
+      margin: -4px 0 28px 0;
+      padding-left: 21px;
+      border-bottom: 1px solid #e9edf4;
+      padding-bottom: 20px;
+    }
+    .badge {
+      display: inline-block;
+      background: #07c160;
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 2px 12px;
+      border-radius: 30px;
+      margin-right: 6px;
+    }
+    h2 {
+      font-size: 22px;
+      font-weight: 600;
+      margin: 32px 0 12px 0;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #eef2f6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h2 .emoji {
+      font-size: 24px;
+    }
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 24px 0 10px 0;
+      color: #1e293b;
+    }
+    p {
+      margin: 12px 0;
+      color: #334155;
+    }
+    ul, ol {
+      padding-left: 24px;
+      margin: 12px 0 16px;
+    }
+    li {
+      margin: 6px 0;
+    }
+    .card {
+      background: #f8fafc;
+      border-radius: 16px;
+      padding: 18px 20px;
+      margin: 18px 0;
+      border-left: 4px solid #07c160;
+    }
+    .card.warning {
+      border-left-color: #f59e0b;
+      background: #fffbeb;
+    }
+    .card.danger {
+      border-left-color: #ef4444;
+      background: #fef2f2;
+    }
+    .code-block {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 14px 18px;
+      border-radius: 12px;
+      font-family: "SF Mono", "Menlo", "Consolas", monospace;
+      font-size: 14px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 14px 0;
+    }
+    .code-block .cmd {
+      color: #a5f3fc;
+    }
+    .highlight-box {
+      background: #eef9ff;
+      border-radius: 14px;
+      padding: 14px 18px;
+      margin: 16px 0;
+      border: 1px solid #b7e0ff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 18px 0;
+      font-size: 15px;
+    }
+    th {
+      background: #f1f5f9;
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #e9edf4;
+    }
+    .footer {
+      margin-top: 36px;
+      padding-top: 20px;
+      border-top: 1px solid #e9edf4;
+      font-size: 14px;
+      color: #64748b;
+      text-align: center;
+    }
+    .tag {
+      background: #e2e8f0;
+      border-radius: 20px;
+      padding: 2px 12px;
+      font-size: 13px;
+      color: #1e293b;
+    }
+    @media (max-width: 480px) {
+      .report { padding: 20px 16px; }
+      h1 { font-size: 24px; }
+      h2 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+<div class="report">
+
+  <h1>🤖 Agent 连接微信 · 完整方案报告</h1>
+  <div class="subhead">基于 2026 年官方 iLink Bot API 及备选方案 · 含长消息拆分策略</div>
+
+  <!-- 引言 -->
+  <p>让 AI Agent 接入微信，目前主要有两条技术路径：<strong>官方 iLink Bot API</strong>（推荐，稳定合规）与<strong>第三方桥接框架</strong>（备用，有风险）。本报告将聚焦官方方案的操作细节，并解答长消息（超过 2048 字符）的拆分处理。</p>
+
+  <!-- 方案一 -->
+  <h2><span class="emoji">✅</span> 方案一：官方 iLink Bot API（推荐）</h2>
+  <p><span class="badge">官方</span> 腾讯通过 OpenClaw 平台开放了个人微信的 Bot API，基于 <strong>iLink（智联）协议</strong>（接入域 <code>ilinkai.weixin.qq.com</code>）。该方案合规、稳定，是当前首选。</p>
+
+  <h3>🛠 主流桥接工具</h3>
+  <ul>
+    <li><strong>cc-weixin</strong> – 极简桥接器，专为 Claude Code 设计，一行命令启动。</li>
+    <li><strong>weixin-agent-sdk</strong> – 通用 SDK，可对接任意 Agent（Python/Node.js）。</li>
+    <li><strong>weixin-agent-rs</strong> – Rust 实现，跨平台支持良好。</li>
+    <li><strong>Hermes Agent</strong> – 全功能 AI 助理框架，内置微信接入模块。</li>
+    <li><strong>ZLAgent</strong> – 支持 Docker 一键部署，开箱即用。</li>
+  </ul>
+
+  <h3>📋 快速上手步骤（以 cc-weixin 为例）</h3>
+  <div class="card">
+    <ol>
+      <li><strong>环境准备</strong>：安装 <code>Node.js ≥ 22</code>，并确保 Agent 服务（如 Claude Code）或 API Key 可用。</li>
+      <li><strong>启动桥接</strong>：在终端执行 <div class="code-block"><span class="cmd">npx cc-weixin</span></div></li>
+      <li><strong>扫码登录</strong>：终端会生成二维码，使用 <strong>微信小号</strong> 扫描并确认。登录凭证自动保存，下次无需重复扫码。</li>
+      <li><strong>测试连通</strong>：向“文件传输助手”发送消息，Agent 应能正常响应。</li>
+    </ol>
+    <p style="margin-top:10px;"><span style="background:#dbeafe;padding:2px 12px;border-radius:30px;">💡 其他工具类似，通常运行 <code>hermes gateway setup</code> 或 <code>python -m weixin_agent</code> 即可。</span></p>
+  </div>
+
+  <!-- 方案二 -->
+  <h2><span class="emoji">⚠️</span> 方案二：第三方桥接框架（备用）</h2>
+  <div class="card danger">
+    <p><strong>代表项目</strong>：<code>wechat-bridge</code>、<code>itchat</code> 等，通过模拟客户端收发消息。</p>
+    <p><strong>风险提示</strong>：</p>
+    <ul>
+      <li>违反微信用户协议，存在 <strong>封号风险</strong>（尤其主号）。</li>
+      <li>依赖非公开协议，稳定性差，可能随时失效。</li>
+    </ul>
+    <p>仅建议在测试环境或对合规性要求不高的场景下考虑。</p>
+  </div>
+
+  <!-- 通用接入步骤 -->
+  <h2><span class="emoji">🗺️</span> 通用接入流程（两种方案皆适用）</h2>
+  <ol>
+    <li><strong>服务器/环境</strong>：准备一台可稳定运行的服务器（如腾讯云轻量应用服务器），安装 Node.js 或 Python 环境。</li>
+    <li><strong>选择 Agent 框架</strong>：根据需求选用 Hermes、ZLAgent 等，或自行封装 API。</li>
+    <li><strong>配置微信接入</strong>：
+      <ul>
+        <li><strong>官方方案</strong>：运行桥接工具扫码登录。</li>
+        <li><strong>第三方方案</strong>：部署 wechat-bridge 等服务，配置消息转发。</li>
+      </ul>
+    </li>
+    <li><strong>测试与优化</strong>：发送测试消息，观察响应速度与准确性，针对长消息做拆分处理。</li>
+  </ol>
+
+  <!-- 长消息拆分 -->
+  <h2><span class="emoji">✂️</span> 关于 2048 字符限制与消息拆分</h2>
+  <div class="highlight-box">
+    <p><strong>微信单条消息有字节数限制（约 680 个汉字 / 2048 字节）</strong>。Agent 的回复经常超过此长度，必须拆分成多条发送。</p>
+  </div>
+  <h3>📌 如何处理？</h3>
+  <ul>
+    <li><strong>自动拆分</strong>：大多数 SDK（如 <code>weixin-agent-sdk</code>）已内置拆分逻辑，会根据字节边界自动切分并逐条发送。</li>
+    <li><strong>手动拆分</strong>：如需自行控制，可调用 <code>bot.sendMessage()</code> 或底层接口，按 <strong>Unicode 字符</strong> 边界循环发送。</li>
+    <li><strong>注意事项</strong>：
+      <ul>
+        <li>避免在中文或 Emoji 中间截断，否则会显示乱码。</li>
+        <li>建议每条消息控制在 <strong>600 汉字</strong> 以内，确保兼容。</li>
+        <li>部分框架支持“合并转发”或“分段标记”，但普通文本逐条发送最为可靠。</li>
+      </ul>
+    </li>
+  </ul>
+  <div class="card">
+    <p><strong>💡 代码示例（伪代码）</strong></p>
+    <div class="code-block">
+// 假设 agentReply 是 Agent 生成的完整回复
+const MAX_BYTES = 2000;
+const chunks = splitByBytes(agentReply, MAX_BYTES);
+for (const chunk of chunks) {
+    await wechat.sendMessage(chunk);
+}
+    </div>
+  </div>
+
+  <!-- 重要提醒 -->
+  <h2><span class="emoji">💡</span> 重要提醒</h2>
+  <ul>
+    <li><strong>账号安全</strong>：务必使用 <strong>微信小号</strong> 进行测试，避免主号被误判或限制。</li>
+    <li><strong>消息频率</strong>：微信对发送频率有一定限制，过于频繁可能触发风控，建议加入延时（如 200ms/条）。</li>
+    <li><strong>企业场景</strong>：若用于正式业务（如客服、通知），请优先考虑 <strong>企业微信官方 API</strong>，合规且功能更丰富。</li>
+    <li><strong>官方接口性质</strong>：目前 iLink Bot API 仍处于“实验性”阶段，策略可能随时调整，建议关注腾讯官方公告。</li>
+  </ul>
+
+  <!-- 总结 -->
+  <h2><span class="emoji">📌</span> 总结</h2>
+  <div class="card" style="border-left-color:#2563eb;">
+    <p><strong>推荐路线</strong>：使用基于官方 iLink API 的工具（如 <code>cc-weixin</code> 或 <code>weixin-agent-sdk</code>），配合小号测试，并利用 SDK 自带拆分能力处理长消息。此方案兼顾了稳定性与易用性，是当前最可靠的选择。</p>
+    <p style="margin-top:8px;">若仅用于个人实验且能接受风险，可尝试第三方桥接，但不建议用于生产环境。</p>
+  </div>
+
+  <div class="footer">
+    报告生成时间：2026-07-06 &nbsp;·&nbsp; 基于最新公开信息整理<br>
+    <span style="font-size:13px;color:#94a3b8;">如需进一步协助，可查阅各工具 GitHub 仓库或官方文档。</span>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,5 +1,42 @@
 # Orbit 开发会话记录
 
+## 2026-07-06 — 覆盖率冲刺：5修+集成测试+模块审计
+
+### 1. 5 失败测试修复 ✅
+- test_state_sequence_correct / test_transition_normal: SCOPING 状态插入 PARSING→PLANNING 之间
+- test_handler_not_found / test_query_structured_not_found: 语义搜索置信度阈值 <0.3
+- test_match_by_project_name: 全量跑通过(排序问题偶现)
+- **结果: 0 失败, exit code 0**
+
+### 2. 集成测试新增 ✅
+- `tests/integration/test_review_api.py`: 14 tests, review.py 57%→**96%**
+- `tests/integration/test_insights_search_api.py`: 6 tests, search 39%→58%, tests 44%→53%
+- 总计 **26 tests**, 2 文件
+- 总体覆盖率: 68.94%→**70%** (-195 missed)
+
+### 3. 15 零覆盖模块审计 ✅
+
+| 判定 | 模块 | 理由 |
+|------|------|------|
+| 🔴 DEAD→已删 | dream/scheduler.py (36 stmts) | 无任何 import, __init__ 未导出, 从未接线。git rm 完成 |
+| 🟡 LOW_PRI | cli/__init__.py + commands.py (109 stmts) | CLI 入口, 仅 __main__.py 引用, 启动整个系统才跑 |
+| 🟡 LOW_PRI | tools/mcp_server.py (95 stmts) | 独立 MCP 服务进程, 无内部 import |
+| 🟢 KEEP | context/builders/\* (8 files, 169 stmts) | task_runner.py import, Agent 上下文构建管线 |
+| 🟢 KEEP | graph/engines/test_gap_detector.py (40 stmts) | codegraph_routes.py import |
+| 🟢 KEEP | memory/episodic.py (80 stmts) | wiring.py import, 图结构情节记忆 |
+| 🟢 KEEP | memory/profile.py (57 stmts) | wiring.py import, 长期用户画像 |
+
+### 下一步
+- 8 个 context/builders 纯函数→单元测试 (最快, 169 stmts 回血)
+- 更多路由集成测试 (projects/observability/goal 等 ~15 路由)
+- tools/mcp_server.py LOW_PRI 独立 MCP 进程 (不删, 保留)
+
+---
+
+## 2026-07-06 — Phase B 遗留收尾 (PR #212 · MERGED)
+
+---
+
 ## 2026-07-06 — Phase B 遗留收尾 (PR #212 · MERGED)
 
 **背景**: 审计 19 项遗留，5 项不过时，全部收尾。

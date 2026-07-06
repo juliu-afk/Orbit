@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>grill-me 生态系统解构 —— Orbit 可借鉴的模式</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text2: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #79c0ff;
+    --green: #3fb950;
+    --orange: #d2991d;
+    --red: #f85149;
+    --purple: #a371f7;
+    --cyan: #39c5cf;
+    --code-bg: #1c2128;
+    --inline-code: #b392f0;
+    --max-w: 960px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .container { max-width: var(--max-w); margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* Header */
+  header {
+    text-align: center;
+    padding: 60px 0 48px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  header h1 {
+    font-size: 2.2em;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #f0f6fc;
+    margin-bottom: 12px;
+  }
+  header .subtitle {
+    color: var(--text2);
+    font-size: 0.95em;
+  }
+  header .badge-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+  }
+  .badge-p0 { background: #da363320; color: var(--red); border: 1px solid #da363340; }
+  .badge-p1 { background: #d2991d20; color: var(--orange); border: 1px solid #d2991d40; }
+  .badge-p2 { background: #3fb95020; color: var(--green); border: 1px solid #3fb95040; }
+  .badge-info { background: #58a6ff20; color: var(--accent); border: 1px solid #58a6ff40; }
+
+  /* TOC */
+  nav.toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 48px;
+  }
+  nav.toc h2 { font-size: 1em; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
+  nav.toc ol { list-style: none; counter-reset: toc; }
+  nav.toc li { counter-increment: toc; margin: 6px 0; }
+  nav.toc a { color: var(--accent); text-decoration: none; font-size: 0.93em; }
+  nav.toc a:hover { text-decoration: underline; }
+  nav.toc a::before { content: counter(toc) ". "; color: var(--text2); }
+
+  /* Sections */
+  section { margin-bottom: 52px; }
+  h2 {
+    font-size: 1.55em;
+    font-weight: 700;
+    color: #f0f6fc;
+    margin-bottom: 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #e6edf3;
+    margin: 28px 0 12px;
+  }
+  h4 {
+    font-size: 1.03em;
+    font-weight: 600;
+    color: var(--text);
+    margin: 22px 0 8px;
+  }
+  p { margin-bottom: 12px; }
+  strong { color: #f0f6fc; }
+  a { color: var(--accent); }
+
+  /* Callout */
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    padding: 16px 20px;
+    border-radius: 0 6px 6px 0;
+    margin: 18px 0;
+    color: var(--text2);
+  }
+  .callout.insight {
+    border-left-color: var(--purple);
+  }
+  .callout.warning {
+    border-left-color: var(--orange);
+  }
+  .callout.success {
+    border-left-color: var(--green);
+  }
+  .callout strong { color: var(--text); }
+  .callout-title {
+    font-weight: 700;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+
+  /* Tables */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 16px 0;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+  }
+  th {
+    background: var(--surface2);
+    color: #f0f6fc;
+    font-weight: 600;
+    text-align: left;
+    padding: 10px 14px;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface); }
+  .col-yes { color: var(--green); font-weight: 600; }
+  .col-no { color: var(--red); }
+  .col-gap { color: var(--orange); }
+
+  /* Code */
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    font-size: 0.85em;
+    line-height: 1.55;
+    margin: 14px 0;
+    color: #e6edf3;
+  }
+  code {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    font-size: 0.88em;
+  }
+  :not(pre) > code {
+    background: var(--surface2);
+    color: var(--inline-code);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  pre .kw { color: #ff7b72; }
+  pre .str { color: #a5d6ff; }
+  pre .cmt { color: #8b949e; font-style: italic; }
+  pre .fn { color: #d2a8ff; }
+  pre .num { color: #79c0ff; }
+  pre .type { color: #ffa657; }
+
+  /* Tree */
+  .tree {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    font-size: 0.85em;
+    line-height: 1.55;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 14px 0;
+    color: #e6edf3;
+    white-space: pre;
+  }
+  .tree .dir { color: var(--accent); }
+  .tree .file { color: var(--text); }
+  .tree .cmt { color: var(--text2); }
+
+  /* Flow diagram */
+  .flow {
+    font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    font-size: 0.82em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 14px 0;
+    white-space: pre;
+    overflow-x: auto;
+    color: #e6edf3;
+  }
+
+  /* Priority grid */
+  .priority-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 18px 0;
+  }
+  @media (max-width: 700px) { .priority-grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .card h4 {
+    margin-top: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .tag {
+    font-size: 0.7em;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .tag-p0 { background: #f8514920; color: var(--red); }
+  .tag-p1 { background: #d2991d20; color: var(--orange); }
+  .tag-p2 { background: #3fb95020; color: var(--green); }
+  .card ul { margin: 10px 0 0 18px; font-size: 0.9em; color: var(--text2); }
+  .card li { margin: 4px 0; }
+
+  /* Quote */
+  blockquote {
+    border-left: 3px solid var(--purple);
+    padding: 12px 18px;
+    margin: 18px 0;
+    background: var(--surface);
+    border-radius: 0 6px 6px 0;
+    font-size: 1.05em;
+    color: #e6edf3;
+  }
+
+  /* Summary box */
+  .summary-box {
+    background: linear-gradient(135deg, #1a1f2e 0%, #161b22 100%);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    margin: 24px 0;
+  }
+  .summary-box h3 { margin-top: 0; color: var(--accent2); }
+
+  /* Check/cross lists */
+  .check-list { list-style: none; margin: 10px 0; }
+  .check-list li { padding: 4px 0; }
+  .check-list .ok { color: var(--green); }
+  .check-list .gap { color: var(--orange); }
+
+  /* Gap analysis table special */
+  .gap-table td:first-child { color: var(--red); font-weight: 700; font-size: 1.2em; text-align: center; width: 30px; }
+  .gap-table td:nth-child(2) { color: var(--green); }
+  .gap-table td:nth-child(3) { color: var(--text2); }
+  .gap-table td:nth-child(4) { color: var(--orange); font-weight: 600; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    color: var(--text2);
+    font-size: 0.82em;
+    padding: 40px 0 0;
+    border-top: 1px solid var(--border);
+    margin-top: 60px;
+  }
+  footer a { color: var(--text2); }
+
+  /* Print */
+  @media print {
+    :root { --bg: #fff; --surface: #f6f8fa; --surface2: #eaeef2; --border: #d0d7de; --text: #24292f; --text2: #57606a; --code-bg: #f6f8fa; }
+    body { font-size: 12px; }
+    .container { max-width: 100%; padding: 20px; }
+    header { padding: 20px 0 24px; margin-bottom: 24px; }
+    pre, .tree, .flow { border: 1px solid #d0d7de; }
+    .priority-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>grill-me 生态系统解构</h1>
+  <p class="subtitle">Orbit 可借鉴的模式 · 2026-07-06</p>
+  <p class="subtitle" style="margin-top:4px;">研究范围：grill-me · grill-with-docs · drill-me · mattpocock/skills 仓库架构</p>
+  <div class="badge-row">
+    <span class="badge badge-info">3 项目解构</span>
+    <span class="badge badge-info">7 项差距分析</span>
+    <span class="badge badge-p0">2 项 P0</span>
+    <span class="badge badge-p1">2 项 P1</span>
+    <span class="badge badge-p2">2 项 P2</span>
+    <span class="badge badge-info">6 条设计原则</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li><a href="#s1">生态全景</a></li>
+    <li><a href="#s2">逐项目解构</a> — grill-me / grill-with-docs / drill-me</li>
+    <li><a href="#s3">mattpocock/skills 架构原则</a></li>
+    <li><a href="#s4">Orbit 对比分析</a> — 差距 + 已做对</li>
+    <li><a href="#s5">具体建议</a> — P0 / P1 / P2</li>
+    <li><a href="#s6">核心教训</a></li>
+    <li><a href="#refs">参考来源</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<section id="s1">
+<h2>一、生态全景</h2>
+
+<p>grill-me 不是孤立项目。它是 Matt Pocock 公开的 <strong>18+ 技能仓库</strong>中最具影响力的一个，衍生出"交互协议优先"的工具家族。三项目的共同基因：<strong>Process over Prompt，Interaction Protocol over Infrastructure。</strong></p>
+
+<div class="tree">
+<span class="dir">mattpocock/skills</span> <span class="cmt">(92K star)</span>
+├── <span class="file">grill-me</span>          <span class="cmt">← 核心：AI 面试你，不是写代码</span>
+├── <span class="file">grill-with-docs</span>   <span class="cmt">← 扩展版：+ 统一语言 + ADR</span>
+├── <span class="file">to-prd</span>            <span class="cmt">← 对话 → PRD 合成</span>
+├── <span class="file">to-issues</span>         <span class="cmt">← PRD → 垂直切片 Issue</span>
+├── <span class="file">tdd</span>               <span class="cmt">← 红-绿-重构循环</span>
+├── <span class="file">triage-issue</span>      <span class="cmt">← Issue 状态机</span>
+├── <span class="file">diagnosing-bugs</span>   <span class="cmt">← 结构化调试（先建反馈环）</span>
+├── <span class="file">handoff</span>           <span class="cmt">← 跨会话上下文压缩</span>
+├── <span class="file">domain-model</span>      <span class="cmt">← 领域模型设计</span>
+├── <span class="file">zoom-out</span>          <span class="cmt">← 代码库宏观理解</span>
+├── <span class="file">caveman</span>           <span class="cmt">← 极简 token 压缩模式</span>
+├── <span class="file">write-a-skill</span>     <span class="cmt">← 自扩展：技能写技能</span>
+└── <span class="file">deprecated/</span>        <span class="cmt">(ubiquitous-language, design-an-interface, request-refactor-plan)</span>
+
+<span class="dir">timini/drill-me</span>       <span class="cmt">← 镜像：AI 用间隔重复教你</span>
+├── <span class="file">/drill:me</span>         <span class="cmt">← FSRS 自适应导师</span>
+└── <span class="file">/drill:status</span>     <span class="cmt">← 进度仪表盘</span>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="s2">
+<h2>二、逐项目解构</h2>
+
+<!-- 2.1 -->
+<h3>2.1 grill-me —— 三句话的威力</h3>
+
+<p><strong>完整 SKILL.md</strong>（仅 10 行）：</p>
+<pre>Interview me relentlessly about every aspect of this plan until we reach a
+shared understanding. Walk down each branch of the <strong>design tree</strong>, resolving
+dependencies between decisions <strong>one-by-one</strong>. For each question, provide your
+<strong>recommended answer</strong>.
+
+<strong>Ask the questions one at a time.</strong>
+
+If a question can be answered by exploring the codebase, <strong>explore the
+codebase instead</strong>.</pre>
+
+<div class="table-wrap">
+<table>
+<tr><th>设计元素</th><th>实现方式</th><th>为什么有效</th></tr>
+<tr><td>交互协议</td><td>一次一个问题，禁止打包</td><td>消除认知过载，每步一个决策</td></tr>
+<tr><td>决策树遍历</td><td>深度优先，完成一个分支再开下一个</td><td>防止浅层遍历，每个决策被穷尽</td></tr>
+<tr><td>推荐答案</td><td>每个问题带 AI 推荐</td><td>从"你来想"变成"你来审"，降低用户负担</td></tr>
+<tr><td>代码库优先</td><td>能自己查的不问用户</td><td>减少交互轮次，尊重用户时间</td></tr>
+<tr><td>渐进式加载</td><td>根文件 10 行，细节在 <code>references/</code></td><td>主文件不膨胀，节省上下文 token</td></tr>
+</table>
+</div>
+
+<p><strong>社区扩展版</strong>（alirezarezvani/claude-skills）增加了三个脚本：</p>
+<ul style="margin-left:20px; color:var(--text2);">
+  <li><code>scripts/decision_tree_extractor.py</code> — 从用户方案中提取决策分支</li>
+  <li><code>scripts/question_generator.py</code> — 为每个分支生成推荐问题</li>
+  <li><code>scripts/grill_session_tracker.py</code> — 记录会话状态和已解决决策</li>
+</ul>
+
+<div class="callout insight">
+  <div class="callout-title">💡 核心洞察</div>
+  grill-me 不定义<strong>"问什么"</strong>，它定义<strong>"怎么问"</strong>。Prompt 是触发器，Process 才是产品。这跟模型升级正交——GPT-5 不会让这个交互模式过时。
+</div>
+
+<!-- 2.2 -->
+<h3>2.2 grill-with-docs —— 领域语言工程化</h3>
+
+<p><strong>三层叠加</strong>（在 grill-me 基础上）：</p>
+
+<div class="table-wrap">
+<table>
+<tr><th style="width:20px;">#</th><th>层</th><th>说明</th></tr>
+<tr>
+  <td style="text-align:center;font-weight:700;">1</td>
+  <td><strong>CONTEXT.md</strong></td>
+  <td>严格词汇表，零实现细节。定义"是什么"不说"怎么做"</td>
+</tr>
+<tr>
+  <td style="text-align:center;font-weight:700;">2</td>
+  <td><strong>docs/adr/</strong></td>
+  <td>
+    架构决策记录，<strong>三重过滤门</strong>：
+    <br>① 难逆转（改的成本高）
+    <br>② 缺上下文会惊讶（未来读者会问"为什么这么做"）
+    <br>③ 真实权衡结果（存在替代方案，你选了其中一个）
+    <br>→ 三者全满足才创建 ADR，否则跳过
+  </td>
+</tr>
+<tr>
+  <td style="text-align:center;font-weight:700;">3</td>
+  <td><strong>四种会话行为</strong></td>
+  <td>
+    术语冲突检测：用户用词与 CONTEXT.md 冲突 → 立即挑战<br>
+    模糊语言锐化："account" → "Customer 还是 User？"<br>
+    边界压力测试：发明边缘场景迫使概念精确化<br>
+    代码交叉验证：用户声称的 vs 实际代码实现 → 暴露不一致
+  </td>
+</tr>
+</table>
+</div>
+
+<div class="tree">
+<span class="cmt"># 单上下文仓库</span>
+/
+├── <span class="file">CONTEXT.md</span>
+├── <span class="dir">docs/adr/</span>
+│   ├── <span class="file">0001-event-sourced-orders.md</span>
+│   └── <span class="file">0002-postgres-for-write-model.md</span>
+
+<span class="cmt"># 多上下文仓库（monorepo）</span>
+/
+├── <span class="file">CONTEXT-MAP.md</span>              <span class="cmt">← 指向各上下文</span>
+├── <span class="dir">docs/adr/</span>                   <span class="cmt">← 系统级决策</span>
+├── <span class="dir">src/ordering/</span>
+│   ├── <span class="file">CONTEXT.md</span>
+│   └── <span class="dir">docs/adr/</span>
+└── <span class="dir">src/billing/</span>
+    ├── <span class="file">CONTEXT.md</span>
+    └── <span class="dir">docs/adr/</span>
+</div>
+
+<div class="callout insight">
+  <div class="callout-title">💡 核心洞察</div>
+  共享词汇建立后，AI 响应大幅变短——不用每次重新解释定义。统一语言不仅改善人-AI 通信，也改善 AI 内部推理链。
+</div>
+
+<!-- 2.3 -->
+<h3>2.3 drill-me —— 间隔重复的知识逆向传输</h3>
+
+<div class="tree">
+<span class="dir">drill-me/</span>
+├── <span class="dir">skills/</span>
+│   ├── <span class="dir">me/</span>
+│   │   ├── <span class="file">SKILL.md</span>                    <span class="cmt"># /drill:me 导师（~60行）</span>
+│   │   └── <span class="dir">reference/</span>
+│   │       ├── <span class="file">scheduling.md</span>           <span class="cmt"># FSRS 算法 + 账本格式</span>
+│   │       └── <span class="file">teaching-playbook.md</span>    <span class="cmt"># 会话结构、提示阶梯、难度伺服</span>
+│   └── <span class="dir">status/</span>
+│       └── <span class="file">SKILL.md</span>                    <span class="cmt"># /drill:status 进度仪表盘</span>
+└── <span class="dir">docs/</span>
+    └── <span class="file">the-science.md</span>                  <span class="cmt"># 每个设计决策的学术引用</span>
+</div>
+
+<h4>FSRS 简化算法</h4>
+
+<div class="table-wrap">
+<table>
+<tr><th>组件</th><th>定义</th><th>范围</th></tr>
+<tr><td>Difficulty (D)</td><td>材料固有难度</td><td>1.0 – 10.0</td></tr>
+<tr><td>Stability (S)</td><td>记忆强度（遗忘到 90% 的天数）</td><td>天</td></tr>
+<tr><td>Retrievability (R)</td><td>即时回忆概率</td><td>0 – 1</td></tr>
+</table>
+</div>
+
+<p>遗忘曲线（幂律，非指数）：</p>
+<pre>R(t, S) = (1 + 0.2346 × t / S)^(-0.5)</pre>
+
+<p>更新规则：正确回忆 → 间隔约翻倍 · 错误回忆 → 间隔重置为 1 天 · 自信错误 → 标记 + 插队。</p>
+
+<h4>教学 Playbook（认知科学驱动）</h4>
+
+<div class="table-wrap">
+<table>
+<tr><th>聊天机器人默认行为</th><th>drill-me 的实际做法</th><th>效应量</th></tr>
+<tr><td>向你解释</td><td><strong>测验你</strong> — 检索练习 > 重读</td><td>g ≈ 0.61</td></tr>
+<tr><td>一次性全讲完</td><td><strong>间隔复习</strong> — 按遗忘曲线排期</td><td>FSRS</td></tr>
+<tr><td>让你觉得容易</td><td><strong>~15% 错误率</strong> — 最佳难度</td><td>挑战点假说</td></tr>
+<tr><td>大段文字</td><td><strong>≤150 词/块</strong> — 认知负荷理论</td><td>组块化</td></tr>
+<tr><td>直接给答案</td><td><strong>让你先猜</strong> — 预测试增强记忆</td><td>pre-testing</td></tr>
+</table>
+</div>
+
+<p>记忆存储：<code>~/.drill-me/</code> 下纯 Markdown 文件，可读可编辑，git 可追踪。</p>
+
+<div class="callout insight">
+  <div class="callout-title">💡 核心洞察</div>
+  grill-me 把<strong>人的知识灌给 AI</strong>，drill-me 把<strong>AI 的知识灌给人</strong>。两个方向用同一种设计哲学：一次一件事，按科学规律排期，可审计可追溯。
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="s3">
+<h2>三、mattpocock/skills 仓库架构原则</h2>
+
+<h3>3.1 目录组织模式</h3>
+<div class="tree">
+<span class="dir">skills/&lt;name&gt;/</span>
+├── <span class="file">SKILL.md</span>              <span class="cmt">← 根技能文件（≤50行）</span>
+├── <span class="dir">references/</span>           <span class="cmt">← 按需加载的细节（算法、模板、检查清单）</span>
+├── <span class="dir">scripts/</span>              <span class="cmt">← 可执行工具（提取器、生成器、追踪器）</span>
+└── <span class="dir">deprecated/</span>           <span class="cmt">← 废弃技能</span>
+</div>
+
+<h3>3.2 六条设计原则</h3>
+
+<div class="table-wrap">
+<table>
+<tr><th>原则</th><th>含义</th><th>反模式</th></tr>
+<tr>
+  <td><strong>Process &gt; Prompt</strong></td>
+  <td>Skill 定义工作流，Prompt 只是触发器</td>
+  <td>把 Skill 写成超长 prompt</td>
+</tr>
+<tr>
+  <td><strong>Progressive Disclosure</strong></td>
+  <td>根文件 ≤50 行，细节在 <code>references/</code></td>
+  <td>一个 500 行 SKILL.md</td>
+</tr>
+<tr>
+  <td><strong>Vertical Slice</strong></td>
+  <td>端到端，非水平分层</td>
+  <td>"先写所有 Model，再写所有 Service"</td>
+</tr>
+<tr>
+  <td><strong>Self-extending</strong></td>
+  <td>write-a-skill 技能写技能</td>
+  <td>手动复制粘贴模板</td>
+</tr>
+<tr>
+  <td><strong>Explore before ask</strong></td>
+  <td>代码库能回答的不问用户</td>
+  <td>无脑抛回问题</td>
+</tr>
+<tr>
+  <td><strong>Depth-first</strong></td>
+  <td>一个分支穷尽再开下一个</td>
+  <td>浅层扫一遍，每个分支都没到底</td>
+</tr>
+</table>
+</div>
+
+<h3>3.3 完整工程流水线</h3>
+<div class="flow">
+Setup ──→ Clarify ──→ Shape ──→ PRD ──→ Issues ──→ Triage ──→ Build ──→ Debug ──→ Repair ──→ Handoff
+  │          │          │        │        │           │          │          │          │          │
+  │      grill-me   to-prd  to-issues  triage      tdd     diagnose    repair    handoff
+  │          │                         -issue    implement   -bugs
+  │      grill-with
+  │        -docs
+setup-matt-
+pocock-skills
+</div>
+
+<p>每个节点是 Agent 失败模式的<strong>刹车</strong>，不是强制流水线。技能可组合、独立使用。</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="s4">
+<h2>四、Orbit 对比分析</h2>
+
+<h3>4.1 Orbit 当前架构</h3>
+
+<div class="table-wrap">
+<table>
+<tr><th>维度</th><th>Orbit 现状</th></tr>
+<tr><td>模块数</td><td>37 个 Python 包</td></tr>
+<tr><td>Agent 角色</td><td>8 种（Chatter, Clarifier, Architect, Developer, Reviewer, QA, ConfigManager, Dream）</td></tr>
+<tr><td>状态机</td><td><code>IDLE → PARSING → SCOPING → PLANNING → CODING → VERIFYING → DONE</code></td></tr>
+<tr><td>防幻觉</td><td>8 层（L1 符号引用 → L8 配置漂移）</td></tr>
+<tr><td>图谱</td><td>6 种（代码 / 数据库 / 配置 / 知识 / 元 / 文档）</td></tr>
+<tr><td>通信</td><td>4 种消息类型（Request / Response / Notification / StreamChunk）</td></tr>
+<tr><td>上下文</td><td>L1–L5 分层上下文模型</td></tr>
+<tr><td>记忆</td><td>情景 / 语义 / 决策日志</td></tr>
+<tr><td>自进化</td><td>dream/ + evolution/（GRPO, GEPA）</td></tr>
+</table>
+</div>
+
+<h3>4.2 差距分析：Orbit 缺什么？</h3>
+
+<div class="table-wrap">
+<table class="gap-table">
+<tr><th>#</th><th>grill 生态有的</th><th>Orbit 对应物</th><th>差距</th></tr>
+<tr>
+  <td>1</td>
+  <td><strong>轻量交互协议</strong><br><small>10 行 SKILL.md 定义完整行为模式</small></td>
+  <td>Agent 类用 Python 硬编码</td>
+  <td><strong>缺"模式文件"层</strong>——无法不改代码就换交互策略</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td><strong>渐进式上下文加载</strong><br><small>references/ 按需加载</small></td>
+  <td>TaskContext L1–L5 一次性构建</td>
+  <td><strong>缺按需深化</strong>——总是加载全部 5 层</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><strong>ADR 三重过滤门</strong><br><small>防止决策日志膨胀</small></td>
+  <td>decision_log.py 记录所有决策</td>
+  <td><strong>缺过滤逻辑</strong>——可能记录过多低价值决策</td>
+</tr>
+<tr>
+  <td>4</td>
+  <td><strong>统一语言注册表</strong><br><small>CONTEXT.md + 自动术语冲突检测</small></td>
+  <td>knowledge/ 未整合到 agent 交互</td>
+  <td><strong>术语漂移无检测</strong>——agent 可能用不同词说同一概念</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><strong>深度优先决策树遍历</strong><br><small>完成一个分支再开下一个</small></td>
+  <td>ClarifierAgent 提问模式未结构化</td>
+  <td><strong>提问可能是广度优先</strong>——容易浅层扫过</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td><strong>间隔重复学习</strong><br><small>FSRS 调度 + 记忆 Markdown 账本</small></td>
+  <td>dream/ 做记忆巩固，但不是间隔重复</td>
+  <td><strong>缺验证过的学习调度</strong></td>
+</tr>
+<tr>
+  <td>7</td>
+  <td><strong>自扩展技能系统</strong><br><small>write-a-skill</small></td>
+  <td>dream/ + evolution/ 过于复杂（GRPO）</td>
+  <td><strong>缺简单自扩展</strong></td>
+</tr>
+</table>
+</div>
+
+<h3>4.3 Orbit 已经做对的</h3>
+
+<div class="table-wrap">
+<table>
+<tr><th>grill 原则</th><th>Orbit 对应实现</th><th style="width:60px;">评价</th></tr>
+<tr><td>Process &gt; Prompt</td><td>状态机驱动，不是 prompt 驱动</td><td class="col-yes">✅</td></tr>
+<tr><td>Explore before ask</td><td>SCOPING 阶段用 AffectedFilesScanner + ImportDependencyScanner</td><td class="col-yes">✅</td></tr>
+<tr><td>Vertical Slice</td><td>Golden Route 按任务类型路由</td><td class="col-yes">✅</td></tr>
+<tr><td>可审计追溯</td><td>task_audit_trail + checkpoint + message bus audit ring buffer</td><td class="col-yes">✅</td></tr>
+<tr><td>安全沙箱</td><td>Docker sandbox + ProcessSandbox 回退</td><td class="col-yes">✅</td></tr>
+</table>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section id="s5">
+<h2>五、具体建议</h2>
+
+<div class="priority-grid">
+  <div class="card">
+    <h4><span class="tag tag-p0">P0</span> 5.1 模式文件（Mode File）系统</h4>
+    <p style="font-size:0.88em;color:var(--text2);margin-top:6px;">灵感：grill-me 的 10 行 SKILL.md 定义完整交互模式。</p>
+    <p style="font-size:0.88em;color:var(--orange);"><strong>问题：</strong>Agent 行为硬编码在 Python 类中。改 ClarifierAgent 提问策略需要改源码。</p>
+    <p style="font-size:0.88em;"><strong>方案：</strong>新增 <code>src/orbit/modes/</code> 模块（~200 行），用 ≤30 行 YAML 定义完整行为配置。</p>
+    <ul>
+      <li>不改代码换交互策略</li>
+      <li>用户可写自己的 mode 文件</li>
+      <li>git 可追踪行为变更</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h4><span class="tag tag-p0">P0</span> 5.2 TaskContext 渐进式加载</h4>
+    <p style="font-size:0.88em;color:var(--text2);margin-top:6px;">灵感：grill-me 根文件 10 行，references/ 按需加载。</p>
+    <p style="font-size:0.88em;color:var(--orange);"><strong>问题：</strong>TaskContext 每次全量构建 L1–L5。简单任务大部分上下文字段用不上。</p>
+    <p style="font-size:0.88em;"><strong>方案：</strong>三阶段加载——Stage 1 直接上下文（~2K tokens）→ Stage 2 扩展上下文（~5K）→ Stage 3 全局上下文（~10K）。失败或不确定时自动升级。</p>
+    <ul>
+      <li>简单任务 token 消耗降 60–80%</li>
+      <li>Agent 不会被无关上下文干扰</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h4><span class="tag tag-p1">P1</span> 5.3 ADR 三重过滤门</h4>
+    <p style="font-size:0.88em;color:var(--text2);margin-top:6px;">灵感：grill-with-docs 的 ADR 创建决策树。</p>
+    <p style="font-size:0.88em;color:var(--orange);"><strong>问题：</strong>decision_log.py 可能记录过多决策，信噪比低。</p>
+    <p style="font-size:0.88em;"><strong>方案：</strong><code>should_create_adr()</code> — 难逆转 + 缺上下文会惊讶 + 真实权衡 → 三者全满足才记录。</p>
+    <ul>
+      <li>决策日志从"所有决策"变成"值得记录的决策"</li>
+      <li>信噪比大幅提升</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h4><span class="tag tag-p1">P1</span> 5.4 深度优先 Clarifier 决策树</h4>
+    <p style="font-size:0.88em;color:var(--text2);margin-top:6px;">灵感：grill-me 核心算法——决策树深度优先遍历。</p>
+    <p style="font-size:0.88em;color:var(--orange);"><strong>问题：</strong>ClarifierAgent 提问模式未显式化为树遍历算法。</p>
+    <p style="font-size:0.88em;"><strong>方案：</strong><code>DecisionTreeWalker</code> 类——extract_branches → walk 深度优先 → 每步一个 Question + Recommendation。</p>
+    <ul>
+      <li>需求澄清从"随机提问"变"结构化遍历"</li>
+      <li>不漏决策分支</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h4><span class="tag tag-p2">P2</span> 5.5 轻量 FSRS 学习模块</h4>
+    <p style="font-size:0.88em;color:var(--text2);margin-top:6px;">灵感：drill-me 的 FSRS 间隔重复。</p>
+    <p style="font-size:0.88em;color:var(--orange);"><strong>问题：</strong>dream/ 做记忆巩固，但不是间隔重复。缺乏验证过的学习调度。</p>
+    <p style="font-size:0.88em;"><strong>方案：</strong>新增 <code>src/orbit/learning/</code>（~300 行）— FSRS 简化版 + Markdown 卡片存储（<code>~/.orbit/learning/</code>）。</p>
+    <ul>
+      <li>发现新 bug 模式 → 自动生成卡片</li>
+      <li>类似上下文再现 → 自动复习相关卡片</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h4><span class="tag tag-p2">P2</span> 5.6 从成功任务自动生成模式文件</h4>
+    <p style="font-size:0.88em;color:var(--text2);margin-top:6px;">灵感：mattpocock 的 write-a-skill 技能。</p>
+    <p style="font-size:0.88em;color:var(--orange);"><strong>问题：</strong>dream/ + evolution/ 过于复杂（GRPO），缺简单自扩展。</p>
+    <p style="font-size:0.88em;"><strong>方案：</strong><code>POST /api/v1/modes/generate</code> — 分析任务执行轨迹 → 提取决策点和工具使用模式 → 生成 mode.yaml + references/。</p>
+    <ul>
+      <li>从成功经验学习，不需人工编写 mode 文件</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 5.1 detail -->
+<h3>5.1 模式文件系统 —— 详细方案</h3>
+
+<div class="tree">
+<span class="dir">src/orbit/modes/</span>
+├── <span class="dir">clarify/</span>
+│   ├── <span class="file">mode.yaml</span>              <span class="cmt">← 模式元数据（名称、适用任务类型、状态机钩子）</span>
+│   └── <span class="dir">references/</span>
+│       ├── <span class="file">question-tree.md</span>     <span class="cmt">← 决策树模板</span>
+│       └── <span class="file">domain-checks.md</span>     <span class="cmt">← 领域检查规则</span>
+├── <span class="dir">architect/</span>
+│   ├── <span class="file">mode.yaml</span>
+│   └── <span class="dir">references/</span>
+│       ├── <span class="file">perspectives.md</span>      <span class="cmt">← 多视角设计模板</span>
+│       └── <span class="file">tradeoff-matrix.md</span>   <span class="cmt">← 权衡矩阵</span>
+└── <span class="dir">review/</span>
+    ├── <span class="file">mode.yaml</span>
+    └── <span class="dir">references/</span>
+        ├── <span class="file">checklist.md</span>          <span class="cmt">← 审查清单</span>
+        └── <span class="file">severity-rubric.md</span>   <span class="cmt">← 严重度分级</span>
+</div>
+
+<p><strong>mode.yaml 结构</strong>（≤30 行）：</p>
+<pre><span class="cmt"># clarify/mode.yaml</span>
+<span class="kw">name</span>: <span class="str">clarify</span>
+<span class="kw">version</span>: <span class="num">1</span>
+<span class="kw">description</span>: <span class="str">需求澄清——深度优先决策树遍历</span>
+<span class="kw">applies_to</span>: [<span class="str">PARSING</span>]
+<span class="kw">behavior</span>:
+  <span class="kw">question_strategy</span>: <span class="str">depth_first</span>    <span class="cmt"># depth_first | breadth_first | mixed</span>
+  <span class="kw">max_questions_per_branch</span>: <span class="num">20</span>
+  <span class="kw">require_recommendation</span>: <span class="kw">true</span>     <span class="cmt"># 每个问题必须带推荐答案</span>
+  <span class="kw">codebase_first</span>: <span class="kw">true</span>             <span class="cmt"># 能查代码就不问用户</span>
+<span class="kw">references</span>:
+  - <span class="str">question-tree.md</span>               <span class="cmt"># 按需加载</span>
+  - <span class="str">domain-checks.md</span>               <span class="cmt"># 仅在术语冲突时加载</span></pre>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="s6">
+<h2>六、总结：核心教训</h2>
+
+<h3>grill-me 生态的本质</h3>
+
+<p>这三个项目不是技术创新——它们几乎没有"算法"。<strong>它们的创新在交互协议层。</strong></p>
+
+<div class="table-wrap">
+<table>
+<tr><th>传统 AI 工具</th><th>grill-me 生态</th></tr>
+<tr><td>定义 AI 应该<strong>输出什么</strong></td><td>定义 AI 应该<strong>怎么交互</strong></td></tr>
+<tr><td>长 prompt = 更好的输出</td><td>短协议 = 更好的过程</td></tr>
+<tr><td>基础设施竞争（更好的模型、更快的推理）</td><td>过程竞争（更好的决策树遍历、更好的术语管理）</td></tr>
+<tr><td>一次性的代码生成</td><td>可复用的交互模式</td></tr>
+</table>
+</div>
+
+<div class="summary-box">
+<h3>Orbit 的定位</h3>
+
+<p>Orbit 在<strong>基础设施层已经做到极致</strong>——37 个模块、8 层防幻觉、6 种图谱、毫秒级熔断。<span style="color:var(--green);font-weight:700;">基础设施竞争已经赢了。</span></p>
+
+<p style="margin-top:14px;">但 Orbit 在<strong>交互协议层有空白</strong>。grill-me 生态给的最大启发：</p>
+
+<blockquote>
+  <strong>10 行 markdown 可以定义的行为模式，不需要 1000 行 Python 类。<br>
+  基础设施做重，交互协议做轻。</strong>
+</blockquote>
+
+<p style="margin-top:14px;"><strong>一句话：</strong>Orbit 不需要更多模块。它需要一个"模式文件"系统，让交互策略从代码中解耦出来，实现 grill-me 级别的灵活性和可组合性。</p>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="refs">
+<h2>附录：参考来源</h2>
+
+<ul style="margin-left:20px; color:var(--text2); line-height:2;">
+  <li><a href="https://github.com/mattpocock/skills">mattpocock/skills</a> — 92K star，18+ 技能</li>
+  <li><a href="https://github.com/timini/drill-me">timini/drill-me</a> — FSRS 间隔重复导师</li>
+  <li><a href="https://github.com/alirezarezvani/claude-skills">alirezarezvani/claude-skills</a> — grill-me 社区扩展版（含 decision_tree_extractor 等脚本）</li>
+  <li><a href="https://dev.to/_46ea277e677b888e0cd13/matt-pococks-agent-skills-30k-stars-and-the-start-of-the-skill-economy-lg2">Matt Pocock's Agent Skills — 30K Stars and the Start of the Skill Economy</a></li>
+  <li><a href="https://global.v2ex.co/t/1214285">grill-me + goal: AI 编码完整工作流 (V2EX)</a></li>
+  <li><a href="https://www.aihero.dev/skills-changelog-ubiquitous-language-grill-with-docs">Skills Changelog: Ubiquitous Language → /grill-with-docs (AI Hero)</a></li>
+</ul>
+</section>
+
+<footer>
+  <p>Orbit Research · grill-ecosystem-deconstruction · 2026-07-06</p>
+  <p style="margin-top:4px;"><a href="grill-ecosystem-deconstruction.md">Markdown 版本</a></p>
+</footer>
+
+</div>
+</body>
+</html>

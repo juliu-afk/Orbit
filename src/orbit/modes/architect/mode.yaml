@@ -1,0 +1,16 @@
+# architect/mode.yaml
+# 架构设计 Agent 行为配置——多视角方案生成
+
+name: architect
+version: 1
+description: "架构设计——多视角方案生成，三维评分，推荐最优方案"
+applies_to:
+  - PLANNING
+behavior:
+  question_strategy: mixed
+  max_questions_per_branch: 10
+  require_recommendation: true
+  codebase_first: true
+  auto_upgrade_context: false
+references:
+  - perspectives.md

@@ -66,7 +66,9 @@ export const useChatStore = defineStore('chat', () => {
     disconnect()
 
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const url = `${protocol}//${location.host}/api/v1/chat`
+    // P0-1: WS 认证——附加 token 查询参数，桌面应用无 token 时后端 AUTH_ENABLED=False 跳过校验
+    const token = localStorage.getItem('orbitAuthToken') || ''
+    const url = `${protocol}//${location.host}/api/v1/chat${token ? `?token=${encodeURIComponent(token)}` : ''}`
     let retries = 0
     const MAX_RETRIES = 5
 

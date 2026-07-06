@@ -18,7 +18,9 @@ from orbit.projects.models import ProjectRecord
 
 logger = structlog.get_logger("orbit.projects")
 
-DEFAULT_DB_PATH = "data/projects.db"
+# WHY ORBIT_HOME: exe 的 CWD 是项目根目录而非 exe 所在目录，相对路径会指错 DB
+_ORBIT_HOME = os.environ.get("ORBIT_HOME", os.getcwd())
+DEFAULT_DB_PATH = os.path.join(_ORBIT_HOME, "data", "projects.db")
 
 
 class ProjectRegistry:

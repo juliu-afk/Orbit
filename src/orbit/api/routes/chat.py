@@ -18,6 +18,7 @@ from orbit.agents.base import AgentInput, AgentRole
 from orbit.agents.chatter import ChatterAgent  # 通用对话——首触点
 from orbit.agents.clarifier import ClarifierAgent, StructuredPRD, validate_prd
 from orbit.context.matcher import ContextMatcher
+from orbit.core.config import settings
 from orbit.projects.registry import ProjectRegistry
 from orbit.sessions.registry import SessionRegistry
 
@@ -96,6 +97,15 @@ async def chat_endpoint(ws: WebSocket) -> None:
     返回 JSON:
       { code, data: {type, reply, clarification_status, structured_prd, ...}, message }
     """
+    # P0-1: WS 认证——accept 前校验 token
+    # WHY gated on AUTH_ENABLED: 桌面应用默认不启用认证（无 ORBIT_AUTH_TOKEN 环境变量），
+    #   仅生产部署（env var 已设）时强制校验，与 AuthMiddleware 行为一致
+    if settings.AUTH_ENABLED:
+        token = ws.query_params.get("token", "")
+        if not token or token != settings.ORBIT_AUTH_TOKEN:
+            await ws.close(code=4001, reason="未授权访问")
+            return
+
     await ws.accept()
     try:
         while True:

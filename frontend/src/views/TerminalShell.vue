@@ -24,7 +24,7 @@ import CodeGraphDrawer from '@/components/codegraph/CodeGraphDrawer.vue'
 import WechatBindingPanel from '@/components/settings/WechatBindingPanel.vue'
 import ShortcutPanel from '@/components/layout/ShortcutPanel.vue'
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
-import CodeDiffPanel from '@/components/chat/CodeDiffPanel.vue'
+import MonacoDiffEditor from '@/components/editor/MonacoDiffEditor.vue'  // UX-2: 替代 CodeDiffPanel
 
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
 const chat = useChatStore(); const task = useTaskStore(); const editor = useEditorStore()
@@ -119,7 +119,7 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
   <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
   <!-- WHY 代码产物抽屉: task:update WS 推送代码 output → 自动弹出展示 -->
   <el-drawer v-model="showCodeDiff" title="Generated Code" direction="rtl" size="520px" @close="handleCloseCodeDiff">
-    <CodeDiffPanel v-if="task.codeOutput" :code="task.codeOutput" />
+    <MonacoDiffEditor v-if="task.codeOutput" original="" :modified="task.codeOutput" language="python" height="calc(100vh - 80px)" />
   </el-drawer>
 </div>
 </template>

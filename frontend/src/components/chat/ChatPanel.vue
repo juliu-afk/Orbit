@@ -17,7 +17,9 @@
 
     <!-- 消息历史（user / agent / system） -->
     <div ref="msgListRef" class="chat-panel__messages">
-      <div v-if="chatStore.messages.length === 0" class="chat-panel__empty">
+      <!-- UX-6: 骨架屏——消息为空时加载中显示骨架，已连接显示引导 -->
+      <SkeletonPanel v-if="chatStore.messages.length === 0 && chatStore.connecting" :lines="6" height="auto" />
+      <div v-else-if="chatStore.messages.length === 0" class="chat-panel__empty">
         输入自然语言描述，Agent自动分析需求
       </div>
       <div
@@ -96,6 +98,7 @@ import { useChatStore, type StructuredPRD } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
 import CandidateCard from './CandidateCard.vue'
 import ChatStream from './ChatStream.vue'
+import SkeletonPanel from '@/components/common/SkeletonPanel.vue'  // UX-6
 import PrdConfirmCard from './PrdConfirmCard.vue'
 
 // Agent 角色 → 展示名 + emoji + 颜色 映射

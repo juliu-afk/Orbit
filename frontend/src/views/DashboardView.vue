@@ -11,7 +11,7 @@
     </div>
 
     <ConnectionOverlay
-      v-if="ws.retryCount.value >= ws.maxRetries"
+      :visible="ws.retryCount.value >= ws.maxRetries"
       @reconnect="handleReconnect"
     />
 
@@ -114,7 +114,7 @@
 
     <!-- 代码输出弹出——任务 CODING/DONE 时自动打开 -->
     <el-drawer v-model="showCodeDiff" title="Generated Code" direction="rtl" size="520px" @close="handleCloseCodeDiff">
-      <CodeDiffPanel v-if="taskStore.codeOutput" :code="taskStore.codeOutput" />
+      <MonacoDiffEditor v-if="taskStore.codeOutput" original="" :modified="taskStore.codeOutput" language="python" height="500px" />
     </el-drawer>
 
     <ComposeTrigger ref="composeTrigger" />
@@ -140,7 +140,7 @@ import HealthPanel from '@/components/metrics/HealthPanel.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 import CrossProjectWarning from '@/components/chat/CrossProjectWarning.vue'
-import CodeDiffPanel from '@/components/chat/CodeDiffPanel.vue'
+import MonacoDiffEditor from '@/components/editor/MonacoDiffEditor.vue'  // UX-2
 import ComposeTrigger from '@/components/chat/ComposeTrigger.vue'
 import DreamPanel from '@/components/chat/DreamPanel.vue'
 import SearchPanel from '@/components/editor/SearchPanel.vue'

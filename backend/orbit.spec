@@ -36,9 +36,12 @@ def _discover_orbit_modules(src_dir: Path) -> list[str]:
         # 跳过 __pycache__、测试文件、.venv
         if "__pycache__" in str(py) or ".venv" in str(py):
             continue
-        if py.stem.startswith("test_") or py.stem.startswith("_"):
+        if py.stem.startswith("test_") or (py.stem.startswith("_") and py.stem != "__init__"):
             continue
         rel = py.relative_to(src_dir).with_suffix("")
+        # 跳过顶级 __init__.py——orbit 包由 pathex 覆盖，不需 hidden import
+        if str(rel) == "__init__":
+            continue
         mod = "orbit." + ".".join(rel.parts)
         if mod.endswith(".__init__"):
             mod = mod[:-9]  # strip .__init__

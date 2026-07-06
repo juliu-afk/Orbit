@@ -23,13 +23,16 @@ import ConfigDrawer from '@/components/config/ConfigDrawer.vue'
 import CodeGraphDrawer from '@/components/codegraph/CodeGraphDrawer.vue'
 import WechatBindingPanel from '@/components/settings/WechatBindingPanel.vue'
 import ShortcutPanel from '@/components/layout/ShortcutPanel.vue'
+import CommandPalette from '@/components/layout/CommandPalette.vue'  // UX-11
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
-import MonacoDiffEditor from '@/components/editor/MonacoDiffEditor.vue'  // UX-2: 替代 CodeDiffPanel
+import MonacoDiffEditor from '@/components/editor/MonacoDiffEditor.vue'  // UX-2
+import RulesPanel from '@/components/settings/RulesPanel.vue'  // UX-10
 
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
 const chat = useChatStore(); const task = useTaskStore(); const editor = useEditorStore()
 const settings = useSettingsStore(); const ws = useWebSocket()
 const fileTree = ref<FileNode[]>([]); const showShortcuts = ref(false); const showNewDialog = ref(false); const showCodeDiff = ref(false)
+const showCommandPalette = ref(false); const showRules = ref(false)  // UX-11, UX-10
 
 function buildTree(files: Array<{ path: string }>): FileNode[] {
   const root: FileNode[] = []; const dirMap = new Map<string, FileNode>()
@@ -83,7 +86,22 @@ const gridColumns = () => shell.showFileTree
   : `0 1fr var(--spacing-right-panel)`
 
 watch(()=>session.currentSessionId,(n)=>{if(n)chat.connectChatWs(n,session.currentProjectName||"")})
-function onKeydown(e:KeyboardEvent){ if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();shell.toggleFileTree()}; if((e.metaKey||e.ctrlKey)&&e.key==='/'){e.preventDefault();showShortcuts.value=!showShortcuts.value}; if(e.key==='Escape'){shell.closeAllDrawers();if(shell.showMonaco)shell.closeFileReview()} }
+function onKeydown(e:KeyboardEvent){ if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();shell.toggleFileTree()}; if((e.metaKey||e.ctrlKey)&&e.key==='/'){e.preventDefault();showShortcuts.value=!showShortcuts.value}; if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();showCommandPalette.value=!showCommandPalette.value}; if(e.key==='Escape'){shell.closeAllDrawers();if(shell.showMonaco)shell.closeFileReview()} }
+// UX-11: 命令面板操作分发
+function onCmdExecute(action: string) {
+  switch (action) {
+    case 'toggle:filetree': shell.toggleFileTree(); break
+    case 'toggle:search': shell.showSearch = !shell.showSearch; break
+    case 'toggle:dag': shell.showDAG = !shell.showDAG; break
+    case 'toggle:charts': shell.showChart = !shell.showChart; break
+    case 'toggle:trace': shell.showTrace = !shell.showTrace; break
+    case 'toggle:config': shell.showConfig = !shell.showConfig; break
+    case 'open:settings': showShortcuts.value = true; break
+    case 'open:newsession': showNewDialog.value = true; break
+    case 'open:shortcuts': showShortcuts.value = true; break
+    case 'open:rules': showRules.value = true; break
+  }
+}
 
 function startResize(edge:"left"|"right",e:PointerEvent){ e.preventDefault();(e.target as HTMLElement).setPointerCapture(e.pointerId); const onMove=(ev:PointerEvent)=>{ if(edge==="left")settings.fileTreeWidth=Math.max(160,Math.min(480,ev.clientX)); else settings.rightPanelWidth=Math.max(180,Math.min(600,window.innerWidth-ev.clientX)) }; window.addEventListener("pointermove",onMove); const clean=()=>window.removeEventListener("pointermove",onMove); window.addEventListener("pointerup",clean,{once:true}); window.addEventListener("pointercancel",clean,{once:true}) }
 // P2 fix: 具名函数引用避免每次渲染创建新闭包
@@ -116,6 +134,10 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
   <CodeGraphDrawer v-model:show="shell.showCodeGraph" />
   <WechatBindingPanel v-model:show="shell.showWeChat" />
   <ShortcutPanel v-model:show="showShortcuts" />
+    <!-- UX-11: 命令面板 Cmd+K -->
+    <CommandPalette :visible="showCommandPalette" @close="showCommandPalette = false" @execute="onCmdExecute" />
+    <!-- UX-10: Rules 面板 -->
+    <el-drawer v-model="showRules" title="Rules & Memory" direction="rtl" size="480px"><RulesPanel /></el-drawer>
   <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
   <!-- WHY 代码产物抽屉: task:update WS 推送代码 output → 自动弹出展示 -->
   <el-drawer v-model="showCodeDiff" title="Generated Code" direction="rtl" size="520px" @close="handleCloseCodeDiff">

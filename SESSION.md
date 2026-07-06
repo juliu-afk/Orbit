@@ -1,5 +1,42 @@
 # Orbit 开发会话记录
 
+## 2026-07-07 — 测试覆盖率冲刺 (PR #227 · MERGED)
+
+### 交付
+- **覆盖率**: 行 71%→75% (+4pp) / 分支 58%→60% (+2pp) / 综合 71%→72% (+1pp)
+- **新增测试**: ~170 条，覆盖 18 个模块
+- **重构 Bug 修复**: 7 处（缺 import、循环导入、缺失函数、重复定义）
+- **测试修复**: 12 个文件更新导入路径以匹配 `task_runner.py→task_runner/` 和 `offpeak_scheduler.py→offpeak/` 重构
+
+### 源代码修复（7 处）
+| 文件 | 问题 | 修复 |
+|------|------|------|
+| `task_runner/runner.py` | 缺 `_build_context()` 调用 + `_transition` 导入 | 补调用 + 共享常量移入 checkpoint |
+| `task_runner/checkpoint.py` | 缺状态转换常量 | 移入 `STATE_TRANSITIONS`/`FAST_LANE_TRANSITIONS`/`_transition` |
+| `task_runner/__init__.py` | 循环导入 | 从 checkpoint re-export |
+| `offpeak/deferred_queue.py` | 缺 `UTC`/`get_args`/`cast` | 补 import |
+| `offpeak/scheduler.py` | 缺 `os`/`asyncio`/`datetime` | 补 import |
+| `integration/wiring.py` | 缺 `get_wiring()` 单例 | 加工厂函数 |
+| `react_agent/agent.py` | `_get_decision_log` 重复定义 | 删除重复 |
+
+### 新增测试文件（10 个）
+`test_hallucination_pipeline.py`、`test_clarifier_agent.py`、`test_bulk_routes.py`、`test_analyzer.py`、`test_claude_md_generator.py`、`test_merge_engine.py`、`test_goal_ensemble.py`、`test_coverage_routes4.py`、`test_feedback_analyze.py`、`_find_branches.py`
+
+### 扩展现有测试（14 个文件）
+`test_goal_dependency.py`、`test_brief_package_library.py`、`test_compression_cascade.py`、`test_l6_contract.py`、`test_l5_z3.py`、`test_dream.py`、`test_projects.py`、`test_sharding.py`、`test_observability_probes.py`、`test_trace.py`、`test_memory_store_coverage.py`、`test_tool_registry.py`、`test_resource_scheduler.py`、`test_coverage_gateway.py`
+
+### 已知 skip（需完整集成环境）
+`test_meta_orchestrator.py`(全文件)、`test_dev_pipeline.py`(3)、`test_scheduler.py`(2)、`test_sharding.py`(3)——需 AgentFactory + async LLM mock
+
+### 瓶颈
+分支覆盖率 60% 是主要阻碍。到 80% 需再覆盖 ~750 个分支。工具 `_find_branches.py` 可定位。
+
+### 备注
+- 大部分改动被 ECC hook 直接提交到 master，PR #227 仅含 `test_feedback_analyze.py`
+- `backend/static/assets` 目录需手动创建才能运行 TestClient 测试
+
+---
+
 ## 2026-07-07 — P0 安全漏洞修复 (PR #224 · SQUASH MERGED)
 
 ### 交付

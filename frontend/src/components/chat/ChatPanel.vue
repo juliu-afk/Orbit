@@ -38,56 +38,15 @@
       </div>
     </div>
 
-    <!-- Agent验收选项 -->
-    <div v-if="showAcceptanceOptions" class="chat-panel__acceptance">
-      <div class="acceptance-title">选择验收标准</div>
-      <label
-        v-for="opt in chatStore.structuredPrd?.acceptance_options"
-        :key="opt"
-        class="acceptance-option"
-      >
-        <input type="checkbox" :value="opt" v-model="selectedAcceptance" />
-        <span>{{ opt }}</span>
-      </label>
-      <!-- 自定义验收标准 -->
-      <label class="acceptance-option">
-        <input type="checkbox" v-model="useCustomAcceptance" />
-        <span>自定义</span>
-      </label>
-      <input
-        v-if="useCustomAcceptance"
-        v-model="customAcceptance"
-        class="acceptance-input"
-        placeholder="请输入自定义验收标准..."
-      />
-      <el-button type="primary" size="small" @click="submitAcceptance">提交</el-button>
-    </div>
-
-    <!-- PRD确认（clarification_status=ready时显示） -->
-    <div v-if="showPrdConfirm" class="chat-panel__prd">
-      <div class="prd-title">请确认需求文档</div>
-      <div class="prd-field">
-        <label>目标</label>
-        <textarea v-model="editablePrd.goal" rows="2" class="prd-input"></textarea>
-      </div>
-      <div class="prd-field">
-        <label>范围</label>
-        <textarea v-model="editablePrd.scope" rows="2" class="prd-input"></textarea>
-      </div>
-      <div class="prd-field">
-        <label>验收标准</label>
-        <div
-          v-for="(_ac, i) in editablePrd.acceptance_criteria"
-          :key="i"
-          class="prd-ac-item"
-        >
-          <input v-model="editablePrd.acceptance_criteria[i]" class="prd-input" />
-        </div>
-      </div>
-      <div class="prd-actions">
-        <el-button type="primary" @click="handleConfirmPrd">确认并提交任务</el-button>
-      </div>
-    </div>
+    <!-- Agent验收选项 + PRD确认——拆分到 PrdConfirmCard -->
+    <PrdConfirmCard
+      :show-acceptance-options="showAcceptanceOptions"
+      :show-prd-confirm="showPrdConfirm"
+      :acceptance-options="chatStore.structuredPrd?.acceptance_options ?? []"
+      :editable-prd="editablePrd"
+      @submit-acceptance="submitAcceptance"
+      @confirm-prd="handleConfirmPrd"
+    />
 
     <!-- Agent 流式执行——PRD 确认后串联 ChatStream -->
     <div v-if="chatStore.lastTaskId" class="chat-panel__execution">
@@ -137,6 +96,7 @@ import { useChatStore, type StructuredPRD } from '@/stores/chat'
 import { useSessionStore } from '@/stores/session'
 import CandidateCard from './CandidateCard.vue'
 import ChatStream from './ChatStream.vue'
+import PrdConfirmCard from './PrdConfirmCard.vue'
 
 // Agent 角色 → 展示名 + emoji + 颜色 映射
 const AGENT_META: Record<string, { label: string; emoji: string; color: string }> = {
@@ -155,11 +115,6 @@ const chatStore = useChatStore()
 const sessionStore = useSessionStore()
 const inputText = ref('')
 const msgListRef = ref<HTMLElement | null>(null)
-
-// 验收选项状态
-const selectedAcceptance = ref<string[]>([])
-const useCustomAcceptance = ref(false)
-const customAcceptance = ref('')
 
 // PRD可编辑副本
 const editablePrd = reactive<StructuredPRD>({
@@ -202,25 +157,16 @@ function handleConfirm(project: string) {
   chatStore.confirm(project)
 }
 
-function submitAcceptance() {
-  // 合并已选+自定义验收标准
-  const merged = [...selectedAcceptance.value]
-  if (useCustomAcceptance.value && customAcceptance.value.trim()) {
-    merged.push(customAcceptance.value.trim())
-  }
-  if (merged.length > 0 && chatStore.structuredPrd) {
-    chatStore.structuredPrd.acceptance_criteria = merged
+function submitAcceptance(criteria: string[]) {
+  if (criteria.length > 0 && chatStore.structuredPrd) {
+    chatStore.structuredPrd.acceptance_criteria = criteria
     chatStore.structuredPrd.acceptance_options = []
-    // 发送验收选择给Agent
     chatStore.send(
-      `验收标准：${merged.join('；')}`,
+      `验收标准：${criteria.join('；')}`,
       sessionStore.currentSessionId || '',
       sessionStore.currentProjectName,
     )
   }
-  selectedAcceptance.value = []
-  useCustomAcceptance.value = false
-  customAcceptance.value = ''
 }
 
 function handleConfirmPrd() {

@@ -66,7 +66,8 @@ class TestRunAgent:
                 agent.llm = llm
                 return agent
 
-        sched = Scheduler(agent_factory=MockFactory)
+        from unittest.mock import MagicMock
+        sched = Scheduler(agent_llms={"developer": MagicMock()}, agent_factory=MockFactory)
         output = await sched._task_runner._run_agent("developer", "t1", {"prd": "test"})
         assert "mock done" in output
 
@@ -87,7 +88,8 @@ class TestRunAgent:
             def create(cls, role, llm=None, **kwargs):
                 return SlowAgent()
 
-        sched = Scheduler(agent_factory=SlowFactory)
+        from unittest.mock import MagicMock
+        sched = Scheduler(agent_llms={"developer": MagicMock()}, agent_factory=SlowFactory)
         with pytest.raises(TimeoutError):
             await sched._task_runner._run_agent("developer", "t1", {"prd": "test"}, timeout=0.05)
 

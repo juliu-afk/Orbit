@@ -101,7 +101,7 @@ function registerLanguageProviders() {
           const data = await apiGet<{ references: { name: string; file?: string; line?: number }[] }>(
             `/api/v1/codegraph/references?symbol=${encodeURIComponent(word.word)}`
           )
-          if ((token as CancellableToken).isCancellationRequested) return []
+          if ((token as unknown as CancellableToken).isCancellationRequested) return []
           return (data?.references || []).map(ref => ({
             uri: monaco.Uri.file(ref.file || ''),
             range: { startLineNumber: ref.line || 1, startColumn: 1, endLineNumber: ref.line || 1, endColumn: 1 },

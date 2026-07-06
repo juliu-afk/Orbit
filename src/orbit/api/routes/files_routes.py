@@ -22,9 +22,9 @@ def _svc() -> FileService:
 
 
 @router.get("/tree")
-async def list_files():
+async def list_files(dir: str | None = Query(None, description="项目目录路径，为空则使用默认工作区")):
     try:
-        files = await _svc().list_files()
+        files = await _svc().list_files(directory=dir)
     except (OSError, RuntimeError) as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"files": [f.model_dump() for f in files]}

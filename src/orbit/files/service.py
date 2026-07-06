@@ -39,7 +39,8 @@ class FileService:
         return resolved
 
     # P0-5: 提取同步逻辑，通过 asyncio.to_thread 避免阻塞事件循环
-    def _list_files_sync(self) -> list[FileInfo]:
+    def _list_files_sync(self, root_override: str | None = None) -> list[FileInfo]:
+        walk_root = root_override if root_override else self.workspace
         EXCLUDE_DIRS = {
             "__pycache__",
             "node_modules",
@@ -80,7 +81,7 @@ class FileService:
             ".svg",
         }
         files = []
-        for root, dirs, filenames in os.walk(self.workspace):
+        for root, dirs, filenames in os.walk(walk_root):
             dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not d.startswith(".")]
             for f in filenames:
                 ext = os.path.splitext(f)[1].lower()
@@ -95,7 +96,11 @@ class FileService:
                 )
         return sorted(files, key=lambda x: x.path)
 
-    async def list_files(self) -> list[FileInfo]:
+    async def list_files(self, directory: str | None = None) -> list[FileInfo]:
+        # WHY dir override: 用户打开项目后文件树应展示项目目录，非 exe 所在目录
+        if directory:
+            import functools
+            return await asyncio.to_thread(functools.partial(self._list_files_sync, root_override=directory))
         return await asyncio.to_thread(self._list_files_sync)
 
     async def read_file(self, path: str) -> str:

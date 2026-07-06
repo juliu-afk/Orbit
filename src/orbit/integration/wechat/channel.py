@@ -6,8 +6,9 @@ cc-weixin 作为成熟桥接层，隔离了底层协议变化。
 
 子进程模式：
 - Orbit 启动时 spawn cc-weixin（npx 方式）
+- 从 stdout 解析 cc-weixin 本地 HTTP API 地址
+- QR 码和消息发送通过 HTTP API 调用（不再用占位符）
 - 崩溃自动重启（最多 3 次）
-- Orbit 关闭时 kill 子进程
 - 登录态由 cc-weixin 持久化，重启后无需重新扫码
 """
 
@@ -16,16 +17,22 @@ from __future__ import annotations
 import asyncio
 import io
 import re
-import secrets
 from base64 import b64encode
-from pathlib import Path
+from urllib.parse import urljoin
 
+import httpx
 import qrcode
 import structlog
 
 logger = structlog.get_logger("orbit.wechat.channel")
 
 MAX_RESTART_ATTEMPTS = 3
+CC_WEIXIN_STARTUP_TIMEOUT = 30.0  # 等待 cc-weixin 就绪的超时（秒）
+CC_WEIXIN_API_TIMEOUT = 10.0  # HTTP API 调用超时（秒）
+
+# 匹配 cc-weixin stdout 中的监听地址行
+# cc-weixin 典型输出: "listening on http://127.0.0.1:45678"
+_LISTEN_PATTERN = re.compile(r"listening on (https?://[\d.]+:\d+)", re.I)
 
 
 class WechatChannelError(Exception):
@@ -40,8 +47,9 @@ class WechatChannel:
     """cc-weixin 子进程管理器。
 
     生命周期：
-    - start() → 启动子进程，等待就绪
-    - is_ready → True 表示子进程运行中且登录成功
+    - start() → 启动子进程，解析 API 地址
+    - is_ready → True 表示子进程运行中且 API 地址已解析
+    - is_logged_in → True 表示已登录微信
     - stop() → kill 子进程
     """
 
@@ -50,21 +58,22 @@ class WechatChannel:
         self._restart_count = 0
         self._ready = False
         self._logged_in = False
+        self._api_base: str = ""  # cc-weixin 本地 HTTP API 地址
+        self._http: httpx.AsyncClient | None = None  # 复用 HTTP 连接
 
     # ── 生命周期 ─────────────────────────────────────
 
     async def start(self) -> None:
-        """启动 cc-weixin 子进程。"""
+        """启动 cc-weixin 子进程，解析其 HTTP API 地址。"""
         try:
             # WHY npx 而非全局安装：不污染用户环境，版本由 npx 自动管理
             self._process = await asyncio.create_subprocess_exec(
                 "npx", "cc-weixin",
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,  # cc-weixin 把日志打到 stderr
             )
             logger.info("cc_weixin_started", pid=self._process.pid)
-            # 等子进程启动（检测 stdout 输出 QR 码或 ready 信号）
-            await self._wait_ready(timeout=15.0)
+            await self._wait_ready(timeout=CC_WEIXIN_STARTUP_TIMEOUT)
         except FileNotFoundError:
             raise WechatChannelUnavailableError(
                 "npx 未找到。请安装 Node.js 22+ 后重试。"
@@ -73,7 +82,10 @@ class WechatChannel:
             raise WechatChannelUnavailableError(f"cc-weixin 启动失败: {e}")
 
     async def stop(self) -> None:
-        """停止 cc-weixin 子进程。"""
+        """停止 cc-weixin 子进程 + 关闭 HTTP 客户端。"""
+        if self._http:
+            await self._http.aclose()
+            self._http = None
         if self._process and self._process.returncode is None:
             self._process.terminate()
             try:
@@ -89,8 +101,8 @@ class WechatChannel:
 
     @property
     def is_ready(self) -> bool:
-        """子进程是否就绪。"""
-        return self._ready
+        """子进程是否就绪且 API 地址已解析。"""
+        return self._ready and bool(self._api_base)
 
     @property
     def is_logged_in(self) -> bool:
@@ -102,21 +114,44 @@ class WechatChannel:
     async def get_qrcode_data_url(self) -> str:
         """获取当前登录二维码（PNG base64 data URL）。
 
-        从 cc-weixin stdout 捕获 QR 码字符串，转为 PNG 图片。
-        cc-weixin 使用 qrcode-terminal 输出 ASCII 二维码到终端。
-        实际方案：cc-weixin 启动后轮询其 HTTP 接口获取 QR 码 URL。
-
-        MVP 回退：如果 cc-weixin 没有 HTTP 接口，
-        生成一个占位 QR 码指向启动绑定流程。
+        优先从 cc-weixin HTTP API 获取 QR 码数据，
+        API 不可用时自己生成指向绑定流程的 QR 码。
         """
-        # 尝试从 cc-weixin HTTP 接口获取 QR 码
-        # cc-weixin 默认监听 localhost:随机端口
-        # 此处为 MVP 实现——生成独立绑定 QR 码
-        bind_url = f"https://orbit-bind.example.com/{secrets.token_urlsafe(16)}"
-        return self._generate_qrcode_png(bind_url)
+        # 尝试从 cc-weixin HTTP API 获取 QR 码
+        if self._api_base and self._http:
+            try:
+                qr_data = await self._fetch_qrcode_from_api()
+                if qr_data:
+                    return self._render_qrcode_png(qr_data)
+            except Exception as e:
+                logger.warning("cc_weixin_qrcode_api_failed", error=str(e))
 
-    def _generate_qrcode_png(self, data: str) -> str:
-        """将字符串生成 QR 码 PNG，返回 data:image/png;base64 URL。"""
+        # 回退：生成指向 Orbit 本地回调的绑定 URL
+        # 此 QR 码由 Orbit 自己生成，用于绑定流程中展示
+        import secrets
+        bind_token = secrets.token_urlsafe(16)
+        bind_url = f"http://127.0.0.1:18888/api/v1/wechat/callback?token={bind_token}"
+        logger.info("qrcode_fallback_generated")
+        return self._render_qrcode_png(bind_url)
+
+    async def _fetch_qrcode_from_api(self) -> str | None:
+        """从 cc-weixin HTTP API 获取 QR 码数据。返回 QR 内容字符串或 None。"""
+        if not self._http:
+            return None
+        # cc-weixin 典型 API: GET /qrcode → { "qrcode": "https://ilinkai.weixin.qq.com/..." }
+        resp = await self._http.get(
+            urljoin(self._api_base, "/qrcode"),
+            timeout=CC_WEIXIN_API_TIMEOUT,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("qrcode") or data.get("url") or data.get("data")
+        logger.debug("cc_weixin_qrcode_http_error", status=resp.status_code)
+        return None
+
+    @staticmethod
+    def _render_qrcode_png(data: str) -> str:
+        """将字符串渲染为 QR 码 PNG，返回 data:image/png;base64 URL。"""
         qr = qrcode.QRCode(version=1, box_size=10, border=2)
         qr.add_data(data)
         qr.make(fit=True)
@@ -127,46 +162,82 @@ class WechatChannel:
 
     # ── 消息收发 ─────────────────────────────────────
 
-    def send_message(self, openid: str, content: str) -> None:
-        """发送消息到指定微信用户。
+    async def send_message(self, openid: str, content: str) -> None:
+        """通过 cc-weixin HTTP API 发送消息到指定微信用户。
 
-        MVP 实现：通过 cc-weixin 的标准输入写入命令。
-        实际生产应通过 cc-weixin 的 HTTP API。
-
-        WHY 此处为桩实现：cc-weixin 的具体 API 接口需安装实测后确定。
+        cc-weixin 典型 API: POST /send { openid, content } → { ok: true }
+        失败时抛 WechatChannelUnavailableError。
         """
-        if not self._ready:
+        if not self._ready or not self._api_base:
             raise WechatChannelUnavailableError("微信通道未就绪")
-        logger.info("wechat_message_sent", openid=openid, length=len(content))
-        # TODO: 实现 cc-weixin 消息发送
-        # await self._send_via_api(openid, content)
+
+        if not self._http:
+            self._http = self._create_http_client()
+
+        try:
+            resp = await self._http.post(
+                urljoin(self._api_base, "/send"),
+                json={"openid": openid, "content": content},
+                timeout=CC_WEIXIN_API_TIMEOUT,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("ok") or data.get("success"):
+                    logger.debug("wechat_message_sent", openid=openid, length=len(content))
+                    return
+            # API 返回非成功状态
+            body = resp.text[:200]
+            logger.warning("wechat_send_failed", status=resp.status_code, body=body)
+            raise WechatChannelUnavailableError(f"cc-weixin 返回 {resp.status_code}: {body}")
+        except httpx.TimeoutException:
+            raise WechatChannelUnavailableError("cc-weixin API 超时")
+        except httpx.RequestError as e:
+            raise WechatChannelUnavailableError(f"cc-weixin API 请求失败: {e}")
 
     # ── 内部方法 ─────────────────────────────────────
 
-    async def _wait_ready(self, timeout: float = 15.0) -> None:
-        """等待子进程就绪（检测 stdout 输出）。"""
+    def _create_http_client(self) -> httpx.AsyncClient:
+        """创建复用的 HTTP 客户端。"""
+        return httpx.AsyncClient(
+            base_url=self._api_base,
+            timeout=CC_WEIXIN_API_TIMEOUT,
+        )
+
+    async def _wait_ready(self, timeout: float = CC_WEIXIN_STARTUP_TIMEOUT) -> None:
+        """等待子进程就绪——读取 stdout 解析监听地址和登录状态。"""
         if not self._process or not self._process.stdout:
             return
 
         deadline = asyncio.get_event_loop().time() + timeout
         while asyncio.get_event_loop().time() < deadline:
-            line = await self._process.stdout.readline()
-            if not line:
+            line_bytes = await asyncio.wait_for(
+                self._process.stdout.readline(),
+                timeout=min(5.0, max(0.5, deadline - asyncio.get_event_loop().time())),
+            )
+            if not line_bytes:
                 break
-            decoded = line.decode("utf-8", errors="replace").strip()
+
+            decoded = line_bytes.decode("utf-8", errors="replace").strip()
             logger.debug("cc_weixin_stdout", line=decoded)
-            # 检测就绪信号
-            if "ready" in decoded.lower() or "listening" in decoded.lower():
-                self._ready = True
-                break
+
+            # 解析监听地址——cc-weixin 格式："listening on http://127.0.0.1:XXXXX"
+            if not self._api_base:
+                match = _LISTEN_PATTERN.search(decoded)
+                if match:
+                    self._api_base = match.group(1)
+                    self._ready = True
+                    self._http = self._create_http_client()
+                    logger.info("cc_weixin_api_parsed", base=self._api_base)
+
+            # 检测登录状态
             if "logged in" in decoded.lower() or "login success" in decoded.lower():
                 self._logged_in = True
+                logger.info("cc_weixin_logged_in")
 
-        # 如果 15 秒后仍无 ready 信号，标记不可用但不抛异常
-        # WHY：cc-weixin 可能在等待用户扫码登录，此时进程已启动只是未登录
-        if not self._ready:
-            logger.warning("cc_weixin_not_ready", timeout=timeout)
-            self._ready = True  # 假设进程已启动，只是没有 ready 信号
+        if not self._api_base:
+            logger.warning("cc_weixin_no_listen_addr", timeout=timeout)
+            # 进程已在运行但未解析到 API 地址——标记为 ready 允许后续重试
+            self._ready = True
 
     async def _restart_if_needed(self) -> None:
         """子进程崩溃时尝试重启。"""

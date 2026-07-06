@@ -55,6 +55,12 @@ class TokenBucket:
         self._hour_timestamps.append(now)
 
 
+# ── 处理器类型 ─────────────────────────────────────────
+AsyncSendFn = Callable[[str, str], asyncio.Future[None] | None]
+# 兼容同步和异步发送函数
+SendFn = Callable[[str, str], None] | AsyncSendFn
+
+
 class OutboundQueue:
     """出站消息队列——优先级排序 + 频率控制 + 串行发送。
 
@@ -64,7 +70,7 @@ class OutboundQueue:
         queue.enqueue(OutboundMessage(...))
     """
 
-    def __init__(self, send_fn: Callable[[str, str], None]) -> None:
+    def __init__(self, send_fn: SendFn) -> None:
         self._send_fn = send_fn
         self._bucket = TokenBucket()
         self._queue: deque[OutboundMessage] = deque()
@@ -123,7 +129,10 @@ class OutboundQueue:
                 chunks = self._split_message(msg.content)
                 for chunk in chunks:
                     self._bucket.record_send()
-                    self._send_fn(msg.openid, chunk)
+                    # 兼容 async 和 sync 发送函数
+                    result = self._send_fn(msg.openid, chunk)
+                    if asyncio.iscoroutine(result):
+                        await result
                     await asyncio.sleep(MIN_INTERVAL_MS / 1000)
 
             except Exception as e:

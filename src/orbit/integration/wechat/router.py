@@ -24,9 +24,8 @@ _ROUTE_TABLE: list[tuple[re.Pattern[str], str, int | None]] = [
     (re.compile(r"@Orbit\s+(?:拒绝|reject|no)\s+#?(\d+)", re.I), "reject", 1),
     (re.compile(r"@Orbit\s+(?:帮助|help)\s*$", re.I), "help", None),
     (re.compile(r"@Orbit\s*(?:状态|status)\s*$", re.I), "status", None),
-    # P1: 问答——匹配 "xxx在哪" / "where is" / "找xxx"
-    # WHY qa 不含「查」：与 query_task 二义性。查数字→query_task，找描述→qa。
-    (re.compile(r"@Orbit\s+(?:找|where\s+is)\s+(.+)", re.I), "qa", None),
+    # NOTE: qa 意图留待 P1 实现，届时注册处理器 + 添加路由模式
+    # (re.compile(r"@Orbit\s+(?:找|where\s+is)\s+(.+)", re.I), "qa", None),
 ]
 
 # ── 帮助文本 ──────────────────────────────────────────

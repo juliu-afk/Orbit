@@ -249,6 +249,23 @@ from orbit.tools.registry import ToolRegistry  # noqa: E402
 
 ToolRegistry.get_instance().set_permission(_permission_engine)
 
+# Step 9: SQLAlchemy ORM + CodeGraph —— 必须在 Scheduler 之前初始化
+from sqlalchemy.ext.asyncio import (  # noqa: E402
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from orbit.files.service import FileService  # noqa: E402
+from orbit.review.models import ReviewBase  # noqa: E402
+from orbit.review.service import ReviewService  # noqa: E402
+
+_review_engine = create_async_engine(settings.DATABASE_URL, echo=False)
+_review_session_factory = async_sessionmaker(_review_engine, expire_on_commit=False)
+# G2: CodeGraph 引擎——Scheduler 构造函数需要 graph 参数，先创建
+from orbit.graph.engines.code_graph import CodeGraphEngine  # noqa: E402
+
+_code_graph_engine = CodeGraphEngine(_review_session_factory)
+
 # P2: _redis_client 可能为 None（Redis 连接失败时降级为内存模式）
 _checkpoint_manager = CheckpointManager(redis_client=_redis_client if _redis_client else None)
 _scheduler = Scheduler(
@@ -263,18 +280,6 @@ _scheduler = Scheduler(
 # Phase 4: 注入 Compose + ActorSpawn
 _scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-defined]
 
-# Step 9: 审查模块——SQLAlchemy 2.0 ORM
-from sqlalchemy.ext.asyncio import (  # noqa: E402
-    async_sessionmaker,
-    create_async_engine,
-)
-
-from orbit.files.service import FileService  # noqa: E402
-from orbit.review.models import ReviewBase  # noqa: E402
-from orbit.review.service import ReviewService  # noqa: E402
-
-_review_engine = create_async_engine(settings.DATABASE_URL, echo=False)
-_review_session_factory = async_sessionmaker(_review_engine, expire_on_commit=False)
 _review_service = ReviewService(_review_session_factory)
 _ws_dir = settings.WORKSPACE_DIR or os.getcwd()  # P0-7: 优先使用配置
 _file_service = FileService(_ws_dir)
@@ -282,10 +287,6 @@ _file_service = FileService(_ws_dir)
 importlib.import_module("orbit.api.routes.review").set_review_service(_review_service)
 importlib.import_module("orbit.api.routes.files_routes").set_file_service(_file_service)
 importlib.import_module("orbit.api.routes.git_routes").set_workspace_dir(_ws_dir)
-# Step 9 Phase 1.3: CodeGraph 引擎——复用 graph 数据库连接
-from orbit.graph.engines.code_graph import CodeGraphEngine  # noqa: E402
-
-_code_graph_engine = CodeGraphEngine(_review_session_factory)
 
 importlib.import_module("orbit.api.routes.codegraph_routes").set_code_graph(_code_graph_engine)
 importlib.import_module("orbit.api.routes.codegraph_routes").set_file_service(_file_service)

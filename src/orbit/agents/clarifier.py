@@ -510,6 +510,29 @@ class ClarifierAgent(BaseAgent):
 
 
 
+        # G2: 注入上下文阶段——Agent 据此调整分析深度
+        stage = context.get("stage", 1)
+        if stage >= 2:
+            stage_hint = (
+                "【上下文深度: Level 2】已加载代码图谱和对话记忆。"
+                "可以利用这些信息做更深入的分析，交叉验证用户需求与代码库实际情况。"
+            )
+            # 如果有图谱查询结果，注入已找到的符号
+            l2 = context.get("l2", {})
+            found = l2.get("symbols_found", [])
+            missing = l2.get("symbols_missing", [])
+            if found:
+                stage_hint += f"\n代码库中存在的相关符号: {', '.join(found[:10])}"
+            if missing:
+                stage_hint += f"\n代码库中不存在的符号（可能是新模块）: {', '.join(missing[:10])}"
+            parts.append(stage_hint)
+        elif stage >= 3:
+            parts.append(
+                "【上下文深度: Level 3】已加载架构决策记录和历史教训。"
+                "可以参考历史决策和已知问题模式。"
+            )
+        # else stage=1: 基础上下文，不追加提示
+
         parts.append("【请输出】按 system prompt 规定的 JSON 格式输出本轮澄清结果。")
 
         return "\n\n".join(parts)
@@ -595,8 +618,45 @@ class ClarifierAgent(BaseAgent):
 
 
     def system_prompt(self) -> str:
+        """G1: 返回基础 system prompt + mode 行为注入.
 
-        return CLARIFIER_SYSTEM_PROMPT
+        WHY 动态注入: mode.yaml 的行为参数必须在运行时影响 LLM 输出。
+        _mode=None → 降级到内置默认行为。
+        """
+        base = CLARIFIER_SYSTEM_PROMPT
+        strategy = self._question_strategy
+        recommend = self._require_recommendation
+        codebase_first = self._codebase_first
+
+        # G1: 注入 mode 行为规则——覆盖/增强基础 prompt
+        mode_rules: list[str] = []
+        if strategy == "depth_first":
+            mode_rules.append(
+                "【提问策略：深度优先】逐个深入每个决策分支。"
+                "当前分支所有子问题 unresolved 前，不切换到下一个分支。"
+                "分支顺序：goal → scope → acceptance_criteria → 按需维度。"
+            )
+        elif strategy == "breadth_first":
+            mode_rules.append(
+                "【提问策略：广度优先】先扫所有分支的顶层问题，再逐层深入。"
+                "每个分支问 1 个问题后轮换到下一个分支。"
+            )
+        # mixed: 默认行为，不追加特殊规则
+
+        if recommend:
+            mode_rules.append(
+                "【推荐答案要求】每个问题必须附带你的推荐答案和一句话理由。"
+                "不要只提问——帮用户做决策，让用户审而不是从零想。"
+            )
+        if codebase_first:
+            mode_rules.append(
+                "【代码库优先】能用 Grep/Glob/Read 在代码库中找到答案的，"
+                "先查代码再问用户。不要问用户能从代码中直接读取的问题。"
+            )
+
+        if mode_rules:
+            return base + "\n\n" + "\n".join(mode_rules)
+        return base
 
 
 

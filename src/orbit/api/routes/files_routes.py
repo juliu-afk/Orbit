@@ -27,7 +27,7 @@ async def list_files(dir: str | None = Query(None, description="项目目录路�
         files = await _svc().list_files(directory=dir)
     except (OSError, RuntimeError) as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return {"files": [f.model_dump() for f in files]}
+    return {"code": 0, "data": {"files": [f.model_dump() for f in files]}, "message": "ok"}
 
 
 @router.get("/read")

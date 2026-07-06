@@ -264,6 +264,6 @@ class OrbitWiring:
         mon._task_id = task_id
         queue: asyncio.Queue = asyncio.Queue()
         task = asyncio.create_task(mon.run(queue, task_id=task_id))
-        task._monitor_queue = queue  # type: ignore——供主 Agent 推送事件
+        task._monitor_queue = queue  # type: ignore[attr-defined]  # 供主 Agent 推送事件
         logger.debug("monitor_started", task_id=task_id, goal=goal[:60])
         return task

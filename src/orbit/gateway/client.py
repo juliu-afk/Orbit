@@ -15,6 +15,7 @@ WHY 统一网关：调度器只认 LLMClient.generate()，不直接接触 litell
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import structlog
@@ -29,6 +30,25 @@ from orbit.gateway.schemas import LLMRequest, LLMResponse, LLMUsage
 from orbit.gateway.task_router import TaskModelRouter, TaskType
 
 logger = structlog.get_logger("orbit.gateway.client")
+
+
+def _is_api_error(exc: Exception) -> bool:
+    """判定异常是否为 LLM API 层错误（可重试/降级），而非代码 bug。
+
+    WHY: litellm 抛出的 APIError/RateLimitError/Timeout/APIConnectionError
+    都是可恢复的外部错误——切换模型或重试可能解决。
+    TypeError/AttributeError 等代码 bug 不应重试。
+    """
+    api_error_names = {"APIError", "RateLimitError", "Timeout", "APIConnectionError",
+                       "APIStatusError", "ServiceUnavailableError"}
+    exc_type_name = type(exc).__name__
+    if exc_type_name in api_error_names:
+        return True
+    # 检查继承链——某些 litellm 异常通过自定义类间接继承
+    for base in type(exc).__mro__:
+        if base.__name__ in api_error_names:
+            return True
+    return False
 
 PRICES: dict[str, dict[str, float]] = {
     "deepseek/deepseek-v4-pro": {"prompt": 0.000435, "completion": 0.00087},
@@ -143,7 +163,12 @@ class LLMClient:
         except CircuitOpenError:
             logger.warning("primary_circuit_open", model=model)
         except Exception as e:
-            logger.warning("primary_failed", model=model, error=str(e))
+            # 区分 API 错误（可重试/降级）vs 代码 bug（不应重试）
+            if isinstance(e, (TimeoutError, asyncio.TimeoutError)) or _is_api_error(e):
+                logger.warning("primary_api_error", model=model, error=str(e)[:200])
+            else:
+                logger.critical("primary_unexpected_error", model=model, exc_info=True)
+                raise
         try:
             logger.info("fallback_to_glm47flash", original=model)
             return await self._call_with_circuit(self.fallback_model, req, task_id, "fallback")

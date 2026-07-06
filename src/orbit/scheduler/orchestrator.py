@@ -17,7 +17,9 @@ if TYPE_CHECKING:
     from orbit.communication.message_bus import AgentMessageBus
     from orbit.compression.budget import TokenBudgetTracker
     from orbit.compression.compressor import ContextCompressor
+    from orbit.gateway.client import LLMClient
     from orbit.goal.intake_router import IntakeRouter
+    from orbit.graph.engines.code_graph import CodeGraphEngine
     from orbit.observability.audit import AuditLogger
     from orbit.tools.registry import ToolRegistry
 
@@ -66,6 +68,7 @@ class Scheduler:
         tool_registry: ToolRegistry | None = None,
         router: IntakeRouter | None = None,
         audit_logger: AuditLogger | None = None,
+        graph: CodeGraphEngine | None = None,  # G2: 图谱引擎——Stage 2 符号查询
     ):
         self._agent_llms = agent_llms or {}
         self.checkpoint = checkpoint_manager
@@ -89,6 +92,7 @@ class Scheduler:
             tool_registry=tool_registry,
             audit_logger=audit_logger,
             router=router,
+            graph=graph,  # G2: 图谱引擎——Stage 2 L2 填充
         )
         self._dag_runner = DagRunner(
             checkpoint=checkpoint_manager,

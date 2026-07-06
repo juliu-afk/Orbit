@@ -87,6 +87,8 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(ROOT / "backend" / "static"), "static"),
+        # G1: Modes 数据文件——PyInstaller 不打包 YAML/MD，ModeLoader 依赖它们
+        (str(ROOT / "src" / "orbit" / "modes"), "orbit/modes"),
     ] + THIRD_PARTY_DATAS,
     hiddenimports=_HIDDEN_IMPORTS,
     hookspath=[str(ROOT / "backend" / "hooks")],

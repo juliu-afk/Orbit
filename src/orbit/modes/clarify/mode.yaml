@@ -1,0 +1,17 @@
+# clarify/mode.yaml
+# 需求澄清 Agent 行为配置——grill-me 深度优先决策树遍历
+
+name: clarify
+version: 1
+description: "需求澄清——深度优先决策树遍历，一次一个问题，带推荐答案，代码库优先"
+applies_to:
+  - PARSING
+behavior:
+  question_strategy: depth_first
+  max_questions_per_branch: 20
+  require_recommendation: true
+  codebase_first: true
+  auto_upgrade_context: true
+references:
+  - question-tree.md
+  - domain-checks.md

@@ -258,6 +258,7 @@ _scheduler = Scheduler(
     checkpoint_manager=_checkpoint_manager,
     compressor=_compressor,  # Phase 2 AC7
     budget_tracker=_budget_tracker,  # Phase 2 AC7
+    graph=_code_graph_engine,  # G2: 图谱引擎——Stage 2 符号存在性查询
 )
 # Phase 4: 注入 Compose + ActorSpawn
 _scheduler._compose_orchestrator = _compose_orchestrator  # type: ignore[attr-defined]
@@ -406,6 +407,14 @@ async def _app_lifespan(app: FastAPI) -> None:
     _trajectory_collector = TrajectoryCollector(db_path="data/trajectories.db")
     app.state.trajectory_collector = _trajectory_collector
     logger.info("trajectory_collector_initialized", db_path="data/trajectories.db")
+
+    # G2: 代码图谱索引构建——Stage 2 符号存在性查询的数据源
+    # WHY 启动时构建: 图谱查询是 Stage 2 核心操作，空索引会让 exists() 永远返回 False。
+    try:
+        _graph_files = await _code_graph_engine.build_index(_ws_dir)
+        logger.info("code_graph_index_built", directory=_ws_dir, files=_graph_files)
+    except Exception:
+        logger.warning("code_graph_index_failed", directory=_ws_dir, exc_info=True)
 
     yield  # 应用运行中
 

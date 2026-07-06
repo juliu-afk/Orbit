@@ -105,8 +105,8 @@ class LessonStore:
     def __init__(self, db_path: str = "data/lessons.db") -> None:
         self._db_path = db_path
         self._conn: sqlite3.Connection | None = None
-        # P2 审计哈希链——每条教训记录前一条的 SHA256，确保不可篡改
-        self._prev_hash: str = ""
+        # P2 审计哈希链——从 DB 加载最新 record_hash，确保进程重启后链不断
+        self._prev_hash: str = self._load_latest_hash()
 
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
@@ -141,6 +141,23 @@ class LessonStore:
         self._get_conn().execute(
             "CREATE INDEX IF NOT EXISTS idx_lessons_task_id ON agentops_lessons(task_id)"
         )
+
+    def _load_latest_hash(self) -> str:
+        """从 DB 加载最新 record_hash 作为哈希链起点。
+
+        WHY 持久化: 进程重启后 _prev_hash 从内存丢失会导致哈希链断裂。
+        从最后一条记录恢复哈希链，确保审计不可篡改。
+        """
+        try:
+            conn = self._get_conn()
+            row = conn.execute(
+                "SELECT record_hash FROM agentops_lessons ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            if row and row[0]:
+                return row[0]
+        except Exception:
+            pass  # 表不存在或 DB 不可用 → 从空链开始
+        return ""
 
     def add(
         self,

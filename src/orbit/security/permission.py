@@ -17,6 +17,7 @@ from typing import Any
 import structlog
 
 from orbit.observability.audit import AuditLogger
+from orbit.security.constants import SENSITIVE_FILE_NAMES  # P1-6: 统一常量
 from orbit.security.models import PermissionLayer, SecurityPolicy
 
 logger = structlog.get_logger("orbit.security")
@@ -90,12 +91,28 @@ class PermissionEngine:
             return False
 
         # Layer 4: sandbox（shell 必须隔离）
-        # P1-3: 不仅记录，还拒绝——除非调用方显式绕过沙箱（仅测试用）
+        # P1-4: 强制检查沙箱可用性，不可用则拒绝
         if tool_name == "exec_command":
             if policy and not policy.require_sandbox:
                 pass  # 显式绕过沙箱（仅限测试）
             else:
-                # 沙箱执行——由调用方保证（PermissionEngine 返回 True 但标记需要沙箱）
+                from orbit.sandbox.process_sandbox import ProcessSandbox
+
+                _sandbox = ProcessSandbox()
+                if not _sandbox.is_available():
+                    logger.error(
+                        "permission_sandbox_unavailable_deny",
+                        agent=agent_role,
+                        command=command[:100],
+                    )
+                    _audit.log(
+                        "permission_engine",
+                        "deny_sandbox_unavailable",
+                        status="denied",
+                        agent=agent_role,
+                        tool=tool_name,
+                    )
+                    return False
                 logger.info(
                     "permission_sandbox_required",
                     agent=agent_role,
@@ -188,12 +205,10 @@ class PermissionEngine:
 
     def _is_global_deny(self, tool_name: str, path: str, command: str) -> bool:
         """Layer 5: 全局硬拒绝检查。"""
-        # 禁止访问敏感文件
-        sensitive_patterns = [".env", ".pem", ".key", "credentials", "secrets"]
+        # P1-6: 统一到 security/constants.py
         fname = path.split("/")[-1] if path else ""
-        for p in sensitive_patterns:
-            if fname == p or fname.startswith(p):
-                return True
+        if fname in SENSITIVE_FILE_NAMES:
+            return True
 
         # 禁止 eval/exec
         return bool(command and ("eval(" in command or "exec(" in command))

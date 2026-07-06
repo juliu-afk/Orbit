@@ -1,0 +1,17 @@
+# review/mode.yaml
+# 代码审查 Agent 行为配置——6 维度检查，致命优先
+
+name: review
+version: 1
+description: "代码审查——安全/财务/会计/方案/测试/质量，致命问题先修"
+applies_to:
+  - VERIFYING
+behavior:
+  question_strategy: breadth_first
+  max_questions_per_branch: 30
+  require_recommendation: true
+  codebase_first: true
+  auto_upgrade_context: true
+references:
+  - checklist.md
+  - severity-rubric.md

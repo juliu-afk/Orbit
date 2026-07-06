@@ -4,6 +4,9 @@ Phase 1 升级：DeveloperAgent/ArchitectAgent/ReviewerAgent/QAAgent → 继承 
 获得 think→act→observe 循环 + 工具调用能力。
 
 ConfigManagerAgent/ClarifierAgent → 保持 BaseAgent（不需要文件工具）。
+
+G1 Mode File System (grill-me): AgentFactory 支持注入 ModeConfig——
+10 行 YAML 定义的行为模式，不需要 1000 行 Python 类。
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ if TYPE_CHECKING:
     from orbit.goal_judge.judge import GoalJudge
     from orbit.goal_judge.models import Goal
     from orbit.graph.engines.code_graph import CodeGraphEngine
+    from orbit.modes.schemas import ModeConfig
     from orbit.sandbox.executor import Sandbox
     from orbit.tools.registry import ToolRegistry
 
@@ -208,6 +212,7 @@ class AgentFactory:
         goal: Goal | None = None,  # Phase 4 AC-B1: Goal
         goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge
         reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
+        mode: ModeConfig | None = None,  # G1: Mode File System——注入行为配置
     ) -> BaseAgent:
         """create = get_agent alias for orchestrator."""
         return cls.get_agent(
@@ -215,6 +220,7 @@ class AgentFactory:
             event_bus=event_bus, goal=goal, goal_judge=goal_judge,
             compressor=compressor, budget_tracker=budget_tracker,
             task_keywords=task_keywords, reflection_engine=reflection_engine,
+            mode=mode,
         )
 
     @classmethod
@@ -232,6 +238,7 @@ class AgentFactory:
         budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7
         task_keywords: list[str] | None = None,  # 模板匹配关键词
         reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
+        mode: ModeConfig | None = None,  # G1: Mode File System——注入行为配置
     ) -> BaseAgent:
         """按角色创建 Agent 实例。
 
@@ -245,6 +252,8 @@ class AgentFactory:
             goal: Goal 模型（Phase 4——GoalJudge 判定用）
             goal_judge: GoalJudge 实例（Phase 4——每轮 turn 后自检）
             task_keywords: 任务关键词列表（供模板库匹配注入 system_prompt）
+            mode: ModeConfig 实例（G1——grill-me 模式文件系统）.
+                  None 时降级到 Agent 内置默认行为。
 
         Returns:
             对应角色的 BaseAgent 实例
@@ -259,7 +268,7 @@ class AgentFactory:
             raise ValueError(f"Unknown agent role: {role}")
 
         if issubclass(agent_cls, ReActAgent):
-            return agent_cls(
+            agent = agent_cls(
                 llm=llm,
                 graph=graph,
                 sandbox=sandbox,
@@ -273,7 +282,13 @@ class AgentFactory:
                 task_keywords=task_keywords,  # 模板匹配关键词
                 reflection_engine=reflection_engine,  # Phase A: ReflAct
             )
-        return agent_cls(llm=llm, graph=graph, sandbox=sandbox)
+        else:
+            agent = agent_cls(llm=llm, graph=graph, sandbox=sandbox)
+
+        # G1: 注入 mode 行为配置——不影响现有逻辑
+        # mode=None 时 Agent 沿用内置默认行为
+        agent._mode = mode  # type: ignore[attr-defined]
+        return agent
 
     @classmethod
     def register(cls, role: AgentRole, agent_cls: type[BaseAgent]) -> None:

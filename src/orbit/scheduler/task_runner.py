@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.agents.base import AgentInput
-from orbit.agents.context import TaskContext
+from orbit.agents.context import ContextStage, TaskContext
 from orbit.api.schemas.task import TaskState
 from orbit.checkpoint.manager import CheckpointData, CheckpointManager
 from orbit.events.bus import EventBus
@@ -268,6 +268,8 @@ class TaskRunner:
 
         IDLE 状态特殊处理: chatter agent 返回 _intent 标记，
         "chat" → 结束任务, "programming" → 继续进入 PARSING (clarifier).
+
+        G1 (grill-me): 加载 Mode 配置，注入到 Agent 行为层。
         """
         role = ROLE_MAP.get(state)
 
@@ -281,6 +283,19 @@ class TaskRunner:
             # Inkeep 借鉴 #1: 注入 task_type 供 Agent 选择模型
             task_type = _TASK_TYPE_MAP.get(state, "reasoning")
             context["task_type"] = task_type
+
+            # G1: 加载 Mode 配置——用于 Agent 行为注入
+            # 加载失败降级到 None → Agent 使用内置默认行为
+            mode = None
+            try:
+                from orbit.modes.loader import ModeLoader  # noqa: F811
+                loader = ModeLoader()
+                mode = loader.resolve_for_state(state.value)
+                if mode:
+                    logger.debug("mode_loaded_for_state", state=state.value, mode=mode.name)
+            except Exception:
+                logger.debug("mode_load_skipped", state=state.value)
+            context["_mode"] = mode  # 透传给 _run_agent
 
             # CUA-US1: 注入 Agent 步骤超时——CODING 180s，其他 120s
             step_timeout = AGENT_STEP_TIMEOUT_SECONDS.get(state, AGENT_STEP_TIMEOUT_DEFAULT)
@@ -440,12 +455,15 @@ class TaskRunner:
         prd_text = context.get("prd", "")
         task_keywords = self._extract_keywords(prd_text)
         try:
+            # G1: 从 context 提取 mode 配置（_agent_cycle 中加载）
+            mode = context.get("_mode")
             agent = self._agent_factory.create(
                 role,
                 llm=agent_llm,
                 compressor=self._compressor,
                 budget_tracker=self._budget_tracker,
                 task_keywords=task_keywords,  # 减熵闭环-1
+                mode=mode,  # G1: grill-me Mode File System
             )
         except Exception as e:
             logger.error("agent_build_failed", role=role, error=str(e))
@@ -498,6 +516,30 @@ class TaskRunner:
             except asyncio.CancelledError:
                 raise  # P0-1: 不吞取消信号
             except Exception as e:
+                # G2: Agent 失败→自动升级上下文阶段 (Stage 1→2)，给 Agent 更多信息重试
+                # 每任务只升级一次——load_stage() 内部有 _stage_upgraded 标记
+                mode_config = context.get("_mode")
+                auto_upgrade = (
+                    mode_config is not None
+                    and mode_config.behavior.auto_upgrade_context
+                )
+                if auto_upgrade and hasattr(agent_context, "load_stage"):
+                    try:
+                        # 构建 MemoryStore 供 load_stage 使用
+                        project_path = context.get("project_path", "")
+                        store = MemoryStore(project_path=project_path)
+                        await agent_context.load_stage(
+                            ContextStage.STAGE2,
+                            memory_store=store,
+                        )
+                        logger.info(
+                            "context_auto_upgraded",
+                            task_id=task_id,
+                            role=role,
+                            reason=str(e)[:100],
+                        )
+                    except Exception:
+                        logger.debug("context_upgrade_failed", task_id=task_id)
                 logger.error("agent_run_error", role=role, task_id=task_id, error=str(e))
                 if self._audit_logger:
                     self._audit_logger.log(
@@ -521,36 +563,28 @@ class TaskRunner:
             record_scheduling_latency("dispatch_task", elapsed)
 
     def _build_context(self, task_id: str, context: dict[str, Any]) -> Any:
-        """构建 L1-L5 TaskContext."""
-        l4: dict[str, Any] = {}
-        try:
+        """构建 L1-L5 TaskContext——G2 渐进式: 默认仅 Stage 1.
 
-            project_path = context.get("project_path", "")
-            store = MemoryStore(project_path=project_path)
-            mem = store.read_file(MemoryFileType.EPISODIC)
-            if mem.body:
-                l4["working_memory"] = mem.body[:2000]
-            progress = store.read_file(MemoryFileType.PROGRESS)
-            if progress.body:
-                l4["progress"] = progress.body[:1000]
-        except asyncio.CancelledError:
-            raise  # P2-11: 不吞取消信号
-        except Exception:
-            logger.debug("memory_load_skipped", task_id=task_id)  # P2-11: 至少记日志
-
+        WHY 渐进式: grill-me 模式——先给最少上下文，失败/不确定时再升级。
+        Stage 1: L1+L3 核心字段 ~2K tokens（始终构建）。
+        Stage 2: L2+L4 图谱+工作记忆（_run_agent 失败时 ctx.load_stage()）。
+        Stage 3: L5 长期记忆（Agent 显式请求时）。
+        """
+        # G2: Stage 1 只构建 L1+L3——L2/L4/L5 延迟到 load_stage()
+        # fast_lane 任务不会触发 Stage 2+，省 60-80% token
         return TaskContext(
             task_id=task_id,
             agent_name=context.get("agent_name", ""),
             model_tier=context.get("model_tier", ""),
             l1="遵循小企业会计准则; 禁止直接操作总账; 金额使用 Decimal",
-            l2=context.get("l2", {}),
+            l2={},  # G2: 延迟到 Stage 2
             l3={
                 "state": context.get("state", "UNKNOWN"),
                 "prd": context.get("prd", ""),
                 "artifacts": context.get("artifacts", {}),
             },
-            l4=l4,
-            l5=context.get("l5", []),
+            l4={},  # G2: 延迟到 Stage 2
+            l5=[],  # G2: 延迟到 Stage 3
         )
 
     async def _continue_from(

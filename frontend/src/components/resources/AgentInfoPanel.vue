@@ -32,8 +32,8 @@ onMounted(async () => { const names = await fetchAgentNames(); const results = a
   </div>
   <div class="px-3 py-2 shrink-0" style="border-top:1px solid var(--color-orbit-border)">
     <div class="flex justify-between py-0.5"><span style="color:var(--color-orbit-text-muted)">active</span><span>{{ agentops.metrics?.active_tasks ?? '--' }}</span></div>
-    <div class="flex justify-between py-0.5"><span style="color:var(--color-orbit-text-muted)">tokens</span><span>{{ agentops.metrics?.llm_tokens_total?.toLocaleString() ?? '--' }}</span></div>
-    <div class="flex justify-between py-0.5"><span style="color:var(--color-orbit-text-muted)">intercepted</span><span>{{ agentops.metrics?.hallucination_intercepted_total ?? '--' }}</span></div>
+    <div class="flex justify-between py-0.5"><span style="color:var(--color-orbit-text-muted)">tokens</span><span>{{ ((agentops.metrics?.llm_tokens_total?.input ?? 0) + (agentops.metrics?.llm_tokens_total?.output ?? 0)).toLocaleString() }}</span></div>
+    <div class="flex justify-between py-0.5"><span style="color:var(--color-orbit-text-muted)">intercepted</span><span>{{ Object.values(agentops.metrics?.hallucination_intercepted_total ?? {}).reduce((a,b) => a + (b ?? 0), 0) }}</span></div>
   </div>
 </div>
 </template>

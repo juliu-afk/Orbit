@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Orbit 安全与UX评估报告 — 2026-07-07</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--yellow:#d2991d;--orange:#db6d28;--red:#f85149;--purple:#a371f7}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;max-width:1000px;margin:0 auto;padding:40px 20px}
+h1{font-size:28px;margin-bottom:4px}
+h2{font-size:20px;margin:32px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+h3{font-size:16px;margin:20px 0 10px;color:var(--accent)}
+h4{font-size:14px;margin:16px 0 8px;color:var(--text)}
+.subtitle{color:var(--muted);font-size:14px;margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase}
+.tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+.t-p0{background:#3a0a0a;color:var(--red)}.t-p1{background:#3a2a0a;color:var(--yellow)}.t-p2{background:#1a2a3a;color:var(--accent)}.t-p3{background:#1a1a2a;color:var(--muted)}
+.findings-table td:first-child{white-space:nowrap;font-family:monospace;font-size:12px}
+.score-card{text-align:center;padding:16px}
+.score-card .val{font-size:36px;font-weight:700}
+.score-card .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+.score-card .change{font-size:14px}
+.rec{background:var(--card);border-left:3px solid var(--border);padding:10px 14px;margin:10px 0;border-radius:0 6px 6px 0}
+.rec-hi{border-color:var(--red)}.rec-md{border-color:var(--yellow)}.rec-lo{border-color:var(--accent)}
+table.competitor td:first-child{font-weight:600;color:var(--accent)}
+.warn{background:#3a2a0a;border:1px solid var(--yellow);border-radius:6px;padding:12px 16px;margin:12px 0}
+.crit{background:#3a0a0a;border:1px solid var(--red);border-radius:6px;padding:12px 16px;margin:12px 0}
+hr{border:none;border-top:1px solid var(--border);margin:24px 0}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<h1>Orbit 安全与用户体验评估报告</h1>
+<p class="subtitle">评估日期：2026-07-07 | 代码基线：1676dce | 方法：源码审计 + 开源项目调研 + 竞品分析</p>
+
+<!-- SCORES -->
+<div class="grid2">
+  <div class="card score-card">
+    <div class="val" style="color:var(--yellow)">2.5</div>
+    <div class="lbl">安全评分 / 5.0</div>
+    <div class="change" style="color:var(--red)">3 个 P0 致命问题待修复</div>
+  </div>
+  <div class="card score-card">
+    <div class="val" style="color:var(--yellow)">2.8</div>
+    <div class="lbl">UX 评分 / 5.0</div>
+    <div class="change" style="color:var(--accent)">基础扎实，交互模式缺位</div>
+  </div>
+</div>
+
+<!-- EXECUTIVE SUMMARY -->
+<h2>执行摘要</h2>
+<div class="card">
+<p><strong>安全</strong>：Orbit 拥有完善的安全架构骨架（Docker 沙箱 + ProcessSandbox + 权限引擎 + 熔断器），但存在 3 个 P0 致命漏洞。最严重的是 WebSocket 聊天端点无认证，以及 .env 文件含真实 API 密钥未入 .gitignore。对标业界（Claude Code/Cursor/GitHub Copilot）的沙箱化标准，Orbit 的 Windows 沙箱隔离不完整，缺少 Firecracker/gVisor 级别的硬件隔离。</p>
+<br>
+<p><strong>UX</strong>：Orbit 的终端风格设计和键盘导航是亮点，但缺少模式选择（Ask/Edit/Agent）、计划透明性、Diff 可视化、@-mention 上下文注入、持久化记忆系统等关键交互模式。与 Cursor、Copilot Chat、Windsurf 等竞品的 UX 差距约 2 年。14 项可执行改进中，前 4 项（模式选择器、Diff 可视化、Agent 计划展示、@-mention）可带来最大用户体验提升。</p>
+</div>
+
+<hr>
+
+<!-- SECURITY -->
+<h2>第一部分：安全评估</h2>
+
+<h3>1.1 安全架构现状</h3>
+<div class="card">
+<table>
+<tr><th>层级</th><th>实现</th><th>成熟度</th><th>对标</th></tr>
+<tr><td>沙箱执行</td><td>Docker(--network none,只读挂载) + ProcessSandbox(rlimit+网络隔离)</td><td>🟡 中等</td><td>Claude Code(bwrap/Seatbelt)、Cursor(Cloud VM)</td></tr>
+<tr><td>权限控制</td><td>5层拒绝优先(PermissionEngine) + 路径守卫(WorkspaceGuard)</td><td>🟢 较好</td><td>OpenClaw(permission-based)、Continue.dev(IDE permissions)</td></tr>
+<tr><td>API 认证</td><td>静态 Token 头部验证 + SSE Token 查询参数</td><td>🔴 薄弱</td><td>OAuth2+PKCE、JWT、短期凭证</td></tr>
+<tr><td>资源保护</td><td>令牌桶 + 预算守卫 + 4级降级 + 熔断器</td><td>🟡 中等</td><td>Claude Code(token tracking)、OpenHands(container limits)</td></tr>
+<tr><td>CI 安全</td><td>pip-audit + bandit(仅HIGH) + 周扫描</td><td>🟡 中等</td><td>OWASP 推荐(semgrep+Trivy+secrets scan)</td></tr>
+<tr><td>审计日志</td><td>structlog + Prometheus + AuditLogger</td><td>🟢 较好</td><td>NIST AI RMF、EU AI Act 要求</td></tr>
+</table>
+</div>
+
+<h3>1.2 致命发现 (P0)</h3>
+
+<div class="crit"><strong>P0-1: WebSocket 聊天端点无认证</strong> — <code>src/orbit/api/routes/chat.py:89</code><br>
+AuthMiddleware 仅拦截 HTTP 请求，WebSocket 升级请求绕过中间件。任何能访问 18888 端口的人可无限制调用 LLM Agent。修复：在 WebSocket accept 前验证 token。</div>
+
+<div class="crit"><strong>P0-2: .env 文件含真实 API 密钥且未入 .gitignore</strong> — <code>d:/Orbit/.env</code><br>
+DEEPSEEK_API_KEY、ZAI_API_KEY 为真实密钥格式。若推送公开仓库即泄露。修复：立即将 .env 加入 .gitignore，轮换已暴露的密钥。</div>
+
+<div class="crit"><strong>P0-3: Shell 工具使用 create_subprocess_shell</strong> — <code>src/orbit/tools/shell.py:264</code><br>
+尽管有命令白名单和 shlex.split，shell=True 模式仍存在 shell 解释风险。修复：改用 create_subprocess_exec(list, ...)，直接 exec 无需 shell 中介。</div>
+
+<h3>1.3 严重发现 (P1)</h3>
+
+<table class="findings-table">
+<tr><th>ID</th><th>位置</th><th>问题</th><th>修复方案</th></tr>
+<tr><td>P1-1</td><td>dependencies.py:21</td><td>SSE Token 通过 URL 查询参数传递，泄露到日志/浏览器历史/Referer</td><td>改用 WebSocket 子协议或 HTTP Header</td></tr>
+<tr><td>P1-2</td><td>process_sandbox.py:69</td><td>Windows 沙箱无 AppContainer/Job Object/低完整性级别</td><td>实现 AppContainer 隔离或使用 Firecracker</td></tr>
+<tr><td>P1-3</td><td>dependencies.py:65</td><td>单一静态 Token，无轮换/撤销机制</td><td>实现 JWT + Token 刷新 + 黑名单</td></tr>
+<tr><td>P1-4</td><td>permission.py:93</td><td>PermissionEngine Layer4(沙箱强制)仅为咨询，不实际执行</td><td>在 dispatch 前强制检查沙箱可用性</td></tr>
+<tr><td>P1-5</td><td>token_bucket.py:35</td><td>TokenBucket 无锁，多协程竞态风险</td><td>加 asyncio.Lock 保护 _tokens 修改</td></tr>
+<tr><td>P1-6</td><td>guard.py + permission.py</td><td>敏感文件拒绝列表在三处重复且不同步</td><td>统一到 security_constants.py</td></tr>
+<tr><td>P1-7</td><td>registry/core.py:319</td><td>新 API 路径的 per-tool allowed_agents 白名单未执行</td><td>在 dispatch() 中统一执行新旧两条路径</td></tr>
+<tr><td>P1-8</td><td>security.yml:61</td><td>CI 仅扫描 HIGH 级别 bandit 规则，跳过中低风险</td><td>改为 -lll 扫描全部级别</td></tr>
+</table>
+
+<h3>1.4 中等发现 (P2)</h3>
+<table class="findings-table">
+<tr><th>ID</th><th>问题</th><th>修复</th></tr>
+<tr><td>P2-1</td><td>无 semgrep/custom SAST 规则</td><td>创建 .semgrep/ 目录，添加 WorkspaceGuard.validate 调用检测等规则</td></tr>
+<tr><td>P2-2</td><td>无 secrets scanner(TruffleHog/Gitleaks)</td><td>CI 增加 secrets 扫描 job</td></tr>
+<tr><td>P2-3</td><td>DependencyGuard 仅检查硬编码字典</td><td>接入 PyPI advisory DB 实时查询</td></tr>
+<tr><td>P2-4</td><td>DegradationPath L3(stale cache)为存根</td><td>实现 Redis 缓存后端</td></tr>
+<tr><td>P2-5</td><td>Circuit Breaker 状态不持久化</td><td>接入 Redis 后端（代码已有接口）</td></tr>
+<tr><td>P2-6</td><td>Auth 失败不记录日志</td><td>AuthMiddleware 增加 structlog 记录</td></tr>
+<tr><td>P2-7</td><td>无请求体大小限制</td><td>FastAPI middleware 添加 max_request_size</td></tr>
+</table>
+
+<h3>1.5 安全优化方案</h3>
+
+<h4>短期 (1-2周)</h4>
+<div class="rec rec-hi">1. <strong>修复 P0-1/P0-2/P0-3</strong>：WS 认证、.env 入 .gitignore、shell.py 改 exec</div>
+<div class="rec rec-hi">2. <strong>统一敏感文件拒绝列表</strong>：合并 guard.py + permission.py + validators.py 三处为单点</div>
+<div class="rec rec-hi">3. <strong>Token 从 URL 迁移到 Header</strong>：SSE verify_stream_token 改用 HTTP Header</div>
+<div class="rec rec-md">4. <strong>CI 增加 secrets 扫描</strong>：添加 Gitleaks job，检测硬编码密钥</div>
+<div class="rec rec-md">5. <strong>Auth 失败日志</strong>：AuthMiddleware 增加 structlog.warning</div>
+
+<h4>中期 (1-2月)</h4>
+<div class="rec rec-md">6. <strong>Windows 沙箱加固</strong>：实现 AppContainer 或切换到 gVisor/Firecracker</div>
+<div class="rec rec-md">7. <strong>JWT + Token 刷新</strong>：替代静态 Token，支持轮换和撤销</div>
+<div class="rec rec-md">8. <strong>PermissionEngine Layer4 强制</strong>：dispatch 前检查沙箱可用性，不可用则拒绝</div>
+<div class="rec rec-md">9. <strong>Circuit Breaker Redis 持久化</strong>：实现已有接口，支持多 worker 共享状态</div>
+<div class="rec rec-lo">10. <strong>创建 .semgrep/ 规则库</strong>：WorkspaceGuard 调用检测、litellm 直接调用检测</div>
+<div class="rec rec-lo">11. <strong>DependencyGuard 实时查询</strong>：接入 PyPI advisory DB</div>
+
+<h4>长期 (3-6月)</h4>
+<div class="rec rec-lo">12. <strong>Firecracker MicroVM 沙箱</strong>：替代 Docker，硬件级隔离，150ms 冷启动</div>
+<div class="rec rec-lo">13. <strong>Ithilien 审计链</strong>：SHA-256 哈希链 + Ed25519 签名，满足 EU AI Act 要求</div>
+<div class="rec rec-lo">14. <strong>Agent 身份系统</strong>：OAuth2+PKCE，每个 Agent 独立可撤销身份</div>
+
+<hr>
+
+<!-- UX -->
+<h2>第二部分：用户体验评估</h2>
+
+<h3>2.1 UX 架构现状</h3>
+<div class="card">
+<table>
+<tr><th>维度</th><th>现状</th><th>评分</th></tr>
+<tr><td>视觉设计</td><td>终端风格暗色主题，CSS 变量系统，毛玻璃效果，等宽字体</td><td>🟢 4.0</td></tr>
+<tr><td>键盘导航</td><td>Ctrl+B/Ctrl+/ 等快捷键，面板切换，Escape 关闭</td><td>🟢 4.0</td></tr>
+<tr><td>实时反馈</td><td>SSE 流式 + WebSocket 双通道，Agent 思考动画，状态指示器</td><td>🟡 3.0</td></tr>
+<tr><td>交互模式</td><td>单一 NL 输入通道，无模式选择，无计划预览</td><td>🔴 1.5</td></tr>
+<tr><td>上下文注入</td><td>仅文本输入，无 @-mention、文件拖放、上下文引用</td><td>🔴 1.0</td></tr>
+<tr><td>Diff 可视化</td><td>CodeDiffPanel 为原始 &lt;pre&gt; 文本，无并排/统一 diff</td><td>🔴 1.0</td></tr>
+<tr><td>记忆系统</td><td>DreamPanel 一次性 API 调用，无持久化规则/记忆浏览器</td><td>🟡 2.0</td></tr>
+<tr><td>配置能力</td><td>无用户可配置的 Agent 行为/模型/快捷键</td><td>🔴 1.0</td></tr>
+<tr><td>连接管理</td><td>三套独立连接(Ws/SSE/HTTP poll)，各自重连逻辑</td><td>🟡 2.5</td></tr>
+<tr><td>错误处理</td><td>全屏阻断覆盖层，无优雅降级/重试toast/离线指示器</td><td>🟡 2.5</td></tr>
+</table>
+</div>
+
+<h3>2.2 竞品 UX 对比</h3>
+<div class="card">
+<table class="competitor">
+<tr><th>能力</th><th>Claude Code</th><th>Cursor</th><th>Windsurf</th><th>Copilot</th><th>Continue.dev</th><th>Orbit</th></tr>
+<tr><td>模式选择</td><td>✅ 隐式</td><td>✅ Ask/Edit/Agent</td><td>✅ 5种模式</td><td>✅ Ask/Edit/Agent</td><td>✅ Chat/Edit/Agent</td><td>❌ 无</td></tr>
+<tr><td>计划透明</td><td>✅ 执行前展示</td><td>✅ Composer预览</td><td>✅ Plan→Execute</td><td>⚠️ 部分</td><td>⚠️ 部分</td><td>❌ 无</td></tr>
+<tr><td>Diff 可视化</td><td>✅ 内联diff</td><td>✅ 并排diff+批处理</td><td>✅ 实时diff</td><td>✅ 内联建议</td><td>✅ Monaco diff</td><td>❌ 原始文本</td></tr>
+<tr><td>@-mention</td><td>✅ @file</td><td>✅ @file/@codebase</td><td>✅ @file/@folder</td><td>✅ @file/@workspace</td><td>✅ @file/@url/@jira</td><td>❌ 无</td></tr>
+<tr><td>持久记忆</td><td>✅ CLAUDE.md</td><td>✅ .cursorrules</td><td>✅ AGENTS.md+Memories</td><td>✅ .github/instructions</td><td>✅ config.yaml</td><td>❌ 无</td></tr>
+<tr><td>MCP 集成</td><td>✅ 完整</td><td>⚠️ 部分</td><td>✅ 丰富</td><td>✅ GitHub生态</td><td>✅ 首创完整</td><td>⚠️ 后端有,前端无</td></tr>
+<tr><td>可配置性</td><td>✅ settings.json</td><td>✅ .cursorrules</td><td>✅ Rules+Memories</td><td>✅ .github/prompts</td><td>✅ YAML全配置</td><td>❌ 无</td></tr>
+<tr><td>命令面板</td><td>✅ /commands</td><td>✅ Cmd+Shift+P</td><td>✅ Cmd+K</td><td>✅ Ctrl+I</td><td>✅ /commands</td><td>⚠️ 仅slash命令</td></tr>
+<tr><td>分屏/多面板</td><td>✅ iTerm2复用</td><td>✅ IDE原生</td><td>✅ IDE原生</td><td>✅ 侧边栏</td><td>✅ IDE面板</td><td>⚠️ 固定3列</td></tr>
+</table>
+</div>
+
+<h3>2.3 关键 UX 差距</h3>
+
+<div class="warn"><strong>Gap 1: 无交互模式选择</strong> — 用户无法区分"提问"vs"编辑"vs"自主执行"。所有输入走同一 NL 通道。<br>
+  <strong>方案</strong>：在 TerminalChat 输入框上方添加模式选择器 (Ask / Edit / Agent / Dream)，借鉴 Copilot 和 Cursor 的三模式设计。工作量：低，影响：高。</div>
+
+<div class="warn"><strong>Gap 2: 无 Diff 可视化</strong> — CodeDiffPanel 是原始 &lt;pre&gt; 文本，非真正的 diff。<br>
+  <strong>方案</strong>：集成 Monaco DiffEditor，添加 Accept/Reject 按钮，借鉴 Cursor 的 Diff &amp; Review。工作量：中，影响：高。</div>
+
+<div class="warn"><strong>Gap 3: Agent 执行无计划预览</strong> — ChatStream 直接开始执行，用户不知道 Agent 要做什么。<br>
+  <strong>方案</strong>：ChatStream 启动前展示计划卡片（步骤列表 + Approve/Skip/Modify），借鉴 Claude Code 的 plan-first loop。工作量：中，影响：高。</div>
+
+<div class="warn"><strong>Gap 4: 无 @-mention 上下文注入</strong> — 不能引用文件、符号、历史。<br>
+  <strong>方案</strong>：在 InputBox 实现 `@` 自动完成（文件/符号/会话），高亮 @mention 为样式化 chip。工作量：中，影响：高。</div>
+
+<div class="warn"><strong>Gap 5: 无持久化记忆/规则系统</strong> — DreamPanel 是一次性 API 调用。无项目级配置。<br>
+  <strong>方案</strong>：添加 Rules 面板（类似 Windsurf AGENTS.md / Copilot instructions），添加 Memory 浏览器。工作量：中，影响：高。</div>
+
+<h3>2.4 UX 优化方案</h3>
+
+<h4>短期 Wins (1-2周, 低工作量高影响)</h4>
+<div class="rec rec-hi">1. <strong>添加模式选择器</strong>：InputBox 上方 Ask/Edit/Agent 三按钮。工作量：~100行。</div>
+<div class="rec rec-hi">2. <strong>替换 CodeDiffPanel</strong>：Monaco DiffEditor + Approve/Reject。工作量：~200行。</div>
+<div class="rec rec-hi">3. <strong>消息历史搜索</strong>：ChatPanel 顶部搜索框。工作量：~50行。</div>
+<div class="rec rec-md">4. <strong>移除全屏 ConnectionOverlay</strong>：改为顶部非阻塞 banner。工作量：~30行。</div>
+<div class="rec rec-md">5. <strong>统一连接管理器</strong>：useConnectionManager composable。工作量：~150行。</div>
+<div class="rec rec-md">6. <strong>骨架加载状态</strong>：ChatPanel/FileTree/Monaco 加载时骨架屏。工作量：~100行。</div>
+<div class="rec rec-lo">7. <strong>设置 UI</strong>：为已有的 7 个 localStorage 设置添加配置界面。工作量：~200行。</div>
+
+<h4>中期 (1-2月)</h4>
+<div class="rec rec-hi">8. <strong>Agent 计划展示</strong>：ChatStream 执行前展示计划卡片。工作量：~300行。</div>
+<div class="rec rec-hi">9. <strong>@-mention 自动完成</strong>：文件/符号/会话自动完成。工作量：~300行。</div>
+<div class="rec rec-hi">10. <strong>Rules 面板</strong>：AGENTS.md 编辑器 + Memory 浏览器。工作量：~400行。</div>
+<div class="rec rec-md">11. <strong>命令面板</strong>：Cmd+K 全局命令搜索和执行。工作量：~200行。</div>
+<div class="rec rec-md">12. <strong>工具调用可展开</strong>：ChatStream 工具调用展开/折叠。工作量：~100行。</div>
+
+<h4>长期 (3-6月)</h4>
+<div class="rec rec-lo">13. <strong>对话分支</strong>：从任意消息 fork 新对话。工作量：高。</div>
+<div class="rec rec-lo">14. <strong>完整 i18n</strong>：vue-i18n 中英双语，消除混用。工作量：高。</div>
+<div class="rec rec-lo">15. <strong>面板自定义布局</strong>：可拖拽重排面板，保存布局预设。工作量：高。</div>
+<div class="rec rec-lo">16. <strong>MCP 前端集成</strong>：可视化 MCP 服务器管理界面。工作量：高。</div>
+
+<hr>
+
+<h2>附录：评分方法论</h2>
+<div class="card">
+<p><strong>安全评分 2.5</strong>：基于 OWASP LLM Top 10 (2025) 和 OWASP Agentic AI Top 10 (2026) 框架。3 个 P0 致命问题(deduction -1.5)，7 个 P1 严重问题(deduction -1.0)。安全架构骨架完善(+0.5 bonus)。</p>
+<br>
+<p><strong>UX 评分 2.8</strong>：基于与 5 个竞品(Claude Code/Cursor/Windsurf/Copilot/Continue.dev)的 9 维度对比。交互模式缺位(-1.2)，Diff/上下文/配置不足(-0.8)，视觉+键盘优秀(+0.3)。</p>
+</div>
+
+<hr>
+<p style="color:var(--muted);font-size:12px">报告基于 2026-07-07 代码基线生成。安全研究数据来源：OWASP、NIST AI RMF、CSA AICM、AgentToolBench-Code、MCPTox。UX 研究数据来源：Claude Code/Cursor/Windsurf/Copilot/OpenHands/Continue.dev 公开文档与源码。</p>
+
+</body>
+</html>

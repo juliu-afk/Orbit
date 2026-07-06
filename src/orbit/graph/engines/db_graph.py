@@ -157,7 +157,9 @@ class DbGraphEngine(GraphEngineBase):
         node = await self.find_node_by_name(DbNode, table_name)
         if node is None:
             return []
-        return node.meta.get("foreign_keys", [])  # type: ignore[no-any-return]
+        result = node.meta.get("foreign_keys", [])
+        assert isinstance(result, list), f"DB foreign_keys 应为 list 类型，实际 {type(result)}"
+        return result
 
     async def get_tables(self) -> list[str]:
         """获取所有表名。"""

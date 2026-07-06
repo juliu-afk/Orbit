@@ -94,10 +94,13 @@ class FeedbackEngine:
     );
     """
 
-    def __init__(self, collector: Any | None = None) -> None:
+    def __init__(self, collector: object | None = None) -> None:
         from orbit.observability.trajectory import TrajectoryCollector
 
-        self._collector = collector if collector is not None else TrajectoryCollector(db_path=":memory:")
+        self._collector: TrajectoryCollector = (
+            collector if collector is not None
+            else TrajectoryCollector(db_path=":memory:")
+        )
 
     # ── 公开接口 ─────────────────────────────────
 
@@ -149,7 +152,7 @@ class FeedbackEngine:
     @property
     def _db_path(self) -> str:
         """从 collector 获取 DB 路径——feedback_results 与 trajectories 同库."""
-        return self._collector.db_path  # type: ignore[attr-defined]
+        return self._collector.db_path
 
     async def get_last_report(self) -> FeedbackReport | None:
         """读取最近一次分析报告."""

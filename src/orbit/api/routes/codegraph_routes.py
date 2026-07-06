@@ -182,10 +182,6 @@ async def get_graph_data(project_id: str = Query(..., min_length=1)):
         edges = await _code_graph.get_all_edges()
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=500, detail=str(e))
-    except AttributeError:
-        # CodeGraphEngine 可能没有 get_all_nodes/get_all_edges 方法
-        # 回退到直接查询——由 codegraph_routes 内部处理
-        raise HTTPException(status_code=501, detail="CODE_001: 项目未构建代码索引")
 
     if not nodes:
         return {
@@ -252,3 +248,32 @@ async def get_graph_snapshots(project_id: str = Query(..., min_length=1)):
         "data": {"snapshots": []},
         "message": "ok",
     }
+
+
+class BuildRequest(BaseModel):
+    directory: str
+
+
+@router.post("/build")
+async def build_code_index(body: BuildRequest):
+    """手动触发代码图谱索引构建——解析指定目录下所有 .py 文件。
+
+    WHY 手动触发：启动时构建的目录是 exe 所在路径，用户打开项目后
+    需重新索引到实际项目目录。该端点提供按需构建入口。
+    """
+    if _code_graph is None:
+        raise HTTPException(status_code=503, detail="CodeGraph not available")
+
+    import os
+    if not os.path.isdir(body.directory):
+        raise HTTPException(status_code=400, detail=f"目录不存在: {body.directory}")
+
+    try:
+        count = await _code_graph.build_index(body.directory)
+        return {
+            "code": 0,
+            "data": {"files_parsed": count, "directory": body.directory},
+            "message": f"已索引 {count} 个 Python 文件",
+        }
+    except Exception:
+        raise HTTPException(status_code=500, detail="索引构建失败，请检查目录是否有效")

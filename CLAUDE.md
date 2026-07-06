@@ -1,8 +1,8 @@
 # Orbit — 核心规则
 
 > 轻量级多 Agent 软件开发自循环系统。
-> 自研调度框架，替代 CrewAI 等黑盒框架。六图谱（代码/数据库/配置/知识/元图谱/文档）+ 9 层防幻觉体系 + 毫秒级熔断。
-> 当前阶段：**编码阶段**。24 个源码模块已落地，持续迭代中。
+> 自研调度框架，替代 CrewAI 等黑盒框架。五图谱体系（3 引擎：代码/数据库/配置 + 知识图谱 + 元图谱）+ 9 层防幻觉体系 + 毫秒级熔断。
+> 当前阶段：**覆盖率冲刺**。45 个源码模块已落地，覆盖率 69%→80% 进行中。
 
 ## 文档索引
 
@@ -24,33 +24,40 @@
 
 ## 术语定义
 
-**核心模块**（`src/orbit/` 下已实现的 24 个模块）：
-- `scheduler/` — 调度器状态机、Agent 角色编排
-- `graph/` — 六图谱统一存储与查询（CodeGraph SQLite）
-- `hallucination/` — L1-L8 八层防幻觉（熵监控/双向合约/配置漂移检测等）
+**核心模块**（`src/orbit/` 下已实现的 45 个模块）：
+- `scheduler/` — 调度器状态机 + DAG + 离线调度 + 编辑稳定性检测
+- `graph/` — 图谱引擎（代码/数据库/配置 + 元图谱 12 种跨图谱关系）
+- `hallucination/` — L1-L8 八层防幻觉纵深防御
+- `compliance/` — L9 动态合规验证（规则引擎 + 知识时效性检查）
 - `sandbox/` — Docker 代码片段隔离执行
 - `checkpoint/` — 检查点管理（保存/回滚）
-- `agents/` — Agent 工厂 + 角色定义（base, clarifier, context, factory）
-- `gateway/` — LiteLLM 网关
-- `knowledge/` — 知识库管理
-- `communication/` — 消息总线 + 协议
-- `compliance/` — 合规规则引擎
-- `observability/` — OpenTelemetry + structlog
-- `api/` — FastAPI 路由 + Pydantic 模型
-- 以及 `backup/`, `context/`, `core/`, `events/`, `infrastructure/`, `projects/`, `resource_guard/`, `sessions/`, `sharding/`, `tools/`, `versioning/`, `ws/`
+- `agents/` — Agent 工厂 + 10 角色（base/chatter/clarifier/context/dream/factory/mcts/preact/react_agent/reflection）
+- `gateway/` — LiteLLM 网关 + 三层模型路由（T1/T2/T3）+ 降级
+- `knowledge/` — 知识图谱（SQLite + BGE 向量搜索 + TF-IDF 降级 + MCP）
+- `modes/` — 交互协议层（architect/clarify/review + 三维度评分 + 模式可见性）
+- `memory/` — 分层记忆（情节/画像/决策日志/SCOPE 双流）
+- `evolution/` — 自我进化（GEPA Prompt 进化 + SCOPE + 自蒸馏 + ANCHOR 对齐）
+- `context/` — 上下文预构建体系（5 prebuilder + 7 builder + 5 scanner）
+- `compression/` — Token 预算追踪 + 上下文压缩
+- `communication/` — Agent 消息总线（4 模式 + 幂等 + 熔断传播）
+- `observability/` — OpenTelemetry + 审计 + 反馈引擎 + 轨迹收集
+- `metacognition/` — 元认知监控层（次级 Monitor Agent）
+- `api/` — FastAPI 路由（31 个端点文件）+ Pydantic 模型
+- `compose/` — 多 Agent 编排 + 6×SKILL.md 方法论注入
+- 以及 `actors/`, `backup/`, `brief/`, `cli/`, `dream/`, `events/`, `files/`, `goal/`, `goal_judge/`, `integration/`, `loop/`, `lsp/`, `projects/`, `prompt/`, `resource_guard/`, `review/`, `router/`, `security/`, `sessions/`, `sharding/`, `stream/`, `tools/`, `versioning/`, `worktree/`, `ws/`, `core/`, `infrastructure/`
 
 **核心模型**：`Task`、`AgentRole`、`Checkpoint`、`GraphSnapshot`、`AuditEntry`、`CostRecord`。
 
 **核心概念**：
-- **六图谱**：代码图谱（Tree-sitter）+ 数据库图谱（DDL/MVCC）+ 配置图谱（.env/Nginx/docker-compose）+ 知识图谱（外挂领域知识）+ 元图谱（跨图谱关系）+ 文档图谱，统一存 CodeGraph SQLite
-- **9 层防幻觉**：L1 静态校验 / L2 动态追踪 / L3 熵监控 / L4 沙箱执行 / L5 合约验证 / L6 双向合约定向 / L7 形式化验证（Z3）/ L8 配置漂移检测 / L9 动态合规验证
+- **五图谱体系**：3 引擎（代码图谱 Tree-sitter / 数据库图谱 DDL+MVCC / 配置图谱 .env+Nginx+docker-compose）+ 知识图谱（外挂领域知识 + BGE 语义搜索）+ 元图谱（12 种跨图谱关系：READS_FROM/WRITES_TO/DEPENDS_ON/REFERENCES 等），统一存 CodeGraph SQLite。注：文档图谱仅存在于设计文档，未实现代码
+- **9 层防幻觉**：L1 静态校验 / L2 动态追踪 / L3 熵监控 / L4 类型检查 / L5 Z3 形式化 / L6 合约验证 / L7 沙箱执行 / L8 配置漂移检测 / L9 动态合规验证
 - **熔断**：Token 计数器 + 延迟阈值，超限即熔断回滚到上一检查点
 
 ## 技术栈
 
 | 层级 | 组件 |
 |------|------|
-| 主语言 | Python 3.14 |
+| 主语言 | Python 3.11+ |
 | 包管理 | Poetry 1.8.2 |
 | LLM 网关 | LiteLLM >=1.40 |
 | API | FastAPI + Pydantic v2 + Uvicorn |
@@ -64,25 +71,35 @@
 
 ```
 Orbit/
-├── src/orbit/                     # 主源码（24 个模块）
-│   ├── scheduler/                 # 调度器状态机
-│   ├── graph/                     # 六图谱（code/database/config/knowledge/meta/document）
-│   ├── hallucination/             # L1-L8 防幻觉
+├── src/orbit/                     # 主源码（45 个模块）
+│   ├── scheduler/                 # 调度器状态机 + DAG + 离线调度
+│   ├── graph/                     # 图谱引擎（代码/数据库/配置 + 元图谱）
+│   ├── hallucination/             # L1-L8 防幻觉纵深防御
+│   ├── compliance/                # L9 动态合规验证
 │   ├── sandbox/                   # Docker 隔离执行
 │   ├── checkpoint/                # 检查点管理
-│   ├── agents/                    # Agent 工厂
-│   ├── gateway/                   # LiteLLM 网关
-│   ├── knowledge/                 # 知识库
-│   ├── api/                       # FastAPI 路由
-│   ├── communication/             # 消息总线
-│   ├── compliance/                # 合规引擎
-│   ├── observability/             # 遥测
-│   └── (backup/ context/ core/ events/ infrastructure/ projects/
-│        resource_guard/ sessions/ sharding/ tools/ versioning/ ws/)
+│   ├── agents/                    # Agent 工厂 + 10 角色
+│   ├── gateway/                   # LiteLLM 网关 + 三层模型路由
+│   ├── knowledge/                 # 知识图谱 + BGE 向量语义搜索
+│   ├── modes/                     # 交互协议层（architect/clarify/review）
+│   ├── memory/                    # 分层记忆（情节/画像/决策日志）
+│   ├── evolution/                 # 自我进化（GEPA + SCOPE + 蒸馏）
+│   ├── context/                   # 上下文预构建体系
+│   ├── compression/               # Token 预算 + 上下文压缩
+│   ├── communication/             # 消息总线 + 协议
+│   ├── observability/             # OTEL + 审计 + 反馈引擎
+│   ├── metacognition/             # 元认知监控层
+│   ├── api/                       # FastAPI 路由（31 端点文件）
+│   ├── compose/                   # 多 Agent 编排 + 技能
+│   └── (actors/ backup/ brief/ cli/ dream/ events/ files/ goal/
+│        goal_judge/ integration/ loop/ lsp/ projects/ prompt/
+│        resource_guard/ review/ router/ security/ sessions/
+│        sharding/ stream/ tools/ versioning/ worktree/ ws/
+│        core/ infrastructure/)
 ├── backend/                       # PyInstaller 打包配置 + static/
 ├── frontend/src/                  # Vue3 驾驶舱
-│   ├── views/                     # 页面
-│   ├── components/                # 通用组件（alerts/ audit/ charts/ chat/ dag/ ops/）
+│   ├── views/                     # Boot / Dashboard / TerminalShell
+│   ├── components/                # 20+ 组件目录（chat/ audit/ charts/ dag/ ops/…）
 │   ├── composables/               # 组合式函数
 │   ├── stores/                    # Pinia 状态
 │   └── router/                    # Vue Router
@@ -132,7 +149,7 @@ Orbit/
 | 冒烟测试 | `pytest tests/e2e/ -q --tb=short -k "smoke"` | ≤2min |
 | 回归测试 | `pytest tests/e2e/ -q --tb=short` | ≤10min |
 
-覆盖率目标：调度器/防幻觉纯函数 100%，Service 模块 ≥95%，CI 门禁 ≥95%。
+覆盖率目标：调度器/防幻觉纯函数 100%，Service 模块 ≥80%（当前 69%，冲刺中），CI 门禁 ≥80%。
 
 ## 行为拦截清单
 

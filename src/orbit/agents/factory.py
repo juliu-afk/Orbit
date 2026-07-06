@@ -287,7 +287,7 @@ class AgentFactory:
 
         # G1: 注入 mode 行为配置——不影响现有逻辑
         # mode=None 时 Agent 沿用内置默认行为
-        agent._mode = mode  # type: ignore[attr-defined]
+        agent._mode = mode
         return agent
 
     @classmethod

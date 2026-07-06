@@ -159,7 +159,8 @@ class CheckpointManager:
         if self.redis is None:
             return self._memory_store.get(key)
         try:
-            return await self.redis.get(key)  # type: ignore[no-any-return]
+            assert self.redis is not None, "Redis 连接未初始化"
+            return await self.redis.get(key)  # type: ignore[no-any-return]  # redis-py 返回类型不完整
         except Exception as e:
             logger.warning("redis_load_failed", key=key, error=str(e))
             return self._memory_store.get(key)
@@ -200,7 +201,8 @@ class CheckpointManager:
         WHERE checkpoints.version < EXCLUDED.version
         """
         try:
-            await self.pg.execute(  # type: ignore[union-attr]
+            assert self.pg is not None, "PostgreSQL 连接未初始化"
+            await self.pg.execute(
                 query,
                 task_id,
                 data.state,
@@ -220,7 +222,8 @@ class CheckpointManager:
     async def _load_from_pg(self, task_id: str) -> CheckpointData | None:
         query = "SELECT state, retry_count, progress, context, updated_at, version FROM checkpoints WHERE task_id = $1"
         try:
-            row = await self.pg.fetchrow(query, task_id)  # type: ignore[union-attr]
+            assert self.pg is not None, "PostgreSQL 连接未初始化"
+            row = await self.pg.fetchrow(query, task_id)
         except Exception as e:
             logger.warning("pg_load_failed", task_id=task_id, error=str(e))
             return None

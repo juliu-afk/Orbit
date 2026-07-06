@@ -187,8 +187,8 @@ class ReActAgent(BaseAgent):
                                 line += f" ({d.rationale[:120]})"
                             lines.append(line)
                         decision_history_block = "\n".join(lines)
-        except Exception:
-            logger.debug("decision_query_failed", exc_info=True)  # fail-open
+        except Exception:  # fail-open: 决策日志查询失败不影响主流程
+            logger.debug("decision_query_failed", exc_info=True)
 
         # 1. 构建 system prompt——按角色裁剪工具列表
         # WHY list_for_role: Clarifier 不应看到 exec_command，缩小攻击面+减少 prompt 噪音

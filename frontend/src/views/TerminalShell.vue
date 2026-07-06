@@ -66,6 +66,10 @@ function onSessionSwitched(_sessionId: string) {
 }
 
 function gridAreas():string{ const cols=settings.fileTreeLeft?"filetree chat right":"chat right filetree"; return `"${cols}" "statusbar statusbar statusbar"` }
+// WHY 行内样式计算: CSS 选择器覆盖不了 inline style，必须在这里响应折叠状态
+const gridColumns = () => shell.showFileTree
+  ? `var(--spacing-filetree) 1fr var(--spacing-right-panel)`
+  : `0 1fr var(--spacing-right-panel)`
 
 watch(()=>session.currentSessionId,(n)=>{if(n)chat.connectChatWs(n,session.currentProjectName||"")})
 function onKeydown(e:KeyboardEvent){ if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();shell.toggleFileTree()}; if((e.metaKey||e.ctrlKey)&&e.key==='/'){e.preventDefault();showShortcuts.value=!showShortcuts.value}; if(e.key==='Escape'){shell.closeAllDrawers();if(shell.showMonaco)shell.closeFileReview()} }
@@ -80,7 +84,7 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
 </script>
 
 <template>
-<div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{gridTemplateAreas:gridAreas(),gridTemplateColumns:`var(--spacing-filetree) 1fr var(--spacing-right-panel)`}" @contextmenu.prevent>
+<div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{gridTemplateAreas:gridAreas(),gridTemplateColumns:gridColumns()}" @contextmenu.prevent>
   <div v-show="shell.showFileTree" class="resize-handle resize-left" @pointerdown="handleLeftResize" />
   <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto"><FileTreePanel :tree-data="fileTree" :selected-file="shell.selectedFile" @select-file="onSelectFile" /></aside>
   <main class="panel-center flex flex-col overflow-hidden">

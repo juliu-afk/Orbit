@@ -121,8 +121,9 @@ class SessionRegistry:
         )
 
     # WHY COALESCE: 优先用 sessions 表自己的 local_path（新），回退到 projects 表（旧数据兼容）
+    # WHY effective_path 别名: 避免与 s.* 中 local_path 列名冲突导致 row["local_path"] 取到空值
     _SELECT_SQL = (
-        "SELECT s.*, COALESCE(NULLIF(s.local_path, ''), p.local_path, '') as local_path "
+        "SELECT s.*, COALESCE(NULLIF(s.local_path, ''), p.local_path, '') as effective_path "
         "FROM sessions s "
         "LEFT JOIN projects p ON s.project_name = p.name "
     )
@@ -319,14 +320,12 @@ class SessionRegistry:
 
     @staticmethod
     def _row_to_session(row: sqlite3.Row) -> SessionRecord:
-        local_path = ""
-        local_path = (
-            (row["local_path"] or "") if "local_path" in row else ""
-        )  # 存量 session 无 local_path 列
+        # WHY effective_path: COALESCE 结果，避免与 s.* 中 local_path 列名冲突
+        lp = (row["effective_path"] or "") if "effective_path" in row.keys() else (row["local_path"] or "")
         return SessionRecord(
             session_id=row["id"],
             project_name=row["project_name"] or "",
-            local_path=local_path,
+            local_path=lp,
             title=row["title"] or "",
             status=row["status"] or "active",
             created_at=row["created_at"] or 0.0,

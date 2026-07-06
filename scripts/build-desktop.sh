@@ -34,6 +34,8 @@ rm -rf backend/static/assets
 cp -r frontend/dist/* backend/static/
 
 echo "=== 3. PyInstaller 编译后端 ==="
+# WHY 清 __pycache__: 残留旧 .pyc 会污染 PyInstaller 构建，导致运行时行为与源码不一致
+find "$ROOT/src" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 rm -rf backend/build
 cd backend
 python -m PyInstaller orbit.spec --distpath ../Deliverables --workpath build --noconfirm

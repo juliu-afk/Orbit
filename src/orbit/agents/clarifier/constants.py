@@ -2,9 +2,13 @@
 
 CLARIFIER_SYSTEM_PROMPT: 领域适配 + 澄清维度 + 输出格式（注入 _build_prompt）。
 _OBSERVABLE_VERBS / _PLACEHOLDER_WORDS: V1-V3 校验用常量。
+
+导入方向: constants → scheduler/clarifier（单向，无循环依赖）。
+scheduler/clarifier.py 不导入 agents/clarifier 任何模块——CONTRADICTION_PAIRS 在
+ClarificationEngine 类属性中定义，constants 模块仅引用该属性。
 """
 
-from orbit.scheduler.clarifier import ClarificationEngine
+from orbit.scheduler.clarifier import ClarificationEngine  # 单向依赖——安全
 
 # ---- System Prompt（PRD 定义全文，领域适配 + 澄清维度 + 输出格式） ----
 

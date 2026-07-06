@@ -4,6 +4,7 @@
 Orbit 简化为 5 层: agent_role → tool_category → path_scope → sandbox → global_deny。
 """
 
+from orbit.security.constants import SENSITIVE_FILE_GLOB, SENSITIVE_FILE_NAMES  # noqa: F401
 from orbit.security.guard import WorkspaceGuard
 from orbit.security.models import PermissionLayer, SecurityPolicy
 from orbit.security.permission import PermissionEngine
@@ -13,6 +14,8 @@ __all__ = [
     "BashValidators",
     "PermissionEngine",
     "PermissionLayer",
+    "SENSITIVE_FILE_GLOB",
+    "SENSITIVE_FILE_NAMES",
     "SecurityPolicy",
     "WorkspaceGuard",
 ]

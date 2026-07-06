@@ -260,11 +260,11 @@ class TestAuthCoverage:
     """verify_stream_token 鉴权 + _is_public_path 公开路径判定。"""
 
     def test_verify_stream_token_correct(self):
-        """正确 token → 返回 token 字符串。"""
+        """正确 token → 返回 token 字符串（P1-1: Header 优先）。"""
         from orbit.api.dependencies import verify_stream_token
         from orbit.core.config import settings
 
-        result = verify_stream_token(token=settings.ORBIT_AUTH_TOKEN)
+        result = verify_stream_token(token_header=settings.ORBIT_AUTH_TOKEN)
         assert result == settings.ORBIT_AUTH_TOKEN
 
     def test_verify_stream_token_wrong(self):
@@ -274,7 +274,7 @@ class TestAuthCoverage:
         from orbit.api.dependencies import verify_stream_token
 
         with pytest.raises(HTTPException) as exc_info:
-            verify_stream_token(token="wrong-token")
+            verify_stream_token(token_header="wrong-token")
         assert exc_info.value.status_code == 403
 
     def test_verify_stream_token_empty(self):
@@ -284,7 +284,8 @@ class TestAuthCoverage:
         from orbit.api.dependencies import verify_stream_token
 
         with pytest.raises(HTTPException) as exc_info:
-            verify_stream_token(token="")
+            # P1-1: 无 Header 也无 Query → 403
+            verify_stream_token(token_header=None, token_query=None)
         assert exc_info.value.status_code == 403
 
     @pytest.mark.parametrize(

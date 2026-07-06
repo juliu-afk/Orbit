@@ -3,8 +3,15 @@
 
  * 流式连接逻辑见 composables/useAgentStream.ts。
  */
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAgentStream } from '@/composables/useAgentStream'
+
+// UX-12: 工具调用展开/折叠状态
+const expandedTools = ref<Set<string>>(new Set())
+function toggleTool(id: string) {
+  if (expandedTools.value.has(id)) expandedTools.value.delete(id)
+  else expandedTools.value.add(id)
+}
 
 const props = withDefaults(defineProps<{
   agentId: string
@@ -40,8 +47,12 @@ onUnmounted(() => { cancel() })
 
     <div class="message-list">
       <div v-for="msg in messages" :key="msg.id" :class="['message', msg.role]">
-        <span class="msg-type">{{ msg.type }}</span>
-        <pre class="msg-content">{{ msg.content }}</pre>
+        <!-- UX-12: 工具调用可展开 -->
+        <div v-if="msg.type === 'tool_call' || msg.type === 'tool_result'" class="tool-header" @click="toggleTool(msg.id)">
+          <span class="msg-type">{{ msg.type }}</span>
+          <span class="tool-toggle">{{ expandedTools.has(msg.id) ? '▾' : '▸' }}</span>
+        </div>
+        <pre v-if="msg.type !== 'tool_call' && msg.type !== 'tool_result' || expandedTools.has(msg.id)" class="msg-content">{{ msg.content }}</pre>
       </div>
 
       <div v-if="currentText" class="message assistant streaming">
@@ -68,6 +79,9 @@ onUnmounted(() => { cancel() })
 .message.assistant { background: #1a2a3a; color: #b0c4de; }
 .message.tool { background: #1a1a2a; color: #888; font-size: 12px; }
 .message.streaming { border-left: 2px solid #4caf50; }
+/* UX-12: 工具调用可展开 */
+.tool-header { display:flex;align-items:center;gap:4px;cursor:pointer }
+.tool-toggle { font-size:10px;color:#666 }
 .msg-type { font-size: 10px; color: #666; text-transform: uppercase; margin-bottom: 2px; display: block; }
 .msg-content { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; }
 .cursor { animation: blink 1s step-end infinite; color: #4caf50; }

@@ -299,6 +299,17 @@ _review_service = ReviewService(_review_session_factory)
 _ws_dir = settings.WORKSPACE_DIR or os.getcwd()  # P0-7: 优先使用配置
 _file_service = FileService(_ws_dir)
 
+# ── OrbitWiring: 五大能力集成接线（Phase F）──
+# WHY 在 main.py 初始化: wiring 需要 event_bus（HITL）+ db_path（持久化），
+# 这些依赖仅在框架组装层可用。configure_wiring() 替换模块级懒初始化。
+_orbit_data_dir = Path(os.environ.get("ORBIT_HOME", os.getcwd())) / "data"
+from orbit.integration.wiring import configure_wiring  # noqa: E402
+
+_wiring = configure_wiring(
+    db_path=str(_orbit_data_dir / "orbit_wiring.db"),
+    event_bus=_event_bus,
+)
+
 importlib.import_module("orbit.api.routes.review").set_review_service(_review_service)
 importlib.import_module("orbit.api.routes.files_routes").set_file_service(_file_service)
 importlib.import_module("orbit.api.routes.git_routes").set_workspace_dir(_ws_dir)
@@ -418,12 +429,11 @@ async def _app_lifespan(app: FastAPI) -> None:
     except Exception:
         logger.exception("mcp_init_failed")
 
-    # 执行轨迹收集器——供 FeedbackEngine 分析使用
-    from orbit.observability.trajectory import TrajectoryCollector
-
-    _trajectory_collector = TrajectoryCollector(db_path="data/trajectories.db")
-    app.state.trajectory_collector = _trajectory_collector
-    logger.info("trajectory_collector_initialized", db_path="data/trajectories.db")
+    # 执行轨迹收集器——由 OrbitWiring 统一管理（Phase F）
+    # WHY 不独立创建: wiring 内部已含 TrajectoryCollector + EpisodicMemory + DistillationEngine，
+    # 独立创建会导致双实例、双 DB、轨迹数据分裂。
+    app.state.trajectory_collector = _wiring._get_trajectory()
+    logger.info("orbit_wiring_lifespan_ready", db_path=str(_orbit_data_dir / "orbit_wiring.db"))
 
     # G2: 代码图谱索引构建——Stage 2 符号存在性查询的数据源
     # WHY 启动时构建: 图谱查询是 Stage 2 核心操作，空索引会让 exists() 永远返回 False。

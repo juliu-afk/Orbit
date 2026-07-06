@@ -31,9 +31,11 @@ from orbit.agents.base import AgentRole, BaseAgent
 from orbit.agents.chatter import ChatterAgent
 from orbit.agents.clarifier import ClarifierAgent
 from orbit.agents.dream_agent import DreamAgent
+from orbit.agents.preact import PreActEngine
 from orbit.agents.react_agent import ReActAgent
 from orbit.agents.reflection import ReflectionEngine
 from orbit.knowledge.templates import get_registry
+from orbit.metacognition.vigil import VigilSelfHealer
 from orbit.prompt.ponytail_rules import determine_mode, get_ladder
 
 logger = structlog.get_logger("orbit.agents.factory")
@@ -212,6 +214,8 @@ class AgentFactory:
         goal: Goal | None = None,  # Phase 4 AC-B1: Goal
         goal_judge: GoalJudge | None = None,  # Phase 4 AC-B1: GoalJudge
         reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
+        preact_engine: PreActEngine | None = None,  # Phase D: PreAct 预测规划
+        vigil_healer: VigilSelfHealer | None = None,  # Phase D: VIGIL 自愈运行时
         mode: ModeConfig | None = None,  # G1: Mode File System——注入行为配置
     ) -> BaseAgent:
         """create = get_agent alias for orchestrator."""
@@ -220,6 +224,7 @@ class AgentFactory:
             event_bus=event_bus, goal=goal, goal_judge=goal_judge,
             compressor=compressor, budget_tracker=budget_tracker,
             task_keywords=task_keywords, reflection_engine=reflection_engine,
+            preact_engine=preact_engine, vigil_healer=vigil_healer,
             mode=mode,
         )
 
@@ -238,6 +243,8 @@ class AgentFactory:
         budget_tracker: TokenBudgetTracker | None = None,  # Phase 2 AC7
         task_keywords: list[str] | None = None,  # 模板匹配关键词
         reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
+        preact_engine: PreActEngine | None = None,  # Phase D: PreAct
+        vigil_healer: VigilSelfHealer | None = None,  # Phase D: VIGIL
         mode: ModeConfig | None = None,  # G1: Mode File System——注入行为配置
     ) -> BaseAgent:
         """按角色创建 Agent 实例。
@@ -281,6 +288,8 @@ class AgentFactory:
                 budget_tracker=budget_tracker,  # Phase 2 AC7
                 task_keywords=task_keywords,  # 模板匹配关键词
                 reflection_engine=reflection_engine,  # Phase A: ReflAct
+                preact_engine=preact_engine,  # Phase D: PreAct
+                vigil_healer=vigil_healer,  # Phase D: VIGIL 自愈
             )
         else:
             agent = agent_cls(llm=llm, graph=graph, sandbox=sandbox)

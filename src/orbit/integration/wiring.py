@@ -3,18 +3,19 @@
 将 Phase A-E 的独立模块接入 Agent 执行生命周期。
 单文件接线——最小化对 task_runner/factory 的侵入。
 
-用法:
-    wiring = OrbitWiring()
-    # task start
+框架级初始化:
+    from orbit.integration.wiring import configure_wiring
+    configure_wiring(db_path="data/orbit_wiring.db", event_bus=_event_bus)
+
+运行时用法:
+    wiring = get_wiring()
     wiring.on_task_start(task_id, goal, project_id)
-    # task end
-    wiring.on_task_end(task_id, outcome, quality_score)
-    # agent created
-    enhanced_prompt = wiring.enhance_prompt(base_prompt, category, keywords)
-    # record event
-    wiring.record_event(task_id, title, outcome, tags)
-    # periodic
-    await wiring.maybe_distill()
+    wiring.load_profile(project_id)              # 加载用户画像
+    wiring.start_monitor(task_id, goal)          # 启动 Monitor + HITL
+    wiring.feed_monitor(task_id, event_dict)     # 推送事件到 Monitor
+    wiring.record_event(task_id, title, outcome, tags)  # 情节记忆
+    wiring.enhance_prompt(base_prompt, category, keywords)  # 策略+Agentic注入
+    await wiring.maybe_distill()                # 每N任务离线蒸馏
 """
 
 from __future__ import annotations
@@ -23,7 +24,9 @@ import asyncio
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from orbit.events.bus import EventBus
     from orbit.agents.react_agent import ReActAgent
+    from orbit.memory.profile import UserProfile
 
 import structlog
 
@@ -36,8 +39,11 @@ DISTILL_EVERY_N_TASKS = 10
 class OrbitWiring:
     """全模块集成接线器——单例，懒初始化所有可选组件。
 
-    用法:
-        wiring = OrbitWiring(db_path="orbit_wiring.db")
+    框架级初始化（main.py）:
+        configure_wiring(db_path="data/orbit_wiring.db", event_bus=_event_bus)
+
+    运行时用法:
+        wiring = get_wiring()
         wiring.on_task_start("t1", "audit AR", "client_001")
         wiring.record_event("t1", "AR cutoff error", "rejected", ["audit","AR"])
         wiring.on_task_end("t1", "completed", 0.85)
@@ -48,6 +54,10 @@ class OrbitWiring:
     def __init__(self, db_path: str = ":memory:") -> None:
         self._db_path = db_path
         self._task_count = 0
+        self._event_bus: EventBus | None = None  # main.py 注入——供 HITLManager 使用
+
+        # Monitor 事件队列——task_id → asyncio.Queue
+        self._monitor_queues: dict[str, asyncio.Queue] = {}
 
         # 懒初始化组件
         self._trajectory: object | None = None
@@ -95,6 +105,30 @@ class OrbitWiring:
                             importance=imp, tags=tags or [])
             logger.debug("event_recorded", task_id=task_id, title=title[:60])
 
+    def feed_monitor(self, task_id: str, event: dict) -> None:
+        """向 Monitor 队列推送事件——react_agent 在 TOOL_RESULT/TURN_START 后调用。
+
+        fail-open: 队列满或不存在时静默丢弃。
+        """
+        q = self._monitor_queues.get(task_id)
+        if q is None:
+            return
+        try:
+            q.put_nowait(event)
+        except asyncio.QueueFull:
+            logger.debug("monitor_queue_full", task_id=task_id)
+
+    def load_profile(self, project_id: str) -> UserProfile | None:
+        """加载用户画像——task_runner 在任务开始时调用。
+
+        Returns:
+            UserProfile 或 None（项目无画像时）。
+        """
+        ps = self._get_profile()
+        if ps:
+            return ps.get_profile(project_id)
+        return None
+
     def enhance_prompt(self, base_prompt: str, category: str = "",
                        keywords: list[str] | None = None) -> str:
         """增强 system prompt——注入策略原则 + Agentic 建议。"""
@@ -133,8 +167,15 @@ class OrbitWiring:
             return
 
         # 规则蒸馏
+        anchor = self._get_anchor()
         for t in completed[:10]:
             exported = tc.export_for_training(t["trajectory_id"])
+            # ANCHOR: 蒸馏前检查——拒绝不适合提炼的轨迹
+            if anchor:
+                verdict = anchor.check_before_distill(exported)
+                if verdict.verdict == "rejected":
+                    logger.debug("anchor_reject_distill", traj_id=t.get("trajectory_id",""), reason=verdict.reason)
+                    continue
             de.distill_from_trajectory(exported)
 
         logger.info("distill_triggered", task_count=self._task_count, trajectories=len(completed))
@@ -255,19 +296,31 @@ class OrbitWiring:
         return self._get_mcts()
 
     async def start_monitor(self, task_id: str, goal: str = "") -> asyncio.Task | None:
-        """启动 MonitorAgent 作为独立 asyncio Task。
+        """启动 MonitorAgent 作为独立 asyncio Task——含 HITLManager 接线。
 
         返回 Task 对象——调用方负责在任务结束时 cancel。
         """
         mon = self._get_monitor()
         if mon is None:
             return None
+
+        # 创建 HITLManager——有 event_bus 时接线到前端
+        hitl = None
+        if self._event_bus:
+            try:
+                from orbit.metacognition.hitl import HITLManager
+                hitl = HITLManager(event_bus=self._event_bus)
+            except Exception:
+                logger.debug("hitl_init_failed", exc_info=True)
+
         mon._goal = goal
         mon._task_id = task_id
-        queue: asyncio.Queue = asyncio.Queue()
+        mon._hitl = hitl  # 注入 HITLManager——Monitor CRITICAL 告警可触发人工介入
+
+        queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+        self._monitor_queues[task_id] = queue
         task = asyncio.create_task(mon.run(queue, task_id=task_id))
-        task._monitor_queue = queue  # type: ignore[attr-defined]  # 供主 Agent 推送事件
-        logger.debug("monitor_started", task_id=task_id, goal=goal[:60])
+        logger.debug("monitor_started", task_id=task_id, goal=goal[:60], hitl=hitl is not None)
         return task
 
 
@@ -276,8 +329,35 @@ class OrbitWiring:
 _wiring_instance: OrbitWiring | None = None
 
 
+def configure_wiring(db_path: str, event_bus: EventBus | None = None) -> OrbitWiring:
+    """框架级初始化——main.py 调用，注入依赖。
+
+    替代模块级懒初始化。调用后 get_wiring() 返回已配置的实例。
+
+    Args:
+        db_path: SQLite 数据库路径（持久化轨迹/记忆/策略原则）
+        event_bus: EventBus 实例——供 HITLManager 推送 WS 通知
+
+    Returns:
+        已配置的 OrbitWiring 实例
+    """
+    global _wiring_instance
+    _wiring_instance = OrbitWiring(db_path=db_path)
+    _wiring_instance._event_bus = event_bus
+    # 确保 data 目录存在
+    import os
+    db_dir = os.path.dirname(db_path)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+    logger.info("orbit_wiring_configured", db_path=db_path, has_event_bus=event_bus is not None)
+    return _wiring_instance
+
+
 def get_wiring() -> OrbitWiring:
-    """获取全局 OrbitWiring 单例——懒初始化。"""
+    """获取全局 OrbitWiring 单例。
+
+    如果 configure_wiring() 未被调用，回退到 :memory: 模式（向后兼容）。
+    """
     global _wiring_instance
     if _wiring_instance is None:
         _wiring_instance = OrbitWiring()

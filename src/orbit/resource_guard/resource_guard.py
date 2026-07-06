@@ -105,10 +105,10 @@ class ResourceGuard:
             logger.warning("dependency_blocked", package=package_name, reason=info["reason"])
         return info
 
-    def guard_request(self, task_id: str, estimated_tokens: int = 500) -> GuardResult:
+    async def guard_request(self, task_id: str, estimated_tokens: int = 500) -> GuardResult:
         """请求放行——检查资源预算。"""
         # 1. 全局令牌桶
-        if not self._bucket.allow(estimated_tokens):
+        if not await self._bucket.allow(estimated_tokens):
             return self._deny("TOKEN_BUCKET_EMPTY", level=1)
 
         # 2. 单任务预算

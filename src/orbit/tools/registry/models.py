@@ -73,6 +73,8 @@ class ToolEntry:
     check_fn: Callable[[], bool] | None = None  # 运行时可用性检查
     concurrency: str = "safe"  # "safe" | "serial" | "never_parallel"
     max_result_chars: int = 10000  # >10K → 截断 (AC6b)
+    # P1-7: per-agent 白名单——None=允许全部，[]=拒绝全部
+    allowed_agents: list[str] | None = None
 
 
 # ── 工具调用追踪 ─────────────────────────────────────────

@@ -29,6 +29,13 @@ from orbit.sandbox.executor import (
     SandboxTimeoutError,
 )
 
+# P1-2: Windows AppContainer 隔离——条件导入 pywin32
+try:
+    import pywin32  # noqa: F401
+    _HAS_APPCONTAINER = True
+except ImportError:
+    _HAS_APPCONTAINER = False
+
 logger = structlog.get_logger("orbit.sandbox.process")
 
 
@@ -69,8 +76,31 @@ class ProcessSandbox:
     async def _run_windows(self, code: str) -> str:
         """Windows 进程隔离执行。
 
-        当前实现：subprocess + 临时工作目录 + 环境白名单。
-        WHY 非完整 AppContainer：需 pywin32 依赖，Step 6.3 添加。
+        P1-2: 有 pywin32 时走 AppContainer，无则降级 subprocess。
+        """
+        if _HAS_APPCONTAINER:
+            return await self._run_windows_appcontainer(code)
+        return await self._run_windows_subprocess(code)
+
+    async def _run_windows_appcontainer(self, code: str) -> str:
+        """AppContainer 沙箱执行——需 pywin32。
+
+        TODO(security/P1-2): 实现完整 Windows AppContainer 隔离
+        - 创建 AppContainer profile (CreateAppContainerProfile)
+        - CreateProcess 时绑定 AppContainer SID
+        - 禁止网络访问 (SID: INTERNET_CLIENT / WINAPI_CAPABILITY_INTERNET_CLIENT_SERVER)
+        - 参考: https://learn.microsoft.com/en-us/windows/win32/secauthz/appcontainer-isolation
+        """
+        logger.warning(
+            "appcontainer_not_implemented_fallback_subprocess",
+            code_len=len(code),
+        )
+        return await self._run_windows_subprocess(code)
+
+    async def _run_windows_subprocess(self, code: str) -> str:
+        """subprocess 隔离——CREATE_NO_WINDOW + 临时目录 + 环境白名单。
+
+        当前兜底方案，待 pywin32 就绪后升级为 AppContainer。
         """
         with tempfile.TemporaryDirectory(prefix="orbit-sandbox-") as td:
             script = Path(td) / "code.py"

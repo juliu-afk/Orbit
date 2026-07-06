@@ -317,7 +317,9 @@ class ToolRegistry:
         # 新 API 优先
         entry = self._entries.get(name)
         if entry is not None:
-            # Phase 1 工具不做 per-agent 权限限制——LLM 自行决定调用
+            # P1-7: 新 API 路径也要检查 per-agent 白名单
+            if entry.allowed_agents and agent_name not in entry.allowed_agents:
+                return f"权限拒绝——Agent {agent_name} 不在 {name} 白名单中"
             return await self._dispatch_entry(entry, args)
 
         # 旧 API 回退——走完整权限+限流管线

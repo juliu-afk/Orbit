@@ -20,6 +20,13 @@ from orbit.goal.intake_router import IntakeRouter
 from orbit.goal.memory_tiers import ThreeTierMemory
 from typing import TYPE_CHECKING, Any
 
+from orbit.goal.meta_utils import (
+    _deserialize_spec,
+    _generate_batch_report,
+    _parse_to_goal,
+    _resolve_bases,
+    _topological_layers,
+)
 from orbit.goal.models import (
     GoalBatchReport,
     GoalResult,
@@ -183,7 +190,7 @@ class MetaOrchestrator:
                 # 无 spec 且无 compose_bridge——单任务模式
                 return await self._run_single_task(goal)
 
-            spec = self._deserialize_spec(spec_data)
+            spec = _deserialize_spec(spec_data)
 
             # Goal→Compose: delegate to ComposeOrchestrator when available
             if self.compose_orchestrator:
@@ -195,14 +202,14 @@ class MetaOrchestrator:
                 ok = compose_result.get("status") == "ok"
                 return GoalResult(status="done" if ok else "partial", total_time_seconds=elapsed)
 
-            layers = self._topological_layers(spec.tasks)
+            layers = _topological_layers(spec.tasks)
             previous_merge_shas: dict[str, str] = {}
 
             # 阶段1: 分层调度
             completed_count = 0
             for layer_idx, layer in enumerate(layers):
                 # 解析 base_ref
-                task_bases = self._resolve_bases(layer, previous_merge_shas)
+                task_bases = _resolve_bases(layer, previous_merge_shas)
 
                 # 分配预算
                 budgets = {}
@@ -385,7 +392,7 @@ class MetaOrchestrator:
             return GoalResult(status="failed", reason="批量模式下无有效 Goal")
 
         # 每个文档转为 GoalSession
-        goals = [self._parse_to_goal(doc) for doc in batch_goals]
+        goals = [_parse_to_goal(doc) for doc in batch_goals]
 
         # 依赖分析
         dag = {}
@@ -423,7 +430,7 @@ class MetaOrchestrator:
             status="done" if completed == len(results) else "partial",
             tasks_completed=completed,
             total_tokens=total_tokens,
-            report_path=self._generate_batch_report(results),
+            report_path=_generate_batch_report(results),
         )
 
     # ── 内部: 辅助 ────────────────────────────────────
@@ -477,76 +484,4 @@ class MetaOrchestrator:
                 return True
         return False
 
-    @staticmethod
-    def _generate_batch_report(results: list[GoalResult]) -> str:
-        """生成批量执行报告。"""
-        timestamp = datetime.now(UTC).strftime("%Y-%m-%d-%H%M")
-        path = f"docs/goal-report-{timestamp}.md"
-        logger.info("batch_report_generated", path=path, count=len(results))
-        return path
 
-    @staticmethod
-    def _resolve_bases(
-        layer: list[Any],
-        previous_merges: dict[str, str],
-    ) -> dict[str, str]:
-        """P1-1: 确定每个 task 的 base_ref。"""
-        bases = {}
-        for t in layer:
-            if not t.depends_on:
-                bases[t.id] = "main"
-            else:
-                dep_shas = [previous_merges[d] for d in t.depends_on if d in previous_merges]
-                if not dep_shas:
-                    bases[t.id] = "main"
-                else:
-                    bases[t.id] = dep_shas[-1]
-        return bases
-
-    @staticmethod
-    def _topological_layers(tasks: list[Any]) -> list[list[Any]]:
-        """Kahn 算法按层分组。"""
-        task_map = {t.id: t for t in tasks}
-        in_degree = {t.id: len(t.depends_on) for t in tasks}
-        adj: dict[str, list[str]] = {t.id: [] for t in tasks}
-        for t in tasks:
-            for dep in t.depends_on:
-                if dep in adj:
-                    adj[dep].append(t.id)
-
-        layers = []
-        current = [t for t in tasks if in_degree[t.id] == 0]
-        while current:
-            layers.append(current)
-            nxt = []
-            for t in current:
-                for neighbor in adj.get(t.id, []):
-                    in_degree[neighbor] -= 1
-                    if in_degree[neighbor] == 0:
-                        nxt.append(task_map[neighbor])
-            current = nxt
-
-        if sum(len(l) for l in layers) != len(tasks):
-            remaining = {t.id for t in tasks} - {t.id for l in layers for t in l}
-            raise ValueError(f"环形依赖或不可达节点: {remaining}")
-        return layers
-
-    @staticmethod
-    def _deserialize_spec(spec_data: dict) -> Any:
-        """反序列化 Spec——兼容 dict 和 pydantic。"""
-        try:
-            from orbit.compose.models import Spec, Task
-
-            return Spec(**spec_data)
-        except Exception as e:
-            logger.warning("spec_deserialize_failed", error=str(e)[:200])
-            return spec_data
-
-    @staticmethod
-    def _parse_to_goal(doc: dict) -> GoalSession:
-        """批量文档转 GoalSession。"""
-        return GoalSession(
-            description=doc.get("description", "") or "Untitled Goal",
-            constraints=doc.get("constraints", []),
-            verification_commands=doc.get("verification_commands", []),
-        )

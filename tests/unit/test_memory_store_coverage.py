@@ -153,5 +153,66 @@ class TestScoreBufferFlush:
             store.hit(f"key-{i}", delta=1.0)
         mem = store.read_file(MemoryFileType.EPISODIC)
         for i in range(10):
-            # 每条评分：默认 1.0 + delta 1.0 = 2.0
             assert float(mem.frontmatter[f"score.key-{i}"]) == 2.0
+
+
+# -- 覆盖缺口 --
+
+
+class TestReadForAgent:
+    @pytest.fixture
+    def store(self, tmp_path: Path) -> MemoryStore:
+        return MemoryStore(str(tmp_path))
+
+    def test_read_for_agent_filters_sections(self, store: MemoryStore) -> None:
+        """read_for_agent 按 agent 名称过滤 Section。"""
+        store.write_file(MemoryFileType.EPISODIC,
+            "## Developer\n开发相关记忆\n## QA\n测试相关记忆\n## 通用\n通用记忆")
+        result = store.read_for_agent("Developer")
+        assert "开发相关记忆" in result.body
+        assert "测试相关记忆" not in result.body
+
+    def test_read_for_agent_no_sections(self, store: MemoryStore) -> None:
+        """无 Section 标记时返回全部内容。"""
+        store.write_file(MemoryFileType.EPISODIC, "plain content without sections")
+        result = store.read_for_agent("Developer")
+        assert "plain content" in result.body
+
+
+class TestDecayScores:
+    @pytest.fixture
+    def store(self, tmp_path: Path) -> MemoryStore:
+        return MemoryStore(str(tmp_path))
+
+    def test_decay_scores_reduces_scores(self, store: MemoryStore) -> None:
+        """decay_scores 按因子衰减评分。"""
+        # 先写入一些评分
+        for i in range(5):
+            store.hit(f"topic-{i}", delta=1.0)
+        # 确保缓冲区已刷新
+        store._flush_scores()
+        count = store.decay_scores(factor=0.5)
+        assert count >= 5
+        mem = store.read_file(MemoryFileType.EPISODIC)
+        # 评分应从 2.0 衰减到 1.0
+        assert float(mem.frontmatter["score.topic-0"]) == 1.0
+
+    def test_decay_scores_empty(self, store: MemoryStore) -> None:
+        """无评分时 decay_scores 返回 0。"""
+        count = store.decay_scores()
+        assert count == 0
+
+
+class TestAppendToFileAsync:
+    @pytest.fixture
+    def store(self, tmp_path: Path) -> MemoryStore:
+        return MemoryStore(str(tmp_path))
+
+    @pytest.mark.asyncio
+    async def test_append_async_preserves_content(self, store: MemoryStore) -> None:
+        """异步追加保留已有内容。"""
+        store.write_file(MemoryFileType.NOTES, "existing note")
+        await store.append_to_file_async(MemoryFileType.NOTES, "new async entry")
+        mem = store.read_file(MemoryFileType.NOTES)
+        assert "existing note" in mem.body
+        assert "new async entry" in mem.body

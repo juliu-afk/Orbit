@@ -194,3 +194,56 @@ class TestSpanStatus:
         assert SpanStatus.ERROR == "error"
         assert SpanStatus.TIMEOUT == "timeout"
         assert SpanStatus.IN_PROGRESS == "in_progress"
+
+
+# -- 覆盖缺口 --
+
+
+class TestTraceStoreExtended:
+    """TraceStore 查询方法——get_recent_tasks/cleanup/export_otel_json。"""
+
+    @pytest.fixture
+    def store(self):
+        from orbit.observability.trace import TraceStore
+        return TraceStore(":memory:")
+
+    @pytest.mark.asyncio
+    async def test_get_recent_tasks_empty(self, store):
+        """空数据库 → 返回空列表。"""
+        tasks = await store.get_recent_tasks(limit=5)
+        assert tasks == []
+
+    @pytest.mark.asyncio
+    async def test_cleanup_empty(self, store):
+        """空数据库 cleanup → 返回 0。"""
+        deleted = await store.cleanup(full_days=7, summary_days=30)
+        assert deleted >= 0
+
+    @pytest.mark.asyncio
+    async def test_export_otel_empty(self, store):
+        """空数据库 → OTEL 导出返回 None。"""
+        result = await store.export_otel_json("nonexistent")
+        assert result is None
+
+
+class TestTraceCollectorEdgeCases:
+    """TraceCollector 边缘情况。"""
+
+    def test_end_span_already_ended(self):
+        from orbit.observability.trace import SpanStatus, TraceCollector
+        span = TraceCollector.start_span("t1", component="agent", action="test")
+        TraceCollector.end_span(span, status=SpanStatus.OK)
+        # 第二次 end 不应崩
+        TraceCollector.end_span(span, status=SpanStatus.OK)  # no-op
+
+    def test_start_span_truncation_boundary(self):
+        from orbit.observability.trace import TraceCollector
+        # 恰好 256 字符不应截断
+        exact = "B" * 256
+        span = TraceCollector.start_span("t1", component="x", action="y", input_summary=exact)
+        assert len(span.input_summary) == 256
+
+    def test_start_span_none_input(self):
+        from orbit.observability.trace import TraceCollector
+        span = TraceCollector.start_span("t1", component="x", action="y")
+        assert span.input_summary == ""

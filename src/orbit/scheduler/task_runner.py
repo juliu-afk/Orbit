@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from orbit.compression.compressor import ContextCompressor
     from orbit.gateway.client import LLMClient
     from orbit.goal.intake_router import IntakeRouter
+    from orbit.graph.engines.code_graph import CodeGraphEngine
     from orbit.observability.audit import AuditLogger
     from orbit.tools.registry import ToolRegistry
 
@@ -105,6 +106,7 @@ class TaskRunner:
         tool_registry: ToolRegistry | None = None,
         audit_logger: AuditLogger | None = None,
         router: IntakeRouter | None = None,
+        graph: CodeGraphEngine | None = None,  # G2: 图谱引擎——Stage 2 符号查询
         fast_lane: bool = False,
     ) -> None:
         self._agent_factory = agent_factory
@@ -116,6 +118,7 @@ class TaskRunner:
         self._tool_registry = tool_registry
         self._audit_logger = audit_logger
         self.router = router
+        self._graph = graph  # G2: 图谱引擎
         self._fast_lane = fast_lane
         # 减熵闭环-2: 编辑摇摆检测器（全局单例）
         self._edit_detector = EditStabilityDetector()
@@ -534,6 +537,7 @@ class TaskRunner:
                         store = MemoryStore(project_path=project_path)
                         await agent_context.load_stage(
                             ContextStage.STAGE2,
+                            graph=self._graph,
                             memory_store=store,
                         )
                         logger.info(

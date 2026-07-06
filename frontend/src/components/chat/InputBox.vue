@@ -4,6 +4,9 @@ import { apiGet } from '@/services/api'
 const emit = defineEmits<{ (e: 'send', text: string): void; (e: 'navigate-history', d: -1 | 1): void }>()
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const inputText = ref('')
+// UX-1: 交互模式选择——Ask(提问) / Edit(编辑) / Agent(自主执行)
+const MODES = ['Ask', 'Edit', 'Agent'] as const
+const currentMode = ref<string>('Ask')
 // v0.24: 恢复 apiGet fallback——后端 /api/v1/terminal/commands 可用时动态获取
 const FALLBACK_CMDS = ['/task', '/review', '/dream', '/search', '/help', '/compose']
 const CMDS = ref<string[]>([...FALLBACK_CMDS])
@@ -55,8 +58,14 @@ defineExpose({ focus, setText })
 </script>
 <template>
 <div class="input-box" style="position:relative">
+  <!-- UX-1: 模式选择器——Ask/Edit/Agent -->
+  <div class="mode-bar">
+    <button v-for="m in MODES" :key="m" class="mode-btn" :class="{ active: currentMode === m }" @click="currentMode = m">
+      {{ m === 'Ask' ? '💬' : m === 'Edit' ? '✏️' : '🤖' }} {{ m }}
+    </button>
+  </div>
   <div class="flex items-start gap-2 px-3 py-2">
-    <textarea ref="inputRef" v-model="inputText" class="flex-1 resize-none outline-none" style="background:transparent;border:none;color:var(--color-orbit-text);font-family:var(--font-mono);font-size:13px;line-height:1.6;caret-color:var(--color-orbit-accent)" rows="1" placeholder="/help..." @keydown="onKey" />
+    <textarea ref="inputRef" v-model="inputText" class="flex-1 resize-none outline-none" style="background:transparent;border:none;color:var(--color-orbit-text);font-family:var(--font-mono);font-size:13px;line-height:1.6;caret-color:var(--color-orbit-accent)" rows="1" :placeholder="currentMode === 'Ask' ? 'Ask anything...' : currentMode === 'Edit' ? 'Describe the edit...' : '/help...'" @keydown="onKey" />
   </div>
   <!-- WHY: 斜杠命令补全下拉——自动弹出，Tab/方向键选择，Enter 选中 -->
   <div v-if="showAC && filtered.length > 0" class="ac-dropdown">
@@ -79,4 +88,12 @@ defineExpose({ focus, setText })
 .ac-item:hover, .ac-active {
   background: var(--color-orbit-surface-hover); color: var(--color-orbit-text);
 }
+.mode-bar { display:flex; gap:2px; padding:4px 8px 0 }
+.mode-btn {
+  padding:2px 10px; border:none; border-radius:12px; cursor:pointer; font-size:11px;
+  background:transparent; color:var(--color-orbit-text-secondary); font-family:var(--font-mono);
+  transition: background .15s, color .15s;
+}
+.mode-btn:hover { background:var(--color-orbit-surface-hover); color:var(--color-orbit-text) }
+.mode-btn.active { background:var(--color-orbit-accent); color:#fff }
 </style>

@@ -116,13 +116,25 @@ class TaskContext:
         memory_store: "MemoryStore | None" = None,
     ) -> None:
         """Stage 2: 填充图谱查询结果 (L2) + 工作记忆 (L4)."""
-        # L2: 代码图谱——符号引用（如果 graph 可用且未填充）
+        # L2: 代码图谱——符号存在性查询（如果 graph 可用且未填充）
         if graph is not None and not self.l2:
             try:
-                # 从 L3 提取可能相关的符号名
                 prd_text = self.l3.get("prd", "")
                 if prd_text:
-                    # 轻量查询——只查直接引用的符号，不做全图遍历
+                    # 提取 PRD 中可能的符号名（匹配 snake_case / CamelCase / 中文）
+                    import re as _re
+                    candidates = _re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]{2,})\b', prd_text)
+                    # 去重 + 限制最多 20 个符号，避免查询爆炸
+                    unique = list(dict.fromkeys(candidates))[:20]
+                    symbols_found: list[str] = []
+                    symbols_missing: list[str] = []
+                    for sym in unique:
+                        if await graph.exists(sym):
+                            symbols_found.append(sym)
+                        else:
+                            symbols_missing.append(sym)
+                    self.l2["symbols_found"] = symbols_found
+                    self.l2["symbols_missing"] = symbols_missing
                     self.l2["source"] = "code_graph_stage2"
             except Exception:
                 logger.debug("stage2_graph_skipped", task_id=self.task_id)
@@ -158,8 +170,12 @@ class TaskContext:
                 logger.debug("stage3_memory_skipped", task_id=self.task_id)
 
     def to_dict(self) -> dict[str, Any]:
+        # G2: stage 可能是 ContextStage 或 int（Prebuilder 重建后）。兼容两种。
+        stage_val = self.stage.value if hasattr(self.stage, "value") else int(self.stage)
         raw = {
             "task_id": self.task_id,
+            # G2: stage 字段——LLM 据此感知当前上下文深度（1/2/3）
+            "stage": stage_val,
             "l1": self.l1,
             "l2": self.l2,
             "l3": self.l3,

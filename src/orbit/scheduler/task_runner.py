@@ -485,11 +485,15 @@ class TaskRunner:
             from orbit.context.prebuilder import ContextPrebuilder
             prebuilder = ContextPrebuilder.build_for_role(role)
             pruned = prebuilder.build(agent_context.to_dict())
+            # G2: 保存 stage——重建时 stage 是运行时状态，不应被 prebuilder 覆盖
+            saved_stage = getattr(agent_context, "stage", None)
             # 重建 TaskContext——保持 to_dict() 截断能力
             agent_context = type(agent_context)(**{
                 k: v for k, v in pruned.items()
                 if k in {f.name for f in type(agent_context).__dataclass_fields__.values()}
             })
+            if saved_stage is not None:
+                agent_context.stage = saved_stage
         except Exception:
             logger.debug("prebuilder_failed_fail_open", role=role, exc_info=True)
 

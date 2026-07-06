@@ -95,3 +95,32 @@ class TestTaskShardingEngine:
         # 所有分片应完成
         for s in plan.shards:
             assert s.status == ShardStatus.COMPLETED, f"Shard {s.shard_index} failed: {s.error}"
+
+    # ── 覆盖缺口 ──
+
+    def test_shard_plan_failed_property(self) -> None:
+        """ShardPlan.failed 计算正确（line 65）。"""
+        from orbit.sharding.engine import ShardPlan, ShardResult
+        plan = ShardPlan(
+            parent_task_id="t",
+            shards=[
+                ShardResult(shard_id="0", shard_index=0, content="a", status=ShardStatus.FAILED),
+                ShardResult(shard_id="1", shard_index=1, content="b", status=ShardStatus.COMPLETED),
+            ],
+        )
+        assert plan.failed == 1
+
+    def test_shard_plan_progress_empty(self) -> None:
+        """空分片列表 → progress 返回 0.0（line 70）。"""
+        from orbit.sharding.engine import ShardPlan
+        plan = ShardPlan(parent_task_id="t", shards=[])
+        assert plan.progress == 0.0
+
+    @pytest.mark.asyncio(loop_scope="function")
+    async def test_execute_single_shard_exception(self, engine: TaskShardingEngine) -> None:
+        """单分片执行异常 → FAILED 状态（lines 172-174）。"""
+        from unittest.mock import AsyncMock
+        engine._scheduler.run_task = AsyncMock(side_effect=RuntimeError("boom"))
+        plan = await engine.execute("短需求", "task-exec-err")
+        assert plan.shards[0].status == ShardStatus.FAILED
+        assert "boom" in plan.shards[0].error

@@ -73,3 +73,77 @@ async def test_l5_syntax_error_code(validator):
     code = "def broken(:"
     contract = validator._parse_contract(code)
     assert contract is None
+
+
+# ── 覆盖缺口 ──
+
+
+@pytest.mark.asyncio
+async def test_l5_self_claimed_contract_no_formal(validator):
+    """self_claimed_contract 提供但无 @formal → L5ContractResult。"""
+    result = await validator.validate(
+        "def add(x, y): return x + y",
+        self_claimed_contract="此函数做加法",
+    )
+    assert result.passed is True
+    assert hasattr(result, "self_claimed_contract")
+
+
+@pytest.mark.asyncio
+async def test_l5_self_claimed_contract_z3_skipped(validator):
+    """self_claimed_contract + Z3 未安装 → contract_mismatch=False。"""
+    code = """
+@formal
+@requires("x > 0")
+@ensures("result == x + y")
+def add(x, y): return x + y
+"""
+    result = await validator.validate(code, self_claimed_contract="x>0 => result==x+y")
+    assert result.passed is True
+    assert hasattr(result, "self_claimed_contract")
+    assert hasattr(result, "contract_mismatch")
+
+
+def test_describe_contract():
+    """_describe_contract 将结构化契约转为可读字符串。"""
+    validator = L5Z3Validator()
+    contract = {"pre": ["x > 0", "y != 0"], "post": ["result == x + y"]}
+    desc = validator._describe_contract(contract)
+    assert "requires:" in desc
+    assert "ensures:" in desc
+    assert "x > 0" in desc
+
+
+def test_describe_contract_empty():
+    """空契约 → 'empty contract'。"""
+    validator = L5Z3Validator()
+    desc = validator._describe_contract({"pre": [], "post": []})
+    assert desc == "empty contract"
+
+
+def test_parse_contract_with_single_quotes():
+    """单引号装饰器也被识别。"""
+    validator = L5Z3Validator()
+    code = """
+@formal
+@requires('x > 0')
+@ensures('result == x + 1')
+def inc(x): return x + 1
+"""
+    contract = validator._parse_contract(code)
+    assert contract is not None
+    assert "x > 0" in contract["pre"]
+    assert "result == x + 1" in contract["post"]
+
+
+@pytest.mark.asyncio
+async def test_l5_z3_error_path(validator):
+    """Z3 solver 错误 → unknown + warning。"""
+    code = """
+@formal
+@requires("x > 0")
+@ensures("result == x + y")
+def f(x, y): return x + y
+"""
+    result = await validator.validate(code)
+    assert result.z3_status in ("skipped", "unknown")

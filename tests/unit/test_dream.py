@@ -101,3 +101,52 @@ class TestDreamEngine:
 
         assert _jaccard_similarity("", "") == 0.0
         assert _jaccard_similarity("a", "") == 0.0
+
+
+# ── 覆盖缺口测试 ──
+
+class TestDreamEngineCoverage:
+    """覆盖 _stage_merge 异常路径 + _stage_gather 非空路径。"""
+
+    @pytest.mark.asyncio
+    async def test_stage_merge_llm_exception(self):
+        """LLM 调用异常 → 返回原始内容（lines 139, 152-154）。"""
+        from unittest.mock import AsyncMock
+        from orbit.dream.engine import DreamEngine
+        from orbit.dream.models import DreamConfig
+
+        mock_llm = AsyncMock()
+        mock_llm.generate = AsyncMock(side_effect=RuntimeError("LLM timeout"))
+        engine = DreamEngine(llm_client=mock_llm, config=DreamConfig())
+        result = await engine._stage_merge("test content", 0.3)
+        # 异常被捕获，返回原始内容
+        assert result == "test content"
+
+    def test_stage_gather_with_progress_and_notes(self):
+        """非空 progress 和 notes → 包含在 gathered 中（lines 123, 128）。"""
+        from orbit.dream.engine import DreamEngine
+        from orbit.dream.models import DreamConfig
+        from orbit.memory.models import MemoryFileType
+        from orbit.memory.store import MemoryStore
+
+        store = MemoryStore()
+        store.write_file(MemoryFileType.PROGRESS, "progress body # test", {"type": "progress"})
+        store.write_file(MemoryFileType.NOTES, "notes body # test", {"type": "notes"})
+        engine = DreamEngine(memory_store=store, config=DreamConfig())
+        gathered = engine._stage_gather()
+        assert "progress body" in gathered
+        assert "notes body" in gathered
+
+    @pytest.mark.asyncio
+    async def test_run_exception_path(self):
+        """run() 内部异常 → FAILED 状态（lines 100-102）。"""
+        from unittest.mock import MagicMock
+        from orbit.dream.engine import DreamEngine
+        from orbit.dream.models import DreamConfig
+
+        engine = DreamEngine(config=DreamConfig())
+        # 让 _stage_gather 抛 RuntimeError
+        engine._stage_gather = MagicMock(side_effect=RuntimeError("disk error"))
+        engine._stage_dedup = MagicMock()  # 不会被调用
+        result = await engine.run()
+        assert result.status == "failed"

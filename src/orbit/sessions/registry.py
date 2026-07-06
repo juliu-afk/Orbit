@@ -95,60 +95,55 @@ class SessionRegistry:
 
     # ── Session CRUD ───────────────────────────────────
 
-    def create(self, project_name: str, title: str = "") -> SessionRecord:
+    def create(self, project_name: str, title: str = "", local_path: str = "") -> SessionRecord:
         """创建新 Session。返回带 UUID 的 SessionRecord。"""
         conn = self._get_conn()
         now = time.time()
         session_id = uuid.uuid4().hex  # 32 chars, no dashes
         # WHY 去连字符: 与 TaskStatusResponse.task_id 格式一致，方便前端统一处理
         conn.execute(
-            "INSERT INTO sessions (id, project_name, title, status, created_at, updated_at) "
-            "VALUES (?, ?, ?, 'active', ?, ?)",
-            (session_id, project_name, title, now, now),
+            "INSERT INTO sessions (id, project_name, title, status, created_at, updated_at, local_path) "
+            "VALUES (?, ?, ?, 'active', ?, ?, ?)",
+            (session_id, project_name, title, now, now, local_path),
         )
         conn.commit()
-        logger.info("session_created", session_id=session_id, project=project_name)
+        logger.info("session_created", session_id=session_id, project=project_name, path=local_path)
         return SessionRecord(
             session_id=session_id,
             project_name=project_name,
+            local_path=local_path,
             title=title,
             status="active",
             created_at=now,
             updated_at=now,
         )
 
+    # WHY COALESCE: 优先用 sessions 表自己的 local_path（新），回退到 projects 表（旧数据兼容）
+    _SELECT_SQL = (
+        "SELECT s.*, COALESCE(NULLIF(s.local_path, ''), p.local_path, '') as local_path "
+        "FROM sessions s "
+        "LEFT JOIN projects p ON s.project_name = p.name "
+    )
+
     def get(self, session_id: str) -> SessionRecord | None:
-        """按 ID 查询 Session。LEFT JOIN projects 取 local_path。"""
+        """按 ID 查询 Session。"""
         row = (
             self._get_conn()
-            .execute(
-                "SELECT s.*, p.local_path "
-                "FROM sessions s "
-                "LEFT JOIN projects p ON s.project_name = p.name "
-                "WHERE s.id=?",
-                (session_id,),
-            )
+            .execute(self._SELECT_SQL + "WHERE s.id=?", (session_id,))
             .fetchone()
         )
         return self._row_to_session(row) if row else None
 
     def list_all(self, status: str | None = None) -> list[SessionRecord]:
-        """列出所有 Session，按 updated_at DESC。可选过滤 status。
-        LEFT JOIN projects 取 local_path——区分同名不同路径的项目。
-        """
+        """列出所有 Session，按 updated_at DESC。可选过滤 status。"""
         conn = self._get_conn()
-        base_sql = (
-            "SELECT s.*, p.local_path "
-            "FROM sessions s "
-            "LEFT JOIN projects p ON s.project_name = p.name "
-        )
         if status:
             rows = conn.execute(
-                base_sql + "WHERE s.status=? ORDER BY s.updated_at DESC",
+                self._SELECT_SQL + "WHERE s.status=? ORDER BY s.updated_at DESC",
                 (status,),
             ).fetchall()
         else:
-            rows = conn.execute(base_sql + "ORDER BY s.updated_at DESC").fetchall()
+            rows = conn.execute(self._SELECT_SQL + "ORDER BY s.updated_at DESC").fetchall()
         return [self._row_to_session(r) for r in rows]
 
     def list_by_project(self, project_name: str) -> list[SessionRecord]:
@@ -156,10 +151,7 @@ class SessionRegistry:
         rows = (
             self._get_conn()
             .execute(
-                "SELECT s.*, p.local_path "
-                "FROM sessions s "
-                "LEFT JOIN projects p ON s.project_name = p.name "
-                "WHERE s.project_name=? ORDER BY s.updated_at DESC",
+                self._SELECT_SQL + "WHERE s.project_name=? ORDER BY s.updated_at DESC",
                 (project_name,),
             )
             .fetchall()

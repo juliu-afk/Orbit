@@ -14,11 +14,13 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from orbit.projects.registry import ProjectRegistry
 from orbit.sessions.registry import SessionRegistry
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 _registry = SessionRegistry()
+_projects = ProjectRegistry()
 
 
 # ── Pydantic schemas（API 契约层，不放入 sessions/models.py）──
@@ -29,6 +31,7 @@ class SessionCreateRequest(BaseModel):
 
     project_name: str = Field(..., min_length=1, max_length=200, description="项目名称")
     title: str = Field("", max_length=100, description="会话标题，可选")
+    local_path: str = Field("", max_length=1000, description="项目本地路径，可选——空时从 ProjectRegistry 补")
 
 
 class SessionUpdateRequest(BaseModel):
@@ -68,7 +71,13 @@ class SessionDetailResponse(BaseModel):
     description="为指定项目创建新 Session。项目必须已在 ProjectRegistry 中注册。",
 )
 async def create_session(req: SessionCreateRequest) -> dict:
-    rec = _registry.create(req.project_name, req.title)
+    # WHY 从 ProjectRegistry 补 local_path: 前端只传 project_name，路径需从项目注册表查
+    local_path = req.local_path
+    if not local_path:
+        proj = _projects.get(req.project_name)
+        if proj:
+            local_path = proj.local_path
+    rec = _registry.create(req.project_name, req.title, local_path)
     return {
         "code": 0,
         "data": rec.to_dict(),

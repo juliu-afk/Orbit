@@ -14,7 +14,7 @@ GET  /observability/feedback           审计反馈分析报告
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -180,7 +180,7 @@ async def create_lesson(
     result = _lessons.add(
         task_id=task_id,
         domain=domain,
-        outcome=outcome,  # type: ignore[arg-type]
+        outcome=cast(Literal["success", "failure"], outcome),
         lesson=lesson,
         tags=tag_list,
     )

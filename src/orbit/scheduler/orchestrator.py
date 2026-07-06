@@ -44,6 +44,8 @@ class SchedulerError(Exception):
 class Scheduler:
     """Orbit 编排层入口——委托 TaskRunner + DagRunner 执行."""
 
+    _compose_orchestrator: object | None = None  # Phase 2: ComposeOrchestrator——main.py 注入
+
     GOLDEN_ROUTE: dict[str, list[str]] = {
         "实现新功能": ["architect", "developer"],
         "修复Bug": ["qa", "developer", "reviewer"],

@@ -13,9 +13,10 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, HTTPException, Request
 
-
+logger = structlog.get_logger("orbit.api.schedule")
 router = APIRouter(prefix="/api/v1/schedule", tags=["schedule"])
 
 
@@ -122,7 +123,8 @@ async def promote_to_urgent(request: Request, goal_id: str):
 
     async def _on_urgent_done(t: asyncio.Task) -> None:
         try: t.result()
-        except Exception: pass
+        except Exception:
+            logger.warning("urgent_callback_error", exc_info=True)
 
     bg = asyncio.create_task(offpeak.orchestrator.run(goal))
     bg.add_done_callback(lambda t: asyncio.ensure_future(_on_urgent_done(t)))

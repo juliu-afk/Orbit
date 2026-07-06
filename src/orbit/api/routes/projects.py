@@ -126,7 +126,8 @@ async def _generate_brief_background(project_name: str, project_path: str) -> No
     logger = structlog.get_logger("orbit.api.projects")
 
     try:
-        gen = BriefGenerator(_brief_llm)  # type: ignore[arg-type]
+        assert _brief_llm is not None, "LLM 客户端未初始化"
+        gen = BriefGenerator(_brief_llm)
         analysis = analyze_directory(project_path)
         brief = await gen.generate(project_path, analysis=analysis)
         write_brief(project_path, brief)

@@ -182,10 +182,6 @@ async def get_graph_data(project_id: str = Query(..., min_length=1)):
         edges = await _code_graph.get_all_edges()
     except (RuntimeError, ValueError) as e:
         raise HTTPException(status_code=500, detail=str(e))
-    except AttributeError:
-        # CodeGraphEngine 可能没有 get_all_nodes/get_all_edges 方法
-        # 回退到直接查询——由 codegraph_routes 内部处理
-        raise HTTPException(status_code=501, detail="CODE_001: 项目未构建代码索引")
 
     if not nodes:
         return {
@@ -279,5 +275,5 @@ async def build_code_index(body: BuildRequest):
             "data": {"files_parsed": count, "directory": body.directory},
             "message": f"已索引 {count} 个 Python 文件",
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"索引构建失败: {e}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="索引构建失败，请检查目录是否有效")

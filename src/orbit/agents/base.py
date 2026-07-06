@@ -56,6 +56,7 @@ class BaseAgent(ABC):
     """
 
     role: AgentRole
+    _mode: object | None = None  # Phase G: ModeConfig——factory 注入，mypy 需显式声明
 
     def __init__(self, llm: Any = None, graph: Any = None, sandbox: Any = None) -> None:
         self.llm = llm

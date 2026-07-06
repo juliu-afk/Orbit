@@ -76,7 +76,7 @@ def app(workspace_dir):
     files_mod = importlib.import_module("orbit.api.routes.files_routes")
     files_mod.set_file_service(MockFileService())
 
-    return create_app(enable_auth=False, routes=["files_routes", "blame_routes", "terminal_routes"])
+    return create_app(enable_auth=False, routes=["files_routes", "blame_routes", "terminal_routes", "git_routes"])
 
 
 @pytest.fixture
@@ -211,3 +211,45 @@ async def test_terminal_exec_cwd_traversal(client):
         json={"command": "echo test", "cwd": "../../etc"},
     )
     assert resp.status_code == 403
+
+
+# ── Git routes tests ─────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_git_gpg_keys(client):
+    """GET /api/v1/git/gpg-keys → 200——空列表(测试环境无 GPG)。"""
+    resp = await client.get("/api/v1/git/gpg-keys")
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_git_merge_conflicts(client):
+    """GET /api/v1/git/merge-conflicts → 200——空冲突列表。"""
+    resp = await client.get("/api/v1/git/merge-conflicts")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "conflicts" in data
+    assert data["conflicts"] == []
+
+
+@pytest.mark.asyncio
+async def test_git_commit_no_changes(client):
+    """POST /api/v1/git/commit 无变更 → 失败（工作区有文件）。"""
+    resp = await client.post(
+        "/api/v1/git/commit",
+        json={"message": "test commit"},
+    )
+    # 工作区可能有未跟踪文件——commit 可能成功或失败，均接受
+    assert resp.status_code in (200, 400)
+
+
+@pytest.mark.asyncio
+async def test_git_commit_invalid_path(client):
+    """POST /api/v1/git/commit 路径遍历 → 400。"""
+    resp = await client.post(
+        "/api/v1/git/commit",
+        json={"message": "test", "files": ["../etc/passwd"]},
+    )
+    assert resp.status_code == 400

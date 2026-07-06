@@ -365,7 +365,33 @@ class ClarifierAgent(BaseAgent):
 
         context = input_data.context
 
+        # G6: 检测 mode 调优意图——用户说"快点"/"问细点"时不走 LLM，直接改 mode
+        try:
+            from orbit.modes.tuner import ModePreset, ModeTuner
+            from orbit.modes.loader import ModeLoader
 
+            intent = ModeTuner.detect_intent(user_message)
+            if intent is not None:
+                loader = ModeLoader()
+                new_config = ModeTuner.apply_preset(loader, "clarify", intent)
+                if new_config:
+                    self._mode = new_config  # 更新当前实例立即生效
+                    strategy_label = {
+                        ModePreset.FAST: "快速模式（广度优先，每分支 ≤8 问）",
+                        ModePreset.DEEP: "深入模式（深度优先，每分支 ≤30 问）",
+                        ModePreset.RESET: "默认模式（深度优先，每分支 ≤20 问）",
+                    }.get(intent, str(intent))
+                    return AgentOutput(
+                        status="ok",
+                        result={
+                            "reply": f"已切换到 {strategy_label}。",
+                            "clarification_status": "clarifying",
+                            "structured_prd": None,
+                            "missing_fields": [],
+                        },
+                    )
+        except Exception:
+            pass  # fail-open: mode 调优失败不影响正常流程
 
         # mock 模式：无 LLM 时返回模板，供 CI 测试（参照现有 DeveloperAgent mock 模式）
 
@@ -461,6 +487,26 @@ class ClarifierAgent(BaseAgent):
             )
 
 
+
+        # G6: 注入模式可见性前缀——用户看到 [🔍 clarify·深度模式]
+        try:
+            from orbit.modes.indicator import ModeIndicator
+
+            mode_name = getattr(self, "_mode", None)
+            if mode_name is not None:
+                mode_name = mode_name.name if hasattr(mode_name, "name") else None
+            prefix = ModeIndicator.for_agent(
+                mode_name=mode_name,
+                question_strategy=self._question_strategy,
+                max_questions=(
+                    self._mode.behavior.max_questions_per_branch
+                    if self._mode is not None and hasattr(self._mode, "behavior") else None
+                ),
+            )
+            if "reply" in parsed:
+                parsed["reply"] = f"{prefix} {parsed['reply']}"
+        except Exception:
+            pass  # fail-open: 前缀失败不影响回复
 
         return AgentOutput(status="ok", result=parsed)
 

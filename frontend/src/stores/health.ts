@@ -24,7 +24,7 @@ export const useHealthStore = defineStore('health', () => {
       const j = await r.json()
       componentDetail.value = j
     } catch (e) {
-      console.warn("[health] request failed", e)
+      if (import.meta.env.DEV) console.warn("[health] request failed", e)
     } finally {
       loading.value = false
     }

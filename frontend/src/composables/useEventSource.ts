@@ -58,7 +58,7 @@ export function useEventSource() {
             data: raw.data ?? {},
           })
         } catch {
-          console.warn('[useEventSource] 事件解析失败', eventType, e.data)
+          if (import.meta.env.DEV) console.warn('[useEventSource] 事件解析失败', eventType, e.data)
         }
       })
     }
@@ -68,7 +68,7 @@ export function useEventSource() {
       // P2-2: 有限重连——超限后彻底断开
       retryCount.value++
       if (retryCount.value >= MAX_RECONNECT) {
-        console.warn('[useEventSource] 已达重连上限', MAX_RECONNECT)
+        if (import.meta.env.DEV) console.warn('[useEventSource] 已达重连上限', MAX_RECONNECT)
         es.close()
         eventSource.value = null
       }

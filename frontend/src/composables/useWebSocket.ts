@@ -49,7 +49,7 @@ export function useWebSocket() {
         const msg: WsMessage = JSON.parse(event.data as string)
         onMessage?.(msg)
       } catch {
-        console.warn('[useWebSocket] 消息解析失败', event.data)
+        if (import.meta.env.DEV) console.warn('[useWebSocket] 消息解析失败', event.data)
       }
     }
 

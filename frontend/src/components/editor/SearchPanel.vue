@@ -43,9 +43,9 @@ async function doSearch() {
     const p = new URLSearchParams({ q: query.value, search_type: searchType.value, max_results: '50' })
     const data = await apiGet<SearchResult[]>(`/api/v1/search?${p.toString()}`)
     if (!aborter.signal.aborted) results.value = data
-  } catch (e: any) {
-    if (e?.name === 'AbortError') return
-    console.error('Search failed:', e)
+  } catch (e: unknown) {
+    if (e instanceof DOMException && e.name === 'AbortError') return
+    if (import.meta.env.DEV) console.error('Search failed:', e)
     results.value = []
   } finally {
     if (!aborter.signal.aborted) loading.value = false

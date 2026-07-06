@@ -235,7 +235,7 @@ function handleConfirmPrd() {
 // ChatStream 事件处理
 function onStreamFinish(result: Record<string, unknown>) {
   // Agent 执行完成——可在驾驶舱展示完成通知
-  console.debug('ChatStream finished', result)
+  if (import.meta.env.DEV) console.debug('ChatStream finished', result)
 }
 
 function onStreamError(message: string) {

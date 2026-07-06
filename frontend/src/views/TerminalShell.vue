@@ -24,11 +24,12 @@ import CodeGraphDrawer from '@/components/codegraph/CodeGraphDrawer.vue'
 import WechatBindingPanel from '@/components/settings/WechatBindingPanel.vue'
 import ShortcutPanel from '@/components/layout/ShortcutPanel.vue'
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
+import CodeDiffPanel from '@/components/chat/CodeDiffPanel.vue'
 
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
 const chat = useChatStore(); const task = useTaskStore(); const editor = useEditorStore()
 const settings = useSettingsStore(); const ws = useWebSocket()
-const fileTree = ref<FileNode[]>([]); const showShortcuts = ref(false); const showNewDialog = ref(false)
+const fileTree = ref<FileNode[]>([]); const showShortcuts = ref(false); const showNewDialog = ref(false); const showCodeDiff = ref(false)
 
 function buildTree(files: Array<{ path: string }>): FileNode[] {
   const root: FileNode[] = []; const dirMap = new Map<string, FileNode>()
@@ -63,6 +64,16 @@ function onSessionSwitched(_sessionId: string) {
   if (session.currentSessionId) {
     chat.connectChatWs(session.currentSessionId, session.currentProjectName)
   }
+}
+
+// WHY: 代码产物就绪 → 自动弹出抽屉——从 DashboardView 移植到 TerminalShell
+watch(() => task.hasCodeOutput, (show) => {
+  if (show) showCodeDiff.value = true
+})
+
+function handleCloseCodeDiff() {
+  showCodeDiff.value = false
+  task.consumeCodeOutput()
 }
 
 function gridAreas():string{ const cols=settings.fileTreeLeft?"filetree chat right":"chat right filetree"; return `"${cols}" "statusbar statusbar statusbar"` }
@@ -106,6 +117,10 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
   <WechatBindingPanel v-model:show="shell.showWeChat" />
   <ShortcutPanel v-model:show="showShortcuts" />
   <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
+  <!-- WHY 代码产物抽屉: task:update WS 推送代码 output → 自动弹出展示 -->
+  <el-drawer v-model="showCodeDiff" title="Generated Code" direction="rtl" size="520px" @close="handleCloseCodeDiff">
+    <CodeDiffPanel v-if="task.codeOutput" :code="task.codeOutput" />
+  </el-drawer>
 </div>
 </template>
 

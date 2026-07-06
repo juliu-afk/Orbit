@@ -44,8 +44,8 @@ async function execute() {
       '/api/v1/terminal/exec', { command: cmd, timeout: 30 }
     )
     history.value.push({ command: cmd, stdout: res.stdout, stderr: res.stderr, exitCode: res.exit_code, duration: Math.round(res.duration_ms) })
-  } catch (e: any) {
-    history.value.push({ command: cmd, stdout: '', stderr: e.message || 'Command failed', exitCode: -1, duration: 0 })
+  } catch (e: unknown) {
+    history.value.push({ command: cmd, stdout: '', stderr: e instanceof Error ? e.message : 'Command failed', exitCode: -1, duration: 0 })
   } finally {
     // P1: 超限时移除最旧条目——防大输出卡死浏览器
     if (history.value.length > MAX_ENTRIES) {

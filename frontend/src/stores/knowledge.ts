@@ -60,7 +60,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
         concepts.value = j.data || []
       }
     } catch (e) {
-      console.warn("[knowledge] request failed", e)
+      if (import.meta.env.DEV) console.warn("[knowledge] request failed", e)
     } finally {
       loading.value = false
     }
@@ -75,7 +75,7 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
         concepts.value = j.data || []
       }
     } catch (e) {
-      console.warn("[knowledge] request failed", e)
+      if (import.meta.env.DEV) console.warn("[knowledge] request failed", e)
     } finally {
       loading.value = false
     }

@@ -22,7 +22,7 @@ async function runRuff() {
     const res = await apiPost<{ exit_code: number; stdout: string }>('/api/v1/terminal/exec', { command: 'ruff check --fix .', timeout: 30 })
     result.value = res.stdout ? 'Formatted' : 'No issues'
     emit('refresh')
-  } catch (e: any) { result.value = e.message || 'Failed' }
+  } catch (e: unknown) { result.value = e instanceof Error ? e.message : 'Failed' }
 }
 
 async function runMyPy() {
@@ -30,7 +30,7 @@ async function runMyPy() {
   try {
     const res = await apiPost<{ exit_code: number; stdout: string }>('/api/v1/terminal/exec', { command: 'mypy --strict .', timeout: 60 })
     result.value = res.exit_code === 0 ? 'No type errors' : res.stdout.slice(-200)
-  } catch (e: any) { result.value = e.message || 'Failed' }
+  } catch (e: unknown) { result.value = e instanceof Error ? e.message : 'Failed' }
 }
 
 async function organizeImports() {
@@ -39,7 +39,7 @@ async function organizeImports() {
     const res = await apiPost<{ exit_code: number }>('/api/v1/terminal/exec', { command: 'ruff check --select I --fix .', timeout: 15 })
     result.value = res.exit_code === 0 ? 'Imports organized' : 'Check terminal for details'
     emit('refresh')
-  } catch (e: any) { result.value = e.message || 'Failed' }
+  } catch (e: unknown) { result.value = e instanceof Error ? e.message : 'Failed' }
 }
 </script>
 

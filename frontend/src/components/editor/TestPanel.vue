@@ -57,7 +57,7 @@ async function runTests() {
     results.value = res
     coverage.value = cov
   } catch (e) {
-    console.error('Test run failed:', e)
+    if (import.meta.env.DEV) console.error('Test run failed:', e)
   } finally {
     loading.value = false
   }

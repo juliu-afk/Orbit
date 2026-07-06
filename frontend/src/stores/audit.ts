@@ -39,7 +39,7 @@ export const useAuditStore = defineStore('audit', () => {
         auditLogs.value = j.data || []
       }
     } catch (e) {
-      console.warn("[audit] request failed", e)
+      if (import.meta.env.DEV) console.warn("[audit] request failed", e)
     } finally {
       loading.value = false
     }
@@ -54,7 +54,7 @@ export const useAuditStore = defineStore('audit', () => {
         lessons.value = j.data || []
       }
     } catch (e) {
-      console.warn("[audit] request failed", e)
+      if (import.meta.env.DEV) console.warn("[audit] request failed", e)
     } finally {
       loading.value = false
     }
@@ -73,7 +73,7 @@ export const useAuditStore = defineStore('audit', () => {
         body: JSON.stringify(data),
       })
     } catch (e) {
-      console.warn("[audit] request failed", e)
+      if (import.meta.env.DEV) console.warn("[audit] request failed", e)
     }
   }
 

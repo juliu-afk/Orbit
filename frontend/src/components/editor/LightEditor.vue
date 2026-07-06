@@ -76,7 +76,7 @@ async function save() {
     await apiPost('/api/v1/files/write', { path: props.file, content })
     saved.value = true; emit('saved', content)
     setTimeout(() => saved.value = false, 2000)
-  } catch (e) { console.error('Save failed:', e) } finally { saving.value = false }
+  } catch (e) { if (import.meta.env.DEV) console.error('Save failed:', e) } finally { saving.value = false }
 }
 onBeforeUnmount(() => editor.value?.dispose())
 </script>

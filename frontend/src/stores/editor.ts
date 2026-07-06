@@ -44,5 +44,13 @@ export const useEditorStore = defineStore('editor', () => {
     }
   }
 
-  return { currentFile, original, modified, language, loading, openFile }
+  // WHY 聊天代码块直接编辑: 无文件路径，将代码内容作为临时视图打开
+  function openCode(code: string, lang: string = 'python') {
+    original.value = ''
+    modified.value = code
+    language.value = lang
+    currentFile.value = `[code].${lang}`
+  }
+
+  return { currentFile, original, modified, language, loading, openFile, openCode }
 })

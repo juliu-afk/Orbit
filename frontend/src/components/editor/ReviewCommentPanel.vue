@@ -30,7 +30,7 @@ const comments = ref<ThreadComment[]>([])
 const newComment = ref('')
 
 async function loadComments() {
-  try { const d = await apiGet<ThreadComment[]>(`/api/v1/review/sessions/${props.reviewId}/comments?file=${props.file}`); comments.value = d } catch (e) { console.error('loadComments failed:', e) }
+  try { const d = await apiGet<ThreadComment[]>(`/api/v1/review/sessions/${props.reviewId}/comments?file=${props.file}`); comments.value = d } catch (e) { if (import.meta.env.DEV) console.error('loadComments failed:', e) }
 }
 onMounted(() => loadComments())
 async function addComment() {
@@ -39,7 +39,7 @@ async function addComment() {
     await apiPost(`/api/v1/review/sessions/${props.reviewId}/comments`, { file_path: props.file, line_start: props.line, line_end: props.line, body: newComment.value, created_by: 'user' })
     comments.value.push({ id: '', file: props.file, line: props.line, body: newComment.value, status: 'open', author: 'user' })
     newComment.value = ''
-  } catch (e) { console.error('addComment failed:', e) }
+  } catch (e) { if (import.meta.env.DEV) console.error('addComment failed:', e) }
 }
 </script>
 

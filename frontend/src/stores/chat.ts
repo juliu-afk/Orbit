@@ -85,7 +85,7 @@ export const useChatStore = defineStore('chat', () => {
           const resp = JSON.parse(event.data as string)
           handleChatResponse(resp)
         } catch {
-          console.warn('[chat] 消息解析失败', event.data)
+          if (import.meta.env.DEV) console.warn('[chat] 消息解析失败', event.data)
         }
       }
 

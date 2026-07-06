@@ -36,7 +36,7 @@ export const usePeakStore = defineStore('peak', () => {
     try {
     await fetch(`/api/v1/schedule/queue/${goalId}/urgent`, { method: 'POST' })
     await fetchQueue(); await fetchPeakStatus()
-    } catch (e) { console.error("[peak] promoteToUrgent failed:", e) }
+    } catch (e) { if (import.meta.env.DEV) console.error("[peak] promoteToUrgent failed:", e) }
   }
   async function refreshAll() {
     await Promise.all([fetchPeakStatus(), fetchQueue(), fetchSavings()])

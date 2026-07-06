@@ -1,23 +1,18 @@
 /** SSE 连接管理 composable.
 
- * WHY EventSource 而非 WebSocket: SSE 是浏览器原生单向流，
- * 适合 Agent 流式输出（只读）。取消操作走独立 POST 端点。
+ * P1-1: fetch 替代 EventSource——原生 EventSource 不支持自定义 HTTP Header，
+ * token 只能经 URL 查询参数传递，泄露到日志/浏览器历史/Referer。
+ * fetch + ReadableStream 支持 X-Orbit-Token header，消除 URL 泄露。
 
  * 与 useWebSocket.ts 互补——WebSocket 用于 Dashboard 实时更新,
  * SSE 用于 Agent 执行流式输出。
 
- * P2-2: 增加重连上限——EventSource 默认无限重连，
- * 服务端持续非 200 时消耗客户端资源。限制最多 5 次重连。
+ * P2-2: 增加重连上限——有限重连而非无限。
  */
 import { ref, type Ref } from 'vue'
 import type { StreamEvent, StreamEventType } from '@/types/stream'
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
-
-const EVENT_TYPES: StreamEventType[] = [
-  'text_delta', 'thinking', 'tool_call', 'tool_result',
-  'turn_start', 'finish_step', 'error', 'cancelled',
-]
 
 const MAX_RECONNECT = 5
 
@@ -28,56 +23,84 @@ export function useEventSource() {
   const retryCount = ref(0)
 
   let onEvent: ((event: StreamEvent) => void) | null = null
+  let abortController: AbortController | null = null
 
   function setEventHandler(handler: (event: StreamEvent) => void) {
     onEvent = handler
   }
 
-  function connect(url: string) {
+  /** P1-1: fetch-based SSE——支持 X-Orbit-Token header，防止 token 泄露到 URL。 */
+  async function connect(url: string) {
     disconnect()
     connectionStatus.value = 'connecting'
     retryCount.value = 0
 
-    const es = new EventSource(url)
-    eventSource.value = es
+    const token = localStorage.getItem('orbitAuthToken') || ''
+    abortController = new AbortController()
 
-    es.onopen = () => {
+    try {
+      const response = await fetch(url, {
+        headers: token ? { 'X-Orbit-Token': token } : {},
+        signal: abortController.signal,
+      })
+
+      if (!response.ok) {
+        connectionStatus.value = 'disconnected'
+        retryCount.value++
+        if (retryCount.value < MAX_RECONNECT) {
+          const delay = Math.min(1000 * Math.pow(2, retryCount.value - 1), 16000)
+          setTimeout(() => connect(url), delay)
+        }
+        return
+      }
+
       connectionStatus.value = 'connected'
       retryCount.value = 0
-    }
 
-    for (const eventType of EVENT_TYPES) {
-      es.addEventListener(eventType, (e: MessageEvent) => {
-        try {
-          const raw = JSON.parse(e.data as string)
-          onEvent?.({
-            type: eventType,
-            taskId: raw.task_id ?? '',
-            agentId: raw.agent_id ?? '',
-            turn: raw.turn ?? 0,
-            data: raw.data ?? {},
-          })
-        } catch {
-          if (import.meta.env.DEV) console.warn('[useEventSource] 事件解析失败', eventType, e.data)
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''  // 未完成的行留到下次
+
+        let currentEventType = ''
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEventType = line.slice(7).trim()
+          } else if (line.startsWith('data: ')) {
+            const raw = line.slice(6)
+            try {
+              const parsed = JSON.parse(raw)
+              onEvent?.({
+                type: currentEventType as StreamEventType,
+                taskId: parsed.task_id ?? '',
+                agentId: parsed.agent_id ?? '',
+                turn: parsed.turn ?? 0,
+                data: parsed.data ?? {},
+              })
+            } catch {
+              if (import.meta.env.DEV)
+                console.warn('[useEventSource] 事件解析失败', currentEventType, raw.slice(0, 100))
+            }
+          }
         }
-      })
-    }
-
-    es.onerror = () => {
-      connectionStatus.value = 'disconnected'
-      // P2-2: 有限重连——超限后彻底断开
-      retryCount.value++
-      if (retryCount.value >= MAX_RECONNECT) {
-        if (import.meta.env.DEV) console.warn('[useEventSource] 已达重连上限', MAX_RECONNECT)
-        es.close()
-        eventSource.value = null
       }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      connectionStatus.value = 'disconnected'
     }
   }
 
   function disconnect() {
-    retryCount.value = MAX_RECONNECT // 阻止自动重连
-    eventSource.value?.close()
+    retryCount.value = MAX_RECONNECT
+    abortController?.abort()
+    abortController = null
     eventSource.value = null
     connectionStatus.value = 'disconnected'
     taskId.value = null

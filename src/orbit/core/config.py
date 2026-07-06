@@ -132,6 +132,9 @@ class Settings:
     # P2-3 (PR#130): 类定义时求值 os.environ——仅影响动态设置环境变量后
     # 不重载模块的场景。生产环境变量在进程启动时已确定，无实际风险。
     AUTH_ENABLED: bool = _get_bool("ORBIT_AUTH_ENABLED", "ORBIT_AUTH_TOKEN" in os.environ)
+    # P1-3: JWT 密钥——默认随机生成，生产环境必须显式设置
+    JWT_SECRET: str = _get("JWT_SECRET", secrets.token_urlsafe(32))
+    JWT_TTL_MINUTES: int = _get_int("JWT_TTL_MINUTES", 60)
     # WHY tauri://localhost：Tauri 桌面壳通过自定义协议加载前端
     CORS_ORIGINS: str = _get("CORS_ORIGINS", "http://localhost:*,tauri://localhost")
 
@@ -290,6 +293,9 @@ class Settings:
     # P2-3 (PR#130): 类定义时求值 os.environ——仅影响动态设置环境变量后
     # 不重载模块的场景。生产环境变量在进程启动时已确定，无实际风险。
     AUTH_ENABLED: bool = _get_bool("ORBIT_AUTH_ENABLED", "ORBIT_AUTH_TOKEN" in os.environ)
+    # P1-3: JWT 密钥——默认随机生成，生产环境必须显式设置
+    JWT_SECRET: str = _get("JWT_SECRET", secrets.token_urlsafe(32))
+    JWT_TTL_MINUTES: int = _get_int("JWT_TTL_MINUTES", 60)
     # WHY tauri://localhost：Tauri 桌面壳通过自定义协议加载前端
     CORS_ORIGINS: str = _get("CORS_ORIGINS", "http://localhost:*,tauri://localhost")
 

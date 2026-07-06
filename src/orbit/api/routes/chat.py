@@ -18,6 +18,7 @@ from orbit.agents.base import AgentInput, AgentRole
 from orbit.agents.chatter import ChatterAgent  # 通用对话——首触点
 from orbit.agents.clarifier import ClarifierAgent, StructuredPRD, validate_prd
 from orbit.context.matcher import ContextMatcher
+from orbit.api.dependencies import _verify_token  # P1-3: JWT + static token
 from orbit.core.config import settings
 from orbit.projects.registry import ProjectRegistry
 from orbit.sessions.registry import SessionRegistry
@@ -102,7 +103,8 @@ async def chat_endpoint(ws: WebSocket) -> None:
     #   仅生产部署（env var 已设）时强制校验，与 AuthMiddleware 行为一致
     if settings.AUTH_ENABLED:
         token = ws.query_params.get("token", "")
-        if not token or token != settings.ORBIT_AUTH_TOKEN:
+        # P1-3: 静态 token + JWT 双模式验证
+        if not _verify_token(token):
             await ws.close(code=4001, reason="未授权访问")
             return
 

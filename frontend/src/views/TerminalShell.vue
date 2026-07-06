@@ -20,12 +20,15 @@ import TokenChartDrawer from '@/components/charts/TokenChartDrawer.vue'
 import SearchDrawer from '@/components/editor/SearchDrawer.vue'
 import TraceDrawer from '@/components/observability/TraceDrawer.vue'
 import ConfigDrawer from '@/components/config/ConfigDrawer.vue'
+import CodeGraphDrawer from '@/components/codegraph/CodeGraphDrawer.vue'
+import WechatBindingPanel from '@/components/settings/WechatBindingPanel.vue'
 import ShortcutPanel from '@/components/layout/ShortcutPanel.vue'
+import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
 const chat = useChatStore(); const task = useTaskStore(); const editor = useEditorStore()
 const settings = useSettingsStore(); const ws = useWebSocket()
-const fileTree = ref<FileNode[]>([]); const showShortcuts = ref(false)
+const fileTree = ref<FileNode[]>([]); const showShortcuts = ref(false); const showNewDialog = ref(false)
 
 function buildTree(files: Array<{ path: string }>): FileNode[] {
   const root: FileNode[] = []; const dirMap = new Map<string, FileNode>()
@@ -37,6 +40,30 @@ function buildTree(files: Array<{ path: string }>): FileNode[] {
 }
 async function fetchFileTree(){ try{ const d=await apiGet<{files:Array<{path:string}>}>("/api/v1/files/tree"); if(d.files)fileTree.value=buildTree(d.files) }catch{} }
 async function onSelectFile(path:string){ await editor.openFile(path); shell.openFileReview(path) }
+
+// WHY: 项目文件夹选择后重建上下文——刷新 session/chat/文件树
+async function onSessionCreated() {
+  if (session.messages.length > 0) {
+    chat.restoreMessages(session.messages.map(m => ({
+      role: m.role, content: m.content, created_at: m.created_at,
+    })))
+  }
+  agentops.fetchAll()
+  fetchFileTree()
+  if (session.currentSessionId) {
+    chat.connectChatWs(session.currentSessionId, session.currentProjectName)
+  }
+}
+
+// WHY: session 切换后刷新上下文——和 onSessionCreated 同逻辑，但不需要 restoreMessages（已在 switchToSession 中加载）
+function onSessionSwitched(_sessionId: string) {
+  chat.reset()
+  agentops.fetchAll()
+  fetchFileTree()
+  if (session.currentSessionId) {
+    chat.connectChatWs(session.currentSessionId, session.currentProjectName)
+  }
+}
 
 function gridAreas():string{ const cols=settings.fileTreeLeft?"filetree chat right":"chat right filetree"; return `"${cols}" "statusbar statusbar statusbar"` }
 
@@ -56,13 +83,25 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
 <div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{gridTemplateAreas:gridAreas(),gridTemplateColumns:`var(--spacing-filetree) 1fr var(--spacing-right-panel)`}" @contextmenu.prevent>
   <div v-show="shell.showFileTree" class="resize-handle resize-left" @pointerdown="handleLeftResize" />
   <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto"><FileTreePanel :tree-data="fileTree" :selected-file="shell.selectedFile" @select-file="onSelectFile" /></aside>
-  <main class="panel-center flex flex-col overflow-hidden"><TerminalChat /></main>
+  <main class="panel-center flex flex-col overflow-hidden">
+        <!-- 无 Session 引导——为什么没有自动创建：用户需主动选择项目文件夹 -->
+        <div v-if="!session.currentSessionId" class="welcome-empty">
+          <div class="welcome-icon">🪐</div>
+          <h2 class="welcome-title">Welcome to Orbit</h2>
+          <p class="welcome-desc">Select a project folder to get started</p>
+          <button class="open-btn" @click="showNewDialog = true">Open or Create Project</button>
+        </div>
+        <TerminalChat v-else />
+      </main>
   <div class="resize-handle resize-right" @pointerdown="handleRightResize" />
   <aside class="panel-right" style="border-left:1px solid var(--color-orbit-border);overflow-y:auto"><MonacoPanel v-if="shell.showMonaco" /><AgentInfoPanel v-else /></aside>
-  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @toggle-trace="shell.toggleTrace()" @toggle-config="shell.toggleConfig()" />
+  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @toggle-trace="shell.toggleTrace()" @toggle-config="shell.toggleConfig()" @toggle-codegraph="shell.toggleCodeGraph()" @toggle-wechat="shell.toggleWeChat()" @new-session="showNewDialog = true" @switch-session="onSessionSwitched" />
   <DAGDrawer v-model:show="shell.showDAG" /><TokenChartDrawer v-model:show="shell.showChart" /><SearchDrawer v-model:show="shell.showSearch" @open-file="shell.openFileReview" />
   <TraceDrawer v-model:show="shell.showTrace" /><ConfigDrawer v-model:show="shell.showConfig" />
+  <CodeGraphDrawer v-model:show="shell.showCodeGraph" />
+  <WechatBindingPanel v-model:show="shell.showWeChat" />
   <ShortcutPanel v-model:show="showShortcuts" />
+  <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
 </div>
 </template>
 
@@ -74,4 +113,11 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
 .resize-handle:hover,.resize-handle:active{background:var(--color-orbit-accent)}
 .resize-left{grid-area:filetree;justify-self:end}
 .resize-right{grid-area:right;justify-self:start}
+/* 无 Session 引导 */
+.welcome-empty { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; color: var(--color-orbit-text-secondary); font-family: var(--font-mono); }
+.welcome-icon { font-size: 48px; margin-bottom: 8px; }
+.welcome-title { font-size: 20px; font-weight: 600; color: var(--color-orbit-text); margin: 0; }
+.welcome-desc { font-size: 13px; color: var(--color-orbit-text-muted); margin: 0 0 16px; }
+.open-btn { padding: 10px 24px; background: var(--color-orbit-accent); border: none; border-radius: 6px; color: #fff; font-size: 14px; font-family: var(--font-mono); cursor: pointer; transition: opacity 0.15s; }
+.open-btn:hover { opacity: 0.85; }
 </style>

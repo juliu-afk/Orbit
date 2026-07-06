@@ -51,6 +51,7 @@ _ROUTE_MODULES: dict[str, tuple[str, str]] = {
     "compliance_routes": ("orbit.api.routes.compliance_routes", "router"),
     "terminal_routes": ("orbit.api.routes.terminal_routes", "router"),
     "diagnostics_ws": ("orbit.api.routes.diagnostics_ws", "router"),
+    "wechat_routes": ("orbit.api.routes.wechat_routes", "router"),
     "health": ("orbit.api.routes.health", "router"),
 }
 
@@ -84,6 +85,7 @@ _ROUTE_SPEC: dict[str, tuple[str, str, str | None]] = {
     "terminal_routes":  ("orbit.api.routes.terminal_routes", "router", "API_V1_STR"),
     "config_routes":    ("orbit.api.routes.config_routes", "router", "API_V1_STR"),
     "diagnostics_ws":   ("orbit.api.routes.diagnostics_ws", "router", None),
+    "wechat_routes":    ("orbit.api.routes.wechat_routes", "router", "API_V1_STR"),
     "health":           ("orbit.api.routes.health", "router", None),
 }
 

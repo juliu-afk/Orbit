@@ -27,7 +27,8 @@ def verify_stream_token(token: str = Query(...)) -> str:
 
 # ── 公开路径 —— 无需认证 ──
 _PUBLIC_PATHS: frozenset[str] = frozenset(
-    {"/health", "/metrics", "/docs", "/redoc", "/openapi.json", "/favicon.ico"}
+    {"/health", "/metrics", "/docs", "/redoc", "/openapi.json", "/favicon.ico",
+     "/api/v1/wechat/callback"}  # iLink 回调无需 Orbit auth token
 )
 
 

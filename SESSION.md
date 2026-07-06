@@ -1,5 +1,33 @@
 # Orbit 开发会话记录
 
+## 2026-07-07 — P0 安全漏洞修复 (PR #224 · SQUASH MERGED)
+
+### 交付
+- **P0-1: WebSocket 聊天端点认证** — chat.py ws.accept() 前校验 token (gate on AUTH_ENABLED)
+- **P0-3: Shell exec 模式切换** — shell.py create_subprocess_shell → create_subprocess_exec(*shlex.split(cmd))
+- **前端适配** — chat.ts WS URL 附加 ?token= 查询参数
+- **测试** — +3 WS auth 测试 (拒绝无token/错token/通过正确token)
+- **文档** — 阶段 1-4 完整四文档链
+
+### 审查
+- 阶段 3b 审查通过 (R1: 补 WS auth 测试 → 已修)
+
+### 测试
+- 166 passed, 0 failed, 5 skipped
+- 前端构建 ✅
+- CI 全红——已有 poetry.lock 不同步问题，非本次引入
+
+### 关键决策
+- WS token 用查询参数 (与 SSE verify_stream_token 一致)
+- AUTH_ENABLED gate——桌面应用默认不启用，向后兼容
+- 管道/重定向 exec 模式下自然不可用——白名单从未允许合法管道，零影响
+
+### 踩坑
+- Pydantic Settings frozen → monkeypatch.setattr 失败 → 改用 unittest.mock.patch module-level
+- CI 全红为已有基础设施问题 (poetry.lock out of sync)
+
+---
+
 ## 2026-07-07 — 代码质量全面冲刺 (多轮, 已推送 master)
 
 ### 评估体系

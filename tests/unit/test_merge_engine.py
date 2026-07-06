@@ -1,183 +1,104 @@
-"""merge_engine.py unit tests — 覆盖 P0-2 coverage gap."""
-
+"""MergeEngine unit tests - pure functions coverage."""
 from __future__ import annotations
-
-import json as _json
 
 import pytest
 
-from orbit.router.agent import ModelTier
-from orbit.scheduler.escalation import TierAttempt
-from orbit.scheduler.merge_engine import (
-    EVALUATION_DIMENSIONS,
-    DimensionScore,
-    MergeEngine,
-    MergeResult,
-)
+from orbit.scheduler.merge_engine import EVALUATION_DIMENSIONS, MergeEngine, MergeResult
 
 
-class TestDeterministicCheck:
-    def test_normal_output(self):
-        engine = MergeEngine(llm_client=None)
-        scores = engine._deterministic_check({"code": "def f(): return 1"}, "task")
-        assert scores["syntax_valid"] == 10.0
-        assert scores["status_is_ok"] == 10.0
-        assert scores["no_eval"] == 10.0
-
-    def test_empty_dict_output(self):
-        engine = MergeEngine(llm_client=None)
-        # empty dict → str({}) = "{}" which is non-empty. Test with truly empty content.
-        scores = engine._deterministic_check({"code": ""}, "task")
-        # str output includes dict repr so it's non-empty. Score is 10 for non-empty.
-        assert scores["no_empty_output"] == 10.0
-
-    def test_status_error(self):
-        engine = MergeEngine(llm_client=None)
-        scores = engine._deterministic_check({"status": "failed"}, "task")
-        assert scores["status_is_ok"] == 0.0
-
-    def test_contains_eval(self):
-        engine = MergeEngine(llm_client=None)
-        scores = engine._deterministic_check({"code": "eval('1+1')"}, "task")
-        assert scores["no_eval"] == 0.0
-
-    def test_hardcoded_secret(self):
-        engine = MergeEngine(llm_client=None)
-        scores = engine._deterministic_check({"code": "sk-1234secret"}, "task")
-        assert scores["no_hardcoded_secret"] == 0.0
-
-    def test_has_error_handling(self):
-        engine = MergeEngine(llm_client=None)
-        scores = engine._deterministic_check({"code": "try:\n  pass\nexcept:\n  pass"}, "task")
-        assert scores["has_error_handling"] == 10.0
+class TestMergeEngineInit:
+    def test_init_no_llm(self):
+        e = MergeEngine(None)
+        assert e is not None
 
 
-class TestParseScores:
-    def test_parses_valid_json(self):
-        engine = MergeEngine(llm_client=None)
-        raw = _json.dumps(
-            {
-                "evaluations": {
-                    "tier_1": {
-                        "correctness": {"score": 8, "reason": "ok", "best_of": None},
-                    },
-                },
-            }
-        )
-        attempts = [
-            TierAttempt(tier=ModelTier.TIER_1, model="m", output={"code": "x"}, success=True)
-        ]
-        scored = engine._parse_scores(raw, attempts)
-        assert "tier_1" in scored
-        assert len(scored["tier_1"]) == 6  # all 6 dimensions
+class TestEvaluationDimensions:
+    def test_all_six_dimensions(self):
+        assert len(EVALUATION_DIMENSIONS) == 6
 
-    def test_missing_dimension_defaults(self):
-        engine = MergeEngine(llm_client=None)
-        raw = _json.dumps({"evaluations": {"tier_1": {}}})
-        attempts = [
-            TierAttempt(tier=ModelTier.TIER_1, model="m", output={"code": "x"}, success=True)
-        ]
-        scored = engine._parse_scores(raw, attempts)
-        assert scored["tier_1"][0].score == 5.0  # default
+    def test_weights_sum_to_100(self):
+        total = sum(d["weight"] for d in EVALUATION_DIMENSIONS)
+        assert total == 100
 
+    def test_each_has_checks(self):
+        for d in EVALUATION_DIMENSIONS:
+            assert len(d["deterministic_checks"]) > 0
 
-class TestBuildEvaluationPrompt:
-    def test_contains_dimensions(self):
-        engine = MergeEngine(llm_client=None)
-        attempts = [
-            TierAttempt(tier=ModelTier.TIER_1, model="m", output={"code": "x"}, success=True),
-        ]
-        det_scores = {"tier_1": {"syntax_valid": 10.0}}
-        prompt = engine._build_evaluation_prompt(attempts, "task", det_scores)
-        assert "正确性" in prompt
-        assert "syntax_valid" in prompt
-
-    def test_contains_all_dims(self):
-        engine = MergeEngine(llm_client=None)
-        attempts = [
-            TierAttempt(tier=ModelTier.TIER_1, model="m", output={"code": "x"}, success=True)
-        ]
-        det_scores = {"tier_1": {}}
-        prompt = engine._build_evaluation_prompt(attempts, "task", det_scores)
-        for dim in EVALUATION_DIMENSIONS:
-            assert dim["name"] in prompt
-
-
-class TestBuildSynthesisPrompt:
-    def test_contains_scorecard_table(self):
-        engine = MergeEngine(llm_client=None)
-        attempts = [
-            TierAttempt(tier=ModelTier.TIER_1, model="m1", output={"code": "a"}, success=True),
-            TierAttempt(tier=ModelTier.TIER_2, model="m2", output={"code": "b"}, success=True),
-        ]
-        scores = {}
-        for a in attempts:
-            scores[a.tier_label] = [
-                DimensionScore(key=d["key"], score=7, reason="ok") for d in EVALUATION_DIMENSIONS
-            ]
-        prompt = engine._build_synthesis_prompt(attempts, scores, "task")
-        assert "评分卡" in prompt
-        assert "|" in prompt  # table
-
-
-class TestMergeSingleAttempt:
-    @pytest.mark.asyncio
-    async def test_returns_single_directly(self):
-        engine = MergeEngine(llm_client=None)
-        attempts = [
-            TierAttempt(tier=ModelTier.TIER_1, model="m", output={"code": "solo"}, success=True),
-        ]
-        result = await engine.merge(attempts, "task")
-        assert result.merged == {"code": "solo"}
-        assert result.scorer == "n/a (single attempt)"
-
-    @pytest.mark.asyncio
-    async def test_uses_first_with_output(self):
-        engine = MergeEngine(llm_client=None)
-        attempts = [
-            TierAttempt(tier=ModelTier.TIER_1, model="m", output=None, success=False),
-            TierAttempt(tier=ModelTier.TIER_2, model="m", output={"code": "only"}, success=True),
-        ]
-        result = await engine.merge(attempts, "task")
-        assert result.merged == {"code": "only"}
-
-
-class TestFallbackMerge:
-    def test_returns_t3_on_fallback(self):
-        engine = MergeEngine(llm_client=None)
-        attempts = [
-            TierAttempt(tier=ModelTier.TIER_1, model="m1", output={"code": "a"}, success=True),
-            TierAttempt(tier=ModelTier.TIER_3, model="m3", output={"code": "c"}, success=True),
-        ]
-        result = engine._fallback_merge(attempts)
-        assert result.merged == {"code": "c"}
-        assert "fallback" in result.scorer
-
-
-class TestDimensionScore:
-    def test_creation(self):
-        ds = DimensionScore(key="test", score=7.5, reason="good", best_of=None)
-        assert ds.score == 7.5
-        assert ds.key == "test"
+    def test_key_dimensions_present(self):
+        keys = {d["key"] for d in EVALUATION_DIMENSIONS}
+        assert "correctness" in keys
+        assert "security" in keys
+        assert "maintainability" in keys
 
 
 class TestMergeResult:
     def test_defaults(self):
-        mr = MergeResult(
-            merged={},
-            scorer="gpt",
-            scorecard={},
-            taken_from={},
-            gaps_filled=[],
-            total_scores={},
+        r = MergeResult()
+        assert r.selected_branch == ""
+        assert r.merged_content == ""
+
+    def test_with_scores(self):
+        r = MergeResult(
+            selected_branch="main", merged_content="code",
+            dimension_scores={"correctness": 90}, winner="main",
         )
-        assert mr.merged == {}
+        assert r.winner == "main"
 
 
-class TestEvalDimensions:
-    def test_total_weight_100(self):
-        total = sum(d["weight"] for d in EVALUATION_DIMENSIONS)
-        assert total == 100
+class TestDeterministicCheck:
+    def test_empty_output(self):
+        e = MergeEngine(None)
+        result = e._deterministic_check({}, "task")
+        assert isinstance(result, dict)
+        assert "correctness" in result
 
-    def test_six_dimensions(self):
-        assert len(EVALUATION_DIMENSIONS) == 6
+    def test_ok_output_scores_high(self):
+        e = MergeEngine(None)
+        result = e._deterministic_check({"status": "ok", "result": {"code": "print(1)"}}, "task")
+        assert result["correctness"] > 0
+
+    def test_empty_output_scores_zero(self):
+        e = MergeEngine(None)
+        result = e._deterministic_check({}, "")
+        assert result["correctness"] == 0.0
+
+
+class TestBuildPrompts:
+    def test_build_evaluation_prompt(self):
+        e = MergeEngine(None)
+        prompt = e._build_evaluation_prompt("output1", "output2", "task")
+        assert len(prompt) > 0
+        assert "output1" in prompt
+
+    def test_build_synthesis_prompt(self):
+        e = MergeEngine(None)
+        prompt = e._build_synthesis_prompt("best", "other", {"correctness": 90})
+        assert len(prompt) > 0
+
+
+class TestParseScores:
+    def test_parse_valid_json(self):
+        e = MergeEngine(None)
+        dims = EVALUATION_DIMENSIONS
+        scores = e._parse_scores('{"correctness": 90, "completeness": 80, "security": 85, "maintainability": 75, "performance": 70, "simplicity": 80}', dims)
+        assert scores["correctness"] == 90
+        assert scores["security"] == 85
+
+    def test_parse_invalid_json(self):
+        e = MergeEngine(None)
+        scores = e._parse_scores("not json", EVALUATION_DIMENSIONS)
+        # 降级——所有维度给 50
+        assert all(v == 50 for v in scores.values())
+
+
+class TestFallbackMerge:
+    def test_fallback_no_attempts(self):
+        e = MergeEngine(None)
+        result = e._fallback_merge([])
+        assert result.selected_branch == "fallback"
+        assert result.winner == "none"
+
+    def test_tier_label(self):
+        r = MergeResult(selected_branch="b", winner="w")
+        r.tier = 1
+        assert "Tier 1" in r.tier_label

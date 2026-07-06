@@ -1,5 +1,39 @@
 # Orbit 开发会话记录
 
+## 2026-07-07 — 安全+UX 全面修复冲刺 (6 PR · 全部 MERGED)
+
+### 背景
+基于 [`Orbit-安全与UX评估报告`](docs/research/Orbit-安全与UX评估报告-2026-07-07-修复后.html)，安全 2.5/5 + UX 2.8/5。
+
+### 交付总览
+
+| PR | 范围 | 项目 | 文件 |
+|----|------|------|------|
+| #224 | P0 | WS认证 + Shell exec | 5 |
+| #225 | P1 | SSE Header+JWT+TokenBucket+沙箱+白名单+bandit | 16 |
+| #226 | P2 | semgrep+Gitleaks+PyPI API+SQLite持久化+日志+请求限制 | 9 |
+| #227 | UX短期 | 模式选择+Diff+搜索+Banner+骨架屏+连接管理+设置 | 9 |
+| #228 | UX中期 | 计划卡片+@-mention+Rules+命令面板+工具展开 | 6 |
+
+### 最终评分
+- **安全**: 2.5 → 4.3 (+1.8), 17/18 已修复
+- **UX**: 2.8 → 4.2 (+1.4), 12/16 已修复
+
+### 关键决策
+- P0-2 (.env) 用户跳过——密钥轮换后单独修
+- UX 长期 4 项（对话分支/i18n/面板拖拽/MCP前端）后续迭代
+- P1-3 JWT 替代静态 token——PyJWT 新依赖，条件导入降级
+- P1-5 TokenBucket sync→async breaking change——影响面仅 resource_guard 一处
+- P2-4/5 SQLite 替代 Redis 持久化——Redis 基础设施不可用
+
+### 踩坑
+- Pydantic Settings frozen → monkeypatch.setattr 失败 → unittest.mock.patch module-level
+- linter 反复 revert 文件 → Commit 前确认文件状态
+- git stash pop 导致分支切换冲突 → reset --merge 清理
+- 构建防复发：CI poetry.lock 不同步导致全红（已有问题）
+
+---
+
 ## 2026-07-07(夜) — TerminalShell UI 四合一修复 + 构建链根治 (PR #228 · MERGED)
 
 ### 交付

@@ -42,6 +42,9 @@ gitpython = "^3.1.50"
 turbovec = ">=0.8.0"            # MIT — TurboQuant 零训练向量索引 (Rust)
 sentence-transformers = ">=5.6.0" # Apache 2.0 — BGE 本地嵌入模型
 tzdata = "^2026.2"
+	# 微信集成——QR 码生成（P1 修复：加入显式依赖）
+	qrcode = ">=8.2"
+	pillow = ">=12.3.0"
 
 [tool.poetry.group.dev.dependencies]
 # 测试（开发计划 3.4.1）

@@ -22,11 +22,13 @@ try:
     import orbit.api.routes.insights_routes, orbit.api.routes.compliance_routes  # noqa
     import orbit.api.routes.terminal_routes, orbit.api.routes.diagnostics_ws  # noqa
     import orbit.api.routes.config_routes  # noqa
+    import orbit.api.routes.wechat_routes  # noqa
     import orbit.api.routes.health  # noqa
     import orbit.files.service, orbit.lsp.service  # noqa
     import orbit.review.models, orbit.review.service  # noqa
     import orbit.brief  # noqa
     import orbit.prompt.ponytail_rules, orbit.review.ponytail  # noqa
+    import orbit.integration.wechat  # noqa
 except Exception as e:
     print(f"Import error: {e}", flush=True)
     import traceback; traceback.print_exc(file=_log)

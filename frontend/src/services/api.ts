@@ -45,3 +45,7 @@ export async function apiPut<T = unknown>(path: string, body: unknown): Promise<
     body: JSON.stringify(body),
   })
 }
+
+export async function apiDelete<T = unknown>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' })
+}

@@ -1,5 +1,30 @@
 # Orbit 开发会话记录
 
+## 2026-07-07(夜) — TerminalShell UI 四合一修复 + 构建链根治 (PR #228 · MERGED)
+
+### 交付
+- **窗口可见性**: Tauri 窗口加 `.center()` `.focused()` `.visible()` — 修复透明窗口创建在屏幕外的问题
+- **文件树折叠自适应**: `gridColumns()` computed 替代行内 style — 修复折叠后聊天区不扩宽
+- **文件树跟项目走**: `/api/v1/files/tree?dir=` 参数 + 前端传 `currentProjectPath` — 修复打开 CIF 项目后文件树展示默认目录
+- **API 响应格式统一**: `/tree` 端点改为 `{code:0, data:{files}}` — 修复 `apiGet` 校验失败静默崩溃
+- **Metrics HTTP 500**: `_histogram_avg()` 加 `except AttributeError` — 修复 prometheus_client 0.25 兼容性
+- **Metrics UI 乱码**: `AgentInfoPanel` tokens/intercepted 求和显示 — 修复 `[object Object]` 问题
+- **Session 路径丢失**: `local_path` 列 + ORBIT_HOME 绝对路径 + `effective_path` 别名 — 修复下拉全是同名 Orbit
+- **微信 503**: `setup_wechat()` 注入 — 修复微信集成未初始化
+- **代码图谱 500**: `GraphBase.metadata.create_all` — 修复 `code_nodes` 表未建
+- **聊天代码块**: `MessageItem` \`\`\` 解析 + ↗ Monaco 打开 + `CodeDiffPanel` drawer + `hasCodeOutput` watcher
+- **构建缓存根治**: 前端 `dist/` `.vite/` `assets/` + Python `__pycache__/` 全清 + `NoCacheStaticFiles` 禁用 WebView2 缓存
+- **PyInstaller 包缺失**: `orbit.spec` 自动发现不再跳过 `__init__.py` — 修复子包无法导入
+
+### 踩坑记录
+| 现象 | 根因 | 预防 |
+|------|------|------|
+| 文件树永远展示默认目录 | `files/tree` 返回 `{files}` 而非 `{code:0,data:{files}}` → `apiGet` code 校验 500 → 静默 catch | API 响应格式统一标准 |
+| 构建后运行时行为与源码不一致 | `__pycache__` 残留旧 `.pyc` 污染 PyInstaller | build-desktop.sh 加 `find __pycache__ -exec rm` |
+| WebView2 加载旧前端 | Tauri 缓存 `index.html` 无 Cache-Control | `NoCacheStaticFiles` 加 `no-cache` 头 |
+| Session `local_path` 永远为空 | `SELECT s.*, COALESCE() as local_path` 列名冲突 → row 取到 s.* 空值 | 别名改为 `effective_path` |
+| 多窗口并行改同一文件 | 合并冲突残留重复 `local_path=lp` + `local_path=local_path` | 改前确认无其他窗口动文件 |
+
 ## 2026-07-07 — 测试覆盖率冲刺 (PR #227 · MERGED)
 
 ### 交付

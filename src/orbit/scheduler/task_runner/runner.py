@@ -28,6 +28,12 @@ from orbit.agents.base import AgentInput, AgentRole
 from orbit.agents.context import ContextStage, TaskContext
 from orbit.api.schemas.task import TaskState
 from orbit.checkpoint.manager import CheckpointData, CheckpointManager
+from orbit.scheduler.task_runner import (
+    FAST_LANE_TRANSITIONS,
+    STATE_TRANSITIONS,
+    _state_to_progress,
+    _transition,
+)
 from orbit.events.bus import EventBus
 from orbit.events.schemas import DashboardEvent, TaskUpdatePayload, TokenUpdatePayload
 from orbit.memory.models import MemoryFileType
@@ -337,6 +343,8 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
             self._audit_logger.log(
                 "orchestrator", "agent_start", task_id=task_id, role=role
             )
+
+        agent_context = self._build_context(task_id, context)
 
         try:
             try:

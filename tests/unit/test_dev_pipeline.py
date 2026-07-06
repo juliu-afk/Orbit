@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -51,7 +52,7 @@ class TestOrchestratorRunAgent:
 
         from orbit.scheduler.orchestrator import Scheduler
 
-        sched = Scheduler(agent_llms=None, agent_factory=FakeFactory)
+        sched = Scheduler(agent_llms={"developer": MagicMock()}, agent_factory=FakeFactory)
         output = await sched._task_runner._run_agent("developer", "test-task", {"prd": "write add function"})
         assert "add" in output or "code" in output.lower() or "ok" in output.lower()
 
@@ -96,7 +97,7 @@ class TestRunAgentRealFactory:
         from orbit.agents.factory import AgentFactory
         from orbit.scheduler.orchestrator import Scheduler
 
-        sched = Scheduler(agent_llms=None, agent_factory=AgentFactory)
+        sched = Scheduler(agent_llms={"developer": MagicMock()}, agent_factory=AgentFactory)
         output = await sched._task_runner._run_agent("developer", "test-real", {"prd": "write add function"})
         assert "mock" in output.lower() or "code" in output.lower()
 
@@ -110,7 +111,7 @@ class TestRunAgentRealFactory:
 
         bus = EventBus()
         sched = Scheduler(
-            agent_llms=None,
+            agent_llms={"developer": MagicMock()},
             event_bus=bus,
             agent_factory=AgentFactory,
         )

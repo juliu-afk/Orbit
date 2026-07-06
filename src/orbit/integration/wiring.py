@@ -269,3 +269,16 @@ class OrbitWiring:
         task._monitor_queue = queue  # type: ignore[attr-defined]  # 供主 Agent 推送事件
         logger.debug("monitor_started", task_id=task_id, goal=goal[:60])
         return task
+
+
+# ── 模块级单例 ──
+
+_wiring_instance: OrbitWiring | None = None
+
+
+def get_wiring() -> OrbitWiring:
+    """获取全局 OrbitWiring 单例——懒初始化。"""
+    global _wiring_instance
+    if _wiring_instance is None:
+        _wiring_instance = OrbitWiring()
+    return _wiring_instance

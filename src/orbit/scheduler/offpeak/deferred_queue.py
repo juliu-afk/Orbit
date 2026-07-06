@@ -9,7 +9,8 @@ import asyncio
 import json
 import os
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import cast, get_args
 
 import structlog
 

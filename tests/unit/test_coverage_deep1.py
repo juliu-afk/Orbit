@@ -18,13 +18,15 @@ from orbit.observability.probes import (
     _probe_llm_gateway,
     _probe_session_store,
 )
-from orbit.scheduler.offpeak_scheduler import (
+from orbit.scheduler.offpeak import (
     DeferredQueue,
-    DeferredTask,
     OffPeakScheduler,
     PeakWindowManager,
-    ProviderPeakConfig,
+)
+from orbit.scheduler.offpeak_models import (
+    DeferredTask,
     PeakWindow,
+    ProviderPeakConfig,
 )
 
 

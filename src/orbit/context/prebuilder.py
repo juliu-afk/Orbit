@@ -22,6 +22,9 @@ class ContextPrebuilder(ABC):
     role: str = ""  # 子类覆盖——对应 AgentRole.value
     max_chars_per_field: int = 5000  # 与 PromptBuilder/TaskContext 一致
 
+    # P2: Prebuilder 实例缓存——首次创建后复用，避免每次 build_for_role() 新建 5 个实例
+    _instances: dict[str, ContextPrebuilder] = {}
+
     @abstractmethod
     def build(self, raw_context: dict[str, Any]) -> dict[str, Any]:
         """裁剪 context dict——返回裁剪后的 dict。
@@ -67,12 +70,18 @@ class ContextPrebuilder(ABC):
         from orbit.context.prebuilders.qa import QAContextPrebuilder  # noqa: F401
         from orbit.context.prebuilders.reviewer import ReviewerContextPrebuilder  # noqa: F401
 
-        mapping: dict[str, ContextPrebuilder] = {
-            "clarifier": ClarifierContextPrebuilder(),
-            "architect": ArchitectContextPrebuilder(),
-            "developer": DeveloperContextPrebuilder(),
-            "reviewer": ReviewerContextPrebuilder(),
-            "qa": QAContextPrebuilder(),
-            "chatter": DeveloperContextPrebuilder(),  # chatter 用 developer 规则（通用对话→编程意图）
-        }
+        mapping: dict[str, ContextPrebuilder] = {}
+
+        # P2: 检查缓存——首次创建后复用实例
+        for role_key, cls in [
+            ("clarifier", ClarifierContextPrebuilder),
+            ("architect", ArchitectContextPrebuilder),
+            ("developer", DeveloperContextPrebuilder),
+            ("reviewer", ReviewerContextPrebuilder),
+            ("qa", QAContextPrebuilder),
+        ]:
+            if role_key not in ContextPrebuilder._instances:
+                ContextPrebuilder._instances[role_key] = cls()
+            mapping[role_key] = ContextPrebuilder._instances[role_key]
+        mapping["chatter"] = mapping["developer"]  # chatter 用 developer 规则
         return mapping.get(role, DeveloperContextPrebuilder())

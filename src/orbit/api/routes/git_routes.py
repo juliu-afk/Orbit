@@ -9,19 +9,10 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+# P2: 改用共享 _workspace.py 模块——消除 7 个路由重复定义
+from orbit.api.routes._workspace import _ws, set_workspace as set_workspace_dir  # noqa: E402
+
 router = APIRouter(prefix="/git", tags=["git"])
-_workspace_dir: str | None = None
-
-
-def set_workspace_dir(d: str) -> None:
-    global _workspace_dir
-    _workspace_dir = d
-
-
-def _ws() -> str:
-    if _workspace_dir is None:
-        raise RuntimeError("workspace not set")
-    return _workspace_dir
 
 
 class GpgKey(BaseModel):

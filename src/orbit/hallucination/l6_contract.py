@@ -80,7 +80,10 @@ class L6ContractValidator:
                 code_ep = code_endpoints[key]  # type: ignore[index]
                 matches = self._compare_endpoint(ep, code_ep)
                 violations.extend([m for m in matches if not m.matched])
-            # NOTE: spec 中定义但代码未实现的端点不报错（可能是其他文件定义）
+            # NOTE: spec 中定义但代码未实现的端点不报错——设计意图：
+            # 一个 OpenAPI spec 可能由多个微服务共同实现，当前服务仅负责
+            # 其中部分端点。未在当前代码库找到的端点由其他服务/文件提供，
+            # 不应视为合规违规。如需全量校验，使用 l8_config 配置漂移检测。
 
         if violations:
             result = ValidationResult(

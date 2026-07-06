@@ -249,7 +249,8 @@ from orbit.tools.registry import ToolRegistry  # noqa: E402
 
 ToolRegistry.get_instance().set_permission(_permission_engine)
 
-_checkpoint_manager = CheckpointManager(redis_client=_redis_client)
+# P2: _redis_client 可能为 None（Redis 连接失败时降级为内存模式）
+_checkpoint_manager = CheckpointManager(redis_client=_redis_client if _redis_client else None)
 _scheduler = Scheduler(
     agent_llms=_agent_llms,
     event_bus=_event_bus,

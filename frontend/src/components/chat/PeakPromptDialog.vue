@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { formatTime } from '@/utils/time'
-
-export interface PeakPromptData {
-  goal_id: string; provider: string; next_offpeak: string; prompt: string
-}
+import type { PeakPromptData } from '@/stores/peak'
 
 const visible = defineModel<boolean>('visible', { required: true })
 const props = defineProps<{ data: PeakPromptData | null }>()

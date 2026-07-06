@@ -127,3 +127,36 @@ async def get_hover_info(symbol: str = Query(...)):
         return f"**{symbol}**" if exists else None
     except (RuntimeError, ValueError):
         return None
+
+
+# P2: TestGapDetector API——测试覆盖空洞检测接入
+@router.get("/test-gaps")
+async def get_test_gaps(function: str = Query(..., min_length=1)):
+    """检测指定函数的测试覆盖空洞——基于参数类型 × 已有测试值。
+
+    WHY: TestGapDetector 已在 PR #201 实现但从未接入生产路径。
+    """
+    if _code_graph is None:
+        return {"code": 0, "data": {"gaps": [], "message": "CodeGraph 未初始化"}}
+    try:
+        from orbit.graph.engines.test_gap_detector import TestGapDetector
+        detector = TestGapDetector()
+        gaps = await detector.detect(_code_graph, function)
+        return {
+            "code": 0,
+            "data": {
+                "function": function,
+                "gaps": [
+                    {
+                        "param": g.param_name,
+                        "type": g.param_type,
+                        "covered": g.covered_values,
+                        "missing": g.missing_cases,
+                    }
+                    for g in gaps
+                ],
+                "total": len(gaps),
+            },
+        }
+    except Exception as e:
+        return {"code": 0, "data": {"gaps": [], "message": str(e)}}

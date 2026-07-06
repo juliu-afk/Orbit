@@ -5,10 +5,14 @@ AuditLogger：封装 structlog，绑定 trace_id/task_id/component，
 
 LessonStore：SQLite 表 agentops_lessons，存储任务成败教训，
            支持按 domain/task_id 查询。
+
+v0.21 P2：审计哈希链——每条教训含 prev_hash=SHA256(上一条)，
+         确保审计记录不可篡改（财税合规基线）。
 """
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 import time
 from dataclasses import dataclass, field
@@ -101,6 +105,8 @@ class LessonStore:
     def __init__(self, db_path: str = "data/lessons.db") -> None:
         self._db_path = db_path
         self._conn: sqlite3.Connection | None = None
+        # P2 审计哈希链——每条教训记录前一条的 SHA256，确保不可篡改
+        self._prev_hash: str = ""
 
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
@@ -124,7 +130,9 @@ class LessonStore:
                 outcome TEXT NOT NULL CHECK (outcome IN ('success','failure')),
                 lesson TEXT NOT NULL,
                 tags TEXT DEFAULT '',
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                prev_hash TEXT DEFAULT '',
+                record_hash TEXT DEFAULT ''
             )
             """)
         self._get_conn().execute(
@@ -148,11 +156,17 @@ class LessonStore:
 
         conn = self._get_conn()
         tags_str = ",".join(tags) if tags else ""
+        # P2 审计哈希链：record_hash = SHA256(prev_hash + 本记录数据)
+        record_data = f"{task_id}|{domain}|{outcome}|{lesson}|{tags_str}"
+        record_hash = hashlib.sha256(
+            (self._prev_hash + record_data).encode("utf-8")
+        ).hexdigest()
         cursor = conn.execute(
-            "INSERT INTO agentops_lessons (task_id, domain, outcome, lesson, tags) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (task_id, domain, outcome, lesson, tags_str),
+            "INSERT INTO agentops_lessons (task_id, domain, outcome, lesson, tags, prev_hash, record_hash) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (task_id, domain, outcome, lesson, tags_str, self._prev_hash, record_hash),
         )
+        self._prev_hash = record_hash
         conn.commit()
         row = conn.execute(
             "SELECT * FROM agentops_lessons WHERE id = ?", (cursor.lastrowid,)

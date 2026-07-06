@@ -21,7 +21,7 @@ import structlog
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, TYPE_CHECKING, cast, get_args
+from typing import Any, TYPE_CHECKING, get_args
 
 import yaml
 
@@ -588,6 +588,7 @@ class DeferredQueue:
 
     @staticmethod
     def _row_to_task(row: sqlite3.Row) -> DeferredTask:
+        assert row["status"] in get_args(DeferredStatus), f"无效 DeferredStatus: {row['status']}"
         return DeferredTask(
             id=row["id"],
             goal_description=row["goal_description"],
@@ -597,8 +598,6 @@ class DeferredQueue:
             estimated_duration_seconds=row["estimated_duration_seconds"],
             target_window_start=row["target_window_start"],
             target_window_end=row["target_window_end"],
-            status=row["status"],  # type: ignore[arg-type]  # DB 写时约束枚举值，运行时安全
-            assert row["status"] in get_args(DeferredStatus), f"无效状态: {row['status']}"
             created_at=row["created_at"],
             released_at=row["released_at"],
             completed_at=row["completed_at"],

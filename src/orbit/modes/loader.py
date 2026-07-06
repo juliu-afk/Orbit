@@ -125,3 +125,33 @@ class ModeLoader:
             if config and state in config.applies_to:
                 return config
         return None
+
+    # ── Mode 写回（G6 ModeTuner 用）────────────
+
+    def update_behavior(self, mode_name: str, params: dict) -> ModeConfig | None:
+        """修改 mode.yaml 中 behavior 字段并写回磁盘，清除缓存.
+
+        WHY 公开方法: ModeTuner 不应直接访问 _modes_dir / _cache。
+        """
+        import yaml as _yaml
+
+        yaml_path = self._modes_dir / mode_name / "mode.yaml"
+        if not yaml_path.exists():
+            logger.warning("mode_file_missing_for_update", mode=mode_name)
+            return None
+
+        try:
+            raw = _yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+            if raw is None:
+                return None
+            behavior = raw.setdefault("behavior", {})
+            behavior.update(params)
+            yaml_path.write_text(
+                _yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False),
+                encoding="utf-8",
+            )
+            self._cache.pop(mode_name, None)  # 清除缓存——下次 load() 重新读
+            return self.load(mode_name)
+        except (OSError, _yaml.YAMLError) as e:
+            logger.warning("mode_update_failed", mode=mode_name, error=str(e))
+            return None

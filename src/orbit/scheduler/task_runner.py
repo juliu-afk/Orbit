@@ -240,6 +240,44 @@ class TaskRunner:
                 self._wire("on_task_end", task_id, "failed", 0.0, turns=cycle_count)
                 return state
 
+        # G6: 任务完成时自动评分——三维度：用户反馈/会话质量/交付结果
+        if state == TaskState.DONE:
+            try:
+                from orbit.modes.scorer import TaskQualityScorer
+
+                chat_history = context.get("history", [])
+                clarifier_result = context.get("artifacts", {}).get("PARSING")
+                review_data = context.get("artifacts", {}).get("VERIFYING", {})
+                review_passed = (
+                    review_data.get("passed", False)
+                    if isinstance(review_data, dict) else False
+                )
+                quality = TaskQualityScorer.score(
+                    task_id=task_id,
+                    chat_history=chat_history,
+                    clarifier_result=clarifier_result,
+                    task_state="DONE",
+                    review_passed=review_passed,
+                )
+                if self._audit_logger:
+                    self._audit_logger.log(
+                        "task_runner", "quality_score",
+                        task_id=task_id, status="info",
+                        detail={
+                            "total": quality.total,
+                            "user_satisfaction": quality.user_satisfaction,
+                            "session_quality": quality.session_quality,
+                            "delivery_outcome": quality.delivery_outcome,
+                        },
+                    )
+                logger.info(
+                    "task_quality_scored",
+                    task_id=task_id,
+                    total=quality.total,
+                )
+            except Exception:
+                logger.debug("quality_score_skipped", task_id=task_id, exc_info=True)
+
         # Phase F: 接线——任务完成 + 周期蒸馏
         self._wire("on_task_end", task_id, "completed" if state == TaskState.DONE else str(state.value), 0.8, turns=cycle_count)
         try:

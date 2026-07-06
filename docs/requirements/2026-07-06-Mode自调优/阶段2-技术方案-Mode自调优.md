@@ -12,7 +12,7 @@
 | AC4-6 | `/mode fast/deep/reset` + 回复确认 | US2 |
 | AC7 | 自然语言检测"快点"/"别问了"/"问细点" | US2 |
 | AC8 | Agent 首条 reply 带模式前缀 | US3 |
-| AC9 | compose 技能也带前缀 | US3 |
+| AC9 | compose 技能也带前缀 | US3 — **P2 远期**（子 agent 输出格式复杂） |
 | AC10 | mode 切换后前缀立即变化 | US3 |
 | AC11 | 现有测试全绿 | 回归 |
 | AC12 | 新增 ≥12 条测试 | 覆盖率 |

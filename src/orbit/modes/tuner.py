@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import structlog
-import yaml
 
 if TYPE_CHECKING:
     from orbit.modes.loader import ModeLoader

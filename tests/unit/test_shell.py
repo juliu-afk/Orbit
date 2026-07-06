@@ -235,7 +235,7 @@ async def test_exec_command_success(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"hello world", b""))
 
-    with patch("asyncio.create_subprocess_shell", AsyncMock(return_value=mock_proc)):
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=mock_proc)):
         result = await exec_command("git status")
 
     assert "[exit:0]" in result
@@ -252,7 +252,7 @@ async def test_exec_command_with_stderr(monkeypatch: pytest.MonkeyPatch) -> None
     mock_proc.returncode = 1
     mock_proc.communicate = AsyncMock(return_value=(b"", b"error msg"))
 
-    with patch("asyncio.create_subprocess_shell", AsyncMock(return_value=mock_proc)):
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=mock_proc)):
         result = await exec_command("git invalid")
 
     assert "[exit:1]" in result
@@ -269,7 +269,7 @@ async def test_exec_command_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_proc = AsyncMock()
     mock_proc.communicate = AsyncMock(side_effect=asyncio.TimeoutError())
 
-    with patch("asyncio.create_subprocess_shell", AsyncMock(return_value=mock_proc)):
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=mock_proc)):
         result = await exec_command("sleep 100")
 
     assert "超时" in result
@@ -284,7 +284,7 @@ async def test_exec_command_with_warnings(monkeypatch: pytest.MonkeyPatch) -> No
     mock_proc.returncode = 0
     mock_proc.communicate = AsyncMock(return_value=(b"", b""))
 
-    with patch("asyncio.create_subprocess_shell", AsyncMock(return_value=mock_proc)):
+    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=mock_proc)):
         result = await exec_command("git push --force")
 
     assert "⚠" in result

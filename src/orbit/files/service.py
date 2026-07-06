@@ -90,7 +90,8 @@ class FileService:
                 if ext not in TEXT_EXT and f not in NAMELESS_WHITELIST:
                     continue
                 full = Path(root) / f
-                rel = str(full.relative_to(self.workspace)).replace("\\", "/")
+                base = Path(walk_root) if root_override else self.workspace
+                rel = str(full.relative_to(base)).replace("\\", "/")
                 files.append(
                     FileInfo(path=rel, size=full.stat().st_size, status=FileStatus.UNCHANGED)
                 )

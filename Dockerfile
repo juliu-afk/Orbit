@@ -1,6 +1,6 @@
 # Orbit 生产镜像（Step 7.1）
-# WHY python:3.12-slim：轻量（~150MB），包含必要的 C 扩展编译工具链
-FROM python:3.12-slim
+# WHY python:3.11-slim：与 pyproject.toml 约束一致（>=3.11,<3.14）
+FROM python:3.11-slim
 
 WORKDIR /app
 

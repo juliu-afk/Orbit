@@ -137,7 +137,7 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
     <!-- UX-11: 命令面板 Cmd+K -->
     <CommandPalette :visible="showCommandPalette" @close="showCommandPalette = false" @execute="onCmdExecute" />
     <!-- UX-10: Rules 面板 -->
-    <el-drawer v-model="showRules" title="Rules & Memory" direction="rtl" size="480px"><RulesPanel :show="showRules" /></el-drawer>
+    <el-drawer v-model="showRules" title="Rules & Memory" direction="rtl" size="480px"><RulesPanel /></el-drawer>
   <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
   <!-- WHY 代码产物抽屉: task:update WS 推送代码 output → 自动弹出展示 -->
   <el-drawer v-model="showCodeDiff" title="Generated Code" direction="rtl" size="520px" @close="handleCloseCodeDiff">

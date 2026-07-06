@@ -11,13 +11,15 @@
       <textarea v-model="rulesText" class="rules-textarea" placeholder="# AGENTS.md&#10;&#10;Project-specific instructions for AI agents..." />
       <div class="rules-actions">
         <button class="rules-save" @click="saveRules">Save</button>
-        <span class="rules-hint">Saved to project root AGENTS.md</span>
+        <span class="rules-hint" v-if="!saveMsg">Saved to project root AGENTS.md</span>
+        <span class="rules-hint" style="color:var(--color-orbit-error)" v-else>{{ saveMsg }}</span>
       </div>
     </div>
 
     <!-- Memory 浏览器 -->
     <div v-if="tab === 'memory'" class="memory-list">
-      <div v-if="!memories.length" class="memory-empty">No memories yet. Agent decisions and learnings appear here.</div>
+      <div v-if="loadError" class="memory-empty" style="color:var(--color-orbit-warn)">{{ loadError }}</div>
+      <div v-else-if="!memories.length" class="memory-empty">No memories yet. Agent decisions and learnings appear here.</div>
       <div v-for="m in memories" :key="m.id" class="memory-item">
         <div class="memory-type">{{ m.type }}</div>
         <div class="memory-text">{{ m.text }}</div>
@@ -28,39 +30,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-
-const props = defineProps<{ show: boolean }>()
-const emit = defineEmits<{ (e: 'update:show', v: boolean): void }>()
+import { ref, onMounted } from 'vue'
 
 const tab = ref<'rules' | 'memory'>('rules')
 const rulesText = ref('')
 const memories = ref<Array<{ id: string; type: string; text: string; time: string }>>([])
+const loadError = ref('')
+const saveMsg = ref('')  // P2: 保存状态反馈
 
-// 加载 AGENTS.md
-watch(() => props.show, async (v) => {
-  if (!v) return
+// 加载 AGENTS.md + Memory
+onMounted(async () => {
   try {
     const resp = await fetch('/api/v1/files/read?path=AGENTS.md')
     if (resp.ok) rulesText.value = await resp.text()
-  } catch { /* 文件不存在 */ }
+  } catch { rulesText.value = '# AGENTS.md\n\n(无法读取——请手动创建)' }
   try {
     const resp = await fetch('/api/v1/memory/list')
     if (resp.ok) {
       const data = await resp.json()
       memories.value = (data.data || data || []).slice(0, 20)
     }
-  } catch { /* API 不可用 */ }
+  } catch { loadError.value = 'Memory API 不可用' }
 })
 
 async function saveRules() {
+  saveMsg.value = ''
   try {
-    await fetch('/api/v1/files/write', {
+    const resp = await fetch('/api/v1/files/write', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: 'AGENTS.md', content: rulesText.value }),
     })
-  } catch { /* 静默失败 */ }
+    saveMsg.value = resp.ok ? 'Saved' : 'Save failed'
+  } catch { saveMsg.value = 'API 不可用' }
 }
 </script>
 

@@ -110,7 +110,7 @@ class TestTaskKeywords:
 class TestDecisionLog:
     """决策日志集成——懒初始化 + fail-open + 查询注入 + [DECISION] 记录."""
 
-    @patch("orbit.agents.react_agent.DecisionLog")
+    @patch("orbit.agents.react_agent.agent.DecisionLog")
     def test_get_decision_log_lazy_init(self, mock_decision_log_cls):
         """_get_decision_log creates DecisionLog on first call, caches subsequent."""
         mock_instance = MagicMock()
@@ -129,7 +129,7 @@ class TestDecisionLog:
         assert result2 is mock_instance
         assert mock_decision_log_cls.call_count == 1
 
-    @patch("orbit.agents.react_agent.DecisionLog")
+    @patch("orbit.agents.react_agent.agent.DecisionLog")
     def test_get_decision_log_fail_open(self, mock_decision_log_cls):
         """_get_decision_log returns None when DecisionLog() raises."""
         mock_decision_log_cls.side_effect = OSError("disk full or permission denied")

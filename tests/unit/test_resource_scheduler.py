@@ -69,3 +69,31 @@ class TestResourceScheduler:
     def test_unknown_task_can_proceed(self) -> None:
         sched = ResourceScheduler()
         assert sched.can_proceed("nonexistent") is False
+
+    # -- 覆盖缺口 --
+
+    def test_critical_preempts_active_low(self) -> None:
+        """CRITICAL 抢占已在运行中的 LOW 任务（lines 132-150）。"""
+        sched = ResourceScheduler(ResourceQuota(max_concurrent_tasks=1))
+        sched.submit("t-low", TaskPriority.LOW)
+        # t-low 已活跃，再用 CRITICAL 抢占
+        assert sched.submit("t-critical", TaskPriority.CRITICAL) is True
+        assert sched.get_task("t-low") is None  # 被抢占
+        assert sched.get_task("t-critical") is not None
+
+    def test_sandbox_limit_can_proceed(self) -> None:
+        """沙箱实例超限 → can_proceed=False（line 174-175）。"""
+        sched = ResourceScheduler(ResourceQuota(max_sandbox_instances=0))
+        sched.submit("t1")
+        assert sched.can_proceed("t1") is False
+
+    def test_long_run_demotion(self) -> None:
+        """长时间运行任务 → 降级 LOW（lines 178-180）。"""
+        sched = ResourceScheduler(
+            ResourceQuota(long_run_threshold_seconds=-1)  # 立即触发
+        )
+        sched.submit("t1", TaskPriority.HIGH)
+        sched.can_proceed("t1")  # 触发降级
+        t = sched.get_task("t1")
+        assert t is not None
+        assert t.priority == TaskPriority.LOW

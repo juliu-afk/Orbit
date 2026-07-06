@@ -608,18 +608,6 @@ class ReActAgent(BaseAgent):
         except Exception:
             logger.debug("decision_log_init_failed", exc_info=True)
             return None
-    # ── 内部 ─────────────────────────────────────────────
-
-    def _get_decision_log(self) -> DecisionLog | None:
-        """懒初始化决策日志——fail-open，异常不阻塞 Agent."""
-        if self._decision_log is not None:
-            return self._decision_log
-        try:
-            self._decision_log = DecisionLog()
-            return self._decision_log
-        except Exception:
-            logger.debug("decision_log_init_failed", exc_info=True)
-            return None
 
     async def _emit(self, task_id: str, event_type: str, data: dict) -> None:
         """推送事件到 EventBus——对标 OpenCode fullStream events。

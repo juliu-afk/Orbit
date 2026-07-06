@@ -111,3 +111,115 @@ class TestToolRegistry:
         invs = reg.get_invocations()
         assert len(invs) == 2
         assert invs[0]["status"] == "success"
+
+    # -- 覆盖缺口 --
+
+    def test_get_instance_singleton(self) -> None:
+        """get_instance 返回同一实例。"""
+        a = ToolRegistry.get_instance()
+        b = ToolRegistry.get_instance()
+        assert a is b
+
+    def test_register_tool_new_api(self) -> None:
+        """新 register_tool API——工具集+并发分类。"""
+        reg = ToolRegistry()
+        reg.register_tool(
+            name="read",
+            toolset="filesystem",
+            schema={"name": "read", "parameters": {"path": "str"}},
+            handler=_echo_handler,
+        )
+        schemas = reg.get_schemas()
+        assert len(schemas) > 0
+
+    def test_list_for_role_developer(self) -> None:
+        """developer 角色可用的工具列表。"""
+        reg = ToolRegistry()
+        # 用新 API 注册——会自动添加到 ROLE_TOOLS
+        reg.register_tool(
+            name="read_file",
+            toolset="filesystem",
+            schema={"name": "read_file"},
+            handler=_echo_handler,
+        )
+        tools = reg.list_for_role("developer")
+        assert isinstance(tools, list)
+        names = {t["name"] for t in tools}
+        assert "read_file" in names
+
+    def test_list_for_role_unknown(self) -> None:
+        """未知角色 → 空列表（最小权限）。"""
+        reg = ToolRegistry()
+        tools = reg.list_for_role("nonexistent_role_xyz")
+        assert tools == []
+
+    def test_get_schema(self) -> None:
+        reg = ToolRegistry()
+        reg.register(ToolSchema(name="x", version="2.0.0"), _echo_handler)
+        s = reg.get_schema("x")
+        assert s is not None
+        assert s.name == "x"
+        assert s.version == "2.0.0"
+
+    def test_get_schema_nonexistent(self) -> None:
+        reg = ToolRegistry()
+        with pytest.raises(ToolNotFoundError):
+            reg.get_schema("no_such_tool")
+
+    def test_would_form_loop(self) -> None:
+        reg = ToolRegistry()
+        reg.record_tool_call("agent1", "edit", {"path": "a.py"})
+        reg.record_tool_call("agent1", "edit", {"path": "a.py"})
+        reg.record_tool_call("agent1", "edit", {"path": "a.py"})
+        reg.record_tool_call("agent1", "edit", {"path": "a.py"})
+        assert reg.would_form_loop("agent1", "edit", {"path": "a.py"}) is True
+
+    def test_would_not_form_loop_yet(self) -> None:
+        reg = ToolRegistry()
+        reg.record_tool_call("agent1", "edit", {"path": "a.py"})
+        assert reg.would_form_loop("agent1", "edit", {"path": "a.py"}) is False
+
+    def test_clear_tool_history(self) -> None:
+        reg = ToolRegistry()
+        reg.record_tool_call("agent1", "edit", {"path": "a.py"})
+        reg.clear_tool_history("agent1")
+        assert reg.would_form_loop("agent1", "edit", {"path": "a.py"}) is False
+
+    def test_should_parallelize_path_scoped(self) -> None:
+        from orbit.tools.registry import ToolCall
+        reg = ToolRegistry()
+        calls = [
+            ToolCall(name="edit_file", args={"path": "a.py"}),
+            ToolCall(name="edit_file", args={"path": "b.py"}),
+        ]
+        parallel, serial = reg._should_parallelize(calls)
+        # 不同路径 → 可并行
+        assert len(parallel) == 2
+        assert len(serial) == 0
+
+    def test_should_parallelize_same_path_serial(self) -> None:
+        from orbit.tools.registry import ToolCall
+        reg = ToolRegistry()
+        calls = [
+            ToolCall(name="edit_file", args={"path": "a.py"}),
+            ToolCall(name="edit_file", args={"path": "a.py"}),
+        ]
+        parallel, serial = reg._should_parallelize(calls)
+        # 同路径 → 串行
+        assert len(serial) > 0
+
+    def test_should_parallelize_never_parallel(self) -> None:
+        from orbit.tools.registry import ToolCall
+        reg = ToolRegistry()
+        calls = [
+            ToolCall(name="exec_command", args={"cmd": "ls"}),
+        ]
+        parallel, serial = reg._should_parallelize(calls)
+        assert len(parallel) == 0
+        assert len(serial) > 0
+
+    def test_version_key(self) -> None:
+        from orbit.tools.registry import _version_key
+        assert _version_key("2.0.0") > _version_key("1.0.0")
+        assert _version_key("1.10.0") > _version_key("1.2.0")
+        assert _version_key("1.0.0") == _version_key("1.0.0")

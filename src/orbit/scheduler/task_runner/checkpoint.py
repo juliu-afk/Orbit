@@ -256,22 +256,4 @@ class TaskCheckpointMixin:
         # 最多 20 个关键词，避免 prompt 膨胀
         return uniq[:20]
 
-    # Phase F: 接线辅助方法
-    def _wire(self, method: str, *args, **kwargs) -> None:
-        """调用 OrbitWiring 方法——fail-open。"""
-        try:
-            w = self._get_wiring()
-            if w: getattr(w, method)(*args, **kwargs)
-        except Exception:
-            logger.warning("wire_call_failed", method=method, exc_info=True)
-
-    def _get_wiring(self):
-        if self._wiring is None:
-            try:
-                from orbit.integration.wiring import OrbitWiring
-                self._wiring = OrbitWiring()
-            except Exception:
-                logger.warning("wiring_init_failed", exc_info=True)
-        return self._wiring
-
 

@@ -28,6 +28,7 @@ from orbit.agents.react_agent.utils import _truncate_output
 from orbit.events.schemas import DashboardEvent
 from orbit.gateway.schemas import LLMRequest
 from orbit.memory.decision_log import DecisionLog, parse_decision_marker
+from orbit.metacognition.vigil import VigilSelfHealer
 from orbit.stream.cancellation import CancellationToken
 from orbit.stream.events import StreamEvent, StreamEventType
 from orbit.tools.registry import DoomLoopError, ToolRegistry
@@ -71,6 +72,7 @@ class ReActAgent(BaseAgent):
         task_keywords: list[str] | None = None,  # 模板匹配关键词（模板库减熵）
         reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
         preact_engine: PreActEngine | None = None,  # Phase D: PreAct
+        vigil_healer: VigilSelfHealer | None = None,  # Phase D: VIGIL 自愈
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
@@ -90,6 +92,8 @@ class ReActAgent(BaseAgent):
         # Phase A: ReflAct 反思引擎
         self._reflection_engine = reflection_engine
         self._preact_engine = preact_engine
+        # Phase D: VIGIL 自愈运行时
+        self._vigil_healer = vigil_healer
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——向后兼容 wrapper。
@@ -390,8 +394,30 @@ class ReActAgent(BaseAgent):
                                     )
                                 except DoomLoopError:
                                     result_str = "检测到工具调用死循环，请换一种方式。"
+                                    # Phase F: 记录死循环事件到情节记忆
+                                    try:
+                                        from orbit.integration.wiring import get_wiring
+                                        get_wiring().record_event(task_id, f"Doom loop: {tool_name}", "repeated", ["doom_loop", tool_name])
+                                    except Exception:
+                                        pass
                                 except Exception as e:
-                                    result_str = f"工具执行失败: {str(e)}"
+                                    error_text = str(e)
+                                    # Phase F: VIGIL 自愈诊断
+                                    if self._vigil_healer:
+                                        try:
+                                            diagnosis = self._vigil_healer.diagnose(error_text)
+                                            if diagnosis.auto_fixable:
+                                                heal = self._vigil_healer.heal(diagnosis, tool_name, tool_args)
+                                                messages.append({"role": "user", "content": f"[VIGIL 自愈建议] {heal.message}"})
+                                        except Exception:
+                                            pass  # VIGIL fail-open
+                                    result_str = f"工具执行失败: {error_text}"
+                                    # Phase F: 记录工具错误到情节记忆
+                                    try:
+                                        from orbit.integration.wiring import get_wiring
+                                        get_wiring().record_event(task_id, f"Tool error: {tool_name}", "failed", [tool_name])
+                                    except Exception:
+                                        pass
 
                                 truncated = _truncate_output(result_str, MAX_RESULT_CHARS)
 
@@ -408,6 +434,16 @@ class ReActAgent(BaseAgent):
                                         "result_preview": truncated[:200],
                                     },
                                 )
+
+                                # Phase F: 推送事件到 Monitor Agent
+                                try:
+                                    from orbit.integration.wiring import get_wiring
+                                    get_wiring().feed_monitor(task_id, {
+                                        "type": "tool_result",
+                                        "data": {"tool": tool_name, "result_size": len(result_str)},
+                                    })
+                                except Exception:
+                                    pass  # fail-open
 
                                 # 更新消息历史
                                 messages.append(
@@ -495,6 +531,12 @@ class ReActAgent(BaseAgent):
                         if reflection.is_drifting():
                             logger.info("reflact_drift_detected", task_id=task_id, turn=turn,
                                          alignment=reflection.goal_alignment, confidence=reflection.confidence)
+                            # Phase F: 记录漂移事件到情节记忆
+                            try:
+                                from orbit.integration.wiring import get_wiring
+                                get_wiring().record_event(task_id, "Goal drift detected", "drifted", ["drift", f"confidence:{reflection.confidence}"])
+                            except Exception:
+                                pass
                             if reflection.correction_needed:
                                 messages.append({"role": "user", "content": f"任务可能偏离目标——{reflection.correction_needed}。请重新对准原始目标: {self._goal.description if hasattr(self._goal, 'description') else str(self._goal)}"})
                                 continue

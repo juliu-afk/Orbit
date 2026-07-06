@@ -114,7 +114,6 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
         self._audit_logger = audit_logger
         self._fast_lane = fast_lane
         self._tool_registry = tool_registry
-        self._wiring = None
         self._edit_detector = EditStabilityDetector()
 
     async def run_task(self, task_id: str, prd: str) -> TaskState:
@@ -135,7 +134,7 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
         keywords = self._extract_keywords(prd)
         context["keywords"] = keywords
 
-        # Phase F: 接线——任务开始 + 轨迹
+        # Phase F: 接线——任务开始 + 轨迹 + 用户画像
         # WHY fail-open: 接线模块是可选的——失败不阻塞任务执行
         try:
             from orbit.integration.wiring import get_wiring
@@ -143,6 +142,14 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
             if w:
                 project_id = context.get("project_id", "")
                 w.on_task_start(task_id, prd, project_id=project_id)
+                # 加载用户画像
+                if project_id:
+                    try:
+                        profile = w.load_profile(project_id)
+                        if profile:
+                            context["user_profile"] = profile
+                    except Exception:
+                        pass
                 # 异步启动监控——不阻塞任务管线
                 try:
                     asyncio.create_task(
@@ -186,11 +193,15 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
         )
 
         # Phase F: 接线——任务完成 + 周期蒸馏
-        self._wire("on_task_end", task_id,
+        try:
+            from orbit.integration.wiring import get_wiring
+            get_wiring().on_task_end(task_id,
                    "completed" if state == TaskState.DONE else str(state.value),
                    0.8, turns=cycle_count)
+        except Exception:
+            pass
         try:
-            w = self._get_wiring()
+            w = get_wiring()
             if w:
                 asyncio.create_task(w.maybe_distill())
         except Exception:
@@ -327,6 +338,15 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
             else:
                 raise RuntimeError(f"角色 {role} 无可用 LLMClient")
 
+        # Phase F: 创建五大能力引擎实例（fail-open: llm=None时各引擎内部skip）
+        from orbit.agents.reflection import ReflectionEngine
+        from orbit.agents.preact import PreActEngine
+        from orbit.metacognition.vigil import VigilSelfHealer
+
+        ref_engine = ReflectionEngine(llm=llm) if llm else None
+        pre_engine = PreActEngine(llm=llm, tools=self._tool_registry) if llm and self._tool_registry else None
+        vigil = VigilSelfHealer()
+
         agent = self._agent_factory.create(
             role,
             llm=llm,
@@ -336,6 +356,9 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
             event_bus=self._event_bus,
             compressor=self._compressor,
             budget_tracker=self._budget_tracker,
+            reflection_engine=ref_engine,   # Phase A: ReflAct
+            preact_engine=pre_engine,       # Phase D: PreAct
+            vigil_healer=vigil,             # Phase D: VIGIL
         )
 
         context["mode"] = getattr(agent, "_mode", None)

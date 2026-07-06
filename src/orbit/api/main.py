@@ -260,6 +260,7 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 from orbit.files.service import FileService  # noqa: E402
 from orbit.review.models import ReviewBase  # noqa: E402
 from orbit.review.service import ReviewService  # noqa: E402
+from orbit.graph.models.nodes import Base as GraphBase  # noqa: E402  # WHY: 代码图谱表建表
 
 _review_engine = create_async_engine(settings.DATABASE_URL, echo=False)
 _review_session_factory = async_sessionmaker(_review_engine, expire_on_commit=False)
@@ -382,6 +383,7 @@ async def _app_lifespan(app: FastAPI) -> None:
     # 审查模块建表（原 _init_review_tables）
     async with _review_engine.begin() as conn:
         await conn.run_sync(ReviewBase.metadata.create_all)
+        await conn.run_sync(GraphBase.metadata.create_all)  # WHY: 代码图谱 code_nodes/edges 表
 
     # D13: 高峰避让延迟调度器（原 _init_offpeak）
     if settings.OFFPEAK_ENABLED:
@@ -418,6 +420,21 @@ async def _app_lifespan(app: FastAPI) -> None:
         logger.info("code_graph_index_built", directory=_ws_dir, files=_graph_files)
     except Exception:
         logger.warning("code_graph_index_failed", directory=_ws_dir, exc_info=True)
+
+    # 微信集成——初始化绑定管理器 + 消息通道
+    # WHY 条件初始化: npx/cc-weixin 在桌面 exe 环境可能不存在，优雅降级
+    try:
+        from orbit.integration.wechat.bind import BindManager  # noqa: E402
+        from orbit.integration.wechat.channel import WechatChannel  # noqa: E402
+
+        _wechat_bind_manager = BindManager(db_path="data/wechat.db")
+        _wechat_channel = WechatChannel()
+        importlib.import_module("orbit.api.routes.wechat_routes").setup_wechat(
+            _wechat_bind_manager, _wechat_channel
+        )
+        logger.info("wechat_initialized")
+    except Exception:
+        logger.warning("wechat_init_failed", exc_info=True)
 
     yield  # 应用运行中
 

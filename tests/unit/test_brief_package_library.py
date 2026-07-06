@@ -199,6 +199,46 @@ class TestPackageLibrary:
         assert decision.decision == "skip"
         assert "无匹配" in decision.reason
 
+    # ── 覆盖缺口 ──
+
+    def test_save_index_before_load(self) -> None:
+        """_save_index 在未加载 index 时直接返回（line 97）。"""
+        lib = PackageLibrary()
+        lib._index = None
+        # 不应崩——直接 return
+        lib._save_index()
+
+    def test_get_skeleton_nonexistent(self) -> None:
+        """不存在的包→空字符串（line 254）。"""
+        lib = PackageLibrary()
+        result = lib.get_skeleton("nonexistent-pkg-12345")
+        assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_decide_injection_fallback_skip_large(self) -> None:
+        """LLM 解析失败 + 大项目（file_count≥5）→ 降级 skip（line 365）。"""
+        lib = PackageLibrary(library_path="D:/OrbitBasePackages")
+        candidates = lib.search(language="python", framework="fastapi")
+
+        class MockResponse:
+            content = "totally broken response!!!"
+            model = "openai/glm-5.2"
+
+        class MockLLM:
+            async def generate(self, req, task_id, agent_name=""):
+                return MockResponse()
+
+        decision = await lib.decide_injection(
+            MockLLM(),  # type: ignore[arg-type]
+            language="python",
+            framework="fastapi",
+            features=[],
+            project_file_count=10,
+            candidate_packages=candidates,
+        )
+        assert decision.decision == "skip"
+        assert "降级规则" in decision.reason
+
 
 class TestBasePackageModel:
     def test_to_dict_roundtrip(self) -> None:

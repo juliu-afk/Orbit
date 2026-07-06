@@ -21,7 +21,7 @@ import structlog
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, TYPE_CHECKING, cast
+from typing import Any, TYPE_CHECKING, cast, get_args
 
 import yaml
 
@@ -588,6 +588,7 @@ class DeferredQueue:
 
     @staticmethod
     def _row_to_task(row: sqlite3.Row) -> DeferredTask:
+        assert row["status"] in get_args(DeferredStatus), f"无效 DeferredStatus: {row['status']}"
         return DeferredTask(
             id=row["id"],
             goal_description=row["goal_description"],

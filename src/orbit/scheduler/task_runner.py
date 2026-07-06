@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 import structlog
 
-from orbit.agents.base import AgentInput
+from orbit.agents.base import AgentInput, AgentRole
 from orbit.agents.context import ContextStage, TaskContext
 from orbit.api.schemas.task import TaskState
 from orbit.checkpoint.manager import CheckpointData, CheckpointManager

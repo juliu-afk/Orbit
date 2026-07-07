@@ -31,6 +31,7 @@ from orbit.agents.base import AgentRole, BaseAgent
 from orbit.agents.chatter import ChatterAgent
 from orbit.agents.clarifier import ClarifierAgent
 from orbit.agents.dream_agent import DreamAgent
+from orbit.agents.mcts import MCTSPlanner
 from orbit.agents.preact import PreActEngine
 from orbit.agents.react_agent import ReActAgent
 from orbit.agents.reflection import ReflectionEngine
@@ -84,7 +85,10 @@ class ArchitectAgent(ReActAgent):
 2. **相似经验回忆**：项目中是否有类似问题的已有实现？如有，标注参考。
 3. **多方案生成**：生成至少 2 个互斥的备选方案（不同架构模式、不同技术栈、不同粒度）
 4. **三维评分**：对每个方案从 [可行性/可维护性/性能] 三个维度打分（0-10），选最优
-5. **最优方案详述**：对最高分方案详细说明接口设计、数据流、需改动的文件"""
+5. **最优方案详述**：对最高分方案详细说明接口设计、数据流、需改动的文件
+6. **MCTS 多路径探索**：对于复杂度高的设计任务（≥3个模块交叉/跨系统对接），
+   可使用蒙特卡洛树搜索（self._mcts_planner）探索多条路径后再决策——
+   先展开2-3个候选方案为子节点，评估后回传奖励，选最优路径。"""
         tmpl_block = _build_templates_prompt(self._task_keywords)
         return f"{base}\n\n{extra}{tmpl_block}"
 
@@ -216,6 +220,7 @@ class AgentFactory:
         reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
         preact_engine: PreActEngine | None = None,  # Phase D: PreAct 预测规划
         vigil_healer: VigilSelfHealer | None = None,  # Phase D: VIGIL 自愈运行时
+        mcts_planner: MCTSPlanner | None = None,  # Phase D: MCTS 多路径探索
         mode: ModeConfig | None = None,  # G1: Mode File System——注入行为配置
     ) -> BaseAgent:
         """create = get_agent alias for orchestrator."""
@@ -225,6 +230,7 @@ class AgentFactory:
             compressor=compressor, budget_tracker=budget_tracker,
             task_keywords=task_keywords, reflection_engine=reflection_engine,
             preact_engine=preact_engine, vigil_healer=vigil_healer,
+            mcts_planner=mcts_planner,
             mode=mode,
         )
 
@@ -245,6 +251,7 @@ class AgentFactory:
         reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
         preact_engine: PreActEngine | None = None,  # Phase D: PreAct
         vigil_healer: VigilSelfHealer | None = None,  # Phase D: VIGIL
+        mcts_planner: MCTSPlanner | None = None,  # Phase D: MCTS
         mode: ModeConfig | None = None,  # G1: Mode File System——注入行为配置
     ) -> BaseAgent:
         """按角色创建 Agent 实例。
@@ -290,6 +297,7 @@ class AgentFactory:
                 reflection_engine=reflection_engine,  # Phase A: ReflAct
                 preact_engine=preact_engine,  # Phase D: PreAct
                 vigil_healer=vigil_healer,  # Phase D: VIGIL 自愈
+                mcts_planner=mcts_planner,  # Phase D: MCTS 多路径探索
             )
         else:
             agent = agent_cls(llm=llm, graph=graph, sandbox=sandbox)

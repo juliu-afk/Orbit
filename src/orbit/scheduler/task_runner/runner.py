@@ -339,6 +339,7 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
                 raise RuntimeError(f"角色 {role} 无可用 LLMClient")
 
         # Phase F: 创建五大能力引擎实例（fail-open: llm=None时各引擎内部skip）
+        from orbit.agents.mcts import MCTSPlanner
         from orbit.agents.reflection import ReflectionEngine
         from orbit.agents.preact import PreActEngine
         from orbit.metacognition.vigil import VigilSelfHealer
@@ -346,6 +347,8 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
         ref_engine = ReflectionEngine(llm=llm) if llm else None
         pre_engine = PreActEngine(llm=llm, tools=self._tool_registry) if llm and self._tool_registry else None
         vigil = VigilSelfHealer()
+        # MCTS: 仅 ArchitectAgent 使用——复杂设计时探索多路径
+        mcts = MCTSPlanner() if role == "architect" else None
 
         agent = self._agent_factory.create(
             role,
@@ -359,6 +362,7 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
             reflection_engine=ref_engine,   # Phase A: ReflAct
             preact_engine=pre_engine,       # Phase D: PreAct
             vigil_healer=vigil,             # Phase D: VIGIL
+            mcts_planner=mcts,              # Phase D: MCTS 多路径探索
         )
 
         context["mode"] = getattr(agent, "_mode", None)

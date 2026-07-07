@@ -353,6 +353,29 @@ class PromptBuilder:
             pkg_info += f"理由: {base_pkg.get('reason', '')}"
             parts.append(f"\n## 基础代码包\n{pkg_info[:500]}")
 
+        # Phase F: 用户画像注入——偏好、沟通风格、长期目标
+        user_profile = ctx.get("user_profile")
+        if user_profile and hasattr(user_profile, "display_name"):
+            profile_lines = ["\n## 用户画像"]
+            if user_profile.display_name:
+                profile_lines.append(f"- 用户: {user_profile.display_name}")
+            if user_profile.role:
+                profile_lines.append(f"- 角色: {user_profile.role}")
+            if user_profile.communication_style:
+                profile_lines.append(f"- 沟通风格: {user_profile.communication_style}")
+            if user_profile.decision_style:
+                profile_lines.append(f"- 决策偏好: {user_profile.decision_style}")
+            # 偏好键值对
+            if user_profile.preferences:
+                for k, v in user_profile.preferences.items():
+                    profile_lines.append(f"- {k}: {v}")
+            # 长期目标
+            if user_profile.goals:
+                goals_text = "、".join(user_profile.goals[:5])
+                profile_lines.append(f"- 长期目标: {goals_text}")
+            if len(profile_lines) > 1:
+                parts.append("\n".join(profile_lines))
+
         # Phase 2: 记忆注入——Agent 工作记忆 + 记忆检索结果
         working_memory = ctx.get("working_memory")
         if working_memory and hasattr(working_memory, "body") and working_memory.body:

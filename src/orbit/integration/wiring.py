@@ -33,7 +33,15 @@ import structlog
 logger = structlog.get_logger("orbit.integration.wiring")
 
 # 每 N 个完成任务触发一次离线蒸馏
-DISTILL_EVERY_N_TASKS = 10
+# WHY 环境变量: 允许部署时调整蒸馏频率而不改代码
+def _get_distill_interval() -> int:
+    import os
+    try:
+        return int(os.environ.get("ORBIT_DISTILL_EVERY_N_TASKS", "10"))
+    except (ValueError, TypeError):
+        return 10
+
+DISTILL_EVERY_N_TASKS = _get_distill_interval()
 
 
 class OrbitWiring:

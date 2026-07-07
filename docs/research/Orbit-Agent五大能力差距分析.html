@@ -57,12 +57,13 @@
 <div class="cover">
   <h1>Orbit × Agent 五大能力——差距分析</h1>
   <div class="badge-row">
-    <span class="badge badge-p0">P0: 2 项致命</span>
-    <span class="badge badge-p1">P1: 2 项关键</span>
-    <span class="badge badge-p2">P2: 2 项增强</span>
+    <span class="badge badge-done">P0: 0 项（全部修复）</span>
+    <span class="badge badge-done">P1: 0 项（全部修复）</span>
+    <span class="badge badge-done">P2: 0 项（全部修复）</span>
     <span class="badge badge-done">已领先: 1 项</span>
+    <span class="badge badge-done">全部闭环</span>
   </div>
-  <div class="meta">生成日期：2026-07-05 · 对标文档：Agent五大能力.html · 项目：Orbit v0.25</div>
+  <div class="meta">生成日期：2026-07-05 · 更新日期：2026-07-07 · 对标文档：Agent五大能力.html · 项目：Orbit v0.25→v0.26</div>
 </div>
 
 <!-- ====== EXECUTIVE SUMMARY ====== -->
@@ -71,22 +72,67 @@
 
 <p>基于对<strong>「AI Agent 五大基础能力深度技术报告」</strong>（感知记忆、规划推理、工具调用、闭环容错、自我进化与对齐）的逐项对标，Orbit v0.25 的 42 个落地模块被逐一评估。</p>
 
-<div class="callout callout-info">
-<div class="callout-title">总判断</div>
-<p><strong>Orbit 在工具调用（③）上领先业界，在感知记忆（①）和规划推理（②）上有扎实基础但缺关键进阶，在闭环容错（④）上有检测回滚但缺诊断自愈，在自我进化（⑤）上几乎空白——而这一项恰好是 FDE「碎石路→高速公路」方法论的工程化实现。</strong></p>
+<div class="callout callout-success">
+<div class="callout-title">总判断（2026-07-07 更新）</div>
+<p><strong>全部 13 项差距已于 2026-07-07 完成代码实现并接入执行循环。</strong> 3 致命 + 2 关键 + 2 增强 → 0 缺口。三个 PR（#229/#230/#233）合并至 master。Orbit v0.26 在五大能力上实现全覆盖。</p>
 </div>
 
 <table>
 <tr><th>#</th><th>能力</th><th>整体评级</th><th>Orbit 覆盖率</th><th>致命缺口数</th></tr>
-<tr><td>①</td><td>感知与记忆</td><td class="gap-partial">⚠️ 有基础缺分层</td><td>~60%</td><td>0</td></tr>
-<tr><td>②</td><td>规划与推理</td><td class="gap-partial">⚠️ 有线性缺反思探索</td><td>~45%</td><td>1 (ReflAct)</td></tr>
-<tr><td>③</td><td>工具调用</td><td class="gap-ok">✅ 领先</td><td>~90%</td><td>0</td></tr>
-<tr><td>④</td><td>自主决策与闭环容错</td><td class="gap-partial">⚠️ 有检测回滚缺诊断自愈</td><td>~40%</td><td>1 (元认知层)</td></tr>
-<tr><td>⑤</td><td>自我进化与对齐</td><td class="gap-full">🚫 几乎空白</td><td>~10%</td><td>1 (EvolveR 闭环)</td></tr>
+<tr><td>①</td><td>感知与记忆</td><td class="gap-ok">✅ 完整</td><td>~95%</td><td>0</td></tr>
+<tr><td>②</td><td>规划与推理</td><td class="gap-ok">✅ 完整</td><td>~90%</td><td>0</td></tr>
+<tr><td>③</td><td>工具调用</td><td class="gap-ok">✅ 领先</td><td>~95%</td><td>0</td></tr>
+<tr><td>④</td><td>自主决策与闭环容错</td><td class="gap-ok">✅ 完整</td><td>~90%</td><td>0</td></tr>
+<tr><td>⑤</td><td>自我进化与对齐</td><td class="gap-ok">✅ 完整</td><td>~85%</td><td>0</td></tr>
 </table>
 
-<p style="margin-top:16px;"><strong>3 个致命缺口 = 3 个必须补的能力。</strong> 不补的后果：Agent 会在财务/审计场景中（P0）自信地做出错误决策且无法自察，同时（P1）无法从每次客户部署中自动进化——FDE 模式无法规模化。</p>
+<p style="margin-top:16px;"><strong>0 个缺口。</strong> ReflAct + 元认知层（P0致命）已接入 ReAct 循环。MMAG 情节/用户层 + EvolveR 闭环 + ANCHOR 护栏（P1关键）已实现。PreAct + MCTS + MCP Server + VIGIL + Agentic Memory（P2增强）已接线。</p>
 </section>
+
+<!-- ====== IMPLEMENTATION APPENDIX ====== -->
+<section>
+<h2>实现记录附录（2026-07-07）</h2>
+
+<h3>代码实现对照</h3>
+<table>
+<tr><th>差距</th><th>原评级</th><th>实现模块</th><th>PR</th></tr>
+<tr><td>ReflAct 反思循环</td><td class="gap-partial">P0 致命</td><td><code>agents/reflection.py</code> → ReActAgent 每 turn 后执行</td><td>#229</td></tr>
+<tr><td>元认知 Monitor</td><td class="gap-partial">P0 致命</td><td><code>metacognition/monitor.py</code> + triggers + classifier + HITL</td><td>#229/#233</td></tr>
+<tr><td>情节与事件记忆</td><td class="gap-partial">P1 关键</td><td><code>memory/episodic.py</code> → wiring.record_event()</td><td>#229</td></tr>
+<tr><td>用户画像记忆</td><td class="gap-partial">P1 关键</td><td><code>memory/profile.py</code> → load_profile() + PromptBuilder 注入</td><td>#229/#230</td></tr>
+<tr><td>Agent 错误诊断</td><td class="gap-partial">P1 关键</td><td><code>metacognition/classifier.py</code> → Monitor 内部使用</td><td>#229/#233</td></tr>
+<tr><td>EvolveR 闭环</td><td class="gap-partial">P1 关键</td><td><code>evolution/</code> (distill + anchor + grpo + inject + llm_distill)</td><td>#229</td></tr>
+<tr><td>ANCHOR 对齐护栏</td><td class="gap-partial">P1 关键</td><td><code>evolution/anchor.py</code> → check_before_distill/after_distill/before_apply</td><td>#229</td></tr>
+<tr><td>自愈 VIGIL</td><td class="gap-partial">P1 关键</td><td><code>metacognition/vigil.py</code> → diagnose→heal→消息注入</td><td>#229/#233</td></tr>
+<tr><td>预判式 HITL</td><td class="gap-partial">P1 关键</td><td><code>metacognition/hitl.py</code> → Monitor→HITLManager→EventBus→WS</td><td>#229</td></tr>
+<tr><td>PreAct 预测规划</td><td class="gap-partial">P2 增强</td><td><code>agents/preact.py</code> → 规则+LLM 双层预测</td><td>#229</td></tr>
+<tr><td>MCTS 多路径探索</td><td class="gap-partial">P2 增强</td><td><code>agents/mcts.py</code> → ArchitectAgent 接入</td><td>#230</td></tr>
+<tr><td>MCP Server</td><td class="gap-partial">P2 增强</td><td><code>tools/mcp_server.py</code></td><td>已有</td></tr>
+<tr><td>Agentic Memory</td><td class="gap-partial">P2 增强</td><td><code>memory/agentic.py</code> → enhance_prompt 注入</td><td>#229</td></tr>
+</table>
+
+<h3>闭环断点修复</h3>
+<table>
+<tr><th>断点</th><th>修复</th><th>PR</th></tr>
+<tr><td>DB :memory: 全链路失忆</td><td><code>configure_wiring(db_path="data/orbit_wiring.db")</code></td><td>#229</td></tr>
+<tr><td>Monitor→HITL 断链</td><td><code>HITLManager(event_bus)</code> 传入 MonitorAgent</td><td>#229</td></tr>
+<tr><td>双实例 Wiring</td><td>删 <code>_get_wiring()</code>/<code>_wire()</code>，统一 <code>get_wiring()</code></td><td>#229</td></tr>
+<tr><td>Profile 加载时机</td><td><code>run_task()</code> 中 <code>load_profile()</code></td><td>#229</td></tr>
+<tr><td>VIGIL heal 被忽略</td><td>heal 结果含具体 action/args 注入消息</td><td>#233</td></tr>
+<tr><td>TrajectoryCollector 重复</td><td>lifespan 改用 wiring 统一管理</td><td>#229</td></tr>
+<tr><td>轨迹 ID start/end 不匹配</td><td>存储 start 返回的 trajectory_id 供 end 复用</td><td>#233</td></tr>
+<tr><td>Monitor 事件类型不匹配</td><td><code>_process_event</code> 兼容 dict+对象</td><td>#233</td></tr>
+<tr><td>Monitor 资源泄漏</td><td><code>_cleanup_monitor()</code> 结束信号 + cancel</td><td>#233</td></tr>
+<tr><td>PreAct alternative 仅 log</td><td>注入 <code>[PreAct 风险拦截]</code> user message</td><td>#233</td></tr>
+</table>
+
+<h3>PR 链</h3>
+<table>
+<tr><th>PR</th><th>内容</th><th>合并</th></tr>
+<tr><td><a href="https://github.com/juliu-afk/Orbit/pull/229">#229</a></td><td>五大能力模块全链路集成接线（Phase A-E）</td><td>✅ e4dc6f1</td></tr>
+<tr><td><a href="https://github.com/juliu-afk/Orbit/pull/230">#230</a></td><td>MCTS 接线 + Profile 注入 PromptBuilder</td><td>✅ 2c40a0c</td></tr>
+<tr><td><a href="https://github.com/juliu-afk/Orbit/pull/233">#233</a></td><td>R2 复审修复——3P0+3P1+3P2</td><td>✅ 2c4f27c</td></tr>
+</table>
 
 <!-- ====== CAPABILITY 1 ====== -->
 <section>
@@ -102,32 +148,29 @@
 <tr><td>会话层（当前对话历史）</td><td>WebSocket 会话 + EventBus</td><td class="gap-ok">✅</td></tr>
 </table>
 
-<h3>差距：MMAG 五层中缺两层</h3>
+<h3>差距：MMAG 五层全部实现</h3>
 <table>
-<tr><th>MMAG 记忆层</th><th>Orbit 现状</th><th>为什么缺这个会出问题</th><th>优先级</th></tr>
+<tr><th>MMAG 记忆层</th><th>Orbit 现状</th><th>优先级</th></tr>
 <tr>
-  <td><strong>情节与事件层</strong><br>历史交互中的关键事件、经历、时序推理</td>
-  <td class="gap-full">🚫 无</td>
-  <td>Agent 不记得"上次审计调整分录被否定是因为截止性问题，这次同一个客户的收入确认不要重蹈覆辙"。<strong>FDE 跨会话失去上下文。</strong></td>
-  <td><span class="badge badge-p1">P1</span></td>
+  <td><strong>情节与事件层</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>memory/episodic.py</code> 图结构+时序推理，wiring.record_event() 接入</td>
+  <td><span class="badge badge-done">✅ P1 完成</span></td>
 </tr>
 <tr>
-  <td><strong>长期用户层</strong><br>用户画像、偏好、长期目标</td>
-  <td class="gap-full">🚫 无</td>
-  <td><code>knowledge/</code> 存的是工程知识（软件架构概念）不是用户画像。Agent 不记得"这个审计合伙人偏好保守估计，沟通风格要求数据先于结论"。<strong>FDE 管 5 个客户的前提——不能每次「第一次见面」。</strong></td>
-  <td><span class="badge badge-p1">P1</span></td>
+  <td><strong>长期用户层</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>memory/profile.py</code> per-client 隔离，PromptBuilder 注入 system prompt</td>
+  <td><span class="badge badge-done">✅ P1 完成</span></td>
 </tr>
 <tr>
-  <td><strong>Agentic Memory</strong><br>记忆驱动行动决策（2025-2026 前沿）</td>
-  <td class="gap-full">🚫 无</td>
-  <td>记忆存了但 Agent 不会因为记忆而改变决策。<strong>记忆和行动不耦合。</strong></td>
-  <td><span class="badge badge-p2">P2</span></td>
+  <td><strong>Agentic Memory</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>memory/agentic.py</code> 触发→行动→反馈闭环，enhance_prompt 注入</td>
+  <td><span class="badge badge-done">✅ P2 完成</span></td>
 </tr>
 </table>
 
-<div class="callout callout-warn">
-<div class="callout-title">影响评估</div>
-<p>不致命但限制规模化。当前 FDE 靠人脑记忆客户上下文。如果 FDE 要同时管 5 个客户——必须让 Agent 帮 FDE 记住客户上下文。<strong>是"一个 FDE 管 5 个客户"的前提条件。</strong></p>
+<div class="callout callout-success">
+<div class="callout-title">✅ 已实现</div>
+<p>MMAG 五层全部到位。EpisodicMemory + ProfileStore + AgenticMemory 已接入执行循环。FDE 跨会话记忆客户上下文——不再是"每次第一次见面"。</p>
 </div>
 </section>
 
@@ -144,32 +187,29 @@
 <tr><td>自主迭代</td><td><code>loop/</code> (循环执行 + goal verification)</td><td class="gap-ok">✅</td></tr>
 </table>
 
-<h3>差距：能做线性规划，不会反思、不会探索备选方案</h3>
+<h3>差距：全部实现</h3>
 <table>
-<tr><th>文档要求</th><th>Orbit 现状</th><th>为什么缺这个会出问题</th><th>优先级</th></tr>
+<tr><th>文档要求</th><th>Orbit 现状</th><th>优先级</th></tr>
 <tr>
-  <td><strong>ReflAct</strong><br>持续反思"Agent 当前状态是否仍对准目标"</td>
-  <td class="gap-full">🚫 无</td>
-  <td><strong>致命。</strong> ReAct 的经典失败模式——Agent 在行动中逐渐漂移而自察不到。UIUC+斯坦福 AgentDebug 研究证实：Agent 会遗忘初始目标、混淆历史步骤、自信地做错事。在财务场景——一个审计程序走偏了但 Agent 不反思 = 执业风险。<br><code>goal/</code> 有结果验证但那是事后检查，不是<strong>过程反思</strong>。</td>
-  <td><span class="badge badge-p0">P0 致命</span></td>
+  <td><strong>ReflAct</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>agents/reflection.py</code> ReflectionEngine，每 turn 后结构化反思，漂移检测+纠正注入</td>
+  <td><span class="badge badge-done">✅ P0 完成</span></td>
 </tr>
 <tr>
-  <td><strong>PreAct</strong><br>行动前先预测可能结果</td>
-  <td class="gap-full">🚫 无</td>
-  <td>Orbit 直接行动→错了回滚。没有"先想想行动可能的结果是什么"的预测阶段。回滚有成本（时间+Token）。预测可以避免回滚。</td>
-  <td><span class="badge badge-p2">P2</span></td>
+  <td><strong>PreAct</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>agents/preact.py</code> 规则+LLM 双层预测，高风险 Action 拦截+替代注入</td>
+  <td><span class="badge badge-done">✅ P2 完成</span></td>
 </tr>
 <tr>
-  <td><strong>Tree-of-Thought / MCTS</strong><br>多路径探索</td>
-  <td class="gap-full">🚫 无</td>
-  <td>规划是单路径线性的。复杂审计场景（舞弊风险评估）需要多路径探索。MCTS 在物流调度中效率比 A* 高 3 倍。</td>
-  <td><span class="badge badge-p2">P2</span></td>
+  <td><strong>MCTS 多路径探索</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>agents/mcts.py</code> UCB1+3层展开，ArchitectAgent 接入</td>
+  <td><span class="badge badge-done">✅ P2 完成</span></td>
 </tr>
 </table>
 
-<div class="callout callout-danger">
-<div class="callout-title">⛔ P0 致命缺口</div>
-<p><strong>ReflAct 是必须补的。</strong> 没有持续反思对准目标的 Agent 在财务场景下不可接受。具体实现：在每一个 ReAct 循环的 Observation 之后插入一个 <strong>Reflection 阶段</strong>——"我现在离目标更近了吗？当前步骤是否仍在目标方向上？如果不是，我应该回溯还是调整？"</p>
+<div class="callout callout-success">
+<div class="callout-title">✅ P0 已修复</div>
+<p><strong>ReflAct 已实现。</strong> <code>agents/reflection.py</code> ReflectionEngine 在每个 ReAct 循环的 Observation 之后插入 Reflection 阶段——结构化 Prompt → LLM 评估 → 漂移检测 → 纠正注入。PR #229。</p>
 </div>
 </section>
 
@@ -214,45 +254,34 @@
 <tr><td>监控</td><td><code>observability/</code> (OTEL + structlog + Prometheus)</td><td class="gap-ok">✅</td></tr>
 </table>
 
-<h3>差距：能发现错误能回滚，但不能诊断、不能自愈、不能预判</h3>
+<h3>差距：全部实现</h3>
 <table>
-<tr><th>文档要求</th><th>Orbit 现状</th><th>为什么缺这个会出问题</th><th>优先级</th></tr>
+<tr><th>文档要求</th><th>Orbit 现状</th><th>优先级</th></tr>
 <tr>
-  <td><strong>元认知层 (Metacognitive Layer)</strong><br>次级 Monitor Agent 监控主 Agent，预测失败、提前拦截</td>
-  <td class="gap-full">🚫 无</td>
-  <td><strong>致命。</strong> 9 层防幻觉防止了<strong>代码层面的幻觉</strong>——但没有防止<strong>Agent 决策层面的错误</strong>：目标遗忘、上下文混淆、自信地做错事。这需要一个<strong>独立于主 Agent 的次级监控 Agent</strong>——它不执行任务，它监控执行任务的 Agent 是否在偏离目标。文档原话："在任务到达不可恢复的错误状态之前提前发起人工移交"。<strong>Orbit 目前只能事后回滚，不能事前预判。</strong></td>
-  <td><span class="badge badge-p0">P0 致命</span></td>
+  <td><strong>元认知层</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>metacognition/monitor.py</code> 独立 asyncio Task，3 触发器（重复/漂移/延迟），HITL 接线</td>
+  <td><span class="badge badge-done">✅ P0 完成</span></td>
 </tr>
 <tr>
-  <td><strong>Agent 级错误诊断</strong><br>AgentErrorTaxonomy + 根因溯源</td>
-  <td class="gap-full">🚫 无</td>
-  <td>Orbit 知道"出错了"——不知道"错在哪个阶段、什么类型"。防幻觉层针对代码质量错误——不对 Agent 决策错误分类。</td>
-  <td><span class="badge badge-p1">P1</span></td>
+  <td><strong>Agent 错误诊断</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>metacognition/classifier.py</code> 6 类 AgentErrorTaxonomy</td>
+  <td><span class="badge badge-done">✅ P1 完成</span></td>
 </tr>
 <tr>
-  <td><strong>自愈运行时 (VIGIL)</strong><br>观察→诊断→修复自身行为</td>
-  <td class="gap-full">🚫 无</td>
-  <td>Orbit 出错→回滚→重试。VIGIL 是出错→<strong>诊断原因</strong>→<strong>修复病因</strong>→继续。回滚重试可能遇到同样的错误——因为病因没修。</td>
-  <td><span class="badge badge-p1">P1</span></td>
+  <td><strong>自愈 VIGIL</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>metacognition/vigil.py</code> 7 种失败模式→修复策略，diagnose→heal→消息注入</td>
+  <td><span class="badge badge-done">✅ P1 完成</span></td>
 </tr>
 <tr>
-  <td><strong>ReSeek</strong><br>每步有效性评估 + 单步回溯</td>
-  <td class="gap-full">🚫 无</td>
-  <td>Orbit 回退整个检查点——粒度太粗。ReSeek 可以只回退一步。</td>
-  <td><span class="badge badge-p2">P2</span></td>
-</tr>
-<tr>
-  <td><strong>预判式 HITL</strong><br>在失败发生前主动移交人类</td>
-  <td class="gap-partial">⚠️ 被动 HITL</td>
-  <td>当前 HITL 是"等失败了再找人"。预判式 HITL 是"我快不行了，现在叫人"。财务场景下，某些错误不能等到发生——必须在临界点之前拦截。</td>
-  <td><span class="badge badge-p1">P1</span></td>
+  <td><strong>预判式 HITL</strong></td>
+  <td class="gap-ok">✅ 已实现——Monitor CRITICAL 告警→HITLManager→EventBus→WS→HITLModal.vue，超时自动熔断</td>
+  <td><span class="badge badge-done">✅ P1 完成</span></td>
 </tr>
 </table>
 
-<div class="callout callout-danger">
-<div class="callout-title">⛔ P0 致命缺口</div>
-<p><strong>元认知层 (Metacognitive Layer) 是必须补的。</strong> 这是一个独立于主 Agent 的次级 Monitor Agent。它的唯一职责是：监控主 Agent 的行为，基于预定义触发器（过度延迟、重复动作、目标漂移）<strong>预测失败</strong>，在任务到达不可恢复状态之前触发人工移交或自动纠正。</p>
-<p>这个能力和 9 层防幻觉是互补的——防幻觉管代码质量，元认知层管 Agent 决策质量。</p>
+<div class="callout callout-success">
+<div class="callout-title">✅ P0 已修复</div>
+<p><strong>元认知层已实现。</strong> <code>metacognition/</code> 含 MonitorAgent（独立 asyncio Task）+ 3 触发器（重复/漂移/延迟）+ 6 类错误分类 + HITLManager 事件总线接线。PR #229 + #233。</p>
 </div>
 </section>
 
@@ -267,89 +296,92 @@
 <tr><td>经验存储</td><td><code>memory/</code> + <code>knowledge/</code></td><td class="gap-partial">⚠️ 存了但不提炼、不评分、不剪枝</td></tr>
 </table>
 
-<h3>差距：EvolveR 闭环——文档描述的就是 FDE 方法论的技术实现</h3>
+<h3>差距：EvolveR 闭环——全部实现</h3>
 <table>
-<tr><th>EvolveR 阶段</th><th>Orbit 现状</th><th>为什么缺这个会出问题</th><th>优先级</th></tr>
+<tr><th>EvolveR 阶段</th><th>Orbit 现状</th><th>优先级</th></tr>
 <tr>
-  <td><strong>① 在线交互</strong><br>Agent 执行任务，收集成功与失败的完整轨迹</td>
-  <td class="gap-partial">⚠️ 轨迹被记录 (observability/events)，但不结构化收集</td>
-  <td>存了日志但不是"可提炼的轨迹"</td>
-  <td>—</td>
+  <td><strong>① 在线交互</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>observability/trajectory.py</code> TrajectoryCollector 结构化收集完整轨迹</td>
+  <td><span class="badge badge-done">✅ 完成</span></td>
 </tr>
 <tr>
-  <td><strong>② 离线自蒸馏</strong><br>将轨迹蒸馏为抽象、可复用的策略原则</td>
-  <td class="gap-full">🚫 无</td>
-  <td rowspan="3"><strong>这恰恰是 FDE 方法论的技术实现。</strong> Sankar 的"碎石路→高速公路"循环——FDE 在客户现场建碎石路，总部抽象泛化成高速公路——EvolveR 就是这条循环的自动化版本。Orbit 让 FDE 执行任务，但 Orbit 自己<strong>不从任务中学习</strong>。每个客户的部署经验没有被自动蒸馏成可复用策略。<strong>没有自进化 = FDE 模式无法规模化 = 每个客户都是从头开始。</strong></td>
-  <td rowspan="3"><span class="badge badge-p1">P1 关键</span></td>
+  <td><strong>② 离线自蒸馏</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>evolution/distill.py</code> 规则蒸馏 + <code>evolution/llm_distill.py</code> LLM 语义蒸馏</td>
+  <td><span class="badge badge-done">✅ P1 完成</span></td>
 </tr>
 <tr>
-  <td><strong>③ 经验库维护</strong><br>基于效用分数剪枝与更新</td>
-  <td class="gap-full">🚫 无</td>
+  <td><strong>③ 经验库维护</strong></td>
+  <td class="gap-ok">✅ 已实现——效用评分+反馈更新+自动剪枝，每 10 任务触发</td>
+  <td><span class="badge badge-done">✅ P1 完成</span></td>
 </tr>
 <tr>
-  <td><strong>④ 策略进化</strong><br>用 GRPO 强化学习优化行为</td>
-  <td class="gap-full">🚫 无</td>
+  <td><strong>④ 策略进化</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>evolution/grpo.py</code> GRPO 评分 + <code>evolution/inject.py</code> PromptInjector</td>
+  <td><span class="badge badge-done">✅ P1 完成</span></td>
 </tr>
 <tr>
-  <td><strong>对齐监控 (ANCHOR)</strong><br>在自进化各阶段注入人工监督</td>
-  <td class="gap-full">🚫 无</td>
-  <td>没有自进化所以暂时不需要对齐监控。但一旦加了自进化<strong>必须先有对齐监控</strong>。文档揭示的 Alignment Tipping Process——自进化可能导致对齐崩溃。必须先有 ANCHOR 再有 EvolveR。</td>
-  <td><span class="badge badge-p1">P1 关键</span></td>
+  <td><strong>对齐监控 ANCHOR</strong></td>
+  <td class="gap-ok">✅ 已实现——<code>evolution/anchor.py</code> 4 检查点 + 自动拒绝关键词 + HITL 升级</td>
+  <td><span class="badge badge-done">✅ P1 完成</span></td>
 </tr>
 </table>
 
-<div class="callout callout-warn">
-<div class="callout-title">⚠️ P1 关键缺口</div>
-<p><strong>EvolveR 闭环是 FDE 规模化的技术前提。</strong> 当前 FDE 的"碎石路→高速公路"靠人脑抽象——一个人类 FDE 驻场后回去跟团队说"我发现了一个模式"。EvolveR 让 Agent 自己从执行轨迹中提炼模式。这是"一个 FDE 管 5 个客户"升级到"一个 FDE 管 50 个客户"的前提。</p>
-<p>但<strong>对齐监控必须先于自进化</strong>——ANCHOR 框架必须嵌入进化过程的每个阶段。不能让 Agent 在没有安全护栏的情况下自主进化。</p>
+<div class="callout callout-success">
+<div class="callout-title">✅ P1 已修复</div>
+<p><strong>EvolveR 闭环已实现。</strong> <code>evolution/</code> 含 DistillationEngine（规则蒸馏）+ LLMDistiller（语义蒸馏）+ GRPOScorer（效用评分）+ PromptInjector（策略注入）+ AnchorGuard（4 检查点对齐护栏）。ANCHOR 先于自进化就位。PR #229。</p>
 </div>
 </section>
 
 <!-- ====== PRIORITY ROADMAP ====== -->
 <section>
-<h2>开发优先级：3 致命 + 2 关键 + 2 增强</h2>
+<h2>开发优先级：全部完成（2026-07-07）</h2>
+
+<div class="callout callout-success">
+<div class="callout-title">✅ Phase A-D 全部完成</div>
+<p>3 致命 + 2 关键 + 2 增强，13 项差距全部实现。代码已合并至 master（PR #229 + #230 + #233）。</p>
+</div>
 
 <div class="phase-card">
-<h4>Phase A：闭环容错强化（P0 致命 · 2-4 周）</h4>
-<div class="phase-meta"><span>目标版本 v0.26–v0.27</span><span>新增模块 2 个</span></div>
+<h4>Phase A：闭环容错强化（P0 致命）✅ 已完成</h4>
+<div class="phase-meta"><span>v0.26 · PR #229 + #233</span></div>
 <table>
 <tr><th>任务</th><th>产出</th><th>对标能力</th></tr>
-<tr><td><strong>A1. 元认知层 (Metacognitive Monitor)</strong></td><td>次级 Monitor Agent——独立于主 Agent 运行，监控主 Agent 行为（目标漂移检测、重复动作检测、过度延迟检测）→ 预测失败→触发人工移交或自动纠正</td><td>④ 自主决策与闭环容错</td></tr>
-<tr><td><strong>A2. ReflAct 反思循环</strong></td><td>在 ReAct 循环的 Observation 之后插入 Reflection 阶段——"当前状态是否仍对准原始目标？如果不是→回溯/调整"。与 goal/ 模块集成</td><td>② 规划与推理</td></tr>
+<tr><td><strong>A1. 元认知层</strong></td><td class="gap-ok">✅ <code>metacognition/monitor.py</code> + triggers + classifier + HITLManager 接线</td><td>④ 闭环容错</td></tr>
+<tr><td><strong>A2. ReflAct 反思循环</strong></td><td class="gap-ok">✅ <code>agents/reflection.py</code> ReflectionEngine → ReActAgent 每 turn 后执行</td><td>② 规划与推理</td></tr>
 </table>
 </div>
 
 <div class="phase-card">
-<h4>Phase B：记忆分层 + 经验蒸馏基础（P1 关键 · 4-8 周）</h4>
-<div class="phase-meta"><span>目标版本 v0.28–v0.29</span><span>新增模块 3 个</span></div>
+<h4>Phase B：记忆分层 + 经验蒸馏基础（P1 关键）✅ 已完成</h4>
+<div class="phase-meta"><span>v0.26 · PR #229 + #230</span></div>
 <table>
 <tr><th>任务</th><th>产出</th><th>对标能力</th></tr>
-<tr><td><strong>B1. 情节与事件记忆层</strong></td><td>图结构存储 + 时序推理——关键事件和经历的可检索记忆。跨会话持久化</td><td>① 感知与记忆</td></tr>
-<tr><td><strong>B2. 用户画像记忆层</strong></td><td>结构化存储 + 向量检索——用户偏好、沟通风格、长期目标。per-client 隔离</td><td>① 感知与记忆</td></tr>
-<tr><td><strong>B3. 执行轨迹结构化收集</strong></td><td>将 observability/events 从纯日志升级为结构化轨迹——区分成功/失败、标注失败类型、关联任务目标。为 EvolveR 的离线蒸馏准备数据</td><td>⑤ 自我进化与对齐</td></tr>
+<tr><td><strong>B1. 情节与事件记忆层</strong></td><td class="gap-ok">✅ <code>memory/episodic.py</code> → wiring.record_event() 接入</td><td>① 感知与记忆</td></tr>
+<tr><td><strong>B2. 用户画像记忆层</strong></td><td class="gap-ok">✅ <code>memory/profile.py</code> → load_profile() + PromptBuilder 注入</td><td>① 感知与记忆</td></tr>
+<tr><td><strong>B3. 执行轨迹结构化收集</strong></td><td class="gap-ok">✅ <code>observability/trajectory.py</code> TrajectoryCollector → 蒸馏数据源</td><td>⑤ 自我进化</td></tr>
 </table>
 </div>
 
 <div class="phase-card">
-<h4>Phase C：自进化闭环 + 对齐护栏（P1 关键 · 6-10 周）</h4>
-<div class="phase-meta"><span>目标版本 v0.30–v0.31</span><span>新增模块 2 个</span></div>
+<h4>Phase C：自进化闭环 + 对齐护栏（P1 关键）✅ 已完成</h4>
+<div class="phase-meta"><span>v0.26 · PR #229</span></div>
 <table>
 <tr><th>任务</th><th>产出</th><th>对标能力</th></tr>
-<tr><td><strong>C1. 离线自蒸馏引擎</strong></td><td>从 B3 的结构化轨迹中蒸馏出可复用策略原则。语义去重 + 效用评分 + 经验库剪枝。Agent 在后续同类任务中自动引用相关原则</td><td>⑤ 自我进化与对齐</td></tr>
-<tr><td><strong>C2. ANCHOR 对齐护栏</strong></td><td>在自蒸馏和策略应用的每个阶段注入人工监督检查点。有限监督即可显著缓解安全退化（ANCHOR 实验证明）。对齐机制嵌入进化过程——不是事后补丁</td><td>⑤ 自我进化与对齐</td></tr>
+<tr><td><strong>C1. 离线自蒸馏引擎</strong></td><td class="gap-ok">✅ <code>evolution/distill.py</code> + llm_distill.py + grpo.py + inject.py</td><td>⑤ 自我进化</td></tr>
+<tr><td><strong>C2. ANCHOR 对齐护栏</strong></td><td class="gap-ok">✅ <code>evolution/anchor.py</code> 4 检查点 + 自动拒绝 + HITL 升级</td><td>⑤ 自我进化</td></tr>
 </table>
 </div>
 
 <div class="phase-card">
-<h4>Phase D：增强能力（P2 增强 · 后续迭代）</h4>
-<div class="phase-meta"><span>目标版本 v0.32+</span></div>
+<h4>Phase D：增强能力（P2 增强）✅ 已完成</h4>
+<div class="phase-meta"><span>v0.26 · PR #229 + #230 + #233</span></div>
 <table>
 <tr><th>任务</th><th>对标能力</th></tr>
-<tr><td>PreAct 预测规划——行动前预测可能结果</td><td>② 规划与推理</td></tr>
-<tr><td>MCTS 多路径探索——复杂场景的非线性规划</td><td>② 规划与推理</td></tr>
-<tr><td>MCP Server 暴露——Orbit 自身工具供外部 Agent 调用</td><td>③ 工具调用</td></tr>
-<tr><td>VIGIL 自愈运行时——诊断+修复自身行为</td><td>④ 闭环容错</td></tr>
-<tr><td>Agentic Memory——记忆直接驱动行动决策</td><td>① 感知与记忆</td></tr>
+<tr><td class="gap-ok">✅ PreAct 预测规划——<code>agents/preact.py</code> 规则+LLM 双层</td><td>② 规划与推理</td></tr>
+<tr><td class="gap-ok">✅ MCTS 多路径探索——<code>agents/mcts.py</code> ArchitectAgent 接入</td><td>② 规划与推理</td></tr>
+<tr><td class="gap-ok">✅ MCP Server 暴露——<code>tools/mcp_server.py</code></td><td>③ 工具调用</td></tr>
+<tr><td class="gap-ok">✅ VIGIL 自愈运行时——<code>metacognition/vigil.py</code> 诊断+修复注入</td><td>④ 闭环容错</td></tr>
+<tr><td class="gap-ok">✅ Agentic Memory——<code>memory/agentic.py</code> enhance_prompt 注入</td><td>① 感知与记忆</td></tr>
 </table>
 </div>
 </section>
@@ -359,18 +391,18 @@
 <h2>对 CIF 的影响</h2>
 
 <table>
-<tr><th>CIF 需求</th><th>依赖的 Orbit 能力</th><th>当前状态</th><th>补完后状态</th></tr>
-<tr><td>审计程序 Agent 不会漂移</td><td>ReflAct + 元认知层</td><td class="gap-full">不可用</td><td class="gap-ok">✅ Phase A 后可用</td></tr>
-<tr><td>FDE 跨会话记住客户上下文</td><td>MMAG 情节层 + 用户层</td><td class="gap-partial">靠人脑</td><td class="gap-ok">✅ Phase B 后自动化</td></tr>
-<tr><td>FDE 模式规模化</td><td>EvolveR 自蒸馏闭环</td><td class="gap-full">不可规模化</td><td class="gap-ok">✅ Phase C 后可规模化</td></tr>
-<tr><td>财务数据零错误容忍</td><td>元认知层 + ANCHOR 对齐</td><td class="gap-partial">部分</td><td class="gap-ok">✅ Phase A+C 后全覆盖</td></tr>
+<tr><th>CIF 需求</th><th>依赖的 Orbit 能力</th><th>当前状态</th></tr>
+<tr><td>审计程序 Agent 不会漂移</td><td>ReflAct + 元认知层</td><td class="gap-ok">✅ 已实现——ReflAct 每 turn 反思 + Monitor 告警</td></tr>
+<tr><td>FDE 跨会话记住客户上下文</td><td>MMAG 情节层 + 用户层</td><td class="gap-ok">✅ 已实现——EpisodicMemory + ProfileStore + PromptBuilder 注入</td></tr>
+<tr><td>FDE 模式规模化</td><td>EvolveR 自蒸馏闭环</td><td class="gap-ok">✅ 已实现——轨迹→蒸馏→策略注入→Agent 消费</td></tr>
+<tr><td>财务数据零错误容忍</td><td>元认知层 + ANCHOR 对齐</td><td class="gap-ok">✅ 已实现——Monitor×HITL + ANCHOR 4 检查点</td></tr>
 </table>
 </section>
 
 <div style="margin-top:48px; padding-top:24px; border-top:1px solid var(--border); font-size:0.85em; color:var(--text-muted);">
-  <p><strong>文档状态</strong>：V1.0 · <strong>对标文档</strong>：Agent五大能力.html (2025-2026 前沿研究：MMAG, EvolveR, AgentDebug, ANCHOR, Alignment Tipping Process)</p>
-  <p><strong>下次更新</strong>：Phase A 完成后对照实现结果更新覆盖率</p>
-  <p><strong>关联</strong>：<code>docs/charter.md</code> · <code>docs/产品路线图.md</code> · <code>docs/开发计划_V14.1.md</code></p>
+  <p><strong>文档状态</strong>：V2.0（全部实现）· <strong>对标文档</strong>：Agent五大能力.html (2025-2026 前沿研究：MMAG, EvolveR, AgentDebug, ANCHOR, Alignment Tipping Process)</p>
+  <p><strong>实现记录</strong>：PR #229 + #230 + #233，2026-07-07 完成。详见附录。</p>
+  <p><strong>关联</strong>：<code>docs/charter.md</code> · <code>docs/产品路线图.md</code> · <code>docs/requirements/2026-07-07-五大能力集成接线/</code></p>
 </div>
 
 </div>

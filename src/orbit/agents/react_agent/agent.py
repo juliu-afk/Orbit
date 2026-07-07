@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 import structlog
 
 from orbit.agents.base import AgentInput, AgentOutput, AgentRole, BaseAgent
+from orbit.agents.mcts import MCTSPlanner
 from orbit.agents.preact import PreActEngine
 from orbit.agents.reflection import ReflectionEngine
 from orbit.agents.react_agent.models import IterationBudget
@@ -73,6 +74,7 @@ class ReActAgent(BaseAgent):
         reflection_engine: ReflectionEngine | None = None,  # Phase A: ReflAct
         preact_engine: PreActEngine | None = None,  # Phase D: PreAct
         vigil_healer: VigilSelfHealer | None = None,  # Phase D: VIGIL 自愈
+        mcts_planner: MCTSPlanner | None = None,  # Phase D: MCTS 多路径探索
     ) -> None:
         super().__init__(llm=llm, graph=graph, sandbox=sandbox)
         self.tools = tools or ToolRegistry.get_instance()
@@ -94,6 +96,8 @@ class ReActAgent(BaseAgent):
         self._preact_engine = preact_engine
         # Phase D: VIGIL 自愈运行时
         self._vigil_healer = vigil_healer
+        # Phase D: MCTS 多路径探索（仅 ArchitectAgent 使用）
+        self._mcts_planner = mcts_planner
 
     async def execute(self, input_data: AgentInput) -> AgentOutput:
         """ReAct 循环主入口——向后兼容 wrapper。

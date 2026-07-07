@@ -58,12 +58,34 @@ function navigateHunk(direction: number) {
   if (line > 0) diffEditor.value?.revealPositionInCenter({ lineNumber: line, column: 1 })
 }
 
+// 注册自定义暗色主题——匹配 Orbit 系统配色
+monaco.editor.defineTheme('orbitDark', {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [],
+  colors: {
+    'editor.background': '#0a0a14',          // --color-orbit-bg
+    'editor.foreground': '#e0e0e0',          // --color-orbit-text
+    'editor.lineHighlightBackground': '#12122a',  // --color-orbit-surface
+    'editor.selectionBackground': '#2a2a4a55',    // --color-orbit-border + alpha
+    'editor.inactiveSelectionBackground': '#2a2a4a33',
+    'editorLineNumber.foreground': '#666688',     // --color-orbit-text-muted
+    'editorLineNumber.activeForeground': '#8888aa', // --color-orbit-text-secondary
+    'editorGutter.background': '#0a0a14',         // 与 main bg 统一
+    'editorCursor.foreground': '#4caf50',         // --color-orbit-accent
+    'editorWidget.background': '#0f0f1a',         // --color-orbit-panel
+    'editorWidget.border': '#2a2a4a',             // --color-orbit-border
+  },
+})
+
 onMounted(() => {
   if (!containerRef.value) return
   diffEditor.value = monaco.editor.createDiffEditor(containerRef.value, {
     readOnly: props.readOnly, renderSideBySide: true, minimap: { enabled: false },
     scrollBeyondLastLine: false, automaticLayout: true, glyphMargin: true,
     folding: true, lineNumbers: 'on', renderIndicators: true, originalEditable: false,
+    theme: 'orbitDark', fontSize: 12, lineNumbersMinChars: 3,
+    padding: { top: 8, bottom: 8 },
   })
   updateModel()
   // IDE功能追赶: 注册 Go to Def / References / Hover providers
@@ -154,8 +176,8 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.monaco-diff-container { border: 1px solid var(--el-border-color-light); border-radius: 4px; }
+.monaco-diff-container { border: 1px solid var(--color-orbit-border, #2a2a4a); border-radius: 4px; background: var(--color-orbit-bg, #0a0a14); }
 .monaco-diff-wrapper { display: flex; flex-direction: column; }
-.hunk-nav { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--el-border-color-light); border-top: none; border-radius: 0 0 4px 4px; background: var(--el-bg-color); flex-shrink: 0; }
-.hunk-label { font-size: 12px; color: var(--el-text-color-secondary); margin-right: auto; }
+.hunk-nav { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--color-orbit-border, #2a2a4a); border-top: none; border-radius: 0 0 4px 4px; background: var(--color-orbit-panel, #0f0f1a); flex-shrink: 0; }
+.hunk-label { font-size: 12px; color: var(--color-orbit-text-secondary, #8888aa); margin-right: auto; }
 </style>

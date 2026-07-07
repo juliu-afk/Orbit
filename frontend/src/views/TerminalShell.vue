@@ -44,7 +44,7 @@ function buildTree(files: Array<{ path: string }>): FileNode[] {
   return root
 }
 async function fetchFileTree(){ try{ const dir=session.currentProjectPath; const url=dir?`/api/v1/files/tree?dir=${encodeURIComponent(dir)}`:"/api/v1/files/tree"; const d=await apiGet<{files:Array<{path:string}>}>(url); if(d.files)fileTree.value=buildTree(d.files) }catch{} }
-async function onSelectFile(path:string){ await editor.openFile(path); shell.openFileReview(path) }
+async function onSelectFile(path:string){ await editor.openFile(path, undefined, undefined, session.currentProjectPath || undefined); shell.openFileReview(path) }
 
 // WHY: 项目文件夹选择后重建上下文——刷新 session/chat/文件树
 async function onSessionCreated() {

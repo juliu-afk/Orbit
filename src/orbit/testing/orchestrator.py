@@ -46,15 +46,15 @@ class ReviewService(Protocol):
 
 class TestOrchestrator:
     """测试流程编排器——L4 核心。
-
-    Phase 1 MVP:
-    - 意图提取 → 意图驱动生成 → 沙箱执行 → 门禁 → 报告
-    - 修复循环（≤3 轮）
-    - 框架适配检查
-    - CrossReport（测试 + 审查合并）
-
-    Phase 2+: RTS / 变异引导 / AB 对比
     """
+    __test__ = False  # 非 pytest 测试类
+
+    # Phase 1 MVP:
+    # - 意图提取 → 意图驱动生成 → 沙箱执行 → 门禁 → 报告
+    # - 修复循环（≤3 轮）
+    # - 框架适配检查
+    # - CrossReport（测试 + 审查合并）
+    # Phase 2+: RTS / 变异引导 / AB 对比
 
     def __init__(
         self,
@@ -170,12 +170,17 @@ class TestOrchestrator:
         # Phase 3: 失败模式 → knowledge/
 
         # ── 8. 并行启动审查 + 生成 CrossReport ──
+        # WHY 兜底：审查 Agent 可能不可用（离线/未配置），此时用静态分析作为最小审查
         review_result = None
         if self._review:
             try:
                 review_result = await self._review.review(code, goal_id)
             except Exception:
-                logger.warning("审查服务调用失败，跳过", exc_info=True)
+                logger.warning("审查服务调用失败，回退静态分析", exc_info=True)
+                review_result = self._static_review_fallback(code, module)
+
+        if review_result is None:
+            review_result = self._static_review_fallback(code, module)
 
         cross = self._reporter.build_cross_report(task_id, result, review_result)
 
@@ -289,3 +294,60 @@ class TestOrchestrator:
         imports = "import pytest\n\n"
         body = "\n\n".join(t.code for t in tests)
         return imports + body
+
+    def _static_review_fallback(self, code: str, module: str) -> dict:
+        """审查 Agent 不可用时的静态分析兜底。
+
+        WHY 兜底: S4 断点——审查不应可选。当 ReviewService 不可用时，
+        至少用正则+AST 做最小安全+结构检查，确保 CrossReport 总是有审查结果。
+        """
+        import ast
+        import re
+
+        issues: list[dict] = []
+
+        # 1. 硬编码密钥检测
+        secret_patterns = [
+            (r'(?i)(api_key|password|secret|token)\s*=\s*["\'][^"\']{8,}["\']', "可能硬编码密钥"),
+            (r'(?i)(-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----)', "包含私钥"),
+        ]
+        for pattern, msg in secret_patterns:
+            if re.search(pattern, code):
+                issues.append({
+                    "file": module, "line": 0, "severity": "blocking",
+                    "message": f"[静态兜底] {msg}",
+                    "suggestion": "从环境变量读取，禁止硬编码",
+                })
+
+        # 2. 危险函数调用检测
+        dangerous_calls = {
+            "eval": "使用 eval() 存在代码注入风险",
+            "exec": "使用 exec() 存在代码注入风险",
+            "os.system": "使用 os.system() 存在命令注入风险",
+            "subprocess.call": "使用 subprocess.call() 建议走 sandbox/ 模块",
+        }
+        for func, msg in dangerous_calls.items():
+            if func + "(" in code:
+                issues.append({
+                    "file": module, "line": 0, "severity": "warning",
+                    "message": f"[静态兜底] {msg}",
+                    "suggestion": f"替换 {func}() 为安全替代方案",
+                })
+
+        # 3. AST 结构检查
+        try:
+            tree = ast.parse(code)
+            func_count = sum(1 for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)))
+            if func_count == 0:
+                issues.append({
+                    "file": module, "line": 0, "severity": "info",
+                    "message": "[静态兜底] 代码中未定义函数",
+                })
+        except SyntaxError:
+            issues.append({
+                "file": module, "line": 0, "severity": "blocking",
+                "message": "[静态兜底] 代码有语法错误",
+                "suggestion": "检查缩进和括号匹配",
+            })
+
+        return {"issues": issues, "source": "static_fallback"}

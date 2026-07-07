@@ -198,6 +198,27 @@ class TestReporter:
         return mapping.get(decision, "gray")
 
     def _is_covered_by_tests(self, file: str, result: TestRunResult) -> bool:
-        """简化判断——后续 Phase 2 用覆盖率 JSON 精确匹配。"""
-        # 当前：有测试结果且没有失败 → 认为有关联覆盖
-        return result.passed > 0 and result.failed == 0
+        """判断文件是否被测试覆盖。
+
+        Phase 1: 基于测试结果推测——有通过且无失败。
+        Phase 2: 读 coverage.json 做文件级精确匹配。
+        """
+        if result.passed == 0:
+            return False
+        # 尝试读 coverage.json 做文件级匹配
+        try:
+            from pathlib import Path
+            import json
+            cov_path = Path("coverage.json")
+            if cov_path.exists():
+                data = json.loads(cov_path.read_text(encoding="utf-8"))
+                files_data = data.get("files", {}) if isinstance(data, dict) else {}
+                # 文件路径模糊匹配
+                for cov_file in files_data:
+                    if file in cov_file or cov_file.endswith(file):
+                        pct = files_data[cov_file].get("summary", {}).get("percent_covered", 0)
+                        return pct > 0
+        except (OSError, json.JSONDecodeError, KeyError):
+            pass
+        # 兜底：有测试通过 → 推测有覆盖
+        return result.failed == 0

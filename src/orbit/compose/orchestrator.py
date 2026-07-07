@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 from orbit.compose.models import Spec, Task
 from orbit.compose.parser import ComposeParser
+from orbit.review.ponytail import PonytailReviewer  # S3: 过度工程检测进入审查门禁
 from orbit.scheduler.orchestrator import Scheduler
 
 logger = structlog.get_logger("orbit.compose.orchestrator")
@@ -40,12 +41,16 @@ class ComposeOrchestrator:
         scheduler: Scheduler | None = None,
         max_retries: int = 2,
         worktree_manager: WorktreeManager | None = None,  # Phase 4 AC-B4
+        review_service: Any | None = None,  # S1: 审查引擎连线——ReviewService 或兼容接口
+        ponytail: PonytailReviewer | None = None,  # S3: Ponytail 过度工程检测器
     ) -> None:
         self.actor_spawn = actor_spawn
         self.parser = parser or ComposeParser()
         self.scheduler = scheduler
         self.MAX_RETRIES = max_retries
         self._worktree = worktree_manager
+        self._review = review_service  # S1: 审查引擎引用
+        self._ponytail = ponytail or PonytailReviewer()  # S3: 默认实例化
 
     async def run_spec(
         self,
@@ -164,6 +169,24 @@ class ComposeOrchestrator:
         # 4. Code quality review
         code_review = await self._code_review(spec, results)
 
+        # 4b. P1: Agent 测试自循环——代码生成后自动触发
+        # WHY: 测试不应是可选的阶段 4 人类步骤——Agent 生成代码后立即自测
+        for task_id, task_result in results.items():
+            output = task_result.get("output", {}) if isinstance(task_result, dict) else {}
+            if isinstance(output, dict):
+                code = output.get("code_for_testing") or output.get("code")
+                module = output.get("module_for_testing") or task_id
+                if code:
+                    try:
+                        from orbit import testing
+                        await testing.run_on_code(
+                            code=str(code)[:100_000],  # 截断过长代码
+                            module=str(module),
+                            goal_id=parent_task_id,
+                        )
+                    except Exception:
+                        logger.warning("testing_hook_failed", task_id=task_id, exc_info=True)
+
         # 5. 汇总
         all_ok = all(r.get("status") in ("ok", "dispatched") for r in results.values())
 
@@ -227,13 +250,75 @@ class ComposeOrchestrator:
         return {"ok": True, "reason": "spec 审查通过"}
 
     async def _code_review(self, spec: Spec, results: dict) -> dict[str, Any]:
-        """代码审查门禁——P1-2: 增强检查产物+错误残留。"""
+        """代码审查门禁——S1: 连线 ReviewService 状态机 + S3: Ponytail 过度工程检测。
+
+        改动前（断点）: 仅检查错误残留和输出长度，跳过审查引擎。
+        改动后: 创建 Review 会话 → Ponytail 静态扫描 → 逐 task 记录 ReviewDecision
+        → 状态机推进到 approved/ changes_requested。
+        """
+        review_id = ""
+        ponytail_findings: list[dict] = []
+
+        # ── S1: 通过 ReviewService 创建审查会话 ──
+        if self._review:
+            try:
+                review = await self._review.create_review(
+                    task_id=getattr(spec, "title", "unknown"),
+                    created_by="compose_orchestrator",
+                )
+                review_id = review.id
+            except ValueError:
+                # 同一 task 已有活跃审查——复用（E1 边缘情况）
+                logger.info("review_exists_reusing", task_id=getattr(spec, "title", ""))
+            except Exception as e:
+                logger.warning("review_create_failed", error=str(e))
+        else:
+            logger.info("no_review_service_skip_session")
+
+        # ── S3: Ponytail 过度工程检测（并行跑，不阻塞主流程）──
+        if self._ponytail:
+            try:
+                for task_id, result in results.items():
+                    output = result.get("output", "")
+                    if output and len(str(output)) > 10:
+                        ponytail_report = self._ponytail.review_file(
+                            file_path=task_id.replace(":", "/") + ".py",
+                            content=str(output),
+                        )
+                        for f in ponytail_report.findings:
+                            ponytail_findings.append({
+                                "file": f.file_path,
+                                "line": f.line,
+                                "severity": f.severity,
+                                "category": f.category,
+                                "message": f.problem,
+                                "suggestion": f.lazier_alternative,
+                            })
+            except Exception as e:
+                logger.warning("ponytail_review_failed", error=str(e))
+
+        # ── 逐 task 分析结果 ──
         failed = []
         warnings = []
+        ponytail_warnings = ponytail_findings  # 供调用方取用
+
         for task_id, result in results.items():
             status = result.get("status", "unknown")
             if status == "error":
                 failed.append({"task_id": task_id, "error": result.get("error", "未知错误")})
+                # S1: 记录 ReviewDecision
+                if review_id and self._review:
+                    try:
+                        await self._review.record_decision(
+                            review_id=review_id,
+                            file_path=task_id,
+                            hunk_index=0,
+                            decision="rejected",
+                            decided_by="compose_orchestrator",
+                            comment=f"Task failed: {result.get('error', '')[:500]}",
+                        )
+                    except Exception:
+                        pass
                 continue
             output = result.get("output", "")
             if not output or len(str(output)) < 10:
@@ -241,14 +326,39 @@ class ComposeOrchestrator:
             if "Traceback" in str(output) or "Error:" in str(output):
                 warnings.append({"task_id": task_id, "warning": "输出包含错误堆栈残留"})
 
+            # S1: 通过的 task 记录 approved
+            if review_id and self._review:
+                try:
+                    await self._review.record_decision(
+                        review_id=review_id,
+                        file_path=task_id,
+                        hunk_index=0,
+                        decision="approved" if status == "ok" else "comment",
+                        decided_by="compose_orchestrator",
+                    )
+                except Exception:
+                    pass
+
+        # ── S1: 推进审查状态机 ──
+        if review_id and self._review:
+            try:
+                new_status = "changes_requested" if failed else "approved"
+                await self._review.transition_status(review_id, new_status)
+            except Exception as e:
+                logger.warning("review_transition_failed", error=str(e))
+
         review: dict[str, Any] = {
             "ok": len(failed) == 0,
             "reason": f"全部 {len(results)} 个任务通过",
         }
+        if review_id:
+            review["review_id"] = review_id
         if failed:
             review["failed_tasks"] = failed
         if warnings:
             review["warnings"] = warnings
+        if ponytail_warnings:
+            review["ponytail_findings"] = ponytail_warnings
         return review
 
     # ── 拓扑排序 ──────────────────────────────────

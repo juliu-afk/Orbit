@@ -46,6 +46,7 @@ class ReviewService:
         decision: str,
         decided_by: str,
         comment: str | None = None,
+        severity: str = "major",  # M5: critical / major / minor
     ) -> ReviewDecision:
         async with self.session_factory() as session:
             rd = ReviewDecision(
@@ -55,6 +56,7 @@ class ReviewService:
                 decision=decision,
                 decided_by=decided_by,
                 comment=comment,
+                severity=severity,
             )
             session.add(rd)
             review = await session.get(Review, review_id)

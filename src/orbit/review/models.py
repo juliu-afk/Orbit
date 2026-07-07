@@ -47,6 +47,8 @@ class ReviewDecision(ReviewBase):
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
     hunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     decision: Mapped[str] = mapped_column(String(20), nullable=False)
+    # M5: 严重程度——区分致命/严重/一般，对标 compose/skills/review.md 的 severity 体系
+    severity: Mapped[str] = mapped_column(String(20), default="major", nullable=False)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     decided_by: Mapped[str] = mapped_column(String(100), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(tz=UTC))

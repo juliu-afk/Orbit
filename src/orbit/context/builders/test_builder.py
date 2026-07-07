@@ -10,6 +10,7 @@ from typing import Any
 
 class TestContextBuilder:
     """变更文件列表 → 结构化应测清单。不用 LLM。"""
+    __test__ = False  # 非 pytest 测试类
 
     name = "test"
 

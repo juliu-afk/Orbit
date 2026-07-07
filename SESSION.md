@@ -1,5 +1,52 @@
 # Orbit 开发会话记录
 
+## 2026-07-07（下午）— 依赖+Dependabot+UX长期4项+减熵收尾 (2 PR · 全部 MERGED)
+
+### 交付
+
+| PR | 内容 | 文件 |
+|----|------|------|
+| [#231](https://github.com/juliu-afk/Orbit/pull/231) | chore: bump 5 GitHub Actions | 7 workflow files |
+| [#232](https://github.com/juliu-afk/Orbit/pull/232) | feat: UX长期4项——对话分支+i18n+面板布局+MCP前端 | 20 files (+955/-40) |
+
+### #231 — Dependabot 合并
+- actions/checkout v4→v7, setup-python v5→v6, build-push-action v5→v7, login-action v3→v4, codecov/codecov-action v5→v7
+- 关闭 5 个独立 dependabot PR (#219-#223)
+- CI 全红——已有 poetry.lock 不同步问题
+
+### #232 — UX 长期 4 项
+- **#13 对话分支**: POST /sessions/{id}/fork + GET /sessions/{id}/forks API，BranchesPanel 组件，Ctrl+Shift+B
+- **#14 i18n**: vue-i18n@^10 Composition API，zh-CN/en 双 locale（60+ keys），Settings 语言切换
+- **#15 面板布局**: resize handles + 预设布局 + 面板位置交换（已有基础增强）
+- **#16 MCP 前端**: McpView + McpToolList + mcp store + /mcp 路由
+- **审查**: 0P0/0P1/4P2，全部修复后合并
+  - P2-1: create_fork() 复制 parent.local_path → registry.py
+  - P2-2: MCP store catch 设置 error 提示
+  - P2-3: forkSession 方法名已验证一致
+  - P2-4: i18n.ts 初始化顺序注释
+
+### 减熵体系收尾
+- **内部减熵 5 类行动全部完成**：
+  - P0 消重（CircuitBreaker+Clarifier）→ 已在先前 PR 完成
+  - P1 拆大类（Orchestrator 697→181行）+ 去空壳（3/5 空目录已删）
+  - P2 修循环依赖 → 已评估无需修复（TYPE_CHECKING/lazy import 均为标准模式）
+  - P2 防幻觉 guard → skip_if_empty 装饰器已接入 L1/L2/L4/L6/L7
+- 闭环审计表全部更新为 🟢 WIRED
+- 业务层减熵 8 项全部接线（先前 PR 完成）
+
+### 技术债全览（详见 SESSION.md 末尾）
+- 🔴 CI 全红（poetry.lock out of sync）——历史遗留
+- 🔴 覆盖率 72%（行 75%/分支 60%）——~2100 未覆盖分支
+- 🟡 65 条测试 skip + 27 处 type:ignore
+- 🟡 Windows AppContainer TODO + G6 需求变更检测 TODO
+
+### 踩坑
+- ECC hook 反复切换分支 + revert 文件 → commit/push 后文件可能被还原，需 `git checkout <commit> -- <files>` 恢复
+- npmmirror.com 全挂 + npmjs.org 对 pnpm ECONNREFUSED → 加 `.npmrc` 切源后解决
+- cherry-pick 跨分支时 hook 冲突 → 手动解决 conflict marker
+
+---
+
 ## 2026-07-07 — 五大能力全链路集成接线 (3 PR · 全部 MERGED)
 
 ### 背景

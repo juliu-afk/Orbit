@@ -316,22 +316,29 @@ class TestOrchestrator:
     # ── 内部方法 ─────────────────────────────────────────────────
 
     async def _execute_tests(
-        self, test_code: str, source_code: str, task_id: str
+        self, test_code: str, source_code: str, task_id: str,
+        timeout: float = 30.0,
     ) -> TestRunResult:
-        """沙箱执行测试代码 + 被测代码。"""
+        """沙箱执行测试代码 + 被测代码。
+
+        P1: asyncio.timeout 保护——沙箱执行超过 30s 即熔断，
+        防止 FastAPI worker 阻塞。
+        """
         result = TestRunResult(task_id=task_id, status="running")
         full_code = f"{source_code}\n\n{test_code}"
 
         try:
-            import json
-
-            output = await self._sandbox.run(full_code)  # type: ignore[union-attr]
-            # 尝试解析 pytest JSON 输出
-            # Phase 1: 简化为 exit code 判断
+            async with asyncio.timeout(timeout):
+                output = await self._sandbox.run(full_code)  # type: ignore[union-attr]
             result.compiled = "SyntaxError" not in output
             result.passed = 1 if result.compiled else 0
             result.failed = 0 if result.compiled else 1
             result.status = "passed" if result.compiled else "failed"
+        except asyncio.TimeoutError:
+            result.compiled = False
+            result.failed = 1
+            result.status = "failed"
+            result.errors.append(f"沙箱执行超时（{timeout}s）")
         except Exception as e:
             result.compiled = False
             result.failed = 1

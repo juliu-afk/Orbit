@@ -432,7 +432,7 @@ async def _app_lifespan(app: FastAPI) -> None:
     # 执行轨迹收集器——由 OrbitWiring 统一管理（Phase F）
     # WHY 不独立创建: wiring 内部已含 TrajectoryCollector + EpisodicMemory + DistillationEngine，
     # 独立创建会导致双实例、双 DB、轨迹数据分裂。
-    app.state.trajectory_collector = _wiring._get_trajectory()
+    app.state.trajectory_collector = _wiring.get_trajectory()
     logger.info("orbit_wiring_lifespan_ready", db_path=str(_orbit_data_dir / "orbit_wiring.db"))
 
     # G2: 代码图谱索引构建——Stage 2 符号存在性查询的数据源

@@ -50,7 +50,6 @@ class DiagnosisResult:
 
 
 @dataclass
-@dataclass
 class HealResult:
     success: bool = False
     diagnosis: DiagnosisResult | None = None

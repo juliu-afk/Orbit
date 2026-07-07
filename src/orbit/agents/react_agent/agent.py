@@ -347,11 +347,14 @@ class ReActAgent(BaseAgent):
                                     tn = fn.get("name","")
                                     try:
                                         args = json.loads(fn.get("arguments","{}"))
+                                        # P2-3: 规则预测器先行（零Token），仅每 2 轮且规则无法判断时调 LLM
                                         pred = await self._preact_engine.predict(
                                             goal=goal_str, action_name=tn, action_args=args,
-                                            observation="", use_llm=(turn>0))
+                                            observation="", use_llm=(turn > 0 and turn % 2 == 0))
                                         if pred.should_skip() and pred.alternative:
                                             logger.info("preact_skip", task_id=task_id, tool=tn, alt=pred.alternative[:80])
+                                            # 注入替代建议——Agent 知道为什么被跳过，下一轮可用替代方案
+                                            messages.append({"role": "user", "content": f"[PreAct 风险拦截] {tn}({str(args)[:200]}) 被跳过——风险={pred.risk}, 置信度={pred.confidence}。替代方案: {pred.alternative}"})
                                             tool_calls.remove(tc)
                                     except Exception:
                                         logger.debug("preact_skip_error", tool_name=tn, exc_info=True)  # fail-open
@@ -412,7 +415,11 @@ class ReActAgent(BaseAgent):
                                             diagnosis = self._vigil_healer.diagnose(error_text)
                                             if diagnosis.auto_fixable:
                                                 heal = self._vigil_healer.heal(diagnosis, tool_name, tool_args)
-                                                messages.append({"role": "user", "content": f"[VIGIL 自愈建议] {heal.message}"})
+                                                # 注入自愈建议——含具体替代 action/args 供 LLM 重试
+                                                heal_msg = f"[VIGIL 自愈] {tool_name}({str(tool_args)[:200]}) 失败: {error_text[:200]}。{heal.message}"
+                                                if heal.new_action and heal.new_action != tool_name:
+                                                    heal_msg += f" 建议改用 {heal.new_action}({str(heal.new_args)[:200]})。"
+                                                messages.append({"role": "user", "content": heal_msg})
                                         except Exception:
                                             pass  # VIGIL fail-open
                                     result_str = f"工具执行失败: {error_text}"

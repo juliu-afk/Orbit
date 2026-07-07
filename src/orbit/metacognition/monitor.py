@@ -152,8 +152,16 @@ class MonitorAgent:
     # ── 内部 ──────────────────────────────────────────
 
     def _process_event(self, event) -> list[Alert]:
-        """处理单个 StreamEvent。"""
-        event_type = getattr(event, "type", None)
+        """处理单个事件——支持 dict 和对象双形态。
+
+        WHY 双形态: agent.py 通过 wiring.feed_monitor() 推送 dict，
+        但 StreamEvent 对象也可能直接传入。兼容两者。
+        """
+        # 统一获取 event_type——dict 用 .get()，对象用 getattr()
+        if isinstance(event, dict):
+            event_type = event.get("type")
+        else:
+            event_type = getattr(event, "type", None)
         if event_type is None:
             return []
 
@@ -164,8 +172,12 @@ class MonitorAgent:
 
         # TOOL_RESULT → 记录 Action + 运行触发器
         elif str(event_type) == "tool_result":
-            data = getattr(event, "data", {}) or {}
-            tool_name = data.get("tool", "")
+            if isinstance(event, dict):
+                data = event.get("data", {}) or {}
+                tool_name = data.get("tool", "")
+            else:
+                data = getattr(event, "data", {}) or {}
+                tool_name = data.get("tool", "")
             self.feed_action(tool_name)
             return self.check_now(last_tool=tool_name)
 

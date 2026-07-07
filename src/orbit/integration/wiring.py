@@ -66,6 +66,10 @@ class OrbitWiring:
 
         # Monitor 事件队列——task_id → asyncio.Queue
         self._monitor_queues: dict[str, asyncio.Queue] = {}
+        # Monitor Tasks 引用——task_id → asyncio.Task（供清理+结束信号）
+        self._monitor_tasks: dict[str, asyncio.Task] = {}
+        # 轨迹 ID 映射——task_id → trajectory_id（保证 start/end 一致）
+        self._trajectory_ids: dict[str, str] = {}
 
         # 懒初始化组件
         self._trajectory: object | None = None
@@ -87,20 +91,23 @@ class OrbitWiring:
         self._task_count += 1
         tc = self._get_trajectory()
         if tc:
-            tc.start_trajectory(task_id=task_id, goal=goal, project_id=project_id)
-            logger.debug("trajectory_started", task_id=task_id, goal=goal[:60])
+            traj = tc.start_trajectory(task_id=task_id, goal=goal, project_id=project_id)
+            # 存储 trajectory_id——供 on_task_end 匹配
+            self._trajectory_ids[task_id] = traj.trajectory_id
+            logger.debug("trajectory_started", task_id=task_id, trajectory_id=traj.trajectory_id, goal=goal[:60])
 
     def on_task_end(self, task_id: str, outcome: str, quality_score: float = 0.0,
                     turns: int = 0, tool_calls: int = 0) -> None:
-        """任务结束时调用——完成轨迹收集。"""
+        """任务结束时调用——完成轨迹收集 + 清理 Monitor 资源。"""
         tc = self._get_trajectory()
-        if tc:
-            # 需要 trajectory_id——从 task_id 推算
-            import hashlib, time
-            tid = hashlib.sha256(f"{task_id}:".encode()).hexdigest()[:16]
-            tc.finish_trajectory(tid, final_outcome=outcome, quality_score=quality_score,
+        traj_id = self._trajectory_ids.pop(task_id, "")
+        if tc and traj_id:
+            tc.finish_trajectory(traj_id, final_outcome=outcome, quality_score=quality_score,
                                   total_turns=turns, total_tool_calls=tool_calls)
-            logger.debug("trajectory_finished", task_id=task_id, outcome=outcome)
+            logger.debug("trajectory_finished", task_id=task_id, trajectory_id=traj_id, outcome=outcome)
+
+        # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
+        self._cleanup_monitor(task_id)
 
     def record_event(self, task_id: str, title: str, outcome: str = "",
                      tags: list[str] | None = None) -> None:
@@ -307,6 +314,7 @@ class OrbitWiring:
         """启动 MonitorAgent 作为独立 asyncio Task——含 HITLManager 接线。
 
         返回 Task 对象——调用方负责在任务结束时 cancel。
+        Task 引用存储在 self._monitor_tasks，on_task_end 自动清理。
         """
         mon = self._get_monitor()
         if mon is None:
@@ -328,8 +336,33 @@ class OrbitWiring:
         queue: asyncio.Queue = asyncio.Queue(maxsize=100)
         self._monitor_queues[task_id] = queue
         task = asyncio.create_task(mon.run(queue, task_id=task_id))
+        self._monitor_tasks[task_id] = task  # 存储引用——供清理
         logger.debug("monitor_started", task_id=task_id, goal=goal[:60], hitl=hitl is not None)
         return task
+
+    def _cleanup_monitor(self, task_id: str) -> None:
+        """清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列。
+
+        fail-safe: 任何步骤失败不抛异常。
+        """
+        # 1. 发送结束信号（None）让 Monitor.run() 正常退出
+        q = self._monitor_queues.pop(task_id, None)
+        if q:
+            try:
+                q.put_nowait(None)
+            except (asyncio.QueueFull, Exception):
+                pass
+
+        # 2. 取消 Monitor Task
+        mon_task = self._monitor_tasks.pop(task_id, None)
+        if mon_task and not mon_task.done():
+            mon_task.cancel()
+
+    # ── 公开访问方法（P2-2 修复: 替代私有方法 _get_trajectory）──
+
+    def get_trajectory(self):
+        """获取 TrajectoryCollector 实例——供外部（如 main.py）访问。"""
+        return self._get_trajectory()
 
 
 # ── 模块级单例 ──

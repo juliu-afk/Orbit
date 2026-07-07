@@ -23,6 +23,11 @@ class TestGap:
     param_type: str
     covered_values: list[Any] = field(default_factory=list)
     missing_cases: list[str] = field(default_factory=list)
+    # M4: 风险排序字段
+    risk_score: float = 0.0  # 综合风险分 (0.0-1.0)
+    centrality: float = 0.0   # 代码中心度——多少其他函数依赖此函数
+    complexity: float = 0.0   # 改动复杂度
+    static_issues: int = 0    # 静态分析发现的问题数
 
 
 # P1-1: 边界条件用 (标签, 检查函数) 替代纯字符串——
@@ -129,3 +134,68 @@ class TestGapDetector:
             if param_name in params:
                 values.add(params[param_name])
         return values
+
+    # ── M4: 风险排序 ─────────────────────────────────────────
+
+    async def rank_by_risk(
+        self,
+        gaps: list[TestGap],
+        code_graph: Any = None,
+        change_complexity: dict[str, float] | None = None,
+        static_issues: dict[str, int] | None = None,
+    ) -> list[TestGap]:
+        """M4: 对测试缺口按风险排序——对标 TestGapRadar (IEEE TSE 2025)。
+
+        排序因子（14 指标模型中选取 3 个最有效的）:
+        1. 代码中心度 — 被多少其他函数调用（code_graph.get_callers）
+        2. 改动复杂度 — 函数 cyclomatic complexity 或变更行数
+        3. 静态分析发现数 — 同一文件中已有 issues 数
+
+        权重默认值来自 TestGapRadar 论文——积累 30+ 审查后自动调参。
+
+        Returns:
+            按 risk_score 降序排列的 TestGap 列表
+        """
+        change_complexity = change_complexity or {}
+        static_issues = static_issues or {}
+
+        for gap in gaps:
+            # 因子 1: 代码中心度 (0.0-1.0)
+            if code_graph:
+                try:
+                    callers = await code_graph.get_callers(gap.function_name)
+                    caller_count = len(callers) if callers else 0
+                    # 归一化: log2(callers+1) / 10 —— 10 个调用方 → 0.35
+                    import math
+                    gap.centrality = min(1.0, math.log2(caller_count + 1) / 10.0)
+                except Exception:
+                    gap.centrality = 0.0
+            else:
+                gap.centrality = 0.2  # 默认中等偏下（无图谱数据时保守假设）
+
+            # 因子 2: 改动复杂度 (0.0-1.0)
+            gap.complexity = change_complexity.get(gap.function_name, 0.5)  # 默认中等
+
+            # 因子 3: 静态分析问题数 (归一化 0.0-1.0)
+            gap.static_issues = static_issues.get(gap.function_name, 0)
+            static_factor = min(1.0, gap.static_issues / 10.0)  # 10+ 个问题 → 1.0
+
+            # 综合风险分: 加权求和
+            # 权重: centrality 40% / complexity 35% / static_issues 25%
+            gap.risk_score = (
+                0.40 * gap.centrality
+                + 0.35 * gap.complexity
+                + 0.25 * static_factor
+            )
+
+        # 按风险分降序排列
+        ranked = sorted(gaps, key=lambda g: g.risk_score, reverse=True)
+
+        logger.info(
+            "test_gaps_ranked",
+            total=len(ranked),
+            high_risk=sum(1 for g in ranked if g.risk_score >= 0.7),
+            medium_risk=sum(1 for g in ranked if 0.3 <= g.risk_score < 0.7),
+            low_risk=sum(1 for g in ranked if g.risk_score < 0.3),
+        )
+        return ranked

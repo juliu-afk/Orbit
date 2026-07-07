@@ -84,6 +84,10 @@ class TestOrchestrator:
         self._reporter = TestReporter()
         self._ponytail = ponytail or PonytailReviewer()  # S3/S4: 默认实例化——审查永不静默跳过
 
+        # M3: 双向信息推送——测试↔审查信号桥
+        self._test_to_review_queue: asyncio.Queue[dict] = asyncio.Queue(maxsize=100)
+        self._review_to_test_queue: asyncio.Queue[dict] = asyncio.Queue(maxsize=100)
+
         self.max_repair_rounds = max_repair_rounds
 
     # ── 主入口 ──────────────────────────────────────────────────
@@ -233,6 +237,31 @@ class TestOrchestrator:
         summary_card = self._reporter.build_summary_card(result, decision, framework_report)
 
         # 附加 CrossReport 共识信息
+        # M3: 双向推送——记录推送事件到 CrossReport
+        push_signals: list[dict] = []
+        # 测试→审查: 推送覆盖率低的分支
+        if result.coverage_pct < 0.80:
+            signal = {
+                "direction": "test→review",
+                "type": "low_coverage",
+                "detail": f"覆盖率 {result.coverage_pct:.0%} < 80%——审查重点审视逻辑",
+                "target": module,
+            }
+            push_signals.append(signal)
+            self._push_signal_safe(self._test_to_review_queue, signal)
+        # 审查→测试: 推送缺失测试点
+        for issue in review_result.get("issues", []):
+            if issue.get("severity") in ("warning", "blocking", "critical", "major"):
+                signal = {
+                    "direction": "review→test",
+                    "type": "missing_test",
+                    "detail": issue.get("message", ""),
+                    "suggestion": issue.get("suggestion", ""),
+                    "target": issue.get("file", module),
+                }
+                push_signals.append(signal)
+                self._push_signal_safe(self._review_to_test_queue, signal)
+
         summary_card["cross_report"] = {
             "consensus": cross.consensus,
             "divergent_count": len(cross.divergent_points),
@@ -240,6 +269,7 @@ class TestOrchestrator:
                 {"target": d.target, "reason": d.review_reason, "suggestion": d.suggestion}
                 for d in cross.divergent_points
             ],
+            "push_signals": push_signals,  # M3: 双向推送信号记录
         }
 
         return summary_card
@@ -392,3 +422,113 @@ class TestOrchestrator:
             })
 
         return {"issues": issues, "source": "static_fallback"}
+
+    # ── M1: 审查→测试回灌闭环 ─────────────────────────────────
+
+    async def generate_regression_tests(
+        self,
+        review_findings: list[dict],
+        module: str = "",
+        output_dir: str = "tests/regression",
+    ) -> list[str]:
+        """M1: 审查发现 severity ≥ major → 自动生成 test_regression_xxx。
+
+        对标 AC14 + Testora (ICSE 2026) + Meta JiT "catching tests"。
+        生成的测试在旧代码上应通过，在新代码上应失败（如果在修 bug 场景）。
+
+        Args:
+            review_findings: [{file, line, severity, message, suggestion}, ...]
+            module: 所属模块名
+            output_dir: 回归测试保存目录
+
+        Returns:
+            生成的测试文件路径列表
+        """
+        import os
+        from pathlib import Path
+
+        generated_paths: list[str] = []
+        major_findings = [
+            f for f in review_findings
+            if f.get("severity", "") in ("critical", "major", "blocking")
+        ]
+
+        if not major_findings:
+            logger.info("no_major_findings_for_regression", module=module)
+            return generated_paths
+
+        for finding in major_findings:
+            try:
+                # 1. 将审查发现转为 TestIntention
+                file = finding.get("file", module)
+                line = finding.get("line", 0)
+                message = finding.get("message", "")
+                suggestion = finding.get("suggestion", "")
+
+                intention = TestIntention(
+                    target=f"{file}:{line}",
+                    positive=[f"回归验证——原缺陷已修复: {message}"],
+                    negative=[f"原缺陷不应重现: {message}"],
+                    edge_cases=[suggestion] if suggestion else [],
+                )
+
+                # 2. 生成 test_regression_xxx
+                generated = await self._generator.generate(intention, "")
+                if not generated:
+                    continue
+
+                # 3. 组装测试文件内容
+                test_name = self._safe_test_name(file, message)
+                body = "\n\n".join(t.code for t in generated)
+                full_test = (
+                    f"# regression test: {message}\n"
+                    f"# 来源: 审查发现 @ {file}:{line}\n"
+                    f"# 自动生成——请验证测试逻辑正确后保留\n"
+                    f"import pytest\n\n"
+                    f"{body}\n"
+                )
+
+                # 4. 写入文件
+                out_path = Path(output_dir) / f"test_regression_{test_name}.py"
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text(full_test, encoding="utf-8")
+                generated_paths.append(str(out_path))
+
+                logger.info(
+                    "regression_test_generated",
+                    finding=message[:100],
+                    path=str(out_path),
+                )
+            except Exception as e:
+                logger.warning(
+                    "regression_test_generation_failed",
+                    finding=finding.get("message", "")[:100],
+                    error=str(e),
+                )
+                continue  # E7: 单个生成失败不阻塞其他
+
+        return generated_paths
+
+    @staticmethod
+    def _push_signal_safe(queue: asyncio.Queue[dict], signal: dict) -> None:
+        """M3: 安全推送信号——队列满时丢弃最低优先级，不阻塞主流程。
+
+        E10 边缘情况: asyncio.Queue(maxsize=100) 满时丢弃最早消息。
+        """
+        try:
+            queue.put_nowait(signal)
+        except asyncio.QueueFull:
+            # 丢弃最早消息为新信号腾空间——最新信号信息量更大
+            try:
+                queue.get_nowait()
+                queue.put_nowait(signal)
+            except (asyncio.QueueEmpty, asyncio.QueueFull):
+                pass  # 极端情况——静默丢弃
+
+    @staticmethod
+    def _safe_test_name(file: str, message: str) -> str:
+        """从文件路径和审查消息生成合法的测试文件名。"""
+        import re
+        base = file.replace("/", "_").replace(".py", "").replace("\\", "_")
+        msg_part = re.sub(r'[^a-zA-Z0-9_]', '_', message)[:40]
+        return f"{base}_{msg_part}" if msg_part else base

@@ -1,0 +1,89 @@
+{
+  "app": {
+    "title": "Orbit",
+    "connected": "已连接",
+    "connecting": "连接中...",
+    "disconnected": "已断开"
+  },
+  "nav": {
+    "dashboard": "驾驶舱",
+    "mcp": "MCP 服务器",
+    "settings": "设置",
+    "files": "文件",
+    "graph": "图谱",
+    "search": "搜索",
+    "commands": "命令面板"
+  },
+  "session": {
+    "new": "打开或新建项目",
+    "select": "选择一个项目开始工作",
+    "archive": "归档",
+    "fork": "从此处分叉",
+    "forkTitle": "分支: {title}",
+    "childSessions": "子分支",
+    "noForks": "暂无分支",
+    "forkedFrom": "分叉自"
+  },
+  "chat": {
+    "placeholder": "输入消息... (Enter 发送, Shift+Enter 换行)",
+    "send": "发送",
+    "stop": "停止",
+    "modeAsk": "询问",
+    "modeEdit": "编辑",
+    "modeAgent": "Agent",
+    "searchHistory": "搜索消息历史...",
+    "noMessages": "暂无消息",
+    "thinking": "思考中...",
+    "toolCall": "工具调用",
+    "toolResult": "工具结果",
+    "expand": "展开",
+    "collapse": "折叠"
+  },
+  "panel": {
+    "fileTree": "文件树",
+    "agentInfo": "Agent 信息",
+    "runStatus": "运行状态",
+    "activeTasks": "活跃任务",
+    "tokenUsage": "Token 消耗",
+    "hallucinationBlocks": "防幻觉拦截",
+    "circuitBreaker": "熔断器",
+    "alerts": "告警"
+  },
+  "mcp": {
+    "title": "MCP 服务器管理",
+    "back": "返回驾驶舱",
+    "serverList": "服务器列表",
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "error": "错误",
+    "tools": "个工具",
+    "noServers": "暂无配置的 MCP 服务器",
+    "discover": "重新发现",
+    "searchTools": "搜索工具...",
+    "toolName": "工具名称",
+    "description": "描述",
+    "parameters": "参数",
+    "noTools": "未发现工具"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "zhCN": "中文",
+    "en": "English",
+    "model": "模型选择",
+    "shortcuts": "快捷键",
+    "opacity": "透明度",
+    "blur": "模糊度"
+  },
+  "common": {
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除",
+    "loading": "加载中...",
+    "error": "发生错误",
+    "retry": "重试",
+    "close": "关闭",
+    "back": "返回"
+  }
+}

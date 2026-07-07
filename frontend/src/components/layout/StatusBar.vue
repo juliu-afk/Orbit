@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useShellStore } from '@/stores/shell'
 import { useSessionStore } from '@/stores/session'
 import type { ConnectionStatus } from '@/composables/useWebSocket'
@@ -9,12 +10,15 @@ const emit = defineEmits<{
   (e: 'toggle-dag'): void; (e: 'toggle-chart'): void
   (e: 'toggle-search'): void
   (e: 'toggle-trace'): void; (e: 'toggle-config'): void
-  (e: 'toggle-codegraph'): void; (e: 'toggle-wechat'): void
+  (e: 'toggle-codegraph'): void; (e: 'toggle-wechat'): void; (e: 'toggle-branches'): void
   (e: 'new-session'): void
   (e: 'switch-session', sessionId: string): void
 }>()
 const shell = useShellStore()
 const session = useSessionStore()
+const router = useRouter()
+
+function goMcp() { router.push('/mcp') }
 
 const connectionLabel = computed(() => {
   switch (props.connectionStatus) {
@@ -43,7 +47,10 @@ function handleSwitch(sessionId: string) {
     <button class="status-btn" :class="{ active: shell.showConfig }" @click="emit('toggle-config')">Config</button>
     <span class="status-sep">|</span>
     <button class="status-btn" :class="{ active: shell.showCodeGraph }" @click="emit('toggle-codegraph')" title="代码依赖图谱">Graph</button>
+    <button class="status-btn" :class="{ active: $route?.name === 'mcp' }" @click="goMcp" title="MCP 服务器管理">MCP</button>
     <button class="status-btn" :class="{ active: shell.showWeChat }" @click="emit('toggle-wechat')" title="微信连接">WeChat</button>
+    <span class="status-sep">|</span>
+    <button class="status-btn" :class="{ active: shell.showBranches }" @click="emit('toggle-branches')" title="对话分支 (Ctrl+Shift+B)">Branches</button>
   </div>
 
   <!-- 居中：文件名 or 就绪 -->

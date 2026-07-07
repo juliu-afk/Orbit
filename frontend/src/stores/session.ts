@@ -112,15 +112,50 @@ export const useSessionStore = defineStore('session', () => {
     return currentSessionId.value ? { session_id: currentSessionId.value } : {}
   }
 
+  // ── UX #13: 对话分支 ──
+  const childSessions = ref<SessionSummary[]>([])
+
+  async function forkSession(messageIndex?: number): Promise<string | null> {
+    if (!currentSessionId.value) return null
+    try {
+      const body: Record<string, unknown> = {}
+      if (messageIndex !== undefined) body.fork_at_message_index = messageIndex
+      const r = await fetch(`${SESSIONS_URL}/${currentSessionId.value}/fork`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const j = await r.json()
+      if (j.code !== 0) throw new Error(j.message || 'fork failed')
+      const child = j.data as SessionSummary
+      childSessions.value.unshift(child)
+      return child.session_id
+    } catch {
+      return null
+    }
+  }
+
+  async function fetchChildSessions() {
+    if (!currentSessionId.value) return
+    try {
+      const r = await fetch(`${SESSIONS_URL}/${currentSessionId.value}/forks`)
+      const j = await r.json()
+      if (j.code === 0) childSessions.value = j.data as SessionSummary[]
+    } catch {
+      // 静默
+    }
+  }
+
   function reset() {
     clearCurrent()
     sessions.value = []
+    childSessions.value = []
   }
 
   return {
     currentSessionId, currentProjectName, currentProjectPath, currentTitle,
-    sessions, messages, loading,
+    sessions, messages, loading, childSessions,
     fetchSessions, createSession, switchToSession, archiveCurrentSession,
-    clearCurrent, getMetricsFilter, reset,
+    clearCurrent, getMetricsFilter, forkSession, fetchChildSessions, reset,
   }
 })

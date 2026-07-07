@@ -43,6 +43,7 @@ class ComposeOrchestrator:
         worktree_manager: WorktreeManager | None = None,  # Phase 4 AC-B4
         review_service: Any | None = None,  # S1: 审查引擎连线——ReviewService 或兼容接口
         ponytail: PonytailReviewer | None = None,  # S3: Ponytail 过度工程检测器
+        progressive_engine: Any | None = None,  # M2: ProgressiveReviewEngine（可选）
     ) -> None:
         self.actor_spawn = actor_spawn
         self.parser = parser or ComposeParser()
@@ -51,6 +52,7 @@ class ComposeOrchestrator:
         self._worktree = worktree_manager
         self._review = review_service  # S1: 审查引擎引用
         self._ponytail = ponytail or PonytailReviewer()  # S3: 默认实例化
+        self._progressive = progressive_engine  # M2: 渐进式审查引擎
 
     async def run_spec(
         self,
@@ -258,6 +260,16 @@ class ComposeOrchestrator:
         """
         review_id = ""
         ponytail_findings: list[dict] = []
+
+        # M2: 渐进式审查——从 Spec 构建 PRD→ADR→代码三列对照表
+        if self._progressive:
+            try:
+                prd_text = getattr(spec, "prd_text", "") or ""
+                adr_text = getattr(spec, "adr_text", "") or ""
+                self._progressive.build_from_spec(spec, prd_text=prd_text, adr_text=adr_text)
+                logger.info("progressive_review_built", spec=getattr(spec, "title", ""))
+            except Exception:
+                logger.debug("progressive_review_skipped", exc_info=True)
 
         # ── S1: 通过 ReviewService 创建审查会话 ──
         if self._review:

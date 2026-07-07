@@ -69,6 +69,10 @@ class TestOrchestrator:
         checkpoint_manager=None,
         max_repair_rounds: int = 3,
         ponytail: PonytailReviewer | None = None,  # S3: Ponytail 过度工程检测器
+        test_selector=None,   # RTS: TestSelector 实例（可选）
+        failure_feedback=None,  # feedback: FailureFeedback 实例（可选）
+        evolutionary_selector=None,  # L1: EvolutionaryRouter（可选——策略选择）
+        triangle_connector=None,     # L4: TriangleConnector（可选——三角闭环）
     ):
         self._sandbox = sandbox
         self._gateway = gateway
@@ -79,6 +83,10 @@ class TestOrchestrator:
 
         self._intention_extractor = IntentionExtractor()
         self._generator = IntentionDrivenGenerator(gateway)
+        self._rts = test_selector   # RTS 智能测试选择
+        self._feedback = failure_feedback  # 失败模式反馈闭环
+        self._evolutionary = evolutionary_selector  # L1: 进化式策略选择
+        self._triangle = triangle_connector         # L4: 三角闭环
         self._gate = QualityGate()
         self._redundancy_checker = RedundancyChecker(code_graph, knowledge)
         self._reporter = TestReporter()
@@ -130,11 +138,26 @@ class TestOrchestrator:
                 intention.gherkin_scenarios.extend(pi.gherkin_scenarios)
 
         # ── 2. 生成测试代码 ──
+        # L1: 进化式策略选择——AB 历史积累自动路由最优策略
+        if self._evolutionary:
+            best_strategy = await self._evolutionary.select_best_strategy(code, module)
+            if best_strategy and best_strategy != "intention_driven":
+                logger.info("evolutionary_strategy_selected", strategy=best_strategy, module=module)
         generated_tests = await self._generator.generate(intention, code)
         test_code = self._merge_test_code(generated_tests)
 
         # ── 3. 框架适配检查（秒级） ──
         framework_report = await self._redundancy_checker.check(code, module)
+        # M4: TestGapDetector 风险排序——缺口按风险分排列
+        if self._code_graph:
+            try:
+                from orbit.graph.engines.test_gap_detector import TestGapDetector
+                detector = TestGapDetector()
+                gaps = await detector.detect(self._code_graph, module)
+                ranked = await detector.rank_by_risk(gaps, code, module)
+                logger.debug("test_gaps_ranked", total=len(ranked), module=module)
+            except Exception:
+                logger.debug("gap_ranking_skipped", module=module, exc_info=True)
 
         # ── 4. 沙箱执行（仅当框架无阻塞） ──
         result = TestRunResult(task_id=task_id, status="running")
@@ -175,8 +198,15 @@ class TestOrchestrator:
                 result.status = "failed_permanent"
                 break
 
-        # ── 7. 反馈回灌 ──
-        # Phase 3: 失败模式 → knowledge/
+        # ── 7. 反馈回灌──
+        if self._feedback and result.failed > 0:
+            for err in result.errors[:3]:  # 最多记录 3 条
+                await self._feedback.record(
+                    module=module,
+                    error_type="test_failure",
+                    error_detail=err,
+                    repair_successful=decision == GateDecision.PASSED,
+                )
 
         # ── 8. 并行启动审查 + Ponytail + 生成 CrossReport ──
         # S4: 审查不应可选——无 review_service 时至少跑 Ponytail 静态检测
@@ -250,6 +280,18 @@ class TestOrchestrator:
         result.framework_warnings = [w.detail for w in framework_report.warnings]
         result.duration_sec = time.monotonic() - start
         result.status = decision.value
+
+        # L4: 三角闭环——测试结果+审查结果 → evolution/ Prompt 进化
+        if self._triangle and decision == GateDecision.PASSED:
+            try:
+                await self._triangle.feed(
+                    module=module,
+                    test_passed=result.passed,
+                    coverage_pct=result.coverage_pct,
+                    review_issues=review_result.get("issues", []) if review_result else [],
+                )
+            except Exception:
+                logger.debug("triangle_feed_failed", module=module, exc_info=True)
 
         summary_card = self._reporter.build_summary_card(result, decision, framework_report)
 

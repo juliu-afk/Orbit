@@ -2,6 +2,10 @@
  *
  * 使用 vue-i18n 实现中英双语切换。
  * 默认语言从 localStorage 读取，无记录时用 zh-CN。
+ *
+ * WHY 模块级创建: i18n 实例必须在 settings store 初始化前就绪。
+ * main.ts import 顺序保证: i18n.ts → stores/ → App。
+ * fallbackLocale 确保 getCurrentLocale() 总返回有效值。
  */
 import { createI18n } from 'vue-i18n'
 import zhCN from './locales/zh-CN.json'

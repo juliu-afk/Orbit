@@ -40,7 +40,7 @@ export const useMcpStore = defineStore('mcp', () => {
         servers.value = j.data as McpServer[]
       }
     } catch {
-      // 后端路由未就绪——静默降级
+      error.value = '后端 MCP 路由未就绪，请确认后端已启动并配置 MCP 服务器'
       servers.value = []
     } finally {
       loading.value = false

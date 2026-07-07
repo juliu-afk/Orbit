@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit 五大能力扩展优化方案 —— 文件/多模态/Computer Use/Office</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --orange: #d2991d; --purple: #a371f7; --cyan: #39c5cf;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+    background: var(--bg); color: var(--text); line-height:1.75; font-size:15px;
+  }
+  .container { max-width:1200px; margin:0 auto; padding:40px 24px; }
+
+  /* Cover */
+  .cover { text-align:center; padding:80px 0 60px; border-bottom:1px solid var(--border); margin-bottom:60px; }
+  .cover h1 { font-size:2.4em; font-weight:700; margin-bottom:12px; background:linear-gradient(135deg, var(--accent), var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .cover .subtitle { font-size:1.1em; color:var(--text-muted); margin:8px 0 24px; }
+  .cover .meta { font-size:0.85em; color:var(--text-muted); margin-top:32px; }
+  .badge-row { margin-top:20px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .badge { display:inline-block; padding:5px 16px; border-radius:20px; font-size:0.82em; font-weight:600; border:1px solid var(--border); }
+  .badge-new { color:var(--purple); border-color:var(--purple); background:rgba(163,113,247,0.08); }
+  .badge-p0 { color:var(--red); border-color:var(--red); }
+  .badge-p1 { color:var(--orange); border-color:var(--orange); }
+  .badge-p2 { color:var(--accent); border-color:var(--accent); }
+
+  /* Sections */
+  section { margin-bottom:64px; }
+  h2 { font-size:1.5em; font-weight:700; margin-bottom:24px; padding-bottom:12px; border-bottom:1px solid var(--border); color:var(--accent); }
+  h3 { font-size:1.2em; font-weight:600; margin:32px 0 16px; color:#e6edf3; }
+  h4 { font-size:1.05em; font-weight:600; margin:24px 0 12px; color:var(--cyan); }
+  p { margin-bottom:14px; }
+  strong { color:#fff; }
+  ul, ol { margin:12px 0 12px 24px; }
+  li { margin-bottom:6px; }
+
+  /* Tables */
+  table { width:100%; border-collapse:collapse; margin:20px 0; font-size:0.92em; }
+  th, td { text-align:left; padding:10px 14px; border:1px solid var(--border); vertical-align:top; }
+  th { background:var(--surface); font-weight:600; white-space:nowrap; }
+  tr:nth-child(even) { background:rgba(255,255,255,0.015); }
+  .col-rec { background:rgba(63,185,80,0.08); }
+
+  /* Callouts */
+  .callout { border-left:3px solid; padding:16px 20px; margin:20px 0; border-radius:0 8px 8px 0; background:var(--surface); }
+  .callout-info { border-color:var(--accent); }
+  .callout-warn { border-color:var(--orange); }
+  .callout-success { border-color:var(--green); }
+  .callout-danger { border-color:var(--red); }
+  .callout-title { font-weight:700; font-size:0.88em; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+
+  /* Option Cards */
+  .option-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin:20px 0; }
+  .opt-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px; position:relative; }
+  .opt-card.recommended { border-color:var(--green); box-shadow:0 0 0 1px var(--green); }
+  .opt-card .opt-label { font-size:0.75em; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; }
+  .opt-card .opt-name { font-size:1.15em; font-weight:700; margin-bottom:8px; }
+  .opt-card .opt-desc { font-size:0.9em; color:var(--text-muted); margin-bottom:12px; }
+  .opt-card .opt-pros { color:var(--green); font-size:0.85em; }
+  .opt-card .opt-cons { color:var(--red); font-size:0.85em; margin-top:4px; }
+  .opt-card .rec-badge {
+    position:absolute; top:12px; right:12px; background:var(--green); color:#000;
+    font-size:0.7em; font-weight:800; padding:3px 10px; border-radius:12px; text-transform:uppercase;
+  }
+
+  /* Architecture Diagram */
+  .arch-box { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:20px 24px; margin:16px 0; white-space:pre; font-family:'JetBrains Mono','Fira Code',Consolas,monospace; font-size:0.84em; line-height:1.55; overflow-x:auto; color:var(--text-muted); }
+
+  /* Phase Timeline */
+  .timeline { position:relative; padding-left:30px; border-left:2px solid var(--border); margin:24px 0; }
+  .tl-item { position:relative; margin-bottom:28px; }
+  .tl-item::before { content:''; position:absolute; left:-37px; top:4px; width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid var(--bg); }
+  .tl-item.phase-p0::before { background:var(--red); }
+  .tl-item.phase-p1::before { background:var(--orange); }
+  .tl-item.phase-p2::before { background:var(--accent); }
+  .tl-phase { font-weight:700; font-size:0.9em; margin-bottom:4px; }
+  .tl-desc { font-size:0.88em; color:var(--text-muted); }
+
+  /* Tags */
+  .tag { display:inline-block; padding:2px 10px; border-radius:12px; font-size:0.78em; font-weight:600; margin-right:6px; border:1px solid; }
+  .tag-green { color:var(--green); border-color:var(--green); }
+  .tag-orange { color:var(--orange); border-color:var(--orange); }
+  .tag-purple { color:var(--purple); border-color:var(--purple); }
+  .tag-cyan { color:var(--cyan); border-color:var(--cyan); }
+
+  /* Comparison Table highlight */
+  .row-win { background:rgba(63,185,80,0.06) !important; }
+
+  @media print { body { font-size:12px; } .container { max-width:100%; } .opt-card { break-inside:avoid; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- COVER -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <h1>Orbit 五大能力扩展优化方案</h1>
+  <div class="subtitle">文件类型扩展 · 多模态感知 · Computer Use · Office 文件读写 · 多模态 LLM 集成</div>
+  <div class="badge-row">
+    <span class="badge badge-p0">P0 致命: 1 项（多模态 LLM）</span>
+    <span class="badge badge-p1">P1 关键: 3 项</span>
+    <span class="badge badge-p2">P2 增强: 1 项</span>
+    <span class="badge badge-new">预计工期: 6-8 周</span>
+  </div>
+  <div class="meta">
+    生成日期：2026-07-07 · 项目：Orbit v0.26+ · 对标：Claude Code / CUA / Cursor / Copilot<br>
+    源文件：<code>D:/Orbit/docs/research/Orbit-五大能力扩展优化方案.html</code>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- EXECUTIVE SUMMARY -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>0. 执行摘要</h2>
+
+<div class="callout callout-info">
+<div class="callout-title">背景</div>
+<p>Orbit 当前是<strong>纯文本</strong>多 Agent 编排系统——操作对象仅限于代码和文本文件。对标 Claude Code（43 工具含图片/Computer Use）、Cursor（多模态上下文）、Copilot（Office 集成）、Open Interpreter（OS 级操作），Orbit 在五个维度存在能力缺口。本文档为每个缺口提供 3-4 个备选方案、选型理由和分阶段实施路线。</p>
+</div>
+
+<table>
+<tr><th>#</th><th>能力</th><th>当前状态</th><th>优先级</th><th>推荐方案</th><th>预计工期</th></tr>
+<tr>
+  <td>①</td><td>文件类型扩展</td>
+  <td>仅 22 种文本扩展名白名单</td>
+  <td><span class="tag tag-orange">P1 关键</span></td>
+  <td>python-magic + 插件式解析器注册中心</td>
+  <td>2 周</td>
+</tr>
+<tr>
+  <td>②</td><td>视频/图片多模态</td>
+  <td>不支持——LLMRequest 无 image 字段</td>
+  <td><span class="tag tag-orange">P1 关键</span></td>
+  <td>Claude Vision（主）+ Gemini Flash（免费降级）双路由</td>
+  <td>3 周</td>
+</tr>
+<tr>
+  <td>③</td><td>多模态 LLM 集成</td>
+  <td>四模型全文本，Gateway 无 vision 管线</td>
+  <td><span class="tag tag-red" style="color:var(--red);border-color:var(--red);">P0 致命</span></td>
+  <td>LLMRequest 扩展 content array + MultimodalAdapter</td>
+  <td>2 周（与②并行）</td>
+</tr>
+<tr>
+  <td>④</td><td>Computer Use</td>
+  <td>不支持——操作对象是代码，非 GUI</td>
+  <td><span class="tag tag-orange">P1 关键</span></td>
+  <td>Claude Computer Use（主）+ Playwright 结构化工具（兜底）</td>
+  <td>4 周</td>
+</tr>
+<tr>
+  <td>⑤</td><td>Office 文件读写</td>
+  <td>无 openpyxl/python-docx/python-pptx 依赖</td>
+  <td><span class="tag tag-purple">P2 增强</span></td>
+  <td>openpyxl + python-docx + python-pptx 三件套</td>
+  <td>2 周</td>
+</tr>
+</table>
+
+<div class="callout callout-warn">
+<div class="callout-title">关键决策点</div>
+<p><strong>能力 ②+③ 必须并行实施。</strong> 多模态 LLM 网关扩展是图片/视频支持的先决条件——没有 vision-capable 的 LLM 管线，图片输入无法被 Agent 理解。能力 ④（Computer Use）依赖 ②+③ 的截图理解能力。能力 ① 和 ⑤ 相对独立，可并行推进。</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CAPABILITY 1: FILE TYPE EXPANSION -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>① 文件类型扩展</h2>
+
+<h3>1.1 现状</h3>
+<p>Orbit <code>FileService</code>（<code>src/orbit/files/service.py</code>）通过硬编码扩展名白名单过滤文件：</p>
+<ul>
+  <li><strong>TEXT_EXT 白名单</strong>（22 种）：<code>.py .ts .tsx .js .jsx .vue .css .scss .html .md .json .yaml .yml .toml .sql .txt .cfg .ini .env .sh .svg</code></li>
+  <li><strong>EXCLUDE_EXT 黑名单</strong>（8 种）：<code>.pyc .pyo .exe .dll .so .o .db</code></li>
+  <li><strong>EXCLUDE_DIRS</strong>（13 个目录）：<code>__pycache__ node_modules .git .venv ...</code></li>
+  <li>文件读取上限 1MB，UTF-8 编码</li>
+  <li>无 MIME 类型检测，无二进制文件解析能力</li>
+</ul>
+
+<h3>1.2 备选方案</h3>
+
+<div class="option-grid">
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 A</div>
+  <div class="opt-name">扩展现有白名单</div>
+  <div class="opt-desc">在 TEXT_EXT 中追加常见扩展名（.xml .csv .log .rst .tex .go .rs .java .kt 等），其他逻辑不变。</div>
+  <div class="opt-pros">✅ 改动最小，5 分钟完成<br>✅ 零新依赖</div>
+  <div class="opt-cons">❌ 仍是硬编码，维护成本线性增长<br>❌ 无法处理二进制格式（PDF/图片）<br>❌ 新语言/格式每次需改代码</div>
+</div>
+
+<div class="opt-card recommended">
+  <div class="rec-badge">推荐</div>
+  <div class="opt-label" style="color:var(--green);">方案 B ★</div>
+  <div class="opt-name">python-magic + 插件式解析器注册中心</div>
+  <div class="opt-desc">用 <code>python-magic</code>（libmagic 绑定）做 MIME 检测，建立 <code>FileParserRegistry</code> 插件体系——每种格式一个 parser，按 MIME 自动路由。</div>
+  <div class="opt-pros">✅ MIME 自动检测，无需维护扩展名列表<br>✅ 插件架构——新格式注册即用<br>✅ 兼容二进制（PDF/图片/压缩包）<br>✅ 与现有 ToolRegistry 模式一致</div>
+  <div class="opt-cons">❌ 需安装 libmagic 系统依赖（Windows 需 DLL）<br>❌ 改动 FileService 架构<br>❌ 约 500 行新代码</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 C</div>
+  <div class="opt-name">Apache Tika 集成</div>
+  <div class="opt-desc">通过 Tika Server（Java）或 tika-python 做全格式自动检测+内容提取。支持 1200+ 格式。</div>
+  <div class="opt-pros">✅ 格式覆盖最广（1200+）<br>✅ 自动语言检测+元数据提取</div>
+  <div class="opt-cons">❌ 需运行 Java 进程（Tika Server 500MB+ 内存）<br>❌ 与 Orbit 轻量定位冲突<br>❌ 引入外部服务依赖</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 D</div>
+  <div class="opt-name">mimetypes 标准库 + 按需解析</div>
+  <div class="opt-desc">用 Python 标准库 <code>mimetypes</code> 推断类型，仅对已知文本格式做读取。无外部依赖。</div>
+  <div class="opt-pros">✅ 零外部依赖<br>✅ 标准库稳定</div>
+  <div class="opt-cons">❌ mimetypes 基于扩展名猜测（不准确）<br>❌ 无法区分 UTF-8 vs GBK vs 二进制<br>❌ 无插件扩展能力</div>
+</div>
+
+</div>
+
+<h3>1.3 选型理由</h3>
+
+<div class="callout callout-success">
+<div class="callout-title">选择方案 B — python-magic + 插件式解析器注册中心</div>
+<p><strong>核心理由：</strong>Orbit 已有成熟的 <code>ToolRegistry</code> 插件注册模式（<code>src/orbit/tools/registry/</code>），方案 B 的设计与之完全一致——开发者只需在 parser 文件底部 <code>registry.register_parser()</code> 即可注册新格式。python-magic 的 MIME 检测准确率 95%+（基于 libmagic 数十年的文件签名数据库），远超扩展名猜测。Windows 下的 libmagic DLL 已在 PyInstaller 构建链中验证过（pillow 同理）。</p>
+</div>
+
+<h3>1.4 架构设计</h3>
+
+<div class="arch-box">
+┌─────────────────────────────────────────────────────────┐
+│                   FileService v2                        │
+│                                                         │
+│  read_file(path)                                        │
+│    │                                                    │
+│    ├─ 1. python-magic.detect(mime)  ← MIME 检测         │
+│    ├─ 2. FileParserRegistry.match(mime)                 │
+│    │     ├─ text/*      → TextParser (现有逻辑)          │
+│    │     ├─ image/*     → ImageParser (Pillow)          │
+│    │     ├─ application/pdf → PDFParser (PyMuPDF)       │
+│    │     ├─ text/csv     → CsvParser (Polars)           │
+│    │     └─ fallback    → BinaryRefusedError            │
+│    └─ 3. parser.read(path) → ParsedContent              │
+│                                                         │
+│  ParsedContent:                                         │
+│    - text: str | None         # 文本提取结果             │
+│    - metadata: dict           # 元数据                   │
+│    - pages: int | None        # 页数（PDF/文档）         │
+│    - mime_type: str                                     │
+│    - raw_size: int                                      │
+└─────────────────────────────────────────────────────────┘
+</div>
+
+<div class="arch-box">
+# src/orbit/files/parsers/__init__.py
+class FileParser(ABC):
+    """文件解析器基类——对标 ProviderAdapter 模式。"""
+    mime_types: list[str] = []       # 支持的 MIME 类型
+    max_size_mb: int = 10            # 文件大小上限
+
+    @abstractmethod
+    async def parse(self, path: Path) -> ParsedContent: ...
+
+# src/orbit/files/parsers/text_parser.py
+class TextParser(FileParser):
+    mime_types = ["text/*", "application/json", "application/xml", ...]
+
+# src/orbit/files/parsers/image_parser.py
+class ImageParser(FileParser):
+    mime_types = ["image/png", "image/jpeg", "image/gif", "image/webp"]
+    # 提取: 尺寸/EXIF/Dominant colors/OCR text → ParsedContent
+</div>
+
+<h3>1.5 依赖变更</h3>
+<table>
+<tr><th>依赖</th><th>用途</th><th>License</th><th>大小</th></tr>
+<tr><td><code>python-magic</code> (>=0.4.27)</td><td>MIME 类型检测（libmagic 绑定）</td><td>MIT</td><td>~50KB + libmagic DLL</td></tr>
+<tr><td><code>polars</code> (>=1.0)</td><td>CSV/TSV/Parquet 高性能解析（已有？）</td><td>MIT</td><td>~40MB（已安装则复用）</td></tr>
+<tr><td><code>PyMuPDF</code> (>=1.24)</td><td>PDF 文本提取</td><td>AGPL / 商业</td><td>~20MB</td></tr>
+</table>
+
+<div class="callout callout-warn">
+<div class="callout-title">⚠ PyMuPDF License 注意</div>
+<p>PyMuPDF 使用 AGPL——如需闭源分发需购买商业许可。备选：<code>pypdf</code>（BSD，纯 Python，功能较 PyMuPDF 弱但 PDF 文本提取足够）。<strong>推荐先用 pypdf，按需升级 PyMuPDF。</strong></p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CAPABILITY 2: VIDEO/IMAGE MULTIMODAL -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>② 视频/图片多模态感知</h2>
+
+<h3>2.1 现状</h3>
+<p>Orbit 的操作对象是<strong>代码和文本</strong>，不支持任何视觉输入：</p>
+<ul>
+  <li><code>LLMRequest</code> 仅含 <code>prompt: str</code> + <code>messages: list[dict]</code>，无 image/video 字段</li>
+  <li><code>FileService</code> 排除所有非文本格式</li>
+  <li>无截图/屏幕捕获模块</li>
+  <li>已安装 <code>pillow</code>（仅用于微信 QR 码生成）</li>
+</ul>
+
+<h3>2.2 图片支持：备选方案</h3>
+
+<div class="option-grid">
+
+<div class="opt-card recommended">
+  <div class="rec-badge">推荐</div>
+  <div class="opt-label" style="color:var(--green);">方案 A ★</div>
+  <div class="opt-name">Claude Vision（主）+ Gemini Flash（降级）</div>
+  <div class="opt-desc">经 LiteLLM 网关调用 vision-capable 模型。Claude Sonnet/Opus 做精确理解，Gemini 2.0 Flash 做免费降级。图片以 base64 data URL 或 URL 传入 content array。</div>
+  <div class="opt-pros">✅ Claude Vision 行业最强图表/截图理解<br>✅ Gemini Flash 免费 tier（1500 req/day）<br>✅ 经 LiteLLM 统一网关，现有熔断/降级可用<br>✅ 双 provider 冗余——Anthropic 挂了切 Google</div>
+  <div class="opt-cons">❌ 视频需抽帧（vision API 不支持流式视频）<br>❌ Gemini Flash 中文 OCR 弱于 Claude<br>❌ 大图需压缩（Claude max 5MB/image）</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 B</div>
+  <div class="opt-name">GPT-4V / GPT-5V via OpenAI</div>
+  <div class="opt-desc">统一走 OpenAI vision API，单 provider 简单。</div>
+  <div class="opt-pros">✅ 单 API 格式，简单<br>✅ GPT-5V 推理强</div>
+  <div class="opt-cons">❌ 单点故障——OpenAI 挂了全线崩<br>❌ 成本高（GPT-4V $0.01/image）<br>❌ 不如 Claude 在图表/UI 理解上</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 C</div>
+  <div class="opt-name">开源本地模型（Qwen2-VL / LLaVA）</div>
+  <div class="opt-desc">自部署 vision 模型，经 vLLM/Ollama 提供 OpenAI 兼容 API，LiteLLM 接入。</div>
+  <div class="opt-pros">✅ 零 API 费用<br>✅ 数据不出域（合规）<br>✅ 无速率限制</div>
+  <div class="opt-cons">❌ 需 GPU（至少 8GB VRAM）<br>❌ 视觉理解远弱于 Claude/GPT<br>❌ 部署运维成本高</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 D</div>
+  <div class="opt-name">混元/通义千问 Vision（国产）</div>
+  <div class="opt-desc">走国产 vision 模型，满足数据合规要求。</div>
+  <div class="opt-pros">✅ 数据不出境（合规）<br>✅ 中文 OCR 优势<br>✅ 价格低</div>
+  <div class="opt-cons">❌ 英文/代码截图理解弱<br>❌ API 稳定性不如 Claude/GPT<br>❌ litellm 支持可能不完整</div>
+</div>
+
+</div>
+
+<h3>2.3 视频支持：策略</h3>
+
+<div class="callout callout-info">
+<div class="callout-title">视频处理策略：关键帧抽取 + 音频转录</div>
+<p>当前没有 LLM 支持视频流式理解。所有 vision API 只接受图片。视频处理流程：</p>
+<ol>
+  <li><strong>抽帧</strong>：用 <code>opencv-python-headless</code> 按场景变化检测抽取关键帧（每视频 ≤20 帧）</li>
+  <li><strong>音频转录</strong>：用 <code>openai-whisper</code>（本地）或 Gemini Audio 提取语音文字</li>
+  <li><strong>多模态理解</strong>：关键帧 → Claude Vision 描述画面 + 转录文本 → 融合理解</li>
+</ol>
+<p>适用场景：PR 审查视频、产品演示录制、bug 复现录屏。</p>
+</div>
+
+<h3>2.4 选型理由</h3>
+
+<div class="callout callout-success">
+<div class="callout-title">选择方案 A — Claude Vision + Gemini Flash 双路由</div>
+<p><strong>核心理由：</strong></p>
+<ol>
+  <li><strong>质量优先</strong>：Claude Vision 在图表理解、UI 截图分析、代码截图 OCR 上三项 benchmarks 均领先 GPT-4V（参考 VQAv2/TextVQA/MMMU）。Orbit 主要场景是代码截图和技术图表，Claude 优势明显。</li>
+  <li><strong>成本兜底</strong>：Gemini 2.0 Flash 每天 1500 次免费调用，处理缩略图/简单图标识别等低价值场景够用。</li>
+  <li><strong>架构一致性</strong>：两个 provider 都经 LiteLLM 网关，复用现有熔断器、降级策略（主力失败 → 自动切 Gemini Flash）、Token 追踪。</li>
+  <li><strong>渐进式</strong>：先上 Claude Vision（1 周），验证后加 Gemini 降级（1 周），最后加国产模型支持（可选）。</li>
+</ol>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CAPABILITY 3: MULTIMODAL LLM INTEGRATION -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>③ 多模态 LLM 集成</h2>
+
+<h3>3.1 现状</h3>
+<p>Orbit 的 <code>LLMRequest</code> schema（<code>src/orbit/gateway/schemas.py</code>）仅支持纯文本：</p>
+<div class="arch-box">
+class LLMRequest(BaseModel):
+    prompt: str                       # 纯文本 prompt
+    system_prompt: str                # 纯文本 system
+    messages: list[dict] | None       # 仅 text content
+    tools: list[dict] | None
+    # ❌ 无 images / content_parts / vision_config
+</div>
+
+<p>这是 ② 的前置依赖——没有多模态 LLM 管线，图片输入到不了模型。</p>
+
+<h3>3.2 备选方案</h3>
+
+<div class="option-grid">
+
+<div class="opt-card recommended">
+  <div class="rec-badge">推荐</div>
+  <div class="opt-label" style="color:var(--green);">方案 A ★</div>
+  <div class="opt-name">LLMRequest 扩展 content array（OpenAI Vision API 兼容）</div>
+  <div class="opt-desc">在 <code>messages</code> 中支持 <code>content</code> 为 list 格式——对标 OpenAI vision API。Adapter 层负责转换 provider 特定格式。</div>
+  <div class="opt-pros">✅ 行业标准格式（OpenAI/Anthropic/Google 均兼容）<br>✅ 最小侵入——只改 schema + adapter<br>✅ 文本调用不受影响（向后兼容）<br>✅ 新 provider 只需写 adapter</div>
+  <div class="opt-cons">❌ 需处理 base64 图片编码<br>❌ 大图片需预处理（压缩/缩放）</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 B</div>
+  <div class="opt-name">独立 MultimodalGateway（新模块）</div>
+  <div class="opt-desc">新建 <code>src/orbit/gateway/vision/</code>，与文本 Gateway 并行。各自独立路由。</div>
+  <div class="opt-pros">✅ 隔离性好——文本/视觉互不干扰<br>✅ 独立熔断/降级</div>
+  <div class="opt-cons">❌ 代码重复——_call_with_circuit/_stream_completion 等需重写<br>❌ 两套网关增加维护成本<br>❌ 调度器需知道何时用哪个网关</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 C</div>
+  <div class="opt-name">统一 content array + 自动检测路由</div>
+  <div class="opt-desc">在方案 A 基础上，Gateway 自动检测 content 中是否含 image——自动选 vision model 路由。</div>
+  <div class="opt-pros">✅ 对调用方透明——同一个 generate()<br>✅ 无额外 API</div>
+  <div class="opt-cons">❌ 自动检测可能误判<br>❌ 需额外模型路由逻辑</div>
+</div>
+
+</div>
+
+<h3>3.3 选型理由</h3>
+
+<div class="callout callout-success">
+<div class="callout-title">选择方案 A + C 组合——content array 扩展 + 自动检测路由</div>
+<p><strong>核心理由：</strong>OpenAI vision content array 格式已是事实标准——Claude API、Gemini API、LiteLLM 均原生支持。方案 A 改动范围可控（schema + 2 个 adapter + client.py），非破坏性。方案 C 的自动检测路由与 Orbit 现有的 <code>TaskModelRouter</code>（按 task_type 路由）模式一致——只是多一个 "content_has_image → vision_model" 规则。</p>
+</div>
+
+<h3>3.4 架构变更</h3>
+
+<div class="arch-box">
+# ── schema 变更 ──
+class ContentPart(BaseModel):
+    """通用 content part——对标 OpenAI vision API。"""
+    type: Literal["text", "image_url"]
+    text: str | None = None
+    image_url: dict | None = None  # {"url": "data:image/png;base64,..." | "https://..."}
+
+class LLMRequest(BaseModel):
+    prompt: str = ""
+    messages: list[dict] | None = None  # 每条的 content 可为 str | list[ContentPart]
+    # ... 其余字段不变
+
+# ── adapter 变更 ──
+class AnthropicAdapter(ProviderAdapter):
+    def normalize_messages(self, messages):
+        """将 OpenAI content array 转为 Anthropic content block 格式。"""
+        # [{"type":"text","text":"..."},{"type":"image","source":{...}}]
+
+class OpenAIAdapter(ProviderAdapter):
+    def normalize_messages(self, messages):
+        """OpenAI 原生格式——透传。Gemini 也兼容此格式（经 litellm）。"""
+        return messages
+
+# ── client 变更 ──
+class LLMClient:
+    async def generate(self, req, ...):
+        # 自动检测：content 含 image → 路由到 vision model
+        if self._has_image_content(req):
+            model = self._resolve_vision_model(req)
+        # ... 其余逻辑不变
+</div>
+
+<h3>3.5 新增模型</h3>
+<table>
+<tr><th>模型 ID</th><th>Provider</th><th>用途</th><th>成本</th></tr>
+<tr>
+  <td><code>anthropic/claude-sonnet-4-20250514</code></td>
+  <td>Anthropic</td>
+  <td>主力 vision——截图/图表/文档理解</td>
+  <td>$3/$15 per 1M tokens</td>
+</tr>
+<tr>
+  <td><code>gemini/gemini-2.0-flash-exp</code></td>
+  <td>Google</td>
+  <td>降级 vision——免费 tier</td>
+  <td>免费（1500 req/day）</td>
+</tr>
+<tr>
+  <td><code>openai/glm-5.2</code></td>
+  <td>智谱（Coding Plan）</td>
+  <td>现有 T3 推理——若后续支持 vision 则复用</td>
+  <td>免费（Coding Plan）</td>
+</tr>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CAPABILITY 4: COMPUTER USE -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>④ Computer Use</h2>
+
+<h3>4.1 现状</h3>
+<p>Orbit 操作对象是<strong>代码和文本</strong>，不是 GUI。现有研究文档明确结论：</p>
+<div class="callout callout-info">
+<p>「CUA（Computer Use Agent）核心能力是<strong>像素级 GUI 操作</strong>：截图 → 识别 → 点击(x,y) → 键盘输入 → 再截图。Orbit Agent 操作对象是<strong>代码和文本</strong>，不是 GUI。」—— <code>docs/research/CUA项目源码解构——Orbit可借鉴模式分析.html</code></p>
+</div>
+
+<p>Orbit 已具备的接近能力：</p>
+<ul>
+  <li>Docker 沙箱执行代码（<code>src/orbit/sandbox/</code>）</li>
+  <li>白名单 Shell 命令（<code>src/orbit/tools/shell.py</code>）</li>
+  <li>文件系统读写（<code>src/orbit/tools/filesystem.py</code>）</li>
+  <li>Playwright 测试基础设施（<code>tests/e2e/</code>）</li>
+</ul>
+
+<h3>4.2 备选方案</h3>
+
+<div class="option-grid">
+
+<div class="opt-card recommended">
+  <div class="rec-badge">推荐</div>
+  <div class="opt-label" style="color:var(--green);">方案 A ★</div>
+  <div class="opt-name">Claude Computer Use（主）+ 结构化工具（兜底）</div>
+  <div class="opt-desc">集成 Anthropic Computer Use API——截图→理解→操作→再截图循环。同时提供结构化工具（Playwright/clicks）作为确定性操作的兜底。</div>
+  <div class="opt-pros">✅ Claude 原生 Computer Use——最成熟的通用方案<br>✅ 无需训练——自然语言指令驱动<br>✅ 支持任何 GUI 应用（浏览器/桌面/IDE）<br>✅ 结构化工具兜底——精确操作不依赖像素</div>
+  <div class="opt-cons">❌ 成本高（每步 $0.05-0.15）<br>❌ 延迟高（截图+推理×N 步）<br>❌ 需 Docker/KVM 隔离运行环境<br>❌ 依赖能力②+③（vision 管线）</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 B</div>
+  <div class="opt-name">Playwright + 自研像素识别</div>
+  <div class="opt-desc">用 Playwright 控制浏览器，自研截图对比+元素定位。不依赖外部 Computer Use API。</div>
+  <div class="opt-pros">✅ Playwright 已集成（E2E 测试）<br>✅ 零 API 费用<br>✅ 浏览器操作精确可靠</div>
+  <div class="opt-cons">❌ 仅限浏览器——不能操作桌面应用<br>❌ 自研识别远不如 Claude Vision 准确<br>❌ 维护成本高——每个网站需适配</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 C</div>
+  <div class="opt-name">OpenAdapt / Skyvern（开源录制回放）</div>
+  <div class="opt-desc">用开源 Computer Use 框架——录制人类操作→回放+AI 适配变化。</div>
+  <div class="opt-pros">✅ 开源，可自部署<br>✅ 录制回放减少 AI 调用</div>
+  <div class="opt-cons">❌ 项目成熟度低（Skyvern 仍在快速迭代）<br>❌ 需额外部署维护<br>❌ 不如 Claude CU 灵活</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 D</div>
+  <div class="opt-name">纯结构化工具——不实现像素级 GUI</div>
+  <div class="opt-desc">扩展 Shell 白名单 + 新增 Playwright 结构化工具（navigate/click/fill/screenshot）——Agent 通过工具调用操作，不依赖像素识别。</div>
+  <div class="opt-pros">✅ 安全——白名单模式，无任意点击<br>✅ 快速——不经过截图→推理循环<br>✅ Orbit 已有全部基础设施</div>
+  <div class="opt-cons">❌ 无法操作非浏览器应用<br>❌ 无法处理未知 UI<br>❌ 需为每个操作场景写工具</div>
+</div>
+
+</div>
+
+<h3>4.3 选型理由</h3>
+
+<div class="callout callout-success">
+<div class="callout-title">选择方案 A（Claude Computer Use 主）+ 方案 D（结构化工具兜底）</div>
+<p><strong>核心理由：</strong></p>
+<ol>
+  <li><strong>分层策略</strong>：确定性操作（打开 URL/填表单/点按钮）走结构化工具——快、安全、零 AI 成本。不确定性操作（"找到发布按钮"、"检查这个表格是否正确渲染"）走 Claude Computer Use——灵活、通用。</li>
+  <li><strong>渐进式实施</strong>：Phase 1 先上结构化工具（2 周）→ Phase 2 加 Claude CU（2 周）。Phase 1 产出已可用。</li>
+  <li><strong>安全边界</strong>：结构化工具保持白名单模式（只允许 navigate/click/fill/screenshot/screenshot_element），Claude CU 在 Docker 隔离环境中运行——对标 Orbit 现有沙箱架构。</li>
+  <li><strong>与现有架构一致</strong>：结构化工具走 ToolRegistry 注册；Claude CU 走 AnthropicAdapter（已在 gateway 中）；截图理解走能力②+③管线。</li>
+</ol>
+</div>
+
+<h3>4.4 架构设计</h3>
+
+<div class="arch-box">
+┌──────────────────────────────────────────────────────────────┐
+│                    Computer Use 架构                          │
+│                                                              │
+│  Agent 指令: "打开 GitHub PR #123，检查 CI 状态"              │
+│    │                                                         │
+│    ├─ 确定性操作 → 结构化工具（Playwright）                    │
+│    │   ├─ browser_navigate(url)        # 打开 GitHub          │
+│    │   ├─ browser_screenshot()         # 截图确认             │
+│    │   ├─ browser_click(selector)      # 点 PR 标签           │
+│    │   └─ browser_get_text(selector)   # 提取 CI 状态文字     │
+│    │                                                         │
+│    └─ 不确定性操作 → Claude Computer Use（Docker 隔离）        │
+│        ├─ 截图 → Claude Vision 理解当前状态                    │
+│        ├─ Claude 返回操作: click(x,y) / type("text") / scroll │
+│        ├─ 执行操作 → 再截图                                    │
+│        └─ 循环直到目标完成或达到 max_steps                      │
+│                                                              │
+│  工具注册:                                                    │
+│    src/orbit/tools/browser.py    ← Playwright 结构化工具      │
+│    src/orbit/tools/computer.py   ← Claude CU 封装             │
+│    src/orbit/tools/computer_sandbox.py ← Docker 隔离执行       │
+└──────────────────────────────────────────────────────────────┘
+</div>
+
+<h3>4.5 依赖变更</h3>
+<table>
+<tr><th>依赖</th><th>用途</th><th>License</th></tr>
+<tr><td><code>playwright</code> (>=1.48)</td><td>浏览器自动化——结构化工具 + E2E（已有测试依赖）</td><td>Apache 2.0</td></tr>
+<tr><td><code>docker</code> (>=7.0)</td><td>Computer Use 沙箱隔离——Python Docker SDK</td><td>Apache 2.0</td></tr>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- CAPABILITY 5: OFFICE FILE R/W -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>⑤ Office 文件读写（Excel / Word / PPT）</h2>
+
+<h3>5.1 现状</h3>
+<p>Orbit 完全无法处理 Office 文件：</p>
+<ul>
+  <li>无 <code>openpyxl</code>、<code>python-docx</code>、<code>python-pptx</code> 依赖</li>
+  <li>FDE 深度分析将此列为 <strong>🚫 缺失</strong>——数据集成管道（连接 CSV/Excel/PDF）未实现</li>
+  <li>仅支持 CSV 通过文本读取（无结构化解析）</li>
+</ul>
+
+<h3>5.2 备选方案</h3>
+
+<div class="option-grid">
+
+<div class="opt-card recommended">
+  <div class="rec-badge">推荐</div>
+  <div class="opt-label" style="color:var(--green);">方案 A ★</div>
+  <div class="opt-name">openpyxl + python-docx + python-pptx 三件套</div>
+  <div class="opt-desc">Python 生态三大标准库——纯 Python 实现，无需系统依赖。支持读写 .xlsx/.docx/.pptx。</div>
+  <div class="opt-pros">✅ 纯 Python——无系统依赖，PyInstaller 友好<br>✅ 社区成熟（openpyxl 7K+ stars）<br>✅ 支持样式/图表/公式（openpyxl）<br>✅ 与 FileParserRegistry 插件架构一致</div>
+  <div class="opt-cons">❌ 不支持旧格式 .xls/.doc/.ppt（需 LibreOffice）<br>❌ python-pptx 功能较弱（模板支持有限）<br>❌ 大文件（>50MB Excel）性能差</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 B</div>
+  <div class="opt-name">LibreOffice headless 转换</div>
+  <div class="opt-desc">用 LibreOffice headless 模式将任意 Office 格式转为 PDF/CSV/纯文本。覆盖 .xls/.doc/.ppt 等旧格式。</div>
+  <div class="opt-pros">✅ 全格式覆盖（含旧版 .xls/.doc）<br>✅ 转换质量高（原生渲染）</div>
+  <div class="opt-cons">❌ 需安装 LibreOffice（800MB+）<br>❌ 启动慢（每次转换 2-5s）<br>❌ 并发受限（单实例）<br>❌ 不适合打包进 exe</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 C</div>
+  <div class="opt-name">Polars（Excel/CSV）+ python-docx + 自研 PPT</div>
+  <div class="opt-desc">Excel 用 Polars 高性能引擎（已有依赖），CSV/TSV/Parquet 原生支持，Word 用 python-docx，PPT 暂不实现。</div>
+  <div class="opt-pros">✅ Polars 读 Excel 极快（比 openpyxl 快 5-10x）<br>✅ CSV/Parquet 已有基础设施<br>✅ 最小新依赖</div>
+  <div class="opt-cons">❌ Polars 写 Excel 功能有限（无样式/图表）<br>❌ 放弃 PPT 能力</div>
+</div>
+
+<div class="opt-card">
+  <div class="opt-label" style="color:var(--text-muted);">方案 D</div>
+  <div class="opt-name">OnlyOffice / Collabora Online API</div>
+  <div class="opt-desc">通过 Docker 部署 OnlyOffice Document Server，API 调用转换/编辑。</div>
+  <div class="opt-pros">✅ 全格式+协同编辑<br>✅ 渲染质量最高</div>
+  <div class="opt-cons">❌ 需 Docker 运行额外服务（2GB+ 内存）<br>❌ 引入外部服务依赖<br>❌ 过于重量级——超出 Agent 工具范畴</div>
+</div>
+
+</div>
+
+<h3>5.3 选型理由</h3>
+
+<div class="callout callout-success">
+<div class="callout-title">选择方案 A — openpyxl + python-docx + python-pptx 三件套</div>
+<p><strong>核心理由：</strong></p>
+<ol>
+  <li><strong>纯 Python 栈</strong>：三个库均纯 Python 实现，无 C 扩展（python-docx 有 lxml 但已广泛兼容），PyInstaller 打包无障碍。</li>
+  <li><strong>覆盖主流场景</strong>：95%+ 的 Office 文件是 .xlsx/.docx/.pptx 格式。旧格式 .xls 可通过 openpyxl 的 read-only 模式（有限支持）或提示用户转换。</li>
+  <li><strong>Python 生态标准</strong>：openpyxl 是 pandas 的 Excel 引擎、python-docx 是 LangChain 文档加载器的基础、python-pptx 是 ReportLab 的替代——三个库都有大量社区验证。</li>
+  <li><strong>与方案 A（能力①）互补</strong>：Excel/Word 文件通过 python-magic 识别 MIME → FileParserRegistry 路由到对应 parser → openpyxl/python-docx 解析 → Agent 获得结构化内容。</li>
+  <li><strong>大文件兜底</strong>：>10MB Excel → Polars 高性能引擎（方案 C 的读部分），>10MB Word → 截断警告。</li>
+</ol>
+</div>
+
+<h3>5.4 Office Parser 设计</h3>
+
+<div class="arch-box">
+# src/orbit/files/parsers/excel_parser.py
+class ExcelParser(FileParser):
+    mime_types = [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+    ]
+
+    async def parse(self, path: Path) -> ParsedContent:
+        """
+        策略:
+        - ≤10MB → openpyxl（完整功能——样式/公式/图表元数据）
+        - >10MB → Polars read_excel（仅数据——速度优先）
+        """
+        if path.stat().st_size > 10_000_000:
+            return self._parse_large(path)
+        return self._parse_full(path)
+
+    def _parse_full(self, path):
+        wb = openpyxl.load_workbook(path, data_only=True)
+        sheets = {}
+        for name in wb.sheetnames:
+            ws = wb[name]
+            sheets[name] = {
+                "rows": ws.max_row,
+                "cols": ws.max_column,
+                "headers": [cell.value for cell in ws[1]],
+                "sample": [[cell.value for cell in row] for row in ws.iter_rows(min_row=1, max_row=20)],
+            }
+        return ParsedContent(
+            text=self._format_for_llm(sheets),
+            metadata={"sheets": list(sheets.keys()), "size_mb": ...},
+        )
+
+# src/orbit/files/parsers/word_parser.py
+class WordParser(FileParser):
+    mime_types = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+
+    async def parse(self, path: Path) -> ParsedContent:
+        doc = Document(str(path))
+        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+        tables = [[[cell.text for cell in row.cells] for row in t.rows] for t in doc.tables]
+        return ParsedContent(
+            text="\n\n".join(paragraphs),
+            metadata={"paragraphs": len(paragraphs), "tables": len(tables)},
+        )
+
+# src/orbit/files/parsers/ppt_parser.py
+class PPTParser(FileParser):
+    mime_types = ["application/vnd.openxmlformats-officedocument.presentationml.presentation"]
+
+    async def parse(self, path: Path) -> ParsedContent:
+        prs = Presentation(str(path))
+        slides = []
+        for i, slide in enumerate(prs.slides):
+            texts = [shape.text for shape in slide.shapes if hasattr(shape, "text") and shape.text.strip()]
+            slides.append({"slide": i+1, "content": texts})
+        return ParsedContent(
+            text=self._format_slides(slides),
+            metadata={"slides": len(slides)},
+        )
+</div>
+
+<h3>5.5 依赖变更</h3>
+<table>
+<tr><th>依赖</th><th>用途</th><th>License</th><th>大小</th></tr>
+<tr><td><code>openpyxl</code> (>=3.1)</td><td>Excel .xlsx 读写（样式/公式/图表）</td><td>MIT</td><td>~250KB</td></tr>
+<tr><td><code>python-docx</code> (>=1.1)</td><td>Word .docx 读写（段落/表格/样式）</td><td>MIT</td><td>~200KB</td></tr>
+<tr><td><code>python-pptx</code> (>=1.0)</td><td>PowerPoint .pptx 读写（幻灯片/形状/文本）</td><td>MIT</td><td>~300KB</td></tr>
+<tr><td><code>polars</code> (>=1.0)</td><td>大 Excel 高性能读取（已有或新增）</td><td>MIT</td><td>~40MB</td></tr>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- IMPLEMENTATION ROADMAP -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>⑥ 实施路线图</h2>
+
+<h3>6.1 依赖关系</h3>
+<div class="arch-box">
+                      ┌──────────────────┐
+                      │ ③ 多模态 LLM 集成 │ ← P0 致命——所有 vision 能力的先决
+                      └────────┬─────────┘
+                               │ 依赖
+              ┌────────────────┼────────────────┐
+              ▼                ▼                 ▼
+    ┌─────────────────┐ ┌───────────┐  ┌────────────────┐
+    │ ② 图片/视频感知  │ │ ④ CU 主   │  │ ① 文件类型扩展  │
+    │ (Claude Vision)  │ │ (需截图理解)│  │ (MIME 检测)     │
+    └─────────────────┘ └───────────┘  └────────────────┘
+              │                │                 │
+              └────────────────┼─────────────────┘
+                               │ 并行
+              ┌────────────────┼────────────────┐
+              ▼                ▼                 ▼
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │ ④ CU 结构化  │  │ ⑤ Office R/W │  │ ① PDF 解析   │
+    │ (Playwright)  │  │ (三件套)      │  │ (pypdf)      │
+    └──────────────┘  └──────────────┘  └──────────────┘
+</div>
+
+<h3>6.2 分阶段计划</h3>
+
+<div class="timeline">
+
+<div class="tl-item phase-p0">
+  <div class="tl-phase">Phase 0 — 多模态 LLM 管线（P0 · 第 1-2 周）</div>
+  <div class="tl-desc">
+    <strong>目标：</strong>LLMRequest 支持 image content，vision model 可被调用。<br>
+    <strong>产出：</strong><br>
+    · <code>ContentPart</code> schema 定义（OpenAI vision format）<br>
+    · <code>LLMRequest.messages</code> 支持 content array<br>
+    · AnthropicAdapter / OpenAIAdapter 增加 vision content 转换<br>
+    · Gateway 自动检测 image → 路由 vision model<br>
+    · 测试：unit (schema validation) + integration (实际调 Claude Vision)<br>
+    <strong>依赖：</strong>Anthropic API key（Claude Sonnet）<br>
+    <strong>不依赖其他 Phase。</strong>
+  </div>
+</div>
+
+<div class="tl-item phase-p1">
+  <div class="tl-phase">Phase 1 — 图片感知 + 文件扩展（P1 · 第 2-4 周，与 Phase 0 部分并行）</div>
+  <div class="tl-desc">
+    <strong>目标：</strong>Agent 能"看到"图片/截图；文件系统能识别所有格式。<br>
+    <strong>产出：</strong><br>
+    · <code>python-magic</code> MIME 检测集成<br>
+    · <code>FileParserRegistry</code> 插件注册中心<br>
+    · <code>ImageParser</code>（Pillow——提取尺寸/EXIF/base64 编码）<br>
+    · <code>TextParser</code> 升级——支持更多编码（UTF-8/GBK/Latin-1 自动检测）<br>
+    · <code>PDFParser</code>（pypdf——文本提取）<br>
+    · <code>VisionTool</code> 工具注册——Agent 调用 "analyze_image"<br>
+    · Gemini Flash 降级路由<br>
+    <strong>依赖：</strong>Phase 0（vision 管线就绪）<br>
+    <strong>视频支持：</strong>暂不实现——需求验证后再决定。
+  </div>
+</div>
+
+<div class="tl-item phase-p1">
+  <div class="tl-phase">Phase 2 — Computer Use 结构化工具（P1 · 第 3-5 周）</div>
+  <div class="tl-desc">
+    <strong>目标：</strong>Agent 能通过 Playwright 控制浏览器——确定性操作。<br>
+    <strong>产出：</strong><br>
+    · <code>src/orbit/tools/browser.py</code>（navigate / click / fill / screenshot / get_text / get_html）<br>
+    · 白名单安全检查（禁止 file:// 协议 / 限制域名）<br>
+    · 与 ToolRegistry 集成——Agent 自动发现 browser_* 工具<br>
+    · E2E 测试：用 browser tools 自动化 GitHub PR 检查<br>
+    <strong>依赖：</strong>Phase 1（screenshot 需 vision 理解）<br>
+    <strong>不含 Claude CU 像素级操作——那是 Phase 3。</strong>
+  </div>
+</div>
+
+<div class="tl-item phase-p1">
+  <div class="tl-phase">Phase 3 — Office 文件读写（P1 · 第 4-6 周，可与 Phase 2 并行）</div>
+  <div class="tl-desc">
+    <strong>目标：</strong>Agent 能读写 Excel/Word/PPT 文件。<br>
+    <strong>产出：</strong><br>
+    · <code>ExcelParser</code>（openpyxl + Polars fallback）<br>
+    · <code>WordParser</code>（python-docx）<br>
+    · <code>PPTParser</code>（python-pptx）<br>
+    · <code>ExcelWriter</code> / <code>WordWriter</code> 工具（write_file 扩展）<br>
+    · 注册到 FileParserRegistry<br>
+    <strong>依赖：</strong>Phase 1（FileParserRegistry 就绪）<br>
+    <strong>可与 Phase 2 并行。</strong>
+  </div>
+</div>
+
+<div class="tl-item phase-p2">
+  <div class="tl-phase">Phase 4 — Claude Computer Use 像素级操作（P2 · 第 5-7 周）</div>
+  <div class="tl-desc">
+    <strong>目标：</strong>Agent 能像人一样操作任意 GUI——截图→理解→操作→再截图。<br>
+    <strong>产出：</strong><br>
+    · <code>src/orbit/tools/computer.py</code>（Claude CU API 封装）<br>
+    · Docker 沙箱集成——对标现有 <code>sandbox/</code> 模块<br>
+    · 安全边界：只允许在 Docker 容器内执行 GUI 操作<br>
+    · 审计：每一步截图+操作存入 <code>task_audit_trail</code><br>
+    <strong>依赖：</strong>Phase 0（vision 管线）+ Phase 2（结构化工具作为兜底）<br>
+    <strong>门禁：</strong>需用户确认成本预算（每任务 $0.5-5 CU 费用）
+  </div>
+</div>
+
+<div class="tl-item phase-p2">
+  <div class="tl-phase">Phase 5 — 视频支持 + CSV 深度集成（P2 · 第 6-8 周）</div>
+  <div class="tl-desc">
+    <strong>目标：</strong>Agent 能理解视频内容（录屏/演示）。<br>
+    <strong>产出：</strong><br>
+    · <code>VideoParser</code>（opencv 关键帧抽取 + whisper 音频转录）<br>
+    · <code>CsvParser</code> 升级（Polars 高性能 + 自动检测分隔符/编码/类型推断）<br>
+    <strong>依赖：</strong>Phase 1（vision 管线）<br>
+    <strong>可选：</strong>需求确认后实施。
+  </div>
+</div>
+
+</div>
+
+<h3>6.3 甘特图概览</h3>
+<table>
+<tr><th>周</th><th>Phase 0</th><th>Phase 1</th><th>Phase 2</th><th>Phase 3</th><th>Phase 4</th><th>Phase 5</th></tr>
+<tr><td>W1</td><td style="background:var(--red);opacity:0.3;">③ LLMRequest 扩展</td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td>W2</td><td style="background:var(--red);opacity:0.3;">③ Adapter + 路由</td><td style="background:var(--orange);opacity:0.2;">① MIME 检测</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>W3</td><td></td><td style="background:var(--orange);opacity:0.3;">② Claude Vision 工具<br>① FileParserRegistry</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>W4</td><td></td><td style="background:var(--orange);opacity:0.3;">② Gemini 降级<br>① PDF/Image Parser</td><td style="background:var(--orange);opacity:0.2;">④ browser tools</td><td style="background:var(--purple);opacity:0.15;">⑤ Office parsers</td><td></td><td></td></tr>
+<tr><td>W5</td><td></td><td></td><td style="background:var(--orange);opacity:0.3;">④ browser 安全<br>+ E2E 测试</td><td style="background:var(--purple);opacity:0.2;">⑤ Office writers<br>+ 集成测试</td><td></td><td></td></tr>
+<tr><td>W6</td><td></td><td></td><td></td><td style="background:var(--purple);opacity:0.2;">⑤ 收尾测试</td><td style="background:var(--accent);opacity:0.15;">④ Claude CU 封装</td><td></td></tr>
+<tr><td>W7</td><td></td><td></td><td></td><td></td><td style="background:var(--accent);opacity:0.2;">④ Docker 沙箱+审计</td><td style="background:var(--accent);opacity:0.1;">视频(可选)</td></tr>
+<tr><td>W8</td><td></td><td></td><td></td><td></td><td></td><td style="background:var(--accent);opacity:0.1;">CSV 深度(可选)</td></tr>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- RISK & DEPENDENCY MATRIX -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>⑦ 风险与依赖矩阵</h2>
+
+<table>
+<tr><th>#</th><th>风险</th><th>影响</th><th>概率</th><th>缓解措施</th></tr>
+<tr>
+  <td>R1</td>
+  <td><strong>Claude Vision API 成本超预期</strong><br>每张截图 ~500 input tokens × $3/1M = $0.0015/image，Computer Use 每步 10 张图 = $0.015/步，一个任务 50 步 = $0.75</td>
+  <td>中</td>
+  <td>中</td>
+  <td>① Token 预算追踪（已有 <code>compression/</code> 模块）限制每任务 max CU 步数<br>② Gemini Flash 降级处理低价值截图<br>③ 图片预处理：>1920px 缩放、JPEG 质量 70%</td>
+</tr>
+<tr>
+  <td>R2</td>
+  <td><strong>Claude CU 在 Windows 上不可用</strong><br>Anthropic Computer Use 参考实现基于 Linux Docker + Xvfb</td>
+  <td>高</td>
+  <td>高</td>
+  <td>① Phase 2 结构化工具（Playwright）独立于 CU，Windows 原生支持<br>② Claude CU 通过 Docker Desktop（Windows）运行 Linux 容器<br>③ 如 Windows Docker 不可行 → CU 仅 Linux/macOS，Windows 用结构化工具兜底</td>
+</tr>
+<tr>
+  <td>R3</td>
+  <td><strong>python-magic libmagic DLL 在 Windows PyInstaller 打包失败</strong></td>
+  <td>高</td>
+  <td>中</td>
+  <td>① 在 <code>orbit.spec</code> 中显式添加 libmagic DLL 到 <code>binaries</code><br>② 降级方案：用 <code>mimetypes</code> 标准库 + 扩展名映射兜底<br>③ 测试 exe 构建流水线中验证</td>
+</tr>
+<tr>
+  <td>R4</td>
+  <td><strong>Gemini Flash 免费 tier 在中国大陆不可用</strong><br>Google API 需代理</td>
+  <td>中</td>
+  <td>中</td>
+  <td>① 检测网络可达性——不可用则跳过 Gemini，全部走 Claude<br>② 后续加国产 vision 模型（智谱 GLM-5V / 通义千问 VL）作为国内降级</td>
+</tr>
+<tr>
+  <td>R5</td>
+  <td><strong>大 Office 文件（>100MB Excel）OOM</strong></td>
+  <td>中</td>
+  <td>低</td>
+  <td>① >10MB Excel → Polars 流式读取（内存可控）<br>② >50MB 任意格式 → 拒绝并提示用户<br>③ <code>MAX_READ_SIZE</code> 从 1MB 提升为可配置</td>
+</tr>
+<tr>
+  <td>R6</td>
+  <td><strong>浏览器工具被用于恶意网站</strong></td>
+  <td>高</td>
+  <td>低</td>
+  <td>① 域名白名单（默认仅允许 github.com/gitlab.com 等开发站点）<br>② 禁止 file:// 协议<br>③ 禁止下载文件到 workspace 外<br>④ 所有 browser_* 操作写入 audit_trail</td>
+</tr>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- COMPARISON WITH COMPETITORS -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>⑧ 对标竞品——实施后能力矩阵</h2>
+
+<table>
+<tr><th>能力</th><th>Orbit 当前</th><th>Orbit 实施后</th><th>Claude Code</th><th>Cursor</th><th>Copilot</th></tr>
+<tr>
+  <td>文件类型</td>
+  <td>22 种文本</td>
+  <td class="col-rec">60+ 格式（含 PDF/图片/Office）</td>
+  <td>文本+图片</td>
+  <td>文本+图片</td>
+  <td>文本+Office</td>
+</tr>
+<tr>
+  <td>图片理解</td>
+  <td>❌</td>
+  <td class="col-rec">✅ Claude Vision + Gemini 降级</td>
+  <td>✅ Claude Vision</td>
+  <td>✅ GPT-4V</td>
+  <td>❌</td>
+</tr>
+<tr>
+  <td>视频理解</td>
+  <td>❌</td>
+  <td class="col-rec">⚠ 关键帧+转录（Phase 5）</td>
+  <td>❌</td>
+  <td>❌</td>
+  <td>❌</td>
+</tr>
+<tr>
+  <td>多模态 LLM</td>
+  <td>❌</td>
+  <td class="col-rec">✅ 双 provider 路由+降级</td>
+  <td>✅ 单 provider</td>
+  <td>✅ 单 provider</td>
+  <td>✅ 单 provider</td>
+</tr>
+<tr>
+  <td>Computer Use</td>
+  <td>❌</td>
+  <td class="col-rec">⚠ 结构化工具+Claude CU</td>
+  <td>❌（仅 Bash）</td>
+  <td>❌</td>
+  <td>❌</td>
+</tr>
+<tr>
+  <td>Excel 读写</td>
+  <td>❌</td>
+  <td class="col-rec">✅ openpyxl + Polars</td>
+  <td>❌（仅 CSV）</td>
+  <td>❌</td>
+  <td>⚠（仅读取）</td>
+</tr>
+<tr>
+  <td>Word 读写</td>
+  <td>❌</td>
+  <td class="col-rec">✅ python-docx</td>
+  <td>❌</td>
+  <td>❌</td>
+  <td>❌</td>
+</tr>
+<tr>
+  <td>PPT 读写</td>
+  <td>❌</td>
+  <td class="col-rec">✅ python-pptx</td>
+  <td>❌</td>
+  <td>❌</td>
+  <td>❌</td>
+</tr>
+</table>
+
+<div class="callout callout-info">
+<div class="callout-title">差异化优势</div>
+<p>实施后 Orbit 将是<strong>唯一同时具备以下能力的多 Agent 编排系统</strong>：</p>
+<ol>
+  <li><strong>多模态 LLM 双路由降级</strong>——Claude + Gemini 自动切换，避免单点故障（竞品均为单 provider）</li>
+  <li><strong>Computer Use</strong>——Claude Code/Cursor/Copilot 均无 GUI 操作能力</li>
+  <li><strong>Office 文件读写</strong>——唯一覆盖 Excel/Word/PPT 全格式的 Agent 工具链</li>
+  <li><strong>9 层防幻觉 + 毫秒熔断</strong>——已有差异化能力，多模态场景下同样受保护</li>
+</ol>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- APPENDIX: DEPENDENCY SUMMARY -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section>
+<h2>附录 A：新增依赖汇总</h2>
+
+<table>
+<tr><th>依赖</th><th>版本</th><th>用途</th><th>Phase</th><th>License</th><th>大小</th><th>纯 Python</th></tr>
+<tr><td><code>python-magic</code></td><td>>=0.4.27</td><td>MIME 类型检测</td><td>Phase 1</td><td>MIT</td><td>~50KB + libmagic DLL</td><td>❌（C 绑定）</td></tr>
+<tr><td><code>pypdf</code></td><td>>=5.0</td><td>PDF 文本提取</td><td>Phase 1</td><td>BSD</td><td>~500KB</td><td>✅</td></tr>
+<tr><td><code>Pillow</code></td><td>>=12.3</td><td>图片尺寸/EXIF/压缩</td><td>Phase 1</td><td>MIT-CMU</td><td>已安装</td><td>❌（C 扩展）</td></tr>
+<tr><td><code>openpyxl</code></td><td>>=3.1</td><td>Excel .xlsx 读写</td><td>Phase 3</td><td>MIT</td><td>~250KB</td><td>✅</td></tr>
+<tr><td><code>python-docx</code></td><td>>=1.1</td><td>Word .docx 读写</td><td>Phase 3</td><td>MIT</td><td>~200KB</td><td>✅</td></tr>
+<tr><td><code>python-pptx</code></td><td>>=1.0</td><td>PPT .pptx 读写</td><td>Phase 3</td><td>MIT</td><td>~300KB</td><td>✅</td></tr>
+<tr><td><code>polars</code></td><td>>=1.0</td><td>大 Excel/CSV 高性能</td><td>Phase 3</td><td>MIT</td><td>~40MB</td><td>❌（Rust）</td></tr>
+<tr><td><code>playwright</code></td><td>>=1.48</td><td>浏览器自动化</td><td>Phase 2</td><td>Apache 2.0</td><td>已安装（测试）</td><td>❌（Node 绑定）</td></tr>
+<tr><td><code>docker</code></td><td>>=7.0</td><td>Computer Use 沙箱</td><td>Phase 4</td><td>Apache 2.0</td><td>~200KB</td><td>✅</td></tr>
+<tr><td><code>opencv-python-headless</code></td><td>>=4.10</td><td>视频关键帧抽取</td><td>Phase 5</td><td>Apache 2.0</td><td>~30MB</td><td>❌（C++）</td></tr>
+<tr><td><code>openai-whisper</code></td><td>>=20240930</td><td>视频音频转录</td><td>Phase 5</td><td>MIT</td><td>~150MB + model</td><td>❌（PyTorch）</td></tr>
+</table>
+
+<div class="callout callout-warn">
+<div class="callout-title">⚠ PyInstaller 兼容性注意</div>
+<p>标记为"非纯 Python"的依赖在 PyInstaller 打包时需额外处理：</p>
+<ul>
+  <li><strong>python-magic</strong>：需在 <code>orbit.spec</code> 的 <code>binaries</code> 中添加 libmagic DLL</li>
+  <li><strong>Pillow</strong>：已在现有 exe 中验证通过（微信 QR 码功能）</li>
+  <li><strong>polars / opencv / whisper</strong>：有 Rust/C++/PyTorch 扩展，PyInstaller 打包验证需在 Phase 实施时完成</li>
+  <li><strong>playwright</strong>：已通过现有 E2E 测试验证，需确认 <code>chromium</code> 浏览器路径在 exe 中的处理</li>
+</ul>
+</div>
+</section>
+
+<section>
+<h2>附录 B：与现有 Orbit 架构的集成点</h2>
+
+<table>
+<tr><th>新模块</th><th>集成到现有模块</th><th>模式</th></tr>
+<tr>
+  <td><code>src/orbit/files/parsers/</code></td>
+  <td><code>src/orbit/files/service.py</code></td>
+  <td>FileParserRegistry——对标 ToolRegistry 插件注册</td>
+</tr>
+<tr>
+  <td><code>src/orbit/gateway/schemas.py</code>（ContentPart）</td>
+  <td><code>src/orbit/gateway/client.py</code></td>
+  <td>LLMRequest 扩展——向后兼容</td>
+</tr>
+<tr>
+  <td><code>src/orbit/gateway/adapters/anthropic.py</code>（vision）</td>
+  <td><code>src/orbit/gateway/adapters/</code></td>
+  <td>ProviderAdapter.normalize_messages()——已有模式</td>
+</tr>
+<tr>
+  <td><code>src/orbit/tools/browser.py</code></td>
+  <td><code>src/orbit/tools/registry/</code></td>
+  <td>ToolRegistry.register_tool()——已有模式</td>
+</tr>
+<tr>
+  <td><code>src/orbit/tools/computer.py</code></td>
+  <td><code>src/orbit/sandbox/</code> + <code>src/orbit/tools/registry/</code></td>
+  <td>Sandbox 隔离 + Tool 注册——复用现有安全模型</td>
+</tr>
+<tr>
+  <td><code>src/orbit/files/parsers/excel_parser.py</code> 等</td>
+  <td><code>src/orbit/files/parsers/</code></td>
+  <td>FileParser 注册——与 FileParserRegistry 一致</td>
+</tr>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- FOOTER -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section style="border-top:1px solid var(--border); padding-top:32px; margin-top:48px;">
+<p style="color:var(--text-muted); font-size:0.85em;">
+  <strong>文档状态：</strong>草稿 v1.0 · 等待评审<br>
+  <strong>生成日期：</strong>2026-07-07<br>
+  <strong>源文件：</strong><code>D:/Orbit/docs/research/Orbit-五大能力扩展优化方案.html</code><br>
+  <strong>基于：</strong>Orbit v0.26 源码（<code>d:/Orbit/src/orbit/</code>）· 对标 Claude Code / CUA / Cursor / Copilot / Open Interpreter<br>
+  <strong>下一步：</strong>用户确认优先级 → 进入阶段 1 PRD（每能力独立需求文档）
+</p>
+</section>
+
+</div>
+</body>
+</html>

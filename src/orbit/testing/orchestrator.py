@@ -69,6 +69,8 @@ class TestOrchestrator:
         checkpoint_manager=None,
         max_repair_rounds: int = 3,
         ponytail: PonytailReviewer | None = None,  # S3: Ponytail 过度工程检测器
+        test_selector=None,   # RTS: TestSelector 实例（可选）
+        failure_feedback=None,  # feedback: FailureFeedback 实例（可选）
     ):
         self._sandbox = sandbox
         self._gateway = gateway
@@ -79,6 +81,8 @@ class TestOrchestrator:
 
         self._intention_extractor = IntentionExtractor()
         self._generator = IntentionDrivenGenerator(gateway)
+        self._rts = test_selector   # RTS 智能测试选择
+        self._feedback = failure_feedback  # 失败模式反馈闭环
         self._gate = QualityGate()
         self._redundancy_checker = RedundancyChecker(code_graph, knowledge)
         self._reporter = TestReporter()
@@ -175,8 +179,15 @@ class TestOrchestrator:
                 result.status = "failed_permanent"
                 break
 
-        # ── 7. 反馈回灌 ──
-        # Phase 3: 失败模式 → knowledge/
+        # ── 7. 反馈回灌──
+        if self._feedback and result.failed > 0:
+            for err in result.errors[:3]:  # 最多记录 3 条
+                await self._feedback.record(
+                    module=module,
+                    error_type="test_failure",
+                    error_detail=err,
+                    repair_successful=decision == GateDecision.PASSED,
+                )
 
         # ── 8. 并行启动审查 + Ponytail + 生成 CrossReport ──
         # S4: 审查不应可选——无 review_service 时至少跑 Ponytail 静态检测

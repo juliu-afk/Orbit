@@ -321,6 +321,24 @@ importlib.import_module("orbit.api.routes.insights_routes").set_review_service(_
 importlib.import_module("orbit.api.routes.compliance_routes").set_file_service(_file_service)
 importlib.import_module("orbit.api.routes.search_routes").set_workspace(_ws_dir)
 importlib.import_module("orbit.api.routes.tests_routes").set_workspace(_ws_dir)
+# Agent 测试自循环——启动时注入 orchestrator，使 compose/orchestrator 4b 钩子生效
+from orbit.testing import setup as testing_setup
+from orbit.testing.orchestrator import TestOrchestrator
+from orbit.testing.rts import TestSelector
+from orbit.testing.feedback import FailureFeedback
+from orbit.sandbox.process_sandbox import ProcessSandbox
+
+_testing_selector = TestSelector(code_graph=_code_graph_engine)
+_testing_feedback = FailureFeedback(knowledge=None)
+_testing_orchestrator = TestOrchestrator(
+    sandbox=ProcessSandbox(),
+    code_graph=_code_graph_engine,
+    review_service=_review_service,
+    test_selector=_testing_selector,
+    failure_feedback=_testing_feedback,
+)
+testing_setup(_testing_orchestrator)
+logger.info("testing_orchestrator_ready")
 # Step 9 Phase 2: 诊断服务
 from orbit.lsp.service import DiagnosticService  # noqa: E402
 

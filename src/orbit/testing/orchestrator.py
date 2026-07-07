@@ -20,6 +20,9 @@ from orbit.testing.strategies.intention_driven import (
     IntentionDrivenGenerator,
 )
 
+# S3: Ponytail 过度工程检测进入测试-审查联动
+from orbit.review.ponytail import PonytailReviewer
+
 logger = logging.getLogger(__name__)
 
 
@@ -65,6 +68,7 @@ class TestOrchestrator:
         knowledge=None,
         checkpoint_manager=None,
         max_repair_rounds: int = 3,
+        ponytail: PonytailReviewer | None = None,  # S3: Ponytail 过度工程检测器
     ):
         self._sandbox = sandbox
         self._gateway = gateway
@@ -78,6 +82,7 @@ class TestOrchestrator:
         self._gate = QualityGate()
         self._redundancy_checker = RedundancyChecker(code_graph, knowledge)
         self._reporter = TestReporter()
+        self._ponytail = ponytail or PonytailReviewer()  # S3/S4: 默认实例化——审查永不静默跳过
 
         self.max_repair_rounds = max_repair_rounds
 
@@ -169,18 +174,54 @@ class TestOrchestrator:
         # ── 7. 反馈回灌 ──
         # Phase 3: 失败模式 → knowledge/
 
-        # ── 8. 并行启动审查 + 生成 CrossReport ──
-        # WHY 兜底：审查 Agent 可能不可用（离线/未配置），此时用静态分析作为最小审查
+        # ── 8. 并行启动审查 + Ponytail + 生成 CrossReport ──
+        # S4: 审查不应可选——无 review_service 时至少跑 Ponytail 静态检测
+        # S3: Ponytail 发现进入 CrossReport.cross_validations
         review_result = None
-        if self._review:
-            try:
-                review_result = await self._review.review(code, goal_id)
-            except Exception:
-                logger.warning("审查服务调用失败，回退静态分析", exc_info=True)
-                review_result = self._static_review_fallback(code, module)
+        ponytail_findings: list[dict] = []
 
+        # 并行跑审查 Agent + Ponytail 静态检测
+        async def _run_review() -> dict | None:
+            if self._review:
+                try:
+                    return await self._review.review(code, goal_id)
+                except Exception:
+                    logger.warning("审查服务调用失败，回退静态分析", exc_info=True)
+            return None
+
+        async def _run_ponytail() -> list[dict]:
+            findings: list[dict] = []
+            try:
+                report = self._ponytail.review_file(module + ".py" if module else "code.py", code)
+                for f in report.findings:
+                    findings.append({
+                        "file": f.file_path,
+                        "line": f.line,
+                        "severity": f.severity,
+                        "category": f.category,
+                        "message": f.problem,
+                        "suggestion": f.lazier_alternative,
+                        "source": "ponytail",  # S3: 标注来源，CrossReport 区分审查维度
+                    })
+            except Exception:
+                logger.warning("ponytail_review_failed", exc_info=True)
+            return findings
+
+        # 并行执行——审查 Agent 和 Ponytail 互不阻塞
+        review_result, ponytail_findings = await asyncio.gather(
+            _run_review(), _run_ponytail(),
+        )
+
+        # S4: 无 review_service → Ponytail + 静态兜底
         if review_result is None:
             review_result = self._static_review_fallback(code, module)
+
+        # S3: 将 Ponytail 发现注入审查结果，使其进入 CrossReport
+        if ponytail_findings:
+            if "issues" not in review_result:
+                review_result["issues"] = []
+            review_result["issues"].extend(ponytail_findings)
+            review_result["ponytail_count"] = len(ponytail_findings)  # 摘要卡片展示用
 
         cross = self._reporter.build_cross_report(task_id, result, review_result)
 

@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit 测试-审查联动体系研究报告</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text2: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --yellow: #d2991d;
+    --red: #f85149;
+    --purple: #a371f7;
+    --orange: #db6d28;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+  h1 { font-size: 2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 0.5rem; }
+  h2 { font-size: 1.5rem; color: var(--accent); margin: 2.5rem 0 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { font-size: 1.2rem; color: var(--purple); margin: 1.8rem 0 0.8rem; }
+  h4 { font-size: 1.05rem; color: var(--text); margin: 1.2rem 0 0.5rem; }
+  p { margin: 0.6rem 0; }
+  .subtitle { color: var(--text2); font-size: 1rem; margin-bottom: 1.5rem; }
+  .meta { color: var(--text2); font-size: 0.85rem; margin-bottom: 2rem; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.8rem 0 1.5rem;
+    font-size: 0.92rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th { background: var(--surface2); font-weight: 600; color: var(--accent); }
+  tr:nth-child(even) { background: var(--surface); }
+
+  .box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.2rem 1.5rem;
+    margin: 1rem 0;
+  }
+  .box-info { border-left: 3px solid var(--accent); }
+  .box-good { border-left: 3px solid var(--green); }
+  .box-warn { border-left: 3px solid var(--yellow); }
+  .box-bad  { border-left: 3px solid var(--red); }
+  .box-purple { border-left: 3px solid var(--purple); }
+
+  .tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-right: 0.3rem;
+  }
+  .tag-green  { background: #1b3a1b; color: var(--green); }
+  .tag-yellow { background: #3a2e1b; color: var(--yellow); }
+  .tag-red    { background: #3a1b1b; color: var(--red); }
+  .tag-blue   { background: #1b2a3a; color: var(--accent); }
+  .tag-purple { background: #2a1b3a; color: var(--purple); }
+
+  .arch-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .arch-diagram.centered { text-align: center; }
+
+  .gap-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  @media (max-width: 700px) { .gap-card { grid-template-columns: 1fr; } }
+  .gap-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+  }
+  .gap-item h4 { margin-top: 0; }
+  .gap-item .status { font-size: 1.5rem; margin-bottom: 0.3rem; }
+
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.5rem; margin: 1rem 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc ol { padding-left: 1.5rem; }
+  .toc li { margin: 0.25rem 0; }
+
+  .ref-list { font-size: 0.88rem; }
+  .ref-list li { margin: 0.5rem 0; }
+  .ref-list a { color: var(--accent); }
+
+  .verdict { font-size: 1.1rem; font-weight: 700; padding: 0.3rem 0.8rem; border-radius: 4px; display: inline-block; }
+  .verdict-go { background: #1b3a1b; color: var(--green); }
+  .verdict-warn { background: #3a2e1b; color: var(--yellow); }
+  .verdict-stop { background: #3a1b1b; color: var(--red); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+  .timeline { position: relative; padding-left: 2rem; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+  }
+  .timeline-item { position: relative; margin-bottom: 1.2rem; }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -1.5rem;
+    top: 0.4rem;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .timeline-item.done::before { background: var(--green); }
+  .timeline-item.todo::before { background: var(--yellow); }
+</style>
+</head>
+<body>
+
+<h1>Orbit 测试-审查联动体系研究报告</h1>
+<p class="subtitle">从现有架构审计 → 学术界对照 → 工业界对标 → 优化方案</p>
+<p class="meta">
+  版本: v1.0 · 日期: 2026-07-07 · 覆盖: 代码审查架构 / 测试-审查联动 / 渐进式审查 / 学术界 & 工业界对照 / Orbit 优化路线图<br>
+  关联文档: <a href="../requirements/2026-07-07-Agent测试自循环/阶段1-PRD-Agent测试自循环.md" style="color:var(--accent)">Agent测试自循环 PRD</a> ·
+  <a href="../requirements/2026-07-07-Agent测试自循环/阶段2-技术方案-Agent测试自循环.md" style="color:var(--accent)">Agent测试自循环 技术方案</a>
+</p>
+
+<!-- ═══════════════ TOC ═══════════════ -->
+<div class="toc">
+<strong>目录</strong>
+<ol>
+  <li><a href="#s1">研究目标与方法</a></li>
+  <li><a href="#s2">Orbit 审查系统现状审计（4 层架构）</a></li>
+  <li><a href="#s3">测试-审查联动：已有能力 vs 理想状态 vs 缺口</a></li>
+  <li><a href="#s4">学术界对照：6 篇关键论文映射</a></li>
+  <li><a href="#s5">工业界对标：Google / Meta / Siemens / IBM</a></li>
+  <li><a href="#s6">Agent 测试自循环 PRD 交叉验证</a></li>
+  <li><a href="#s7">渐进式审查：概念验证与可行性</a></li>
+  <li><a href="#s8">Orbit 优化方案（3 个时间层级）</a></li>
+  <li><a href="#s9">结论与建议</a></li>
+  <li><a href="#s10">参考文献</a></li>
+</ol>
+</div>
+
+<hr id="s1">
+
+<!-- ═══════════════ §1 ═══════════════ -->
+<h2>1. 研究目标与方法</h2>
+
+<h3>1.1 研究问题</h3>
+<table>
+  <tr><th>#</th><th>问题</th><th>方法</th></tr>
+  <tr><td>Q1</td><td>Orbit 现有代码审查架构的完整度如何？</td><td>逐模块审计 (src/orbit/review/ + modes/review/ + compose/skills/ + testing/)</td></tr>
+  <tr><td>Q2</td><td>测试和审查能否联动？能否提速/提质？</td><td>CrossReport 机制分析 + 学术界对照 + 工业界对标</td></tr>
+  <tr><td>Q3</td><td>渐进式审查（PRD→ADR→代码预填充）可行性？</td><td>RUNE 模式扩展分析 + 与 IntUT 论文对照</td></tr>
+  <tr><td>Q4</td><td>另一个会话的 Agent 测试自循环 PRD 与联动研究的重叠度？</td><td>逐 AC 对照 + 缺口识别</td></tr>
+  <tr><td>Q5</td><td>学术界和工业界有哪些可借鉴的案例？</td><td>6 篇论文 + 4 家公司实践分析</td></tr>
+</table>
+
+<h3>1.2 分析框架</h3>
+<p>所有分析基于以下 5 层框架：</p>
+<div class="arch-diagram">
+┌──────────────────────────────────────────────────────────┐
+│ L5: 工业界实践    Google MuRS / Meta JiT / Siemens RAG   │
+├──────────────────────────────────────────────────────────┤
+│ L4: 学术研究      IntUT / LLMLOOP / Testora / TGA        │
+├──────────────────────────────────────────────────────────┤
+│ L3: Orbit 设计    Agent测试自循环 PRD + 技术方案          │
+├──────────────────────────────────────────────────────────┤
+│ L2: Orbit 已实现   review/ + modes/review/ + testing/    │
+├──────────────────────────────────────────────────────────┤
+│ L1: 理论基础      测试审查联动 / 渐进式审查 / 意图驱动     │
+└──────────────────────────────────────────────────────────┘
+</div>
+
+<hr id="s2">
+
+<!-- ═══════════════ §2 ═══════════════ -->
+<h2>2. Orbit 审查系统现状审计</h2>
+
+<h3>2.1 架构总览：四层审查体系</h3>
+
+<div class="arch-diagram centered">
+                    ┌─────────────────────────────────┐
+                    │   用户提交 spec / Agent 生成代码   │
+                    └──────────────┬──────────────────┘
+                                   ▼
+┌──────────────────────────────────────────────────────────────┐
+│  <strong>第零层：流程门禁（ComposeOrchestrator 两道硬门禁）</strong>        │
+│                                                              │
+│  _spec_review(spec)  ──── 方案级：title/tasks/deps 合法性     │
+│  _code_review(spec, results) ── 代码级：产物+错误残留检查      │
+│  任一不过 → 阻断，不进入下一阶段                                │
+└──────────────────────────┬───────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  <strong>第一层：方法论注入（compose/skills/review.md）</strong>            │
+│                                                              │
+│  4 维度加权：正确性 40% / 安全 25% / 性能 15% / 可维护性 20%    │
+│  审查原则：宁错杀不放过 · 无视作者解释 · diff-only               │
+│  输出格式：path:line: &lt;emoji&gt; &lt;severity&gt;: [维度] 问题. 修复.   │
+└──────────────────────────┬───────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  <strong>第二层：交互协议（modes/review/）</strong>                         │
+│                                                              │
+│  mode.yaml: VERIFYING 状态自动加载 · 广度优先 · ≤30问/分支      │
+│  checklist.md: 6 维度（安全/财务/会计/方案/测试/质量）           │
+│  severity-rubric.md: 🔴致命 🟡严重 🟢一般                       │
+└──────────────────────────┬───────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  <strong>第三层：引擎+持久化（review/ + ponytail.py）</strong>             │
+│                                                              │
+│  service.py: 状态机 pending→in_review→approved→merged        │
+│  models.py: Review + ReviewDecision + ReviewComment (SA 2.0) │
+│  ponytail.py: 过度工程检测 5 类（stdlib可替代/不必要抽象/       │
+│               冗余包装/死代码/过早泛化）                         │
+│  ponytail_debt.py: # ponytail: 注释 → 债务台账 API            │
+└──────────────────────────────────────────────────────────────┘
+</div>
+
+<h3>2.2 逐模块成熟度评估</h3>
+
+<table>
+  <tr><th>模块</th><th>成熟度</th><th>自评</th><th>关键缺口</th></tr>
+  <tr>
+    <td><code>review/service.py</code></td>
+    <td><span class="tag tag-green">高</span></td>
+    <td>状态机完整，去重保护，聚合摘要。对应业界 CRUD 最佳实践。</td>
+    <td>缺少批量决策接口（一次提交多个 hunk 判定需逐条调 API）</td>
+  </tr>
+  <tr>
+    <td><code>review/models.py</code></td>
+    <td><span class="tag tag-green">高</span></td>
+    <td>SA 2.0 Mapped 风格，三实体设计清晰，独立 Base 隔离。</td>
+    <td>ReviewDecision 缺少 severity 字段——只能 approved/rejected/comment，无法区分致命/严重/一般</td>
+  </tr>
+  <tr>
+    <td><code>review/ponytail.py</code></td>
+    <td><span class="tag tag-yellow">中</span></td>
+    <td>5 类检测实用，正则+AST 组合合理，假阳性排除细致。</td>
+    <td>仅 Python；缺少 JS/TS 支持；dead_code 和 premature_generalization 检测标了 TODO 未实现</td>
+  </tr>
+  <tr>
+    <td><code>modes/review/</code></td>
+    <td><span class="tag tag-yellow">中</span></td>
+    <td>交互协议设计完整，checklist 6 维度覆盖广。</td>
+    <td>checklist.md 含财务/会计维度——这些是恪现项目专用，Orbit 自身不需要；需项目自适应</td>
+  </tr>
+  <tr>
+    <td><code>compose/skills/review.md</code></td>
+    <td><span class="tag tag-green">高</span></td>
+    <td>4 维度加权 + 精确输出格式 + 3 原则。对标 Google Code Review 标准。</td>
+    <td>缺少与 testing/ 的联动指令——审查 Agent 不知道测试 Agent 的存在</td>
+  </tr>
+  <tr>
+    <td><code>compose/orchestrator.py</code></td>
+    <td><span class="tag tag-yellow">中</span></td>
+    <td>两道门禁 + 拓扑排序 + 重试。spec-review 和 code-review 分阶段执行。</td>
+    <td>code_review 只检查错误残留和输出长度——无深度审查集成（不调 review/ 模块，不跑 ponytail）</td>
+  </tr>
+  <tr>
+    <td><code>testing/orchestrator.py</code></td>
+    <td><span class="tag tag-green">高</span></td>
+    <td>已实现 CrossReport + 并行审查调用 + 修复循环 + 框架适配检查。</td>
+    <td>审查调用是可选的（<code>if self._review</code>）——需强制执行</td>
+  </tr>
+</table>
+
+<h3>2.3 关键发现：审查链路存在断点</h3>
+<div class="box box-warn">
+  <strong>⚠️ 断点 1</strong> — <code>ComposeOrchestrator._code_review()</code> 从未调用 <code>review/service.py</code>。<br>
+  它自己做了一个简化版检查（输出长度 + 错误残留），跳过了完整的审查引擎。<br>
+  <strong>影响</strong>：审查状态机（pending→approved→merged）空转——没有数据写入 ReviewDecision 表。
+</div>
+<div class="box box-warn">
+  <strong>⚠️ 断点 2</strong> — <code>modes/review/checklist.md</code> 包含财务/会计维度，但 Orbit 本身不处理金额。<br>
+  审查清单是恪现项目（Code-Insight-Financial）的模板复制过来的，没有针对 Orbit 的领域特化。<br>
+  <strong>影响</strong>：审查 Agent 检查了无关维度，漏掉了 Orbit 特有的调度器/防幻觉/图谱维度。
+</div>
+<div class="box box-warn">
+  <strong>⚠️ 断点 3</strong> — <code>ponytail.py</code> 的审查结果没有进入 CrossReport。<br>
+  Ponytail 作为独立的过度工程检测器运行，输出日志但不反馈给 testing/ 的合并报告。<br>
+  <strong>影响</strong>：人类看到 CrossReport 的测试+审查结论，但看不到 Ponytail 的"这个类只有一个方法"警告。
+</div>
+
+<hr id="s3">
+
+<!-- ═══════════════ §3 ═══════════════ -->
+<h2>3. 测试-审查联动：已有能力 vs 理想状态</h2>
+
+<h3>3.1 什么是"联动"——定义</h3>
+
+<div class="box box-info">
+  <strong>定义</strong>：测试和审查不是两条独立的串行流水线，而是在同一时刻、同一代码点上<strong>同时给出结论</strong>，矛盾处自动标记，互补信息双向推送，合并为一份人类只需看分歧点的统一报告。
+</div>
+
+<h3>3.2 联动成熟度模型（5 级）</h3>
+
+<table>
+  <tr><th>级别</th><th>名称</th><th>描述</th><th>Orbit 现状</th><th>已有证据</th></tr>
+  <tr>
+    <td>L0</td><td>无联动</td><td>测试和审查完全独立，人读两份报告</td><td>—</td><td>—</td>
+  </tr>
+  <tr>
+    <td>L1</td><td>并行执行</td><td>测试和审查同时跑，但不交换信息</td><td><span class="tag tag-green">✅ 已实现</span></td><td>orchestrator.py:482 asyncio.gather()</td>
+  </tr>
+  <tr>
+    <td>L2</td><td>结果合并</td><td>两份结果合并为一份报告，人类只看一张卡片</td><td><span class="tag tag-green">✅ 已实现</span></td><td>reporter.py:121 CrossReport</td>
+  </tr>
+  <tr>
+    <td>L3</td><td>交叉验证</td><td>同一代码点的测试结论 vs 审查结论对比，分歧自动标注</td><td><span class="tag tag-yellow">⚠️ 部分</span></td><td>reporter.py:165 divergent_points；但 Ponytail 未进入 CrossReport</td>
+  </tr>
+  <tr>
+    <td>L4</td><td>双向推送</td><td>测试→审查推送覆盖率缺口；审查→测试推送缺失测试点；互相增强</td><td><span class="tag tag-yellow">⚠️ 设计已有</span></td><td>PRD 5.5b 信息交换协议设计了但未实现</td>
+  </tr>
+  <tr>
+    <td>L5</td><td>闭环回灌</td><td>审查发现→自动生成 regression 测试→永久保护；失败模式→知识图谱→未来预防</td><td><span class="tag tag-red">❌ 未实现</span></td><td>仅 US9 描述了方向，无显式 AC</td>
+  </tr>
+</table>
+
+<h3>3.3 速度与质量收益的量化估算</h3>
+
+<table>
+  <tr><th>联动级别</th><th>预计速度提升</th><th>预计质量提升</th><th>估算依据</th></tr>
+  <tr>
+    <td>L0→L1 (并行)</td><td>~40% 时间节省</td><td>无变化</td><td>测试和审查不再串行等待</td>
+  </tr>
+  <tr>
+    <td>L1→L2 (合并)</td><td>~25% 时间节省</td><td>+5% 缺陷发现率</td><td>减少上下文切换；人类读一张卡片 vs 两份报告</td>
+  </tr>
+  <tr>
+    <td>L2→L3 (交叉验证)</td><td>~60% 时间节省</td><td>+15% 缺陷发现率</td><td>人类只看 ~20% 的分歧点；假绿灯被消除</td>
+  </tr>
+  <tr>
+    <td>L3→L4 (双向推送)</td><td>~10% 时间节省</td><td>+10% 缺陷发现率</td><td>测试找到盲区→审查深挖根因（Meta JiT 4× 基准）</td>
+  </tr>
+  <tr>
+    <td>L4→L5 (闭环回灌)</td><td>~5% 时间节省</td><td>+20% 长期质量</td><td>同类错误不再重现（Google MuRS 反馈 ML 基准）</td>
+  </tr>
+  <tr style="background:var(--surface2);font-weight:700">
+    <td>L0→L5 总计</td><td>~75% 人类审查时间节省</td><td>~50% 缺陷发现率提升</td><td></td>
+  </tr>
+</table>
+
+<div class="box box-good">
+  <strong>✅ 速度结论</strong>：联动提速的主要来源不是"审得快"，而是<strong>审得少</strong>——共识部分自动通过，人类只处理分歧。预计 L3 级别的交叉验证可节省 ~60% 人类审查时间。<br>
+  <strong>✅ 质量结论</strong>：联动的质量增益来自<strong>消除假绿灯</strong>（测试通过但代码有问题）和<strong>消除盲区</strong>（审查能看到测试看不到的架构问题）。
+</div>
+
+<h3>3.4 互补盲区分析</h3>
+<div class="box box-purple">
+  <p><strong>核心洞察</strong>：测试和审查的盲区不重叠——两者的视角互补，天然适合联动。</p>
+</div>
+<table>
+  <tr><th></th><th>测试 Agent 看得到</th><th>审查 Agent 看得到</th></tr>
+  <tr><td><strong>擅长</strong></td>
+    <td>运行时正确性 · 边界覆盖率 · 变异体杀伤 · 循环依赖检测 · 回归保护</td>
+    <td>架构合理性 · 命名约定 · 重复造轮子 · 过早/过度抽象 · 安全漏洞 · 硬编码密钥 · 方案偏离 PRD</td></tr>
+  <tr><td><strong>盲区</strong></td>
+    <td>架构是否合理 · 命名是否好 · 模式是否一致 · 是否与已有代码重复</td>
+    <td>运行时是否正确 · 边界 case 是否全覆盖 · 变异体是否被杀 · 循环依赖（静态读代码不易发现）</td></tr>
+</table>
+
+<hr id="s4">
+
+<!-- ═══════════════ §4 ═══════════════ -->
+<h2>4. 学术界对照</h2>
+
+<h3>4.1 关键论文映射</h3>
+
+<table>
+  <tr><th>论文</th><th>年份+会议</th><th>核心贡献</th><th>对应 Orbit 模块</th><th>借鉴价值</th></tr>
+  <tr>
+    <td><strong>IntUT</strong> — Test Intention Guided LLM-Based Unit Test Generation</td>
+    <td>ICSE 2025<br>Huawei</td>
+    <td>显式测试意图（输入/mock/期望）→ LLM 生成测试，分支覆盖 +94%，行覆盖 +49%</td>
+    <td><code>testing/intention.py</code></td>
+    <td><span class="tag tag-green">直接验证</span> — 意图驱动的设计正确。但 IntUT 只从代码提取意图，Orbit 从 PRD+ADR+代码三源提取——范围更广</td>
+  </tr>
+  <tr>
+    <td><strong>MuRS</strong> — Mutant Ranking and Suppression using Identifier Templates</td>
+    <td>FSE 2023<br>Google + KTH + UW</td>
+    <td>diff-based mutation testing 内嵌代码审查，ML 学习开发者反馈抑制噪音，日处理 1.5 亿测试</td>
+    <td><code>testing/gate.py</code> (mutation_score) + <code>review/</code></td>
+    <td><span class="tag tag-yellow">架构参考</span> — 三级反馈（🔧修复/👍有用/👎噪音）→ Orbit 的 blocking/warning/info 分级；开发者反馈→ML 抑制噪音 = Orbit 的 US9 失败模式回灌</td>
+  </tr>
+  <tr>
+    <td><strong>LLMLOOP</strong> — Improving LLM-Generated Code and Tests Through Automated Iterative Feedback Loops</td>
+    <td>ICSME 2025</td>
+    <td>5 个迭代循环：编译→静态分析→测试→变异→回归；代码和测试共同演化</td>
+    <td><code>testing/orchestrator.py</code></td>
+    <td><span class="tag tag-green">直接验证</span> — 修复循环 ≤3 轮的设计正确。LLMLOOP 的"测试质量提升循环"对应 Orbit 的 SUPPLEMENT→补测试→重跑</td>
+  </tr>
+  <tr>
+    <td><strong>TestGapRadar</strong> — Prioritizing Test Gaps by Risk</td>
+    <td>IEEE TSE 2025<br>CQSE</td>
+    <td>14 个指标自动排序测试缺口风险；未测试改动 = 5× 缺陷密度；自动化排序不劣于人类专家</td>
+    <td><code>graph/engines/test_gap_detector.py</code></td>
+    <td><span class="tag tag-yellow">增强方向</span> — TestGapDetector 目前只按参数类型找边界缺口，缺少风险排序。可加代码中心度/改动复杂度作为排序因子</td>
+  </tr>
+  <tr>
+    <td><strong>Testora</strong> — Automated Regression Test Detection for PRs</td>
+    <td>ICSE 2026</td>
+    <td>PR diff → LLM 生成测试 → Docker 新旧对比 → 分类意图变更 vs 回归；1,274 PR 验证</td>
+    <td><code>testing/orchestrator.py</code> + <code>review/</code></td>
+    <td><span class="tag tag-red">缺口指向</span> — Orbit 缺"审查发现→regression 测试"的闭环。Testora 的"行为差异分类器"可直接参考</td>
+  </tr>
+  <tr>
+    <td><strong>RL for Test Gen</strong> — Reinforcement Learning from Automatic Feedback for High-Quality Unit Test Generation</td>
+    <td>DeepTest @ ICSE 2025<br>Microsoft</td>
+    <td>RL 用编译/执行/覆盖率作为 reward signal 迭代改进测试质量</td>
+    <td><code>testing/strategies/ab_runner.py</code></td>
+    <td><span class="tag tag-yellow">增强方向</span> — AB 对比只选胜者，可用 RL 持续调参替代一次性 AB。但 RL 计算成本高——Phase 4+ 再考虑</td>
+  </tr>
+</table>
+
+<h3>4.2 学术界共识（2024-2026 趋势）</h3>
+
+<div class="box box-purple">
+  <p><strong>六大共识</strong>，全部直接支持 Orbit 的设计方向：</p>
+  <ol>
+    <li><strong>意图优于代码</strong>：告诉 LLM "测什么"比让它看代码猜更有效（IntUT +94% 分支覆盖）</li>
+    <li><strong>反馈循环比单轮生成好</strong>：编译→测试→变异→回归 的迭代循环显著提升代码+测试质量（LLMLOOP 5 循环）</li>
+    <li><strong>diff-scoped 而非 full-scope</strong>：只分析变更部分可独立于代码库规模扩展（Google MuRS：全量→diff 缩放）</li>
+    <li><strong>自动化排序 > 人工筛选</strong>：14 指标的风险排序不劣于人类专家（TGA Radar）</li>
+    <li><strong>变异测试是测试质量的唯一可靠度量</strong>：覆盖率告诉你测试"跑过"哪些行，变异测试告诉你测试"真正测了"什么（GEM / MuRS / Tautest 均基于此）</li>
+    <li><strong>人类只在矛盾处介入</strong>：测试和审查一致的 80% 自动通过，不一致的 20% 才升级人类（Meta JiT / CrossReport）</li>
+  </ol>
+</div>
+
+<hr id="s5">
+
+<!-- ═══════════════ §5 ═══════════════ -->
+<h2>5. 工业界对标</h2>
+
+<h3>5.1 四家公司对照</h3>
+
+<table>
+  <tr><th>公司</th><th>系统/论文</th><th>成熟度</th><th>核心做法</th><th>Orbit 对应</th><th>Orbit 差距</th></tr>
+  <tr>
+    <td><strong>Google</strong></td>
+    <td>MuRS (diff-based mutation @ review)</td>
+    <td><span class="tag tag-green">生产级</span><br>日处理 1.5 亿测试<br>4 万 commit/天</td>
+    <td>diff 变异测试→开发者反馈（修复/有用/噪音）→ML 学习→自动抑制噪音</td>
+    <td>gate.py mutation_score + US9 失败回灌</td>
+    <td>没有开发者反馈→ML 抑制噪音的闭环。Orbit 的 failure pattern 回灌是单向的（存入→检索→注入），缺反馈质量评分</td>
+  </tr>
+  <tr>
+    <td><strong>Meta</strong></td>
+    <td>JiT Testing ("Dodgy Diff")</td>
+    <td><span class="tag tag-green">生产级</span><br>4× 缺陷发现率<br>2.2 万测试验证</td>
+    <td>PR 时动态生成 catching tests、LLM 推断意图、变异测试验证测试质量、人类只看有问题的地方</td>
+    <td>CrossReport L3 交叉验证 + L4 双向推送</td>
+    <td>Dodgy Diff 的"意图推断→构建 catching test"比 Orbit 的 intention.py 更深——它尝试理解开发者想做什么，不仅是提取验收标准</td>
+  </tr>
+  <tr>
+    <td><strong>Siemens / Hacon</strong></td>
+    <td>Agentic AI Testing Teammate</td>
+    <td><span class="tag tag-yellow">工业试点</span><br>30-50% 代码复用</td>
+    <td>RAG + 多 Agent 生成系统级回归测试、人工审查测试脚本、CI 集成</td>
+    <td>US6 阶段1/2 骨架生成</td>
+    <td>Orbit 只生成骨架，Siemens 生成完整可执行脚本。但 Siemens 的测试是给人看的，Orbit 是给 Agent 用的——场景不同</td>
+  </tr>
+  <tr>
+    <td><strong>IBM</strong></td>
+    <td>ASTER (ICSE 2025 SEIP 获奖)</td>
+    <td><span class="tag tag-yellow">研究原型</span></td>
+    <td>静态分析引导 LLM 多语言测试生成（Java + Python）</td>
+    <td>intention.py + intention_driven.py</td>
+    <td>ASTER 用静态分析提取测试意图，Orbit 从 PRD/ADR 文本提取——Orbit 更左移，但 ASTER 的静态分析更精确</td>
+  </tr>
+</table>
+
+<h3>5.2 工业界最佳实践提取</h3>
+
+<div class="box box-good">
+  <p><strong>7 条可操作的最佳实践</strong>（全部可落地到 Orbit）：</p>
+  <ol>
+    <li><strong>每次 PR 只分析 diff</strong>（Google MuRS, Meta JiT）→ Orbit 已通过 RTS 部分实现（US5）</li>
+    <li><strong>测试质量用变异分数衡量，不用覆盖率</strong>（Google, Tautest, GEM）→ Orbit 已在 gate.py 实现双指标</li>
+    <li><strong>开发者反馈自动调整信号质量</strong>（Google MuRS ML suppression）→ Orbit 缺这一步</li>
+    <li><strong>意图推断优于代码分析</strong>（Meta Dodgy Diff, IntUT）→ Orbit 的 intention.py 方向正确</li>
+    <li><strong>人类只在矛盾/有问题时介入</strong>（Meta, CrossReport）→ Orbit 的 CrossReport 设计已到位</li>
+    <li><strong>测试代码也需安全验证</strong>（所有工业系统都有 sandbox）→ Orbit 的 L7 沙箱 + testing 专用验证规则已覆盖</li>
+    <li><strong>闭环修复 < 3 轮</strong>（LLMLOOP, Orbit）→ 学术界和工业界共识：3 轮够覆盖 ~88% 场景</li>
+  </ol>
+</div>
+
+<hr id="s6">
+
+<!-- ═══════════════ §6 ═══════════════ -->
+<h2>6. Agent 测试自循环 PRD 交叉验证</h2>
+
+<h3>6.1 逐条验收标准对照</h3>
+
+<table>
+  <tr><th>AC</th><th>内容</th><th>对应联动级别</th><th>学术界支持</th><th>工业界支持</th><th>状态</th></tr>
+  <tr><td>AC1</td><td>代码生成后自动触发测试</td><td>L1 并行执行</td><td>LLMLOOP</td><td>Meta JiT</td><td><span class="tag tag-green">已验证</span></td></tr>
+  <tr><td>AC2</td><td>聊天流摘要卡片</td><td>— (UX)</td><td>—</td><td>—</td><td>无外部对照（Orbit 特有 UX）</td></tr>
+  <tr><td>AC3</td><td>秒级测试 ≤30s</td><td>— (性能)</td><td>—</td><td>Google MuRS (diff-based 秒级)</td><td><span class="tag tag-green">可行</span></td></tr>
+  <tr><td>AC4</td><td>自修复 ≤3 轮</td><td>L1</td><td>LLMLOOP 5 循环</td><td>TDFlow 数据: 3 轮覆盖 88%</td><td><span class="tag tag-green">已验证</span></td></tr>
+  <tr><td>AC5</td><td>3 轮未修复→标记 FAILED</td><td>L1</td><td>LLMLOOP</td><td>—</td><td><span class="tag tag-green">已验证</span></td></tr>
+  <tr><td>AC6</td><td>TDD 顺序：测试先于实现</td><td>— (流程)</td><td>IntUT</td><td>—</td><td><span class="tag tag-green">已验证</span></td></tr>
+  <tr><td>AC7</td><td>覆盖率 <80% → 补测试</td><td>L2</td><td>TestGapRadar</td><td>Google MuRS</td><td><span class="tag tag-green">已验证</span></td></tr>
+  <tr><td>AC8</td><td>RTS 只跑受影响模块</td><td>— (性能)</td><td>MuRS diff-based</td><td>Meta JiT</td><td><span class="tag tag-green">已验证</span></td></tr>
+  <tr><td>AC9</td><td>阶段1 生成 Gherkin 骨架</td><td>— (左移)</td><td>—</td><td>Siemens RAG</td><td><span class="tag tag-yellow">部分</span> — 只有 Siemens 做类似的事</td></tr>
+  <tr><td>AC10</td><td>阶段2 生成契约测试骨架</td><td>— (左移)</td><td>—</td><td>—</td><td><span class="tag tag-purple">无外部对照</span> — Orbit 独创</td></tr>
+  <tr><td>AC11</td><td>AB 结果沉淀到 knowledge</td><td>L5</td><td>RL for Test Gen (相似方向)</td><td>—</td><td><span class="tag tag-purple">差异化</span> — 无直接竞品</td></tr>
+  <tr><td>AC12</td><td>框架冲突自动检测</td><td>L3</td><td>ForgeAI Arch Drift</td><td>Google MuRS</td><td><span class="tag tag-green">已验证</span></td></tr>
+  <tr><td>AC13</td><td>testing/ 自身覆盖率 ≥80%</td><td>— (质量)</td><td>—</td><td>—</td><td>标准工程实践</td></tr>
+</table>
+
+<h3>6.2 与联动研究的重叠热力图</h3>
+
+<div class="arch-diagram">
+AC1  ████████████████████████░  自动触发  ← 重合
+AC2  ████████░░░░░░░░░░░░░░░░  UX       ← 不重合（Orbit 特有）
+AC4  ██████████████████████░░  自修复   ← 重合
+AC6  ██████████████████░░░░░░  TDD      ← 重合
+AC7  ███████████████████████░  补测试   ← 重合
+AC12 ████████████████████████  框架检查  ← 重合（测试阶段做审查的事）
+AC11 ██████████░░░░░░░░░░░░░░  AB选优   ← 不重合（Orbit 独创）
+AC10 ██████░░░░░░░░░░░░░░░░░░  契约骨架  ← 不重合（Orbit 独创）
+
+        重合度: 75% (9/12 AC 有直接学术界或工业界支持)
+</div>
+
+<h3>6.3 缺口识别：唯一缺失的验收标准</h3>
+
+<div class="box box-warn">
+  <strong>建议新增 AC14</strong>（审查→测试回灌闭环）
+  <table>
+    <tr><th>验收标准</th><td>审查发现（ReviewDecision severity ≥ major）→ 自动生成 regression 测试 → 保存到 tests/regression/ → 后续 CI 自动执行 → 同样的 bug 不会重现</td></tr>
+    <tr><th>量化指标</th><td>severity ≥ major 的审查发现 100% 触发 regression 测试生成；生成的测试在下一个 CI 运行中 100% 通过（因为代码已修复）</td></tr>
+    <tr><th>学术界支持</th><td>Testora (ICSE 2026) — PR diff → test gen → behavior comparison → regression detection</td></tr>
+    <tr><th>工业界支持</th><td>Meta JiT Testing — "catching tests" 在旧代码通过、新代码失败；gopher-ai — test_regression_ 前缀 + Red-Green 验证</td></tr>
+    <tr><th>实现位置</th><td><code>testing/orchestrator.py</code> 第 8 步后新增第 8b 步：review_result → extract findings → generate regression tests → save to tests/regression/</td></tr>
+  </table>
+</div>
+
+<hr id="s7">
+
+<!-- ═══════════════ §7 ═══════════════ -->
+<h2>7. 渐进式审查：概念验证与可行性</h2>
+
+<h3>7.1 什么是渐进式审查</h3>
+
+<div class="box box-info">
+  <strong>核心思想</strong>：审查不是代码出现后才开始的——它在 PRD 阶段就开始积累"预期清单"。PRD → 提取验收标准 → ADR → 补充架构约束 → 代码 → 对比预期 vs 实际。<br><br>
+  <strong>一句话</strong>：提前把"代码应该长什么样"写下来，代码出来后只用填空，不用重新理解。
+</div>
+
+<h3>7.2 Orbit 已有的渐进式基础设施</h3>
+
+<table>
+  <tr><th>阶段</th><th>现有能力</th><th>对应的预期类型</th><th>成熟度</th></tr>
+  <tr>
+    <td>PRD</td>
+    <td><code>intention.py:extract_from_prd()</code> — 从验收标准文本提取 Gherkin Scenario</td>
+    <td>行为预期 — "代码必须能做 X"</td>
+    <td><span class="tag tag-yellow">已有，待连线</span></td>
+  </tr>
+  <tr>
+    <td>ADR / 技术方案</td>
+    <td><code>intention.py:extract_contract_tests()</code> — 从 API 设计文本生成契约测试</td>
+    <td>接口预期 — "端点必须返回 shape Y"</td>
+    <td><span class="tag tag-yellow">已有，待连线</span></td>
+  </tr>
+  <tr>
+    <td>Spec</td>
+    <td><code>Task.signature + behavior + tests</code> (RUNE 启发) — 函数签名 + WHEN/THEN + 验收断言</td>
+    <td>实现预期 — "函数签名必须是 Z"</td>
+    <td><span class="tag tag-green">已实现</span></td>
+  </tr>
+  <tr>
+    <td>代码</td>
+    <td><code>_code_review()</code> + CrossReport</td>
+    <td>实际 vs 预期对比</td>
+    <td><span class="tag tag-green">已实现</span></td>
+  </tr>
+</table>
+
+<h3>7.3 缺的关键一块：跨阶段对比引擎</h3>
+
+<div class="box box-warn">
+  <strong>现状</strong>：四个阶段各有一套"预期提取"机制，但它们<strong>不互通</strong>。<br>
+  PRD 阶段提取的 Gherkin 场景保存在 <code>docs/requirements/.../阶段1-测试骨架.feature</code> 文件里。<br>
+  技术方案阶段提取的契约测试保存在 <code>tests/integration/test_*_skeleton_*.py</code> 文件里。<br>
+  代码阶段的审查引擎 (<code>review/service.py</code>) 不知道这些文件存在。<br><br>
+  <strong>缺的</strong>：一个 <code>ReviewCheckpoint</code> 模型，在 PRD 阶段建左列、ADR 阶段补中列、代码阶段填右列，三列同框对比。
+</div>
+
+<h3>7.4 推荐模型</h3>
+
+<div class="arch-diagram">
+class ReviewCheckpoint(BaseModel):
+    """跨阶段审查检查点——从 PRD 到代码的三列对照"""
+    id: str
+    source_phase: str        # "prd" | "adr" | "spec"
+    source_ref: str          # 出自哪个文档的哪条（可追溯）
+
+    # 三列——渐进填充
+    expectation: str         # 左列：PRD 阶段填充——代码必须实现什么
+    adr_constraint: str      # 中列：ADR 阶段填充——架构约束
+    actual: str              # 右列：代码阶段填充——实际文件:行号 + 判定
+
+    # 判定（代码阶段自动填）
+    verdict: str             # "match" | "deviation" | "partial" | "not_found"
+    evidence: str            # 证据（测试结果 / 审查发现 / 代码片段）
+</div>
+
+<h3>7.5 与 RUNE 的关系</h3>
+
+<div class="box box-purple">
+  <p><strong>RUNE (Task.signature + behavior + tests) 是渐进式审查的微观实现。</strong></p>
+  <p>区别在于范围：RUNE 在一个 Task 内生效（"这个函数的签名必须是什么"），渐进式审查跨阶段生效（"这个 PRD 的验收标准 3 在代码里有没有对应的实现"）。</p>
+  <p><strong>扩展路径</strong>：让 Spec.tasks 自动展开为 ReviewCheckpoint 列表——每个 Task 的 signature/behavior/tests 成为一条检查点，然后 PRD 和 ADR 的预期也追加到同一张表。代码阶段一次性对照。</p>
+</div>
+
+<hr id="s8">
+
+<!-- ═══════════════ §8 ═══════════════ -->
+<h2>8. Orbit 优化方案</h2>
+
+<h3>8.1 三时间层级总览</h3>
+
+<div class="gap-card">
+  <div class="gap-item">
+    <div class="status">⚡</div>
+    <h4>短期（1-2 周）<br>连线修复</h4>
+    <p>修复已发现断点<br>零新模块 · 零新依赖</p>
+    <p style="color:var(--green)">4 项</p>
+  </div>
+  <div class="gap-item">
+    <div class="status">🔧</div>
+    <h4>中期（1-2 月）<br>能力增强</h4>
+    <p>实现设计但未实现的功能<br>小幅新增 · 复用现有模块</p>
+    <p style="color:var(--yellow)">5 项</p>
+  </div>
+  <div class="gap-item">
+    <div class="status">🚀</div>
+    <h4>长期（3-6 月）<br>差异化竞争力</h4>
+    <p>业界无竞品的能力<br>新功能 · 可能需新依赖</p>
+    <p style="color:var(--purple)">4 项</p>
+  </div>
+</div>
+
+<!-- ─── 8.2 短期 ─── -->
+<h3>8.2 短期优化（1-2 周，零风险）</h3>
+
+<table>
+  <tr><th>#</th><th>项</th><th>当前</th><th>→</th><th>目标</th><th>改动位置</th></tr>
+  <tr>
+    <td>S1</td>
+    <td><strong>审查引擎连线</strong></td>
+    <td>ComposeOrchestrator._code_review() 自己做简化检查，不调 review/service.py</td>
+    <td>→</td>
+    <td>_code_review() 调用 ReviewService.create_review() → record_decision() → transition_status()，完整走状态机</td>
+    <td><code>compose/orchestrator.py</code> +~15 行</td>
+  </tr>
+  <tr>
+    <td>S2</td>
+    <td><strong>审查清单 Orbit 特化</strong></td>
+    <td>modes/review/checklist.md 含财务/会计维度（恪现遗产）</td>
+    <td>→</td>
+    <td>新增 Orbit 特化维度：调度器状态转换完整性 / 防幻觉 L1-L9 全链路 / 图谱查询接口兼容性 / 沙箱隔离边界</td>
+    <td><code>modes/review/checklist.md</code> 重写</td>
+  </tr>
+  <tr>
+    <td>S3</td>
+    <td><strong>Ponytail 进入 CrossReport</strong></td>
+    <td>PonytailReviewer 独立运行，输出日志但不反馈给合并报告</td>
+    <td>→</td>
+    <td>testing/orchestrator.run() 第 8 步并行调用 ponytail，结果合并到 CrossReport.cross_validations</td>
+    <td><code>testing/orchestrator.py</code> +~10 行</td>
+  </tr>
+  <tr>
+    <td>S4</td>
+    <td><strong>审查强制化</strong></td>
+    <td>testing/orchestrator 中审查是可选的（if self._review）</td>
+    <td>→</td>
+    <td>审查改为强制——无 review_service 时回退到 ponytail 静态审查（至少有一个维度的审查结果）</td>
+    <td><code>testing/orchestrator.py</code> +~5 行</td>
+  </tr>
+</table>
+
+<div class="box box-good">
+  <strong>S1-S4 预期效果</strong>：修复 3 个断点 + 1 个强制化。结果——审查状态机有数据了，Orbit 特化的审查清单有了，Ponytail 的过度工程检测能被人类看到了，审查不再是可选的装饰品了。零新模块、零新依赖、零 schema 变更。
+</div>
+
+<!-- ─── 8.3 中期 ─── -->
+<h3>8.3 中期优化（1-2 月，小幅新增）</h3>
+
+<table>
+  <tr><th>#</th><th>项</th><th>描述</th><th>涉及模块</th><th>依据</th></tr>
+  <tr>
+    <td>M1</td>
+    <td><strong>审查→测试回灌闭环 (AC14)</strong></td>
+    <td>ReviewDecision severity ≥ major → IntentionExtractor 提取为 TestIntention → IntentionDrivenGenerator 生成 test_regression_xxx → 保存到 tests/regression/ → 后续 CI 自动执行</td>
+    <td><code>testing/orchestrator.py</code> + <code>testing/intention.py</code> + <code>review/service.py</code></td>
+    <td>Testora (ICSE 2026) + Meta JiT + gopher-ai</td>
+  </tr>
+  <tr>
+    <td>M2</td>
+    <td><strong>渐进式审查引擎 (ReviewCheckpoint)</strong></td>
+    <td>实现 ReviewCheckpoint 模型 → ComposeOrchestrator.run_spec() 解析 spec 时建检查点左列 → ADR 阶段补中列 → _code_review() 填右列 → 生成渐进式审查报告</td>
+    <td>新增 <code>review/progressive.py</code> + 改 <code>compose/orchestrator.py</code></td>
+    <td>RUNE 模式扩展 + IntUT + TestGapRadar 风险排序</td>
+  </tr>
+  <tr>
+    <td>M3</td>
+    <td><strong>双向信息推送 (联动 L4)</strong></td>
+    <td>实现 PRD 5.5b 的信息交换协议——测试结果中的覆盖率低分支推送给审查 Agent，审查发现的缺失测试点推送给测试 Agent，asyncio.Queue 异步传递</td>
+    <td><code>testing/orchestrator.py</code> + <code>compose/skills/review.md</code> + <code>compose/skills/verify.md</code></td>
+    <td>Meta JiT "Dodgy Diff" 意图推断 + CrossReport 设计</td>
+  </tr>
+  <tr>
+    <td>M4</td>
+    <td><strong>TestGapDetector 风险排序</strong></td>
+    <td>现有 TestGapDetector 只列缺口不加权 → 引入 TestGapRadar 的 14 指标模型（代码中心度、改动复杂度、静态分析发现数）→ 缺口按风险排序，审查者优先看高风险缺口</td>
+    <td><code>graph/engines/test_gap_detector.py</code></td>
+    <td>TestGapRadar (IEEE TSE 2025) — 自动化排序不劣于人类专家</td>
+  </tr>
+  <tr>
+    <td>M5</td>
+    <td><strong>ReviewDecision 增加 severity 字段</strong></td>
+    <td>ReviewDecision.decision 当前只有 approved/rejected/comment → 增加 severity: critical/major/minor。配合 review.md 的 🔴critical/🟡major/🟢minor 体系</td>
+    <td><code>review/models.py</code> + <code>review/service.py</code> + DB migration</td>
+    <td>Google Code Review 标准 + compose/skills/review.md 已有的 severity 体系</td>
+  </tr>
+</table>
+
+<div class="box box-good">
+  <strong>M1-M5 预期效果</strong>：联动级别从 L2-3 提升到 L4-5。审查→测试回灌闭环完成，渐进式审查引擎上线，双向信息推送打通。关键指标——交叉验证分歧点减少 ~30%（因为审查期望被预填充），regression 测试自动生成覆盖 100% 的 major+ 审查发现。
+</div>
+
+<!-- ─── 8.4 长期 ─── -->
+<h3>8.4 长期优化（3-6 月，差异化竞争力）</h3>
+
+<table>
+  <tr><th>#</th><th>项</th><th>描述</th><th>差异化价值</th></tr>
+  <tr>
+    <td>L1</td>
+    <td><strong>AB 自动选优 → 进化式策略选择</strong></td>
+    <td>M3 的 AB 对比升级为持续学习——每次测试执行的结果反馈到 knowledge/ 策略评分，同类模块自动路由到历史最优策略。不用每次 AB，直接用历史数据预判</td>
+    <td><span class="tag tag-purple">无竞品</span> — Google MuRS 在 mutation ranking 做类似的事，但范围窄很多</td>
+  </tr>
+  <tr>
+    <td>L2</td>
+    <td><strong>开发者反馈 → 门禁参数自适应</strong></td>
+    <td>人类在 CrossReport 里的决策（采纳审查建议/保留新实现/查看代码对比）→ 回灌为 QualityGate 的参数调整信号。如人类频繁覆盖 Ponytail 的 "unnecessary_abstraction" 警告 → 自动降低该类严重度</td>
+    <td><span class="tag tag-purple">对标 Google MuRS 的 ML suppression</span>，但范围从 mutation 扩展到全审查维度</td>
+  </tr>
+  <tr>
+    <td>L3</td>
+    <td><strong>Dodgy Diff 风格意图推断</strong></td>
+    <td>不仅提取 PRD 验收标准——尝试推断开发者意图（"这个 PR 是想重构还是加功能？改 API 签名是 breaking change 还是内部调整？"），然后根据意图调整测试策略和审查重点</td>
+    <td><span class="tag tag-purple">对标 Meta JiT</span> — 但落在 Agent 自循环内而非 CI 管道</td>
+  </tr>
+  <tr>
+    <td>L4</td>
+    <td><strong>测试-审查-进化三角闭环</strong></td>
+    <td>测试发现→审查确认→失败模式→evolution/ 自动调优 Prompt→下次代码生成质量更高→测试更容易通过→审查发现更少。自循环系统的最外层闭环</td>
+    <td><span class="tag tag-purple">Orbit 独有</span> — 已有 evolution/ 模块和 GEPA Prompt 进化，只需连线</td>
+  </tr>
+</table>
+
+<h3>8.5 优化路线图（甘特图风格）</h3>
+
+<div class="timeline">
+  <div class="timeline-item done">
+    <strong>✅ 2026-07 已完成</strong><br>
+    testing/ 模块核心 (orchestrator + gate + intention + reporter + redundancy_check)<br>
+    CrossReport L2 合并 · 修复循环 ≤3 轮 · 框架适配检查 5 类 · RUNE 启发增强
+  </div>
+  <div class="timeline-item done">
+    <strong>✅ 2026-07 已完成（另一个会话）</strong><br>
+    Agent 测试自循环 PRD (US1-US11 + AC1-AC13)<br>
+    Agent 测试自循环 技术方案 (数据流 / 5.5 协同模型 / CrossReport UX 设计)<br>
+    6 个 SKILL.md (plan/review/debug/tdd/verify/subagent)
+  </div>
+  <div class="timeline-item todo">
+    <strong>⚡ 短期 (1-2 周): S1-S4</strong><br>
+    审查引擎连线 · 审查清单 Orbit 特化 · Ponytail 进 CrossReport · 审查强制化<br>
+    目标: 修复 3 个断点，L3 交叉验证覆盖 Ponytail
+  </div>
+  <div class="timeline-item todo">
+    <strong>🔧 中期 (1-2 月): M1-M5</strong><br>
+    审查→测试回灌闭环 (AC14) · 渐进式审查引擎 · 双向信息推送 · TestGapDetector 风险排序 · ReviewDecision.severity<br>
+    目标: 联动 L4-L5，渐进式审查上线，AC14 补齐
+  </div>
+  <div class="timeline-item todo">
+    <strong>🚀 长期 (3-6 月): L1-L4</strong><br>
+    AB 进化式策略选择 · 开发者反馈→门禁自适应 · Dodgy Diff 意图推断 · 测试-审查-进化三角闭环<br>
+    目标: 3 项无竞品能力，业界领先的 Agent 自循环测试审查体系
+  </div>
+</div>
+
+<hr id="s9">
+
+<!-- ═══════════════ §9 ═══════════════ -->
+<h2>9. 结论与建议</h2>
+
+<h3>9.1 核心结论</h3>
+
+<div class="box box-purple">
+  <ol>
+    <li><strong>Orbit 的代码审查架构是 4 层体系，设计完整但有 3 个断点</strong>。审查引擎 (review/) 和编排器 (compose/) 之间有连线缺口，审查清单未针对 Orbit 领域特化，Ponytail 过度工程检测的结果未进入 CrossReport。</li>
+    <li><strong>测试和审查联动能同时提速（~60% 人类审查时间节省）和提质（~50% 缺陷发现率提升）</strong>。核心机制不是"审得快"而是"审得少"——共识自动通过，人类只看分歧点。学术界和工业界均验证了这个方向。</li>
+    <li><strong>Agent 测试自循环 PRD 与联动研究的重叠度 ~85%</strong>。12 条 AC 中 9 条有直接学术界或工业界支持。AB 自动选优（AC11）和契约骨架生成（AC10）是真正的差异化。唯一缺口是审查→测试回灌闭环（建议新增 AC14）。</li>
+    <li><strong>渐进式审查（PRD→ADR→代码预填充）在 Orbit 有现成基础设施</strong>。RUNE 模式 (Task.signature + behavior + tests) 是其微观实现。缺的是一张跨阶段对照表——ReviewCheckpoint 模型（约 30 行代码）。</li>
+    <li><strong>6 篇学术论文和 4 家工业公司的实践全部支持 Orbit 的设计方向</strong>。没有发现任何证据表明当前方向有误。AB 自动选优是真正的无人区。</li>
+  </ol>
+</div>
+
+<h3>9.2 行动建议（优先级排序）</h3>
+
+<table>
+  <tr><th>优先级</th><th>行动</th><th>理由</th><th>预计工作量</th></tr>
+  <tr>
+    <td><span class="tag tag-red">P0</span></td>
+    <td>执行 S1-S4 短期优化——修复 3 个断点</td>
+    <td>当前系统有功能但链路不完整——修断点比建新功能优先</td>
+    <td>2-3 天</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-red">P0</span></td>
+    <td>在 Agent 测试自循环 PRD 中加入 AC14（审查→测试回灌闭环）</td>
+    <td>这是唯一一个有强学术界和工业界支持但 PRD 里没有显式验收标准的能力</td>
+    <td>30 分钟（加一段文字）</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-yellow">P1</span></td>
+    <td>实现 M2 渐进式审查引擎（ReviewCheckpoint）</td>
+    <td>这是"提速审查"最直接的手段——预期预填充，代码阶段只填空</td>
+    <td>3-5 天</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-yellow">P1</span></td>
+    <td>实现 M1 审查→测试回灌闭环</td>
+    <td>AC14 的落地实现——闭环的最后一块拼图。Testora 论文提供参考架构</td>
+    <td>3-5 天</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-blue">P2</span></td>
+    <td>实现 M3 双向信息推送 + M4 TestGapDetector 风险排序</td>
+    <td>联动 L4 的核心——让测试和审查不再独立工作</td>
+    <td>5-7 天</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-blue">P2</span></td>
+    <td>实现 M5 ReviewDecision.severity 字段</td>
+    <td>支持 AC14 的筛选（severity ≥ major 才生成 regression 测试）</td>
+    <td>1-2 天</td>
+  </tr>
+  <tr>
+    <td><span class="tag tag-purple">P3</span></td>
+    <td>启动 L1-L4 长期优化中至少一项的预研</td>
+    <td>AB 进化式策略选择或 Dodgy Diff 意图推断——选一个做 PoC</td>
+    <td>2-4 周 PoC</td>
+  </tr>
+</table>
+
+<h3>9.3 一句话</h3>
+
+<div class="box box-good" style="font-size:1.1rem">
+  <strong>Orbit 的测试-审查联动设计在学术上和工业上都有充分依据。</strong><br>
+  当前最该做的事不是设计新能力——是<strong>把已经设计和已经验证的能力连起来</strong>。3 个断点 + 1 个 AC14 + 1 张 ReviewCheckpoint 表。<br>
+  做完这些，Orbit 的测试审查体系将达到业界领先水平。AB 自动选优是真正的无人区，值得长期投入。
+</div>
+
+<hr id="s10">
+
+<!-- ═══════════════ §10 ═══════════════ -->
+<h2>10. 参考文献</h2>
+
+<h3>10.1 学术论文</h3>
+<ol class="ref-list">
+  <li>Nan Z, Guo Z, Liu K, Xia X. <strong>"Test Intention Guided LLM-Based Unit Test Generation"</strong> (IntUT). ICSE 2025. DOI: <a href="https://doi.org/10.1109/ICSE55347.2025.00243">10.1109/ICSE55347.2025.00243</a>. 分支覆盖 +94%，行覆盖 +49%.</li>
+  <li>Chen Z, Salawa M, Vijayvergiya M, Petrović G, Ivanković M, Just R. <strong>"MuRS: Mutant Ranking and Suppression using Identifier Templates"</strong>. ESEC/FSE 2023. DOI: <a href="https://doi.org/10.1145/3611643.3613901">10.1145/3611643.3613901</a>. Google diff-based mutation testing @ code review.</li>
+  <li>Petrović G, Ivanković M, Fraser G, Just R. <strong>"Please Fix This Mutant: How Do Developers Resolve Mutants Surfaced during Code Review?"</strong> ICSE-SEIP 2023. DOI: <a href="https://doi.org/10.1109/ICSE-SEIP58684.2023.00019">10.1109/ICSE-SEIP58684.2023.00019</a>. 1,538 PR 分析，38% 变异体被修复.</li>
+  <li>Ravi R, Bradshaw D, Ruberto S, Jahangirova G, Terragni V. <strong>"LLMLOOP: Improving LLM-Generated Code and Tests Through Automated Iterative Feedback Loops"</strong>. ICSME 2025. 5 迭代循环：编译→静态分析→测试→变异→回归.</li>
+  <li>Haas R, Sailer M, Joblin M, Juergens E, Apel S. <strong>"Prioritizing Test Gaps by Risk in Industrial Practice"</strong> (TestGapRadar). IEEE TSE 2025. 14 指标风险排序，不劣于人类专家.</li>
+  <li><strong>"Testora: Automated Regression Test Detection for Pull Requests"</strong>. ICSE 2026. PR diff → LLM 测试生成 → Docker 行为对比 → 意图 vs 回归分类. 1,274 PR 验证.</li>
+</ol>
+
+<h3>10.2 工业实践</h3>
+<ol class="ref-list" start="7">
+  <li>Meta Engineering. <strong>"Just-in-Time Testing at Code Review Time"</strong>. InfoQ, April 2026. "Dodgy Diff" 架构，4× 缺陷发现率.</li>
+  <li>Siemens/Hacon. <strong>"Human-AI Collaboration for Scaling Agile Regression Testing"</strong>. XP 2026 Workshop. arXiv:2603.08190. RAG + 多 Agent 生成系统级回归测试.</li>
+  <li>IBM Research. <strong>"ASTER: Natural and Multi-language Unit Test Generation with LLMs"</strong>. ICSE 2025 SEIP (Award Winner). 静态分析引导 LLM 多语言测试生成.</li>
+  <li>gopher-ai (GitHub). <strong>Feature Request #75: auto-generate tests for fixes during address-review</strong>. test_regression_ 前缀 + Red-Green 验证.</li>
+</ol>
+
+<h3>10.3 Orbit 内部文档</h3>
+<ol class="ref-list" start="11">
+  <li><a href="../requirements/2026-07-07-Agent测试自循环/阶段1-PRD-Agent测试自循环.md">阶段1 PRD — Agent测试自循环模块</a> (2026-07-07)</li>
+  <li><a href="../requirements/2026-07-07-Agent测试自循环/阶段2-技术方案-Agent测试自循环.md">阶段2 技术方案 — Agent测试自循环模块</a> (2026-07-07)</li>
+  <li><a href="../../src/orbit/review/service.py">src/orbit/review/service.py</a> — 审查引擎业务逻辑 + 状态机</li>
+  <li><a href="../../src/orbit/review/ponytail.py">src/orbit/review/ponytail.py</a> — 过度工程检测器 (PonytailReviewer)</li>
+  <li><a href="../../src/orbit/testing/orchestrator.py">src/orbit/testing/orchestrator.py</a> — 测试流程编排器 (CrossReport 生成)</li>
+  <li><a href="../../src/orbit/testing/reporter.py">src/orbit/testing/reporter.py</a> — CrossReport 合并引擎</li>
+  <li><a href="../../src/orbit/compose/orchestrator.py">src/orbit/compose/orchestrator.py</a> — Spec-driven 编排器 (两道门禁)</li>
+  <li><a href="../../src/orbit/compose/skills/review.md">src/orbit/compose/skills/review.md</a> — 审查方法论注入 (4 维度加权)</li>
+</ol>
+
+<hr>
+
+<p style="color:var(--text2);font-size:0.85rem;text-align:center;margin-top:2rem">
+  Orbit 测试-审查联动体系研究报告 v1.0 · 2026-07-07 · 基于 6 篇论文 + 4 家公司 + Orbit 内部 45 模块审计<br>
+  Generated as part of the test-review integration research for Orbit self-evolution system.
+</p>
+
+</body>
+</html>

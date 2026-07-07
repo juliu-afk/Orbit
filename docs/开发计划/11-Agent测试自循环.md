@@ -173,4 +173,50 @@ testing/ 依赖（全部已有，无需新建）:
 
 ---
 
-*— V14.1+TestCycle · 2026-07-07 —*
+---
+
+## 九、测试-审查联动优化（新增 · 2026-07-07）
+
+> 基于：[Orbit测试审查联动研究.html](../research/Orbit测试审查联动研究.html)
+> 调研覆盖：6 篇学术论文 + 4 家工业公司（Google/Meta/Siemens/IBM）
+
+### 9.1 发现
+
+Orbit 审查架构存在 **3 个断点** + **5 项未实现的设计能力**：
+
+| 类型 | # | 项 | 状态 |
+|------|---|------|------|
+| 断点 | S1 | 审查引擎未连线 — ComposeOrchestrator._code_review() 不调 ReviewService | 已设计未连线 |
+| 断点 | S2 | 审查清单未特化 — checklist.md 含财务/会计维度，缺 Orbit 维度 | 遗留模板 |
+| 断点 | S3 | Ponytail 未进入 CrossReport — 过度工程检测结果仅日志输出 | 独立运行 |
+| 断点 | S4 | 审查可选 — `if self._review:` 条件跳过 | 缺兜底 |
+| 能力 | M1 | 审查→测试回灌闭环 — ReviewDecision → test_regression_xxx 自动生成 | PRD 缺 AC14 |
+| 能力 | M2 | 渐进式审查引擎 — ReviewCheckpoint 三列对照（PRD→ADR→代码） | 未实现 |
+| 能力 | M3 | 双向信息推送 — 测试↔审查 L4 级联动（asyncio.Queue） | PRD 5.5b 设计了未实现 |
+| 能力 | M4 | TestGapDetector 风险排序 — 14 指标加权（对标 TestGapRadar） | 有检测无排序 |
+| 能力 | M5 | ReviewDecision.severity 字段 — 区分 critical/major/minor | severity 在 review.md 中有但 ORM 无 |
+
+### 9.2 实施计划
+
+**Batch A（断点修复 · 2-3 天）**：S1-S4 — 零新模块、零新依赖、≤5 文件改动。
+
+**Batch B（能力增强 · 1-2 周）**：M1-M5 — 新增 `review/progressive.py` + 改 3-4 个现有文件。依赖 Agent 测试自循环 PRD 确认。
+
+| Batch | 需求文档 | 关联 |
+|-------|---------|------|
+| A+B | `docs/requirements/2026-07-07-测试审查联动断点修复/` | 本开发计划 §九 |
+
+### 9.3 Phase 节奏调整
+
+原 Phase 3（闭环反馈）提前到与 Phase 2 并行——M1（审查→测试回灌）和 M3（双向推送）是闭环的核心，不必等 Phase 2 全部完成。
+
+```
+Phase 1: 基础内循环 (已完成) + Batch A 断点修复 (新增)
+Phase 2: 策略增强 + Batch B 能力增强 (M1-M5)
+Phase 3: 闭环反馈 + 渐进式审查
+Phase 4: 人类报告 + 生产化
+```
+
+---
+
+*— V14.1+TestCycle · 2026-07-07 · 更新：测试审查联动优化 —*

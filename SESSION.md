@@ -1,5 +1,49 @@
 # Orbit 开发会话记录
 
+## 2026-07-07 — 五大能力全链路集成接线 (3 PR · 全部 MERGED)
+
+### 背景
+基于 [`Orbit-Agent五大能力差距分析`](docs/research/Orbit-Agent五大能力差距分析.html)（2026-07-05），13 项差距（P0×2+P1×7+P2×4）全部修复。报告 V1.0→V2.0，覆盖率 ①95% ②90% ③95% ④90% ⑤85%。
+
+### 交付
+
+| PR | 内容 | 文件 | 规模 |
+|----|------|------|------|
+| [#229](https://github.com/juliu-afk/Orbit/pull/229) | 五大能力模块全链路集成接线——ReflAct/PreAct/VIGIL/Monitor/情节记忆/EvolveR/ANCHOR/HITL/AgenticMemory 接入执行循环 | 6 | +193/-47 |
+| [#230](https://github.com/juliu-afk/Orbit/pull/230) | MCTS 接线 + Profile 注入 PromptBuilder + DISTILL_EVERY_N_TASKS 环境变量 | 4 | +40/-1 |
+| [#233](https://github.com/juliu-afk/Orbit/pull/233) | R2 复审修复——3P0+3P1+3P2（Monitor 事件类型/轨迹ID/VIGIL注入/PreAct替代/Monitor清理/双重装饰器等） | 5 | +68/-17 |
+
+### 断点修复（7→0）
+
+| # | 断点 | 修复 |
+|---|------|------|
+| 1 | DB `:memory:` 全链路失忆 | `configure_wiring(db_path="data/orbit_wiring.db")` |
+| 2 | Monitor→HITL 断链 | `HITLManager(event_bus)` 传入 MonitorAgent |
+| 3 | 双实例 wiring | 删 `_get_wiring()`/`_wire()`，统一 `get_wiring()` |
+| 4 | Profile 加载时机 | `run_task()` 中 `load_profile()` + PromptBuilder 注入 |
+| 5 | VIGIL heal 被忽略 | heal 结果含具体 action/args 注入消息 |
+| 6 | TrajectoryCollector 重复 | lifespan 改用 wiring 统一管理 |
+| 7 | 轨迹 ID start/end 不匹配 | 存储 start 返回的 trajectory_id 供 end 复用 |
+
+### 关键决策
+- wiring 初始化从"模块懒加载"改为"main.py 显式组装"（框架级视角）
+- 所有 Engine 创建在 task_runner，传入 factory → ReActAgent
+- Monitor 事件队列通过 wiring._monitor_queues 管理，dict+对象双形态兼容
+- 全部调用 fail-open——异常不阻塞主 Agent
+- MCTS 仅 ArchitectAgent 角色创建（按需，不浪费内存）
+
+### 踩坑
+- `_process_event` 用 `getattr` 处理 dict 返回 None → P0-1（改双形态兼容）
+- `on_task_start`/`on_task_end` 轨迹 ID 不同哈希 → P0-2（改存储复用）
+- ReflectionEngine/PreActEngine 无人创建 → 在 task_runner 创建实例
+- Monitor queue 永不消费 → feed_monitor 推送 + cleanup_monitor 清理
+
+### 文档
+- 阶段 1-3 完整文档链：`docs/requirements/2026-07-07-五大能力集成接线/`
+- 差距分析报告更新 V2.0：`docs/research/Orbit-Agent五大能力差距分析.html`
+
+---
+
 ## 2026-07-07 — 安全+UX 全面修复冲刺 (6 PR · 全部 MERGED)
 
 ### 背景

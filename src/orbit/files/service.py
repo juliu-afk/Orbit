@@ -104,8 +104,15 @@ class FileService:
             return await asyncio.to_thread(functools.partial(self._list_files_sync, root_override=directory))
         return await asyncio.to_thread(self._list_files_sync)
 
-    async def read_file(self, path: str) -> str:
-        target = self._safe_path(path)
+    async def read_file(self, path: str, directory: str | None = None) -> str:
+        # WHY directory override: 用户打开项目后文件路径相对项目目录，
+        # 不相对 exe 所在目录。list_files 已支持 dir 参数，read_file 需同步。
+        base = Path(directory).resolve() if directory else self.workspace
+        target = (base / path).resolve()
+        if not str(target).startswith(str(base)):
+            raise ValueError(f"Path traversal denied: {path}")
+        if not target.exists():
+            raise FileNotFoundError(f"File not found: {path}")
         if target.stat().st_size > MAX_READ_SIZE:
             raise ValueError(f"File too large: {target.stat().st_size} > {MAX_READ_SIZE}")
         return target.read_text(encoding="utf-8")
@@ -132,9 +139,12 @@ class FileService:
         }
         return M.get(os.path.splitext(path)[1].lower(), "plaintext")
 
-    async def diff(self, path: str, rev_a: str = "HEAD", rev_b: str | None = None) -> dict:
-        target = self._safe_path(path)
-        cmd = ["git", "-C", str(self.workspace), "diff", "--unified=3"]
+    async def diff(self, path: str, rev_a: str = "HEAD", rev_b: str | None = None, directory: str | None = None) -> dict:
+        base = Path(directory).resolve() if directory else self.workspace
+        target = (base / path).resolve()
+        if not str(target).startswith(str(base)):
+            raise ValueError(f"Path traversal denied: {path}")
+        cmd = ["git", "-C", str(base), "diff", "--unified=3"]
         if rev_b:
             cmd.extend([rev_a, rev_b, "--", str(target)])
         else:

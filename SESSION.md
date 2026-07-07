@@ -1,5 +1,36 @@
 # Orbit 开发会话记录
 
+## 2026-07-07（夜）— 测试-审查联动体系建设 (PR #234 · MERGED)
+
+### 背景
+基于6篇学术论文（IntUT/MuRS/LLMLOOP/TestGapRadar/Testora/RL-TestGen）+4家工业公司（Google/Meta/Siemens/IBM）对标研究。
+
+### 研究
+- [Orbit测试审查联动研究.html](docs/research/Orbit测试审查联动研究.html) — 10章完整报告
+
+### 交付 (PR #234)
+
+| 层级 | 项 | 内容 |
+|------|------|------|
+| P0 | S1-S4 | 审查引擎连线 / checklist Orbit特化 / Ponytail→CrossReport / 审查强制化 |
+| P1 | M1-M2 | 审查→测试回灌 / 渐进式审查引擎(ReviewCheckpoint) |
+| P2 | M3-M5 | 双向推送(asyncio.Queue) / 风险排序(3因子) / severity字段 |
+| P3 | L1+L4 | 进化式策略选择器 / 三角闭环 |
+
+- 代码: 3新+9改 / 测试: 4文件40用例 / 依赖: 0 / Migration: 1
+
+### 审查
+R1新增P1-2(Ponytail导入)非阻塞。R4全绿合并。
+
+### 踩坑
+- 分支污染: 错用`feat/testing-agent-self-cycle`→PR #234混入另一个会话代码
+- 死代码: progressive/evolutionary_selector/triangle/rank_by_risk写了没连线
+
+### 文档
+`docs/requirements/2026-07-07-测试审查联动断点修复/` 阶段1-4完整链路
+
+---
+
 ## 2026-07-07（下午）— 依赖+Dependabot+UX长期4项+减熵收尾 (2 PR · 全部 MERGED)
 
 ### 交付
@@ -806,3 +837,49 @@ docs/ 与 src/ 对照清查，发现 26 项未完成：12 源码 TODO、3 P2 修
 - litellm `collect_submodules()` 只收集 479/1727 模块（缺 tokenizers）→必须文件系统扫描
 - tiktoken 编码数据在 `tiktoken_ext` 命名空间包→PyInstaller 不自动发现→需加入 hiddenimports
 - chat.py `set_clarifier_llm` 注入只在 chat 路由加载时生效→加 `set_chatter_llm` 同步注入
+
+---
+
+## 2026-07-07（夜）— Agent测试自循环模块全套交付 (PR #234 · MERGED)
+
+### 背景
+基于[测试设计V4.html](docs/research/测试设计V4.html)工业级AI-Native测试工程报告+2025-2026前沿研究，将测试从"人类驱动的阶段4外部门禁"升级为"Agent内建质量闭环"。
+
+### 交付总览
+
+| 层 | 模块 | 文件数 |
+|----|------|--------|
+| 后端 testing/ | orchestrator/intention/gate/redundancy_check/reporter/rts/feedback/strategies/api | 12 |
+| 前端 | TestResultCard.vue + MessageItem.vue | 2 |
+| Agent钩子 | AgentOutput.code_for_testing + compose/orchestrator 4b触发 + api/main.py启动注入 | 3 |
+| 断点修复(S1-S4) | compose连线+checklist特化+Ponytail联动+审查兜底 | 4 |
+| 能力增强(M1-M5) | 回归测试生成+渐进式审查+双向推送+缺口排序+severity字段 | 5 |
+| 死代码接线 | progressive/evolutionary/triangle/rank_by_risk | 4 |
+| 测试 | unit tests | 69 |
+
+### 调用链（17步全闭环）
+api/main.py→testing.setup()→compose 4b→testing.run_on_code()→orchestrator.run()
+→intention→evolutionary→generator→redundancy→rank_by_risk→sandbox(asyncio.timeout)
+→gate→repair(≤3轮)→feedback→ponytail∥review→CrossReport→triangle→summary_card
+→前端TestResultCard
+
+### 关键决策
+- 零新数据库表——复用knowledge/知识图谱+coverage.json
+- 零新前端面板——TestResultCard内嵌聊天流，像diff一样展示
+- 零现有模块破坏性修改——testing/纯编排层，通过已有公开接口调用
+- 审查永不静默跳过——PonytailReviewer默认实例化+_static_review_fallback兜底
+- asyncio.timeout(30s)保护FastAPI worker——沙箱执行不阻塞
+- AB测试L1自动/L2-L4人工触发——结果沉淀knowledge/自动选最优策略
+
+### 踩坑
+- Windows GBK编码→rts.py中文标点(Python 3.12 confusable chars)→全英文化解决
+- api/main.py初始化顺序错误→_code_graph_engine未定义→移至依赖之后
+- pytest误收集Test* dataclass→6处加__test__=False
+- git squash merge commit message含"Phase 1 MVP"字样→实际交付为完整成品
+- 外部会话4个死代码模块未接线→progressive/evolutionary/triangle/rank_by_risk全部接入调用链
+
+### 复审历程
+- R1: 0P0/4P2 → P2全修
+- R2: 0P0/3P1/2P2 → P1+S3+S4全修
+- R3: 0P0/1P1(沙箱超时) → asyncio.timeout修复
+- 最终: 0P0/0P1/0P2 → 合并

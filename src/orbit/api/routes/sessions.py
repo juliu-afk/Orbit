@@ -1,10 +1,12 @@
-"""Session API 路由 (Session PR #1).
+"""Session API 路由.
 
 端点:
-  POST   /api/v1/sessions             创建会话
-  GET    /api/v1/sessions             列出所有会话
-  GET    /api/v1/sessions/{id}        会话详情（含聊天记录）
-  PATCH  /api/v1/sessions/{id}        更新会话
+  POST   /api/v1/sessions                 创建会话
+  GET    /api/v1/sessions                 列出所有会话
+  GET    /api/v1/sessions/{id}            会话详情（含聊天记录）
+  PATCH  /api/v1/sessions/{id}            更新会话
+  POST   /api/v1/sessions/{id}/fork       分叉会话（对话分支）
+  GET    /api/v1/sessions/{id}/forks      列出子分支
 """
 
 from __future__ import annotations
@@ -39,6 +41,15 @@ class SessionUpdateRequest(BaseModel):
 
     title: str | None = Field(None, max_length=100)
     status: str | None = Field(None, pattern=r"^(active|archived)$")
+
+
+class SessionForkRequest(BaseModel):
+    """分叉会话请求——UX 长期 #13 对话分支。"""
+
+    fork_at_message_index: int | None = Field(
+        None, ge=0, description="从第几条消息处分叉（0-based）。None=从最新消息处分叉"
+    )
+    title: str = Field("", max_length=100, description="子会话标题，空时自动生成")
 
 
 class SessionResponse(BaseModel):
@@ -166,5 +177,85 @@ async def update_session(session_id: str, req: SessionUpdateRequest) -> dict:
     return {
         "code": 0,
         "data": updated.to_dict() if updated else None,
+        "message": "ok",
+    }
+
+
+# ── UX 长期 #13：对话分支 ─────────────────────────────
+
+
+@router.post(
+    "/{session_id}/fork",
+    response_model=dict,
+    summary="分叉会话（对话分支）",
+    description="从指定消息位置分叉，创建子会话。fork_at_message_index 为 None 时从最新消息处分叉。",
+    responses={404: {"description": "父会话不存在"}},
+)
+async def fork_session(session_id: str, req: SessionForkRequest = SessionForkRequest()) -> dict:
+    """创建会话分支——UX 长期 #13。
+
+    1. 验证父会话存在
+    2. 调用 SessionRegistry.create_fork() 创建子会话
+    3. 复制父会话消息到分叉点
+    4. 返回子会话信息
+    """
+    parent = _registry.get(session_id)
+    if parent is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "detail": f"父会话 {session_id} 不存在",
+                "error_code": "SESSION_NOT_FOUND",
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
+    # 创建子会话（DB lineage 已由 registry.create_fork 记录）
+    title = req.title or f"分支: {parent.title or session_id[:8]}"
+    child_id = _registry.create_fork(session_id, reason=f"forked at message #{req.fork_at_message_index}" if req.fork_at_message_index is not None else "forked at latest")
+
+    # 更新子会话标题
+    _registry.update(child_id, title=title)
+
+    # 复制消息到分叉点
+    all_messages = _registry.get_messages(session_id, limit=1000)
+    fork_index = req.fork_at_message_index if req.fork_at_message_index is not None else len(all_messages) - 1
+    messages_to_copy = all_messages[: fork_index + 1] if fork_index >= 0 else []
+
+    for msg in messages_to_copy:
+        _registry.add_message(
+            child_id,
+            role=msg.role,
+            content=msg.content,
+            candidates=msg.candidates,
+            cross_project_warning=msg.cross_project_warning,
+        )
+
+    child = _registry.get(child_id)
+    if child is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"detail": "分叉创建失败", "error_code": "FORK_FAILED"},
+        )
+
+    return {
+        "code": 0,
+        "data": child.to_dict(),
+        "message": "ok",
+    }
+
+
+@router.get(
+    "/{session_id}/forks",
+    response_model=dict,
+    summary="列出子分支",
+    description="获取指定会话的所有子分支（fork 产生的子会话）。",
+)
+async def list_forks(session_id: str) -> dict:
+    """列出会话的所有子分支。"""
+    children = _registry.get_child_sessions(session_id)
+    return {
+        "code": 0,
+        "data": [c.to_dict() for c in children],
         "message": "ok",
     }

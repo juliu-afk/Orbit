@@ -27,6 +27,7 @@ import CommandPalette from '@/components/layout/CommandPalette.vue'  // UX-11
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 import MonacoDiffEditor from '@/components/editor/MonacoDiffEditor.vue'  // UX-2
 import RulesPanel from '@/components/settings/RulesPanel.vue'  // UX-10
+import BranchesPanel from '@/components/session/BranchesPanel.vue'  // UX-13
 
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
 const chat = useChatStore(); const task = useTaskStore(); const editor = useEditorStore()
@@ -86,7 +87,7 @@ const gridColumns = () => shell.showFileTree
   : `0 1fr var(--spacing-right-panel)`
 
 watch(()=>session.currentSessionId,(n)=>{if(n)chat.connectChatWs(n,session.currentProjectName||"")})
-function onKeydown(e:KeyboardEvent){ if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();shell.toggleFileTree()}; if((e.metaKey||e.ctrlKey)&&e.key==='/'){e.preventDefault();showShortcuts.value=!showShortcuts.value}; if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();showCommandPalette.value=!showCommandPalette.value}; if(e.key==='Escape'){shell.closeAllDrawers();if(shell.showMonaco)shell.closeFileReview()} }
+function onKeydown(e:KeyboardEvent){ if((e.metaKey||e.ctrlKey)&&e.key==='b'){e.preventDefault();shell.toggleFileTree()}; if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key==='B'){e.preventDefault();shell.showBranches=!shell.showBranches}; if((e.metaKey||e.ctrlKey)&&e.key==='/'){e.preventDefault();showShortcuts.value=!showShortcuts.value}; if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();showCommandPalette.value=!showCommandPalette.value}; if(e.key==='Escape'){shell.closeAllDrawers();if(shell.showMonaco)shell.closeFileReview()} }
 // UX-11: 命令面板操作分发
 function onCmdExecute(action: string) {
   switch (action) {
@@ -100,6 +101,7 @@ function onCmdExecute(action: string) {
     case 'open:newsession': showNewDialog.value = true; break
     case 'open:shortcuts': showShortcuts.value = true; break
     case 'open:rules': showRules.value = true; break
+    case 'toggle:branches': shell.showBranches = !shell.showBranches; break
   }
 }
 
@@ -128,7 +130,7 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
       </main>
   <div class="resize-handle resize-right" @pointerdown="handleRightResize" />
   <aside class="panel-right" style="border-left:1px solid var(--color-orbit-border);overflow-y:auto"><MonacoPanel v-if="shell.showMonaco" /><AgentInfoPanel v-else /></aside>
-  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @toggle-trace="shell.toggleTrace()" @toggle-config="shell.toggleConfig()" @toggle-codegraph="shell.toggleCodeGraph()" @toggle-wechat="shell.toggleWeChat()" @new-session="showNewDialog = true" @switch-session="onSessionSwitched" />
+  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @toggle-trace="shell.toggleTrace()" @toggle-config="shell.toggleConfig()" @toggle-codegraph="shell.toggleCodeGraph()" @toggle-wechat="shell.toggleWeChat()" @toggle-branches="shell.showBranches = !shell.showBranches" @new-session="showNewDialog = true" @switch-session="onSessionSwitched" />
   <DAGDrawer v-model:show="shell.showDAG" /><TokenChartDrawer v-model:show="shell.showChart" /><SearchDrawer v-model:show="shell.showSearch" @open-file="shell.openFileReview" />
   <TraceDrawer v-model:show="shell.showTrace" /><ConfigDrawer v-model:show="shell.showConfig" />
   <CodeGraphDrawer v-model:show="shell.showCodeGraph" />
@@ -138,6 +140,8 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
     <CommandPalette :visible="showCommandPalette" @close="showCommandPalette = false" @execute="onCmdExecute" />
     <!-- UX-10: Rules 面板 -->
     <el-drawer v-model="showRules" title="Rules & Memory" direction="rtl" size="480px"><RulesPanel /></el-drawer>
+    <!-- UX-13: 对话分支 -->
+    <el-drawer v-model="shell.showBranches" title="Conversation Branches" direction="rtl" size="360px"><BranchesPanel /></el-drawer>
   <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
   <!-- WHY 代码产物抽屉: task:update WS 推送代码 output → 自动弹出展示 -->
   <el-drawer v-model="showCodeDiff" title="Generated Code" direction="rtl" size="520px" @close="handleCloseCodeDiff">

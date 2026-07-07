@@ -284,7 +284,8 @@ class SessionRegistry:
         parent = self.get(parent_session_id)
         project = parent.project_name if parent else "unknown"
         title = f"Fork of {parent_session_id[:8]}"
-        child = self.create(project, title=title)
+        # P2-1: 复制父会话的 local_path，否则 fork 后文件树等功能失效
+        child = self.create(project, title=title, local_path=parent.local_path if parent else "")
 
         conn = self._get_conn()
         conn.execute(

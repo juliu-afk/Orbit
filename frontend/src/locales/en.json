@@ -1,0 +1,89 @@
+{
+  "app": {
+    "title": "Orbit",
+    "connected": "Connected",
+    "connecting": "Connecting...",
+    "disconnected": "Disconnected"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "mcp": "MCP Servers",
+    "settings": "Settings",
+    "files": "Files",
+    "graph": "Graph",
+    "search": "Search",
+    "commands": "Command Palette"
+  },
+  "session": {
+    "new": "Open or Create Project",
+    "select": "Select a project to get started",
+    "archive": "Archive",
+    "fork": "Fork from here",
+    "forkTitle": "Branch: {title}",
+    "childSessions": "Branches",
+    "noForks": "No branches yet",
+    "forkedFrom": "Forked from"
+  },
+  "chat": {
+    "placeholder": "Type a message... (Enter to send, Shift+Enter for new line)",
+    "send": "Send",
+    "stop": "Stop",
+    "modeAsk": "Ask",
+    "modeEdit": "Edit",
+    "modeAgent": "Agent",
+    "searchHistory": "Search message history...",
+    "noMessages": "No messages",
+    "thinking": "Thinking...",
+    "toolCall": "Tool Call",
+    "toolResult": "Tool Result",
+    "expand": "Expand",
+    "collapse": "Collapse"
+  },
+  "panel": {
+    "fileTree": "File Tree",
+    "agentInfo": "Agent Info",
+    "runStatus": "Run Status",
+    "activeTasks": "Active Tasks",
+    "tokenUsage": "Token Usage",
+    "hallucinationBlocks": "Blocks",
+    "circuitBreaker": "Circuit Breaker",
+    "alerts": "Alerts"
+  },
+  "mcp": {
+    "title": "MCP Server Management",
+    "back": "Back to Dashboard",
+    "serverList": "Server List",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "error": "Error",
+    "tools": "tools",
+    "noServers": "No MCP servers configured",
+    "discover": "Rediscover",
+    "searchTools": "Search tools...",
+    "toolName": "Tool Name",
+    "description": "Description",
+    "parameters": "Parameters",
+    "noTools": "No tools discovered"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "zhCN": "中文",
+    "en": "English",
+    "model": "Model",
+    "shortcuts": "Shortcuts",
+    "opacity": "Opacity",
+    "blur": "Blur"
+  },
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "close": "Close",
+    "back": "Back"
+  }
+}

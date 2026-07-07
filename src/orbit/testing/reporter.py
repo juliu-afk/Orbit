@@ -53,6 +53,7 @@ class CrossReport:
 
 class TestReporter:
     """生成各种格式的测试报告。"""
+    __test__ = False  # 非 pytest 测试类
 
     def build_summary_card(
         self,

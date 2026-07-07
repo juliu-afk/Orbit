@@ -17,6 +17,7 @@ logger = structlog.get_logger("orbit.test_gap")
 @dataclass
 class TestGap:
     """单个测试覆盖空洞."""
+    __test__ = False  # 非 pytest 测试类
 
     function_name: str
     param_name: str
@@ -95,6 +96,7 @@ class TestGapDetector:
         detector = TestGapDetector()
         gaps = await detector.detect(code_graph, function_name="calculate_tax")
     """
+    __test__ = False  # 非 pytest 测试类
 
     async def detect(self, code_graph: Any, function_name: str) -> list[TestGap]:
         """对指定函数做覆盖空洞检测."""

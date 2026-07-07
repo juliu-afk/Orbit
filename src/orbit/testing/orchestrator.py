@@ -229,6 +229,23 @@ class TestOrchestrator:
 
         cross = self._reporter.build_cross_report(task_id, result, review_result)
 
+        # ── 8b. M1: 审查发现 → 回归测试自动生成 ──
+        # WHY: 审查发现的严重问题应自动生成防回归测试，关闭"审查→测试"反馈回路
+        regression_tests_generated = 0
+        if review_result and review_result.get("issues"):
+            for issue in review_result["issues"]:
+                severity = issue.get("severity", "minor")
+                if severity in ("critical", "major", "blocking"):
+                    test_code = self._generate_regression_test(issue, module)
+                    if test_code:
+                        regression_tests_generated += 1
+                        logger.info(
+                            "regression_test_generated",
+                            target=issue.get("file", module),
+                            severity=severity,
+                            reason=issue.get("message", "")[:80],
+                        )
+
         # ── 9. 合并框架警告到报告 ──
         result.framework_warnings = [w.detail for w in framework_report.warnings]
         result.duration_sec = time.monotonic() - start

@@ -169,6 +169,24 @@ class ComposeOrchestrator:
         # 4. Code quality review
         code_review = await self._code_review(spec, results)
 
+        # 4b. P1: Agent 测试自循环——代码生成后自动触发
+        # WHY: 测试不应是可选的阶段 4 人类步骤——Agent 生成代码后立即自测
+        for task_id, task_result in results.items():
+            output = task_result.get("output", {}) if isinstance(task_result, dict) else {}
+            if isinstance(output, dict):
+                code = output.get("code_for_testing") or output.get("code")
+                module = output.get("module_for_testing") or task_id
+                if code:
+                    try:
+                        from orbit import testing
+                        await testing.run_on_code(
+                            code=str(code)[:100_000],  # 截断过长代码
+                            module=str(module),
+                            goal_id=parent_task_id,
+                        )
+                    except Exception:
+                        logger.warning("testing_hook_failed", task_id=task_id, exc_info=True)
+
         # 5. 汇总
         all_ok = all(r.get("status") in ("ok", "dispatched") for r in results.values())
 

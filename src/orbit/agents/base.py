@@ -41,11 +41,16 @@ class AgentOutput(BaseModel):
     """Agent 统一输出模型。
 
     WHY status 字段：调度器据此判断是否需要重试/跳过。
+    code_for_testing / module_for_testing: P1 自动测试钩子——
+    Agent 生成代码后，compose/orchestrator 据此调用 testing.run_on_code()。
     """
 
     status: str = "ok"  # ok | error
     result: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
+    # P1: 自动测试钩子——Agent 输出含代码时，compose orchestrator 据此触发测试自循环
+    code_for_testing: str | None = Field(None, description="生成的代码——触发 testing/orchestrator")
+    module_for_testing: str | None = Field(None, description="代码所属模块名")
 
 
 class BaseAgent(ABC):

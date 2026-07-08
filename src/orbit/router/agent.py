@@ -105,8 +105,14 @@ class RouterAgent:
         )
     """
 
-    def __init__(self, weights: ScoreWeights | None = None):
+    def __init__(
+        self, weights: ScoreWeights | None = None,
+        bandit: object | None = None,           # V14.2+Theory 方向2: ThompsonBandit
+        drift_detector: object | None = None,   # V14.2+Theory 方向20: CUSUMDriftDetector
+    ):
         self.weights = weights or ScoreWeights.from_env()
+        self._bandit = bandit
+        self._drift = drift_detector
 
     async def evaluate(
         self,
@@ -188,6 +194,17 @@ class RouterAgent:
             confidence=round(confidence, 2),
             reasons="; ".join(reasons),
         )
+
+        # V14.2+Theory 方向2: Bandit 覆盖——若启用且后验充足，用 Thompson 采样替代固定权重
+        if self._bandit is not None:
+            from orbit.router.bandit import is_bandit_enabled
+            if is_bandit_enabled():
+                bandit_tier_str = self._bandit.select()
+                try:
+                    tier = ModelTier(bandit_tier_str)
+                    reasons.append(f"bandit: {bandit_tier_str}")
+                except ValueError:
+                    pass  # 非法 tier 名——回退到固定权重结果
 
         return RouterDecision(
             tier=tier,

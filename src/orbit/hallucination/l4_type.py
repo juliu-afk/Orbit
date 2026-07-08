@@ -301,3 +301,78 @@ class L4TypeValidator:
         # Step 3: 对比——自述类型与 mypy 提及的类型有交集 → 匹配
         overlap = predicted_types & mypy_types
         return len(overlap) > 0
+
+
+# ── V14.2+Theory 方向8: TypeDirectedSynthesizer ──────────────
+
+
+class TypeDirectedSynthesizer:
+    """类型导向代码合成约束器.
+
+    WHY 在生成前而非生成后:
+      Wadler "Theorems for free"——多态类型签名提供免费定理。
+      如 List[A] → List[A] 只能是 map id（类型约束缩小了实现空间）。
+      在 Agent system prompt 中注入这些约束，在生成前消减类型错误。
+
+    用法:
+        tds = TypeDirectedSynthesizer()
+        constraints = tds.constrain("def f(x: List[int]) -> List[int]:")
+        # → ["多态约束: List 类型仅可被 map/filter 操作——不可索引越界",
+        #     "必要导入: from typing import List"]
+    """
+
+    @staticmethod
+    def constrain(type_sig: str) -> list[str]:
+        """从类型签名推导生成约束."""
+        constraints: list[str] = []
+
+        # 1. 多态 free theorem
+        ft = TypeDirectedSynthesizer._derive_free_theorem(type_sig)
+        if ft:
+            constraints.append(ft)
+
+        # 2. 必要导入
+        imports = TypeDirectedSynthesizer._required_imports(type_sig)
+        constraints.extend(imports)
+
+        # 3. 安全性约束——禁止 eval/exec
+        if "eval" in type_sig.lower() or "exec" in type_sig.lower():
+            constraints.append("安全约束: 禁止使用 eval()/exec()——静态类型检查无法验证动态代码")
+
+        return constraints
+
+    @staticmethod
+    def _derive_free_theorem(type_sig: str) -> str | None:
+        """从多态签名推导 Wadler 自由定理."""
+        sig = type_sig.strip()
+        # List[A] → List[A] → 只能是 map id 或 filter
+        if "List[" in sig and "-> List[" in sig:
+            return "多态约束: List 类型的输出只能来自对输入 List 的 map/filter/slice 操作——禁止越界索引"
+        # Optional[T] → T → 必须处理 None
+        if "Optional[" in sig and "->" in sig:
+            return "多态约束: Optional 类型输入——必须先检查 None 再使用返回值"
+        # Callable → 高阶函数约束
+        if "Callable[" in sig:
+            return "多态约束: Callable 参数——不应假设具体实现，仅能调用签名规定的参数"
+        return None
+
+    @staticmethod
+    def _required_imports(type_sig: str) -> list[str]:
+        """从类型签名推断必要导入."""
+        imports: list[str] = []
+        type_map = {
+            "Decimal": "from decimal import Decimal",
+            "datetime": "from datetime import datetime",
+            "timedelta": "from datetime import timedelta",
+            "Path": "from pathlib import Path",
+            "Optional": "from typing import Optional",
+            "List": "from typing import List",
+            "Dict": "from typing import Dict",
+            "Tuple": "from typing import Tuple",
+            "Callable": "from typing import Callable",
+            "Iterator": "from typing import Iterator",
+        }
+        for type_name, import_stmt in type_map.items():
+            if type_name in type_sig and import_stmt not in imports:
+                imports.append(f"必要导入: {import_stmt}")
+        return imports

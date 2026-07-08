@@ -20,21 +20,21 @@ class CausalModelManager:
             logger.warning("dag_has_cycle"); 
             try:
                 for u,v in list(nx.find_cycle(dag)): dag.remove_edge(u,v)
-            except nx.NetworkXNoCycle: pass
+            except nx.NetworkXNoCycle: logger.debug("dag_cycle_race_condition")
             except Exception: logger.error("dag_cycle_removal_failed",exc_info=True)
         self._dag = dag; return dag
     async def fit(self, min_samples=None):
         min_samples = min_samples or self.MIN_SAMPLES
         n = self._count_samples()
-        if n < min_samples: return CausalGraph(sample_size=n)
+        if n < min_samples: return CausalGraph(sample_size=n, fit_quality=0.0)
         df = self._extract_data()
-        if df is None or len(df) < min_samples: return CausalGraph(sample_size=len(df) if df is not None else 0)
+        if df is None or len(df) < min_samples: return CausalGraph(sample_size=len(df) if df is not None else 0, fit_quality=0.0)
         dag = self.build_dag()
         try:
             from dowhy import gcm
             m = gcm.InvertibleStructuralCausalModel(dag); gcm.auto.assign_causal_mechanisms(m, df); gcm.fit(m, df)
             self._gcm = m
-        except Exception as e: logger.error("gcm_fit_failed",error=str(e)); return CausalGraph(sample_size=n)
+        except Exception as e: logger.error("gcm_fit_failed",error=str(e)); return CausalGraph(sample_size=n, fit_quality=0.0)
         edges = []; scores = []
         for u,v in dag.edges():
             try:

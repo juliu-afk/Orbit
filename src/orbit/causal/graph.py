@@ -35,11 +35,16 @@ class CausalModelManager:
             m = gcm.InvertibleStructuralCausalModel(dag); gcm.auto.assign_causal_mechanisms(m, df); gcm.fit(m, df)
             self._gcm = m
         except Exception as e: logger.error("gcm_fit_failed",error=str(e)); return CausalGraph(sample_size=n)
-        edges = []
+        edges = []; scores = []
         for u,v in dag.edges():
-            try: s = float(gcm.arrow_strength(m, target=v)); edges.append(CausalEdge(source_var=u,target_var=v,causal_strength=min(s,1.0),confidence=min(n/500.0,1.0),sample_count=n))
-            except Exception: edges.append(CausalEdge(source_var=u,target_var=v,sample_count=n))
-        g = CausalGraph(variables=list(dag.nodes()),edges=edges,learned_at=time.time(),sample_size=n,fit_quality=0.8)
+            try:
+                s = float(gcm.arrow_strength(m, target=v))
+                edges.append(CausalEdge(source_var=u,target_var=v,causal_strength=min(s,1.0),confidence=min(n/500.0,1.0),sample_count=n))
+                scores.append(min(s, 1.0))
+            except Exception:
+                edges.append(CausalEdge(source_var=u,target_var=v,sample_count=n))
+        fit_q = sum(scores)/len(scores) if scores else 0.0
+        g = CausalGraph(variables=list(dag.nodes()),edges=edges,learned_at=time.time(),sample_size=n,fit_quality=round(fit_q,4))
         self._last_graph = g; self._save_edges(edges); self._export_json(g)
         return g
     async def update(self, ids): return await self.fit()

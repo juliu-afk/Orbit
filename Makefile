@@ -57,6 +57,10 @@ typecheck:
 dev:
 	poetry run uvicorn orbit.api.main:app --reload --host 0.0.0.0 --port 8000
 
+# 构建 exe（完整流水线：前端→backend/static→PyInstaller→Tauri）
+exe:
+	bash scripts/build-exe.sh
+
 # 清理
 clean:
 	rm -rf .pytest_cache .coverage htmlcov .mutmut-cache dist build *.egg-info

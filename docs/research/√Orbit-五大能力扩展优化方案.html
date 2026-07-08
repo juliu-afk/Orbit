@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit 五大能力扩展优化方案 v3 —— 国产开源优先 · 自研可行</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #c9d1d9; --text-muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --orange: #d2991d; --purple: #a371f7; --cyan: #39c5cf;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+    background: var(--bg); color: var(--text); line-height:1.75; font-size:15px;
+  }
+  .container { max-width:1200px; margin:0 auto; padding:40px 24px; }
+  .cover { text-align:center; padding:80px 0 60px; border-bottom:1px solid var(--border); margin-bottom:60px; }
+  .cover h1 { font-size:2.3em; font-weight:700; margin-bottom:12px; background:linear-gradient(135deg, var(--green), var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .cover .subtitle { font-size:1.05em; color:var(--text-muted); margin:8px 0 24px; }
+  .cover .meta { font-size:0.85em; color:var(--text-muted); margin-top:32px; }
+  .badge-row { margin-top:20px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  .badge { display:inline-block; padding:5px 16px; border-radius:20px; font-size:0.82em; font-weight:600; border:1px solid var(--border); }
+  .badge-domestic { color:var(--red); border-color:var(--red); background:rgba(249,81,73,0.08); }
+  .badge-oss { color:var(--green); border-color:var(--green); background:rgba(63,185,80,0.08); }
+  .badge-self { color:var(--purple); border-color:var(--purple); background:rgba(163,113,247,0.08); }
+  .badge-new { color:var(--cyan); border-color:var(--cyan); background:rgba(57,197,207,0.08); }
+  section { margin-bottom:64px; }
+  h2 { font-size:1.5em; font-weight:700; margin-bottom:24px; padding-bottom:12px; border-bottom:1px solid var(--border); color:var(--accent); }
+  h3 { font-size:1.2em; font-weight:600; margin:32px 0 16px; color:#e6edf3; }
+  h4 { font-size:1.05em; font-weight:600; margin:24px 0 12px; color:var(--cyan); }
+  p { margin-bottom:14px; }
+  strong { color:#fff; }
+  ul, ol { margin:12px 0 12px 24px; }
+  li { margin-bottom:6px; }
+  table { width:100%; border-collapse:collapse; margin:20px 0; font-size:0.92em; }
+  th, td { text-align:left; padding:10px 14px; border:1px solid var(--border); vertical-align:top; }
+  th { background:var(--surface); font-weight:600; white-space:nowrap; }
+  tr:nth-child(even) { background:rgba(255,255,255,0.015); }
+  .col-rec { background:rgba(63,185,80,0.08); }
+  .col-self { background:rgba(163,113,247,0.06); }
+  .col-new { background:rgba(57,197,207,0.06); }
+  .callout { border-left:3px solid; padding:16px 20px; margin:20px 0; border-radius:0 8px 8px 0; background:var(--surface); }
+  .callout-info { border-color:var(--accent); }
+  .callout-warn { border-color:var(--orange); }
+  .callout-success { border-color:var(--green); }
+  .callout-danger { border-color:var(--red); }
+  .callout-title { font-weight:700; font-size:0.88em; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  .option-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:16px; margin:20px 0; }
+  .opt-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px; position:relative; }
+  .opt-card.recommended { border-color:var(--green); box-shadow:0 0 0 1px var(--green); }
+  .opt-card .opt-label { font-size:0.75em; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px; }
+  .opt-card .opt-name { font-size:1.15em; font-weight:700; margin-bottom:8px; }
+  .opt-card .opt-desc { font-size:0.9em; color:var(--text-muted); margin-bottom:12px; }
+  .opt-card .opt-pros { color:var(--green); font-size:0.85em; }
+  .opt-card .opt-cons { color:var(--orange); font-size:0.85em; margin-top:4px; }
+  .opt-card .rec-badge { position:absolute; top:12px; right:12px; background:var(--green); color:#000; font-size:0.7em; font-weight:800; padding:3px 10px; border-radius:12px; text-transform:uppercase; }
+  .opt-card .self-badge { position:absolute; top:12px; right:12px; background:var(--purple); color:#fff; font-size:0.7em; font-weight:800; padding:3px 10px; border-radius:12px; text-transform:uppercase; }
+  .arch-box { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:20px 24px; margin:16px 0; white-space:pre; font-family:'JetBrains Mono','Fira Code',Consolas,monospace; font-size:0.83em; line-height:1.55; overflow-x:auto; color:var(--text-muted); }
+  .timeline { position:relative; padding-left:30px; border-left:2px solid var(--border); margin:24px 0; }
+  .tl-item { position:relative; margin-bottom:28px; }
+  .tl-item::before { content:''; position:absolute; left:-37px; top:4px; width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid var(--bg); }
+  .tl-item.phase-p0::before { background:var(--red); }
+  .tl-item.phase-p1::before { background:var(--orange); }
+  .tl-item.phase-p2::before { background:var(--accent); }
+  .tl-phase { font-weight:700; font-size:0.9em; margin-bottom:4px; }
+  .tl-desc { font-size:0.88em; color:var(--text-muted); }
+  .tag { display:inline-block; padding:2px 10px; border-radius:12px; font-size:0.78em; font-weight:600; margin-right:6px; border:1px solid; }
+  .tag-green { color:var(--green); border-color:var(--green); }
+  .tag-red { color:var(--red); border-color:var(--red); }
+  .tag-orange { color:var(--orange); border-color:var(--orange); }
+  .tag-purple { color:var(--purple); border-color:var(--purple); }
+  .tag-cyan { color:var(--cyan); border-color:var(--cyan); }
+  .self-dev-bar { display:flex; align-items:center; gap:8px; margin:8px 0; }
+  .self-dev-fill { height:8px; border-radius:4px; background:var(--purple); }
+  .self-dev-track { flex:1; height:8px; border-radius:4px; background:var(--surface); border:1px solid var(--border); }
+  .row-win { background:rgba(63,185,80,0.06) !important; }
+  @media print { body { font-size:12px; } .container { max-width:100%; } .opt-card { break-inside:avoid; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ═══════════════════════════ COVER ═══════════════════════════ -->
+<div class="cover">
+  <h1>Orbit 五大能力扩展优化方案 v3</h1>
+  <div class="subtitle">国产开源优先 · 12 家国产模型矩阵 · GLM-4.6V 免费首选 · 自研全线可行</div>
+  <div class="badge-row">
+    <span class="badge badge-domestic">国产/开源: GLM-4.6V · Qwen-VL · InternVL · ERNIE · Step · 豆包</span>
+    <span class="badge badge-oss">开源 CU: UFO² · ShowUI · TESS-500M</span>
+    <span class="badge badge-self">5/5 能力可自研</span>
+    <span class="badge badge-new">NEW: GLM-4.6V-Flash 免费 + Qwen API 路径</span>
+  </div>
+  <div class="meta">
+    版本: v3（新增 8 家国产模型 + API 路径）· 2026-07-07 · 项目：Orbit v0.26+<br>
+    v2→v3: ① GLM-4.5V → GLM-4.6V-Flash（免费+更强）② 新增 Qwen API 三条路径 ③ 模型矩阵 4→12 家<br>
+    源文件：<code>D:/Orbit/docs/research/Orbit-五大能力扩展优化方案.html</code>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ EXECUTIVE SUMMARY ═══════════════════════════ -->
+<section>
+<h2>0. 执行摘要</h2>
+
+<div class="callout callout-info">
+<div class="callout-title">v3 核心变更（用户指令）</div>
+<ol>
+  <li><strong>Qwen API 路径</strong>：阿里百炼 DashScope（OpenAI 兼容，LiteLLM 直连）+ OpenRouter 第三方聚合</li>
+  <li><strong>GLM-4.6V 替换 GLM-4.5V</strong>：2025.12.8 发布——9B Flash 版完全免费+开源 MIT，性能超 Qwen3-VL-8B；106B 版 API 降价 50%</li>
+  <li><strong>新纳入 8 家国产模型</strong>：百度 ERNIE 4.5、阶跃 Step-1V、字节豆包视觉、讯飞星火、商汤日日新、腾讯混元 Vision</li>
+</ol>
+</div>
+
+<table>
+<tr><th>#</th><th>能力</th><th>推荐方案</th><th>自研度</th><th>关键外部依赖</th><th>工期</th></tr>
+<tr>
+  <td>①</td><td>文件类型扩展</td>
+  <td class="col-rec">python-magic + FileParserRegistry</td>
+  <td class="col-self">100%</td>
+  <td>python-magic (MIT) · pypdf (BSD)</td>
+  <td>2 周</td>
+</tr>
+<tr>
+  <td>②</td><td>图片/视频多模态</td>
+  <td class="col-rec"><strong>GLM-4.6V-Flash（免费首选）+ Qwen2.5-VL-72B（GUI 定位）+ 百度/阶跃/豆包备选</strong></td>
+  <td class="col-self">90%</td>
+  <td>GLM-4.6V-Flash (MIT开源+免费API) · Qwen2.5-VL (Apache 2.0)</td>
+  <td>3 周</td>
+</tr>
+<tr>
+  <td>③</td><td>多模态 LLM 集成</td>
+  <td class="col-rec">LLMRequest content array + 多后端路由（百炼/智谱/千帆/火山/Ollama）</td>
+  <td class="col-self">100%</td>
+  <td>无——纯扩展现有 Gateway</td>
+  <td>2 周</td>
+</tr>
+<tr>
+  <td>④</td><td>Computer Use</td>
+  <td class="col-rec">UFO² 架构 + Qwen2.5-VL-72B（GUI 定位）+ GLM-4.6V（操作推理）+ PyAutoGUI</td>
+  <td class="col-self">85%</td>
+  <td>Qwen2.5-VL (GUI Agent最强) · mss (MIT) · PyAutoGUI (BSD)</td>
+  <td>4 周</td>
+</tr>
+<tr>
+  <td>⑤</td><td>Office 文件读写</td>
+  <td class="col-rec">openpyxl + python-docx + python-pptx</td>
+  <td class="col-self">100%</td>
+  <td>openpyxl (MIT) · python-docx (MIT) · python-pptx (MIT)</td>
+  <td>2 周</td>
+</tr>
+</table>
+
+<div class="callout callout-success">
+<div class="callout-title">核心结论：5/5 可自研。零外国闭源模型日常依赖。Gemini 仅最后防线。</div>
+<p><strong>GLM-4.6V-Flash（2025.12.8 发布）是游戏规则改变者——9B 免费商用、MIT 开源、性能超 Qwen3-VL-8B。</strong>搭配 Qwen2.5-VL-72B（GUI Agent 最强）和百度 ERNIE 4.5（SuperCLUE 国内并列第一），形成完整国产视觉模型矩阵。</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════ ① 文件类型 ═══════════════════════════ -->
+<section>
+<h2>① 文件类型扩展</h2>
+<div class="self-dev-bar"><span style="font-size:0.8em;color:var(--text-muted);width:80px;">自研度</span><div class="self-dev-track"><div class="self-dev-fill" style="width:100%;"></div></div><span style="font-size:0.8em;color:var(--green);">100%</span></div>
+<p>零外部 API。python-magic（MIT）MIME 检测 + FileParserRegistry 插件架构，对标现有 ToolRegistry 模式。方案与 v1/v2 一致，无需修订。</p>
+</section>
+
+<!-- ═══════════════════════════ ③ 多模态 LLM 集成（P0） ═══════════════════════════ -->
+<section>
+<h2>③ 多模态 LLM 集成 <span class="tag tag-red">P0 致命——先决条件</span></h2>
+
+<h3>3.1 自研可行性：✅ 100%</h3>
+<div class="self-dev-bar"><div class="self-dev-track"><div class="self-dev-fill" style="width:100%;"></div></div><span style="font-size:0.8em;color:var(--green);">100%</span></div>
+<p>LLMRequest schema 扩展 + 多后端路由全部自研。Orbit 已有 ProviderAdapter ABC，新增 VisionAdapter 在现有架构内。</p>
+
+<h3>3.2 Qwen3-VL / Qwen2.5-VL API 获取路径</h3>
+
+<div class="callout callout-info">
+<div class="callout-title">三条 API 路径——无需本地 GPU</div>
+</div>
+
+<table>
+<tr><th>#</th><th>路径</th><th>Provider</th><th>接入方式</th><th>成本</th><th>LiteLLM 兼容</th></tr>
+<tr class="row-win">
+  <td><strong>1</strong></td>
+  <td><strong>阿里百炼 DashScope</strong></td>
+  <td>阿里云（官方一级）</td>
+  <td>OpenAI 兼容 <code>/v1/chat/completions</code><br>base_url: <code>https://dashscope.aliyuncs.com/compatible-mode/v1</code></td>
+  <td>按量付费</td>
+  <td>✅ 原生兼容</td>
+</tr>
+<tr>
+  <td>2</td>
+  <td>OpenRouter</td>
+  <td>第三方聚合</td>
+  <td>OpenAI 兼容，model id: <code>qwen/qwen2.5-vl-72b-instruct</code></td>
+  <td>略高于直连</td>
+  <td>✅ 原生兼容</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td>Ollama 本地</td>
+  <td>自部署</td>
+  <td>Ollama pull + OpenAI 兼容 endpoint</td>
+  <td>零（自有机子）</td>
+  <td>✅ 通过 Ollama</td>
+</tr>
+</table>
+
+<h3>3.3 多后端架构（v3 扩展——支持 5 家国产 provider）</h3>
+<div class="arch-box">
+                        ┌──────────────────────────────┐
+                        │    LLMClient.generate()       │
+                        │    自动检测 content 类型        │
+                        │    LiteLLM 统一网关             │
+                        └─────────────┬────────────────┘
+                                      │
+        ┌─────────┬─────────┬─────────┼─────────┬─────────┬──────────┐
+        ▼         ▼         ▼         ▼         ▼         ▼          ▼
+  ┌──────────┐┌─────────┐┌───────┐┌───────┐┌────────┐┌────────┐┌────────┐
+  │ 智谱      ││ 阿里百炼 ││ 百度  ││ 阶跃  ││ 火山    ││ Ollama  ││ OpenRouter│
+  │ bigmodel ││DashScope││ 千帆   ││ 星辰  ││ 引擎    ││ 本地    ││ (备用)  │
+  ├──────────┤├─────────┤├───────┤├───────┤├────────┤├────────┤├────────┤
+  │GLM-4.6V  ││Qwen2.5  ││ERNIE  ││Step-1V││豆包视觉 ││Qwen3-VL ││Qwen2.5  │
+  │Flash FREE││-VL-72B  ││4.5    ││-8K    ││        ││-8B/30B  ││-VL-72B  │
+  └──────────┘└─────────┘└───────┘└───────┘└────────┘└────────┘└────────┘
+
+  降级链: GLM-4.6V-Flash(免费) → 火山豆包(低价) → 百炼Qwen → 千帆ERNIE → Gemini兜底
+</div>
+
+<h3>3.4 新增 provider 的 LiteLLM 配置（Orbit Gateway 零改动量）</h3>
+<div class="arch-box">
+# 在 settings 中新增 API keys，在 LLMClient PRICES 中新增模型条目：
+
+# ── 智谱（已有——新增 GLM-4.6V） ──
+"openai/glm-4.6v": {
+    "api_base": "https://open.bigmodel.cn/api/coding/paas/v4",
+    "api_key": settings.ZAI_API_KEY,  # 已有
+}
+
+# ── 阿里百炼 DashScope（新增） ──
+"openai/qwen2.5-vl-72b-instruct": {
+    "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "api_key": settings.DASHSCOPE_API_KEY,  # 新增
+}
+
+# ── 百度千帆（新增） ──
+"openai/ernie-4.5-turbo": {
+    "api_base": "https://qianfan.baidubce.com/v1",
+    "api_key": settings.QIANFAN_API_KEY,  # 新增
+}
+
+# ── 火山引擎/豆包（新增） ──
+"openai/doubao-vision-pro": {
+    "api_base": "https://ark.cn-beijing.volces.com/api/v3",
+    "api_key": settings.VOLCENGINE_API_KEY,  # 新增
+}
+# 以上全部走 OpenAI 兼容格式——LiteLLM 零改动适配
+</div>
+</section>
+
+<!-- ═══════════════════════════ ② 图片/视频多模态 ═══════════════════════════ -->
+<section>
+<h2>② 图片/视频多模态感知</h2>
+
+<h3>2.1 国产视觉大模型完整矩阵（12 家）</h3>
+
+<table>
+<tr><th>#</th><th>模型</th><th>厂商</th><th>API 可用</th><th>协议</th><th>价格（入/出 百万元）</th><th>视觉能力</th><th>推荐角色</th></tr>
+<tr class="row-win">
+  <td>1</td>
+  <td><strong>GLM-4.6V-Flash (9B)</strong></td>
+  <td>智谱</td>
+  <td>✅ bigmodel.cn</td>
+  <td><strong>MIT 开源</strong></td>
+  <td><strong>完全免费</strong></td>
+  <td>⭐⭐⭐⭐ 9B 超 Qwen3-VL-8B</td>
+  <td class="col-rec"><strong>云端首选——免费+开源</strong></td>
+</tr>
+<tr class="row-win">
+  <td>2</td>
+  <td><strong>GLM-4.6V (106B-A12B)</strong></td>
+  <td>智谱</td>
+  <td>✅ bigmodel.cn</td>
+  <td><strong>MIT 开源</strong></td>
+  <td>入 1 元 / 出 3 元</td>
+  <td>⭐⭐⭐⭐⭐ 比肩 2× 参数量模型</td>
+  <td class="col-rec">高性能场景</td>
+</tr>
+<tr class="row-win">
+  <td>3</td>
+  <td><strong>Qwen2.5-VL-72B</strong></td>
+  <td>阿里</td>
+  <td>✅ 百炼 DashScope</td>
+  <td><strong>Apache 2.0</strong></td>
+  <td>入 3 元 / 出 9 元</td>
+  <td>⭐⭐⭐⭐⭐ GUI Agent 最强</td>
+  <td class="col-rec"><strong>Computer Use 视觉引擎</strong></td>
+</tr>
+<tr>
+  <td>4</td>
+  <td>Qwen2.5-VL-32B</td>
+  <td>阿里</td>
+  <td>✅ 百炼 + OpenRouter</td>
+  <td>Apache 2.0</td>
+  <td>按量</td>
+  <td>⭐⭐⭐⭐</td>
+  <td>中档场景</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td>Qwen3-VL-235B</td>
+  <td>阿里</td>
+  <td>⚠ 百炼（待确认）</td>
+  <td>Apache 2.0</td>
+  <td>待公布</td>
+  <td>⭐⭐⭐⭐⭐ 开源 SOTA</td>
+  <td>旗舰场景（有 API 后）</td>
+</tr>
+<tr>
+  <td>6</td>
+  <td>InternVL 3.5-241B</td>
+  <td>上海 AI 实验室</td>
+  <td>❌ 无官方 API</td>
+  <td>开源</td>
+  <td>自部署 GPU</td>
+  <td>⭐⭐⭐⭐⭐ ScreenSpot 92.9</td>
+  <td>本地 GUI 定位（有 GPU）</td>
+</tr>
+<tr>
+  <td>7</td>
+  <td>DeepSeek-VL2</td>
+  <td>深度求索</td>
+  <td>❌ 无官方 API</td>
+  <td>开源</td>
+  <td>自部署 GPU</td>
+  <td>⭐⭐⭐ MoE 高效</td>
+  <td>文档/表格理解</td>
+</tr>
+<tr>
+  <td>8</td>
+  <td><strong>ERNIE 4.5 Turbo</strong></td>
+  <td>百度</td>
+  <td>✅ 千帆</td>
+  <td>闭源</td>
+  <td>入 3 元 / 出 9 元</td>
+  <td>⭐⭐⭐⭐ SuperCLUE 国内并列第一</td>
+  <td>备选视觉引擎</td>
+</tr>
+<tr>
+  <td>9</td>
+  <td><strong>Step-1V-8K</strong></td>
+  <td>阶跃星辰</td>
+  <td>✅ 阶跃开放平台</td>
+  <td>闭源</td>
+  <td>入 3 元 / 出 9 元</td>
+  <td>⭐⭐⭐⭐ 多模态推理强</td>
+  <td>CU 推理场景备选</td>
+</tr>
+<tr>
+  <td>10</td>
+  <td><strong>豆包视觉</strong></td>
+  <td>字节跳动</td>
+  <td>✅ 火山引擎</td>
+  <td>闭源</td>
+  <td>入 1.5 元 / 出 6 元</td>
+  <td>⭐⭐⭐⭐ 抖音级数据训练</td>
+  <td>低成本备选（价格低 50%）</td>
+</tr>
+<tr>
+  <td>11</td>
+  <td>星火 4.0 Vision</td>
+  <td>科大讯飞</td>
+  <td>✅ 星火平台</td>
+  <td>闭源</td>
+  <td>入 3 元 / 出 9 元</td>
+  <td>⭐⭐⭐ 中文 OCR 强</td>
+  <td>中文文档场景备选</td>
+</tr>
+<tr>
+  <td>12</td>
+  <td>混元 Vision</td>
+  <td>腾讯</td>
+  <td>✅ 腾讯云</td>
+  <td>闭源</td>
+  <td>入 3 元 / 出 9 元</td>
+  <td>⭐⭐⭐</td>
+  <td>腾讯生态场景</td>
+</tr>
+</table>
+
+<h3>2.2 选型结论——三梯次分层</h3>
+
+<div class="callout callout-success">
+<div class="callout-title">三梯次分层——按成本+性能+可用性</div>
+<table>
+<tr><th>梯次</th><th>模型</th><th>理由</th><th>月成本估算</th></tr>
+<tr class="row-win">
+  <td><strong>T1 主力</strong></td>
+  <td><strong>GLM-4.6V-Flash</strong></td>
+  <td>完全免费 + MIT 开源 + 9B 超 Qwen3-VL-8B + 原生多模态 Function Call（打通视觉→可执行行动）</td>
+  <td><strong>零</strong></td>
+</tr>
+<tr>
+  <td><strong>T1 主力</strong></td>
+  <td><strong>Qwen2.5-VL-72B</strong></td>
+  <td>GUI Agent 世界顶尖——CU 视觉定位引擎首选</td>
+  <td>中等（按调用量）</td>
+</tr>
+<tr>
+  <td><strong>T2 备选</strong></td>
+  <td>GLM-4.6V (106B) · 豆包视觉 · ERNIE 4.5 · Step-1V</td>
+  <td>高性能/低成本/推理专项/国内并列第一——交叉覆盖不同场景</td>
+  <td>按需切换</td>
+</tr>
+<tr>
+  <td><strong>T3 兜底</strong></td>
+  <td>Gemini 2.0 Flash</td>
+  <td><strong>仅</strong>当国产全线不可用时启用，不作为日常选项</td>
+  <td>零（1500 req/day 免费）</td>
+</tr>
+</table>
+</div>
+
+<h3>2.3 为什么 GLM-4.6V 是游戏规则改变者</h3>
+<ul>
+  <li><strong>2025.12.8 发布</strong>——最新一代，比 GLM-4.5V 晚 4 个月</li>
+  <li><strong>Flash 版完全免费+MIT 开源</strong>——零成本，可商用，9B 模型超 Qwen3-VL-8B</li>
+  <li><strong>原生多模态 Function Call</strong>——视觉感知→可执行行动，全链路打通。这对 Computer Use 是<strong>质变</strong></li>
+  <li><strong>128K 上下文</strong>——可处理 150 页文档、200 页 PPT、1 小时视频</li>
+  <li><strong>API 降价 50%</strong>（vs GLM-4.5V）——输入 1 元/百万 tokens</li>
+  <li><strong>与 Orbit 已有集成零摩擦</strong>——智谱 Coding Plan 的 api_base 和 api_key 已在 Orbit Gateway 中配置</li>
+</ul>
+</section>
+
+<!-- ═══════════════════════════ ④ Computer Use ═══════════════════════════ -->
+<section>
+<h2>④ Computer Use</h2>
+
+<h3>4.1 自研 VLA 管线——模型选型更新</h3>
+
+<p>v2 的架构设计不变（UFO² 架构 + PyAutoGUI + Orbit 沙箱）。v3 更新视觉引擎的模型选择：</p>
+
+<table>
+<tr><th>CU 子任务</th><th>v2 模型</th><th>v3 模型</th><th>变更理由</th></tr>
+<tr>
+  <td><strong>GUI 元素定位</strong><br>（截图→坐标）</td>
+  <td>Qwen3-VL</td>
+  <td class="col-rec"><strong>Qwen2.5-VL-72B</strong><br>（百炼 API 或 OpenRouter）</td>
+  <td>Qwen2.5-VL-72B 在 GUI Agent benchmark 上经大量验证，OS World 领先。Qwen3-VL 的 API 尚待百炼上架。</td>
+</tr>
+<tr>
+  <td><strong>操作推理</strong><br>（理解界面→决定下一步）</td>
+  <td>Qwen3-VL + GLM-4.5V</td>
+  <td class="col-rec"><strong>GLM-4.6V-Flash</strong>（免费）<br>+ <strong>GLM-4.6V</strong>（高性能）</td>
+  <td>GLM-4.6V 原生多模态 Function Call——视觉理解后直接输出结构化操作（click/type/scroll），比通用 VLM 的坐标预测更可靠。</td>
+</tr>
+<tr>
+  <td><strong>结果验证</strong><br>（操作后截图对比）</td>
+  <td>Qwen3-VL</td>
+  <td class="col-rec"><strong>GLM-4.6V-Flash</strong>（免费）</td>
+  <td>验证任务不需要最强模型——用免费 Flash 版即可</td>
+</tr>
+<tr>
+  <td><strong>专用轻量通道</strong></td>
+  <td>—</td>
+  <td class="col-new"><strong>TESS-500M</strong>（Apache 2.0）</td>
+  <td>简单 click/type 走 508M 小模型，快 10x、零成本</td>
+</tr>
+</table>
+
+<h3>4.2 开源 CU 项目（不变）</h3>
+<p>UFO²（Microsoft，MIT，~9,100 Stars）仍是架构参考首选。Codeeaner/Computer-Use-Agent（Qwen3-VL + Ollama，300 行）作快速 POC 验证。ShowUI（CVPR 2025）作 VLA 模型设计参考。方案 A（自研 VLA 管线）不变。</p>
+</section>
+
+<!-- ═══════════════════════════ ⑤ Office ═══════════════════════════ -->
+<section>
+<h2>⑤ Office 文件读写</h2>
+<div class="self-dev-bar"><div class="self-dev-track"><div class="self-dev-fill" style="width:100%;"></div></div><span style="font-size:0.8em;color:var(--green);">100%</span></div>
+<p>openpyxl + python-docx + python-pptx。方案与 v1/v2 一致，无需修订。</p>
+</section>
+
+<!-- ═══════════════════════════ SELF-DEV SUMMARY ═══════════════════════════ -->
+<section>
+<h2>⑥ 自研可行性汇总</h2>
+
+<table>
+<tr><th>#</th><th>能力</th><th>自研度</th><th>核心自研模块</th><th>外部依赖</th><th>依赖协议</th></tr>
+<tr><td>①</td><td>文件类型扩展</td><td class="col-self">100%</td><td>FileParserRegistry + TextParser + PDFParser</td><td>python-magic · pypdf</td><td>MIT · BSD</td></tr>
+<tr><td>②</td><td>图片/视频感知</td><td class="col-self">90%</td><td>VisionTool + ImagePreprocessor + VideoKeyFrame</td><td>GLM-4.6V-Flash · Qwen2.5-VL · opencv · faster-whisper</td><td>MIT · Apache 2.0</td></tr>
+<tr><td>③</td><td>多模态 LLM 集成</td><td class="col-self">100%</td><td>ContentPart schema + VisionAdapter + 多后端路由</td><td>无（纯扩展现有 Gateway）</td><td>—</td></tr>
+<tr><td>④</td><td>Computer Use</td><td class="col-self">85%</td><td>ComputerUseTool + VLA 管线 + CU Sandbox</td><td>Qwen2.5-VL · GLM-4.6V · mss · PyAutoGUI · UFO² 架构</td><td>Apache 2.0 · MIT · BSD</td></tr>
+<tr><td>⑤</td><td>Office 文件读写</td><td class="col-self">100%</td><td>ExcelParser + WordParser + PPTParser + Writers</td><td>openpyxl · python-docx · python-pptx</td><td>MIT</td></tr>
+</table>
+
+<div class="callout callout-success">
+<div class="callout-title">全部外部依赖均可商用——MIT / BSD / Apache 2.0</div>
+<p>零 AGPL 依赖。零外国闭源模型日常依赖。Gemini 2.0 Flash 仅在国产全线不可用时启用。</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════ ROADMAP ═══════════════════════════ -->
+<section>
+<h2>⑦ 实施路线图</h2>
+
+<h3>7.1 甘特图</h3>
+<table>
+<tr><th>周</th><th>Phase 0: 多模态管线</th><th>Phase 1: 感知+文件</th><th>Phase 2: CU 自研</th><th>Phase 3: Office</th><th>Phase 4: 视频(可选)</th></tr>
+<tr><td>W1</td><td class="col-rec">③ LLMRequest content array<br>③ VisionAdapter 基类</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>W2</td><td class="col-rec">③ 多后端路由（智谱+百炼+千帆+火山）<br>③ Ollama 集成</td><td style="background:var(--orange);opacity:0.25;">① python-magic<br>+ FileParserRegistry</td><td></td><td></td><td></td></tr>
+<tr><td>W3</td><td></td><td style="background:var(--orange);opacity:0.35;">② VisionTool + ImageParser<br>② GLM-4.6V-Flash 集成<br>① PDF/Text Parser</td><td style="background:var(--purple);opacity:0.2;">④ POC: Codeeaner 300行验证</td><td></td><td></td></tr>
+<tr><td>W4</td><td></td><td style="background:var(--orange);opacity:0.35;">② Qwen2.5-VL 集成<br>② 豆包/ERNIE 备选接入<br>② 降级链测试</td><td style="background:var(--purple);opacity:0.3;">④ UFO² 架构研究<br>④ VLA 管线设计</td><td style="background:var(--green);opacity:0.2;">⑤ Excel/Word Parser</td><td></td></tr>
+<tr><td>W5</td><td></td><td></td><td style="background:var(--purple);opacity:0.35;">④ CU Tool 自研<br>④ GLM-4.6V Function Call 操作推理<br>④ Qwen2.5-VL GUI 定位</td><td style="background:var(--green);opacity:0.3;">⑤ PPT Parser + Writers<br>⑤ 集成测试</td><td></td></tr>
+<tr><td>W6</td><td></td><td></td><td style="background:var(--purple);opacity:0.35;">④ CU 沙箱隔离<br>④ TESS-500M 轻量通道<br>④ 审计链 + 安全边界</td><td style="background:var(--green);opacity:0.25;">⑤ 收尾测试+文档</td><td></td></tr>
+<tr><td>W7</td><td></td><td></td><td style="background:var(--purple);opacity:0.25;">④ CU E2E 测试+调优</td><td></td><td style="background:var(--accent);opacity:0.1;">视频(可选)</td></tr>
+<tr><td>W8</td><td></td><td></td><td></td><td></td><td style="background:var(--accent);opacity:0.1;">CSV深度(可选)</td></tr>
+</table>
+
+<h3>7.2 依赖关系</h3>
+<div class="arch-box">
+  ③ 多模态管线（P0）──→ ② 图片感知 ──→ ④ CU 自研
+                    │               │
+                    └──→ ① 文件扩展（并行）  ⑤ Office（并行）
+</div>
+</section>
+
+<!-- ═══════════════════════════ RISK ═══════════════════════════ -->
+<section>
+<h2>⑧ 风险与缓解</h2>
+
+<table>
+<tr><th>#</th><th>风险</th><th>影响</th><th>概率</th><th>缓解</th></tr>
+<tr>
+  <td>R1</td><td><strong>Qwen3-VL 暂未上架百炼 API</strong><br>当前百炼仅有 Qwen2.5-VL 系列</td>
+  <td>中</td>
+  <td>中</td>
+  <td>① 用 Qwen2.5-VL-72B（已上架，GUI Agent 最强）<br>② Qwen3-VL 上架后切换（同一 api_base，只改 model id）<br>③ Qwen3-VL-8B 本地 Ollama 兜底</td>
+</tr>
+<tr>
+  <td>R2</td>
+  <td><strong>GLM-4.6V 刚发布（2025.12.8），API 稳定性待验证</strong></td>
+  <td>中</td>
+  <td>中</td>
+  <td>① GLM-4.6V-Flash 本地部署（MIT 开源，9B 单卡可跑）<br>② 降级到已验证的 GLM-4.5V（仍在服务）<br>③ 降级到豆包视觉/百炼 Qwen</td>
+</tr>
+<tr>
+  <td>R3</td>
+  <td><strong>多 provider 增加 API key 管理复杂度</strong></td>
+  <td>低</td>
+  <td>中</td>
+  <td>① 降级链自动化——按优先级逐一尝试<br>② 默认只配 GLM-4.6V-Flash（免费+最简单）<br>③ 其他 provider 按需启用以太网</td>
+</tr>
+<tr>
+  <td>R4</td>
+  <td><strong>Qwen2.5-VL GUI 坐标预测偏差</strong></td>
+  <td>中</td>
+  <td>中</td>
+  <td>① UIA/Win32 API 优先——绕过视觉定位（占操作 70%+）<br>② GLM-4.6V Function Call 输出结构化操作——不依赖坐标<br>③ 多模型交叉验证</td>
+</tr>
+<tr>
+  <td>R5</td>
+  <td><strong>CU 操作安全性</strong></td>
+  <td>高</td>
+  <td>低</td>
+  <td>① Docker/Windows Sandbox 隔离<br>② 操作白名单<br>③ max_steps + Token 预算硬限制<br>④ HITL 确认高风险操作</td>
+</tr>
+</table>
+</section>
+
+<!-- ═══════════════════════════ COMPARISON ═══════════════════════════ -->
+<section>
+<h2>⑨ 对标竞品——v3 实施后能力矩阵</h2>
+
+<table>
+<tr><th>能力</th><th>Orbit 当前</th><th>Orbit v3 实施后</th><th>Claude Code</th><th>Cursor</th><th>Copilot</th></tr>
+<tr>
+  <td>文件类型</td><td>22 种文本</td><td class="col-rec"><strong>60+ 格式（PDF/图片/Office）</strong></td><td>文本+图片</td><td>文本+图片</td><td>文本+Office</td>
+</tr>
+<tr>
+  <td>图片理解</td><td>❌</td><td class="col-rec"><strong>✅ 12 家国产模型可选，GLM-4.6V-Flash 免费</strong></td><td>✅ Claude Vision</td><td>✅ GPT-4V</td><td>❌</td>
+</tr>
+<tr>
+  <td>多模态 LLM</td><td>❌</td><td class="col-rec"><strong>✅ 5 provider 多后端 + 自动降级</strong></td><td>✅ 单 provider</td><td>✅ 单 provider</td><td>✅ 单 provider</td>
+</tr>
+<tr>
+  <td>Computer Use</td><td>❌</td><td class="col-rec"><strong>✅ 自研 VLA 管线（国产模型+UFO² 架构）</strong></td><td>❌（仅 Bash）</td><td>❌</td><td>❌</td>
+</tr>
+<tr>
+  <td>Office 读写</td><td>❌</td><td class="col-rec"><strong>✅ 全格式（Excel/Word/PPT）</strong></td><td>❌（仅 CSV）</td><td>❌</td><td>⚠（仅读取）</td>
+</tr>
+<tr>
+  <td>模型自主可控</td><td>✅ DS+GLM</td><td class="col-rec"><strong>✅ 100% 国产/开源</strong></td><td>❌ Claude</td><td>❌ GPT</td><td>❌ GPT</td>
+</tr>
+<tr>
+  <td>视觉模型成本</td><td>—</td><td class="col-rec"><strong>主力免费（GLM-4.6V-Flash）</strong></td><td>按量付费</td><td>订阅制</td><td>订阅制</td>
+</tr>
+</table>
+
+<div class="callout callout-info">
+<div class="callout-title">v3 差异化优势总结</div>
+<ol>
+  <li><strong>视觉模型完全自主可控+免费</strong>——GLM-4.6V-Flash MIT 开源+免费 API，12 家国产模型可选。零外国闭源日常依赖。</li>
+  <li><strong>唯一自研 Computer Use 的多 Agent 系统</strong>——基于 UFO² 架构 + GLM-4.6V Function Call（操作推理）+ Qwen2.5-VL（GUI 定位），全链路开源可控。</li>
+  <li><strong>5 provider 多后端架构</strong>——智谱/百炼/千帆/火山/Ollama，自动降级，避免单点故障。</li>
+  <li><strong>5/5 能力可自研</strong>——不依赖任何外部闭源 API（Gemini 仅兜底）。</li>
+</ol>
+</div>
+</section>
+
+<!-- ═══════════════════════════ APPENDIX ═══════════════════════════ -->
+<section>
+<h2>附录 A：新增 API Key 汇总（需申请）</h2>
+
+<table>
+<tr><th>Provider</th><th>环境变量</th><th>申请地址</th><th>用途</th><th>优先级</th></tr>
+<tr class="row-win">
+  <td>智谱 Coding Plan</td>
+  <td><code>ZAI_API_KEY</code></td>
+  <td>open.bigmodel.cn</td>
+  <td>GLM-4.6V-Flash（免费）+ GLM-4.6V</td>
+  <td><strong>P0——已有，零新申请</strong></td>
+</tr>
+<tr>
+  <td>阿里百炼 DashScope</td>
+  <td><code>DASHSCOPE_API_KEY</code></td>
+  <td>bailian.console.aliyun.com</td>
+  <td>Qwen2.5-VL-72B（GUI 定位）</td>
+  <td><strong>P1——CU 视觉引擎</strong></td>
+</tr>
+<tr>
+  <td>百度千帆</td>
+  <td><code>QIANFAN_API_KEY</code></td>
+  <td>console.bce.baidu.com/qianfan</td>
+  <td>ERNIE 4.5 Turbo（备选视觉）</td>
+  <td>P2——可选</td>
+</tr>
+<tr>
+  <td>火山引擎</td>
+  <td><code>VOLCENGINE_API_KEY</code></td>
+  <td>console.volcengine.com/ark</td>
+  <td>豆包视觉（低成本备选）</td>
+  <td>P2——可选</td>
+</tr>
+<tr>
+  <td>阶跃星辰</td>
+  <td><code>STEPFUN_API_KEY</code></td>
+  <td>platform.stepfun.com</td>
+  <td>Step-1V-8K（推理备选）</td>
+  <td>P2——可选</td>
+</tr>
+<tr>
+  <td>OpenRouter</td>
+  <td><code>OPENROUTER_API_KEY</code></td>
+  <td>openrouter.ai</td>
+  <td>第三方聚合（百炼不可用时）</td>
+  <td>P3——兜底</td>
+</tr>
+</table>
+</section>
+
+<section>
+<h2>附录 B：新增依赖汇总（全开源/国产）</h2>
+
+<table>
+<tr><th>依赖</th><th>版本</th><th>用途</th><th>Phase</th><th>协议</th><th>可商用</th></tr>
+<tr><td><code>python-magic</code></td><td>>=0.4.27</td><td>MIME 类型检测</td><td>Phase 1</td><td>MIT</td><td>✅</td></tr>
+<tr><td><code>pypdf</code></td><td>>=5.0</td><td>PDF 文本提取</td><td>Phase 1</td><td>BSD</td><td>✅</td></tr>
+<tr><td><code>Pillow</code></td><td>>=12.3</td><td>图片预处理（已安装）</td><td>Phase 1</td><td>MIT-CMU</td><td>✅</td></tr>
+<tr><td><code>ollama</code></td><td>>=0.4</td><td>本地 VLM 推理</td><td>Phase 0</td><td>MIT</td><td>✅</td></tr>
+<tr><td><code>openpyxl</code></td><td>>=3.1</td><td>Excel 读写</td><td>Phase 3</td><td>MIT</td><td>✅</td></tr>
+<tr><td><code>python-docx</code></td><td>>=1.1</td><td>Word 读写</td><td>Phase 3</td><td>MIT</td><td>✅</td></tr>
+<tr><td><code>python-pptx</code></td><td>>=1.0</td><td>PPT 读写</td><td>Phase 3</td><td>MIT</td><td>✅</td></tr>
+<tr><td><code>mss</code></td><td>>=10.0</td><td>屏幕截图（CU）</td><td>Phase 2</td><td>MIT</td><td>✅</td></tr>
+<tr><td><code>PyAutoGUI</code></td><td>>=0.9.54</td><td>鼠标/键盘操作（CU）</td><td>Phase 2</td><td>BSD</td><td>✅</td></tr>
+<tr><td><code>comtypes</code></td><td>>=1.4</td><td>Windows UIA/COM 调用</td><td>Phase 2</td><td>MIT</td><td>✅</td></tr>
+<tr><td><code>faster-whisper</code></td><td>>=1.0</td><td>视频音频转录（可选）</td><td>Phase 4</td><td>MIT</td><td>✅</td></tr>
+<tr><td><code>opencv-python-headless</code></td><td>>=4.10</td><td>视频关键帧抽取（可选）</td><td>Phase 4</td><td>Apache 2.0</td><td>✅</td></tr>
+</table>
+</section>
+
+<!-- ═══════════════════════════ FOOTER ═══════════════════════════ -->
+<section style="border-top:1px solid var(--border); padding-top:32px; margin-top:48px;">
+<p style="color:var(--text-muted); font-size:0.85em;">
+  <strong>文档状态：</strong>v3 修订版 · 等待评审<br>
+  <strong>生成日期：</strong>2026-07-07<br>
+  <strong>版本历史：</strong><br>
+  &nbsp;&nbsp;v1（初版）→ v2（国产开源优先 + CU 自研）→ <strong>v3（GLM-4.6V + Qwen API 路径 + 12 家国产模型矩阵）</strong><br>
+  <strong>v2→v3 核心变更：</strong><br>
+  &nbsp;&nbsp;① GLM-4.5V → GLM-4.6V-Flash（2025.12.8 发布，免费+MIT 开源+9B 超 Qwen3-VL-8B+原生 Function Call）<br>
+  &nbsp;&nbsp;② 新增 Qwen API 三条路径（百炼 DashScope / OpenRouter / Ollama）<br>
+  &nbsp;&nbsp;③ 模型矩阵 4→12 家：新增百度 ERNIE 4.5、阶跃 Step-1V、字节豆包、讯飞星火、商汤日日新、腾讯混元<br>
+  &nbsp;&nbsp;④ 新增 5 provider API Key 申请指南（附录 A）<br>
+  <strong>源文件：</strong><code>D:/Orbit/docs/research/Orbit-五大能力扩展优化方案.html</code><br>
+  <strong>下一步：</strong>用户确认 v3 优先级 → 进入阶段 1 PRD
+</p>
+</section>
+
+</div>
+</body>
+</html>

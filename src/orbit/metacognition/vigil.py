@@ -10,6 +10,10 @@ WHY 区别于现有 checkpoint/回滚:
   - FailurePattern: 已知失败模式→修复策略的映射库
   - SelfHealer: 诊断+修复+验证三步闭环
   - 修复策略: 参数修正 / 工具替换 / 上下文补充
+
+V14.2+Theory (因果推理 方向 1):
+  - _diagnose_causal(): DoWhy GCM 根因归因——替代规则匹配
+  - diagnose_with_causal(): shadow mode——规则诊断 + 因果诊断并行，结果对比审计
 """
 
 from __future__ import annotations
@@ -139,6 +143,92 @@ class VigilSelfHealer:
             auto_fixable=False,
             confidence=0.3,
         )
+
+    # ── V14.2+Theory: 因果诊断 + Shadow Mode ──────────────────
+
+    async def _diagnose_causal(self, task_id: str,
+                               causal_analyzer=None) -> DiagnosisResult | None:
+        """DoWhy GCM 根因归因——替代规则匹配的因果诊断。
+
+        Args:
+            task_id: 失败任务 ID
+            causal_analyzer: RootCauseAnalyzer 实例（外部注入）
+
+        Returns:
+            DiagnosisResult——因果驱动的诊断，或 None（因果分析不可用）
+        """
+        if causal_analyzer is None:
+            return None
+        try:
+            root_cause = await causal_analyzer.analyze(task_id)
+            if root_cause.top_cause is None or root_cause.confidence < 0.3:
+                return None
+
+            # 将因果根因映射为 DiagnosisResult——VIGIL 的 heal() 可直接消费
+            cause = root_cause.top_cause
+            ft_map: dict[str, FailureType] = {
+                "agent_role": FailureType.INVALID_ARGS,      # 换 Agent = 修正参数
+                "model_tier": FailureType.TIMEOUT,            # 升级模型层 = 延长超时
+                "tool_error_rate": FailureType.TOOL_NOT_FOUND,# 工具序列优化
+                "total_turns": FailureType.TIMEOUT,           # 过多轮次 = 时间问题
+                "latency": FailureType.NETWORK_ERROR,         # 延迟 = 网络/模型问题
+                "quality_score": FailureType.UNKNOWN,         # 低质量 = 需人工
+            }
+            return DiagnosisResult(
+                failure_type=ft_map.get(cause.variable, FailureType.UNKNOWN),
+                root_cause=f"[因果] {cause.variable}={cause.anomaly_score:.2f}——"
+                           f"{cause.explanation or '见数值报告'}",
+                fix_strategy=(
+                    f"因果定向修复——变量 {cause.variable} 贡献了 "
+                    f"{cause.anomaly_score:.0%} 的异常"
+                ),
+                auto_fixable=cause.variable != "quality_score",
+                confidence=root_cause.confidence,
+                suggested_fix={"causal_variable": cause.variable,
+                               "anomaly_score": cause.anomaly_score},
+            )
+        except Exception:
+            import structlog
+            _logger = structlog.get_logger("orbit.vigil.causal")
+            _logger.warning("causal_diagnosis_failed", task_id=task_id, exc_info=True)
+            return None
+
+    async def diagnose_with_causal(self, task_id: str, error_text: str,
+                                   causal_analyzer=None) -> dict:
+        """Shadow mode——规则诊断 + 因果诊断并行，结果对比审计。
+
+        WHY shadow mode:
+          因果诊断是新功能——不直接替换规则诊断。
+          两条路径并行跑 1 周，对比成功率后数据驱动决策。
+
+        Returns:
+            {"rule": DiagnosisResult, "causal": DiagnosisResult|None,
+             "winner": "rule"|"causal"|"tie"}
+        """
+        rule_result = self.diagnose(error_text)
+        causal_result = await self._diagnose_causal(task_id, causal_analyzer)
+
+        # 对比——差值 <0.1 视为并列（先检查 tie 避免不对称）
+        winner = "rule"
+        if causal_result and abs(causal_result.confidence -
+                                  rule_result.confidence) < 0.1:
+            winner = "tie"
+        elif causal_result and causal_result.confidence > rule_result.confidence:
+            winner = "causal"
+
+        import structlog
+        logger = structlog.get_logger("orbit.vigil.shadow")
+        logger.info(
+            "vigil_shadow_compare",
+            task_id=task_id,
+            rule_type=rule_result.failure_type.value,
+            rule_conf=rule_result.confidence,
+            causal_var=causal_result.suggested_fix.get("causal_variable")
+                       if causal_result and causal_result.suggested_fix else None,
+            causal_conf=causal_result.confidence if causal_result else 0,
+            winner=winner,
+        )
+        return {"rule": rule_result, "causal": causal_result, "winner": winner}
 
     def heal(
         self, diagnosis: DiagnosisResult, current_action: str = "",

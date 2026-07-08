@@ -34,6 +34,8 @@ const chat = useChatStore(); const task = useTaskStore(); const editor = useEdit
 const settings = useSettingsStore(); const ws = useWebSocket()
 const fileTree = ref<FileNode[]>([]); const showShortcuts = ref(false); const showNewDialog = ref(false); const showCodeDiff = ref(false)
 const showCommandPalette = ref(false); const showRules = ref(false)  // UX-11, UX-10
+// WHY: FileTree 浏览路径独立于 session.currentProjectPath——允许在不切换会话的情况下浏览其他项目文件
+const fileTreeProjectPath = ref('')
 
 function buildTree(files: Array<{ path: string }>): FileNode[] {
   const root: FileNode[] = []; const dirMap = new Map<string, FileNode>()
@@ -43,11 +45,38 @@ function buildTree(files: Array<{ path: string }>): FileNode[] {
       else { let d=dirMap.get(cp); if(!d){d={name:p,path:cp,isDir:true,children:[]};dirMap.set(cp,d);parent.push(d)}; parent=d.children! } } }
   return root
 }
-async function fetchFileTree(){ try{ const dir=session.currentProjectPath; const url=dir?`/api/v1/files/tree?dir=${encodeURIComponent(dir)}`:"/api/v1/files/tree"; const d=await apiGet<{files:Array<{path:string}>}>(url); if(d.files)fileTree.value=buildTree(d.files) }catch{} }
-async function onSelectFile(path:string){ await editor.openFile(path, undefined, undefined, session.currentProjectPath || undefined); shell.openFileReview(path) }
+async function fetchFileTree(){ try{ const dir=fileTreeProjectPath.value; const url=dir?`/api/v1/files/tree?dir=${encodeURIComponent(dir)}`:"/api/v1/files/tree"; const d=await apiGet<{files:Array<{path:string}>}>(url); if(d.files)fileTree.value=buildTree(d.files) }catch{} }
+// WHY: FileTree 项目切换——仅改变文件浏览路径，不影响当前会话
+function onFileTreeProjectChange(path: string) {
+  fileTreeProjectPath.value = path
+  fetchFileTree()
+}
+// WHY: FileTree 注册新项目后自动创建会话——注册+建文件夹+创建会话一气呵成
+async function onCreateProjectFromFileTree(projectName: string) {
+  try {
+    await session.createSession(projectName)
+    fileTreeProjectPath.value = session.currentProjectPath
+    if (session.messages.length > 0) {
+      chat.restoreMessages(session.messages.map(m => ({
+        role: m.role, content: m.content, created_at: m.created_at,
+      })))
+    }
+    if (session.currentSessionId) {
+      chat.connectChatWs(session.currentSessionId, session.currentProjectName)
+    }
+  } catch { /* 静默 */ }
+}
+// WHY: 分屏——在右侧 Monaco 面板区打开指定 session，实现双会话并行查看
+function onSplitSession(_sessionId: string) {
+  // MVP: 分屏打开分支面板——后续迭代可扩展为真正的双列 chat
+  shell.showBranches = true
+}
+async function onSelectFile(path:string){ await editor.openFile(path, undefined, undefined, fileTreeProjectPath.value || undefined); shell.openFileReview(path) }
 
 // WHY: 项目文件夹选择后重建上下文——刷新 session/chat/文件树
 async function onSessionCreated() {
+  // 同步 FileTree 浏览路径到新会话的项目路径
+  fileTreeProjectPath.value = session.currentProjectPath
   if (session.messages.length > 0) {
     chat.restoreMessages(session.messages.map(m => ({
       role: m.role, content: m.content, created_at: m.created_at,
@@ -60,9 +89,17 @@ async function onSessionCreated() {
   }
 }
 
-// WHY: session 切换后刷新上下文——和 onSessionCreated 同逻辑，但不需要 restoreMessages（已在 switchToSession 中加载）
-function onSessionSwitched(_sessionId: string) {
+// WHY: session 切换后刷新上下文——从 session store 恢复消息到 chat store
+function onSessionSwitched(_newSessionId: string) {
+  // WHY: 同步 FileTree 路径到新会话——确保切换会话时文件树默认显示当前会话的项目文件
+  fileTreeProjectPath.value = session.currentProjectPath
   chat.reset()
+  // WHY: 从 session store 恢复持久化消息——switchToSession 已通过 REST API 加载
+  if (session.messages.length > 0) {
+    chat.restoreMessages(session.messages.map(m => ({
+      role: m.role, content: m.content, created_at: m.created_at,
+    })))
+  }
   agentops.fetchAll()
   fetchFileTree()
   if (session.currentSessionId) {
@@ -110,14 +147,14 @@ function startResize(edge:"left"|"right",e:PointerEvent){ e.preventDefault();(e.
 const handleLeftResize = (e: PointerEvent) => startResize('left', e)
 const handleRightResize = (e: PointerEvent) => startResize('right', e)
 
-onMounted(async()=>{ window.addEventListener("keydown",onKeydown); ws.setMessageHandler((msg)=>{switch(msg.type){case"task:update":task.handleTaskUpdate(msg.payload as Record<string,unknown>);break;case"metrics:snapshot":agentops.handleWsEvent("metrics:snapshot",msg.payload as Record<string,unknown>);break;case"agentops:alert":agentops.handleWsEvent("agentops:alert",msg.payload as Record<string,unknown>);break}}); ws.connect("ws://"+window.location.host+"/ws/dashboard"); await session.fetchSessions(); if(!session.currentSessionId&&session.sessions.length>0)await session.switchToSession(session.sessions[0].session_id); if(session.currentSessionId)chat.connectChatWs(session.currentSessionId,session.currentProjectName||""); agentops.startPolling(); fetchFileTree() })
+onMounted(async()=>{ window.addEventListener("keydown",onKeydown); ws.setMessageHandler((msg)=>{switch(msg.type){case"task:update":task.handleTaskUpdate(msg.payload as Record<string,unknown>);break;case"metrics:snapshot":agentops.handleWsEvent("metrics:snapshot",msg.payload as Record<string,unknown>);break;case"agentops:alert":agentops.handleWsEvent("agentops:alert",msg.payload as Record<string,unknown>);break}}); ws.connect("ws://"+window.location.host+"/ws/dashboard"); await session.fetchSessions(); if(!session.currentSessionId&&session.sessions.length>0)await session.switchToSession(session.sessions[0].session_id); if(session.currentSessionId)chat.connectChatWs(session.currentSessionId,session.currentProjectName||""); agentops.startPolling(); fileTreeProjectPath.value=session.currentProjectPath; fetchFileTree() })
 onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect(); chat.disconnect(); agentops.stopPolling(); task.reset() })
 </script>
 
 <template>
 <div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{gridTemplateAreas:gridAreas(),gridTemplateColumns:gridColumns()}" @contextmenu.prevent>
   <div v-show="shell.showFileTree" class="resize-handle resize-left" @pointerdown="handleLeftResize" />
-  <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto"><FileTreePanel :tree-data="fileTree" :selected-file="shell.selectedFile" @select-file="onSelectFile" /></aside>
+  <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto"><FileTreePanel :tree-data="fileTree" :selected-file="shell.selectedFile" :current-project-path="fileTreeProjectPath" @select-file="onSelectFile" @change-project="onFileTreeProjectChange" @create-project="onCreateProjectFromFileTree" /></aside>
   <main class="panel-center flex flex-col overflow-hidden">
         <!-- 无 Session 引导——为什么没有自动创建：用户需主动选择项目文件夹 -->
         <div v-if="!session.currentSessionId" class="welcome-empty">
@@ -126,11 +163,11 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
           <p class="welcome-desc">Select a project folder to get started</p>
           <button class="open-btn" @click="showNewDialog = true">Open or Create Project</button>
         </div>
-        <TerminalChat v-else />
+        <TerminalChat v-else @switch-session="onSessionSwitched" @split-session="onSplitSession" />
       </main>
   <div class="resize-handle resize-right" @pointerdown="handleRightResize" />
   <aside class="panel-right" style="border-left:1px solid var(--color-orbit-border);overflow-y:auto"><MonacoPanel v-if="shell.showMonaco" /><AgentInfoPanel v-else /></aside>
-  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @toggle-trace="shell.toggleTrace()" @toggle-config="shell.toggleConfig()" @toggle-codegraph="shell.toggleCodeGraph()" @toggle-wechat="shell.toggleWeChat()" @toggle-branches="shell.showBranches = !shell.showBranches" @new-session="showNewDialog = true" @switch-session="onSessionSwitched" />
+  <StatusBar class="panel-bottom" :connection-status="ws.connectionStatus.value" @toggle-dag="shell.toggleDAG()" @toggle-chart="shell.toggleChart()" @toggle-search="shell.toggleSearch()" @toggle-trace="shell.toggleTrace()" @toggle-config="shell.toggleConfig()" @toggle-codegraph="shell.toggleCodeGraph()" @toggle-wechat="shell.toggleWeChat()" @toggle-branches="shell.showBranches = !shell.showBranches" @switch-session="onSessionSwitched" />
   <DAGDrawer v-model:show="shell.showDAG" /><TokenChartDrawer v-model:show="shell.showChart" /><SearchDrawer v-model:show="shell.showSearch" @open-file="shell.openFileReview" />
   <TraceDrawer v-model:show="shell.showTrace" /><ConfigDrawer v-model:show="shell.showConfig" />
   <CodeGraphDrawer v-model:show="shell.showCodeGraph" />

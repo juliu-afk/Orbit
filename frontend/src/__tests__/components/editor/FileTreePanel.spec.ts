@@ -14,8 +14,13 @@ const mockTreeData = [
 
 function factory(props = {}) {
   return shallowMount(FileTreePanel, {
-    props: { treeData: [], selectedFile: null, ...props },
-    global: { stubs: { 'el-empty': { template: '<div class="el-empty-stub"><slot /></div>' } } },
+    props: { treeData: [], selectedFile: null, currentProjectPath: '', ...props },
+    global: {
+      stubs: {
+        'el-empty': { template: '<div class="el-empty-stub"><slot /></div>' },
+        'FileTreeProjectBar': { template: '<div class="ft-project-bar-stub" />' },
+      },
+    },
   })
 }
 

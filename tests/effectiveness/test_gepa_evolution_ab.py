@@ -107,9 +107,12 @@ class TestGEPAEvolutionAB:
         print(f"  Fidelity: {fidelity:.3f}")
 
         # L1+graph 已知 FP 问题——局部变量名被误判为未知符号
-        # 在此修复前，fidelity 阈值放低至不崩溃即可
-        assert isinstance(fidelity, float), "Fidelity should be calculable"
-        print(f"  NOTE: Fidelity limited by L1 FP on local variables (known issue)")
+        # 验证 fidelity 至少可计算（非 NaN/Inf）
+        assert not (fidelity != fidelity), "Fidelity should not be NaN"  # NaN != NaN
+        assert fidelity >= 0.0, f"Fidelity should be non-negative: {fidelity:.3f}"
+        assert fidelity <= 1.0, f"Fidelity should be <= 1.0: {fidelity:.3f}"
+        if fidelity < 0.5:
+            print(f"  WARNING: Fidelity={fidelity:.3f} — L1 FP on local variables (known issue)")
 
     def test_gepa_metrics_formula(self):
         """验证文档定义的指标公式——Fidelity = distilled_rate / original_rate。"""

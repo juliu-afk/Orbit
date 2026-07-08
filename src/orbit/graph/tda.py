@@ -26,9 +26,12 @@ class TDAAnalyzer:
             else:
                 parent[rj] = ri
                 dim0.append((0.0, w))
+        # P2-6: 最终存活分量——MST构建后剩余连通分量
+        dim0.append((0.0, float("inf")))
         return {0: dim0, 1: dim1}
 
     @staticmethod
     def betti_summary(barcode):
-        return {dim: sum(1 for b, d in bars if d > b or d == float("inf"))
+        """P2-6修复: β₀只计存活组件(d==inf), β₁不变."""
+        return {dim: sum(1 for b, d in bars if d == float("inf"))
                 for dim, bars in barcode.items()}

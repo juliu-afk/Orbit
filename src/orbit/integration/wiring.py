@@ -117,21 +117,28 @@ class OrbitWiring:
 
     def on_task_end(self, task_id: str, outcome: str, quality_score: float = 0.0,
                     turns: int = 0, tool_calls: int = 0) -> None:
-        """任务结束时调用——完成轨迹收集 + Bandit/Drift 反馈更新 + 清理 Monitor。"""
+        """任务结束时调用——完成轨迹收集 + Bandit 反馈更新 + 清理 Monitor。"""
         tc = self._get_trajectory()
         traj_id = self._trajectory_ids.pop(task_id, "")
         if tc and traj_id:
             tc.finish_trajectory(traj_id, final_outcome=outcome, quality_score=quality_score,
                                   total_turns=turns, total_tool_calls=tool_calls)
+            # V14.2+Theory 方向2: 从轨迹表读取 model_tier→Bandit 学习
+            b = self._get_bandit()
+            if b:
+                try:
+                    row = tc._db.execute(
+                        "SELECT model_tier FROM trajectories WHERE trajectory_id=?",
+                        (traj_id,)).fetchone()
+                    tier = (row["model_tier"] if row else "") or self._last_tier
+                    if tier:
+                        success = outcome == "completed"
+                        est_latency = turns * 2000.0 if turns > 0 else 0.0
+                        b.update(tier, success, latency_ms=est_latency)
+                        self._last_tier = ""  # 单次消费——防重复计数
+                except Exception:
+                    pass  # fail-open
             logger.debug("trajectory_finished", task_id=task_id, trajectory_id=traj_id, outcome=outcome)
-
-        # V14.2+Theory 方向2: Bandit 学习——每任务结束后更新后验
-        b = self._get_bandit()
-        if b and self._last_tier:
-            success = outcome == "completed"
-            # 用 turns 估算延迟（每 turn ~2s）——CUSUM 需真实延迟，此处仅 Bandit
-            est_latency = turns * 2000.0 if turns > 0 else 0.0
-            b.update(self._last_tier, success, latency_ms=est_latency)
 
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
         self._cleanup_monitor(task_id)
@@ -397,6 +404,22 @@ class OrbitWiring:
     def set_model_tier(self, tier: str) -> None:
         """记录最近 RouterAgent 选中的 tier——供 on_task_end 反馈 Bandit。"""
         self._last_tier = tier
+
+    def get_router_agent(self):
+        """V14.2+Theory 方向2+20: 创建带 Bandit+Drift 的 RouterAgent 单例。
+
+        供 task_runner 在任务开始时调用——Bandit 参与模型选择，Drift 检测模型变点。
+        """
+        try:
+            from orbit.router.agent import RouterAgent
+            return RouterAgent(
+                weights=None,  # 使用默认 ScoreWeights
+                bandit=self._get_bandit(),
+                drift_detector=self._get_drift(),
+            )
+        except Exception:
+            logger.warning("router_agent_init_failed", exc_info=True)
+            return None
 
     async def start_monitor(self, task_id: str, goal: str = "") -> asyncio.Task | None:
         """启动 MonitorAgent 作为独立 asyncio Task——含 HITLManager 接线。

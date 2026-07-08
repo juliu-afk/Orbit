@@ -89,6 +89,11 @@ class IntakeRouter:
             is_batch=form == "batch",
         )
 
+        # 效能指标: 记录 Intake 判定（form 为已检测形态）
+        from orbit.observability.metrics import orbit_intake_accuracy
+        # NOTE: 准确率需人工标注反馈——此处先记录判定形态，供后续校准
+        orbit_intake_accuracy.labels(form=form).set(clarity_score)
+
         if form == "batch":
             # 复数文档——每个独立判定，但此方法只判整体
             result.is_batch = True

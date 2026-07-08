@@ -143,6 +143,14 @@ class ProcessGuard:
         Raises:
             ProcessViolationError: 流程违规
         """
+        import time
+        from orbit.observability.trace import SpanStatus, TraceCollector
+
+        _t0 = time.monotonic()
+        span = TraceCollector.start_span(
+            self.task_id, component="guard", action="check",
+            input_summary=f"state={current_state.value}",
+        )
         self._visited.add(current_state)
 
         # 检查1: 强制状态是否已被访问或将被访问
@@ -195,6 +203,11 @@ class ProcessGuard:
                     f"状态 {prev_state.value} 无产物——流程不完整",
                 )
 
+        TraceCollector.end_span(
+            span, status=SpanStatus.OK,
+            output_summary=f"guard_passed_{current_state.value}",
+            duration_ms=(time.monotonic() - _t0) * 1000,
+        )
         logger.debug(
             "process_guard_check_passed",
             task_id=self.task_id,

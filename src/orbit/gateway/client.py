@@ -108,6 +108,10 @@ class LLMClient:
         routing_strategy: RoutingStrategy | None = None,  # Phase 3: 路由策略
         task_type: str | None = None,  # Inkeep 借鉴 #1: 任务类型路由
     ) -> LLMResponse:
+        import time
+        from orbit.observability.trace import SpanStatus, TraceCollector
+
+        _t0 = time.monotonic()
         # Step 2.3: 通过 Resolver 获取实际模型（而非硬编码 default_model）
         model = self.default_model
         model_source = "default"
@@ -158,8 +162,19 @@ class LLMClient:
             except Exception as e:
                 logger.warning("router_resolve_failed", error=str(e))
 
+        llm_span = TraceCollector.start_span(
+            task_id, component="agent", action="llm_call",
+            input_summary=f"model={model[:32]} agent={agent_name[:32]}",
+            metadata={"model": model, "agent": agent_name, "source": model_source},
+        )
         try:
-            return await self._call_with_circuit(model, req, task_id, model_source)
+            resp = await self._call_with_circuit(model, req, task_id, model_source)
+            TraceCollector.end_span(
+                llm_span, status=SpanStatus.OK,
+                output_summary=f"tokens={resp.usage.total_tokens if resp.usage else '?'}",
+                duration_ms=(time.monotonic() - _t0) * 1000,
+            )
+            return resp
         except CircuitOpenError:
             logger.warning("primary_circuit_open", model=model)
         except Exception as e:
@@ -168,14 +183,35 @@ class LLMClient:
                 logger.warning("primary_api_error", model=model, error=str(e)[:200])
             else:
                 logger.critical("primary_unexpected_error", model=model, exc_info=True)
+                TraceCollector.end_span(
+                    llm_span, status=SpanStatus.ERROR,
+                    output_summary=str(e)[:256],
+                    duration_ms=(time.monotonic() - _t0) * 1000,
+                )
                 raise
         try:
             logger.info("fallback_to_glm47flash", original=model)
-            return await self._call_with_circuit(self.fallback_model, req, task_id, "fallback")
+            resp = await self._call_with_circuit(self.fallback_model, req, task_id, "fallback")
+            TraceCollector.end_span(
+                llm_span, status=SpanStatus.OK,
+                output_summary=f"fallback tokens={resp.usage.total_tokens if resp.usage else '?'}",
+                duration_ms=(time.monotonic() - _t0) * 1000,
+            )
+            return resp
         except CircuitOpenError:
+            TraceCollector.end_span(
+                llm_span, status=SpanStatus.ERROR,
+                output_summary="fallback_circuit_open",
+                duration_ms=(time.monotonic() - _t0) * 1000,
+            )
             logger.error("fallback_circuit_open", model=self.fallback_model)
             raise
         except Exception as e:
+            TraceCollector.end_span(
+                llm_span, status=SpanStatus.ERROR,
+                output_summary=str(e)[:256],
+                duration_ms=(time.monotonic() - _t0) * 1000,
+            )
             logger.error("fallback_failed", model=self.fallback_model, error=str(e))
             raise
 

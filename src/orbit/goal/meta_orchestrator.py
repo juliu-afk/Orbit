@@ -18,6 +18,8 @@ from datetime import UTC, datetime
 
 from orbit.goal.intake_router import IntakeRouter
 from orbit.goal.memory_tiers import ThreeTierMemory
+from orbit.observability.metrics import orbit_goal_status_total
+from orbit.observability.trace import SpanStatus, TraceCollector
 from typing import TYPE_CHECKING, Any
 
 from orbit.goal.meta_utils import (
@@ -147,6 +149,12 @@ class MetaOrchestrator:
         """执行完整 Goal 生命周期。"""
         started_at = time.time()
         goal.started_at = datetime.now(UTC).isoformat()
+        self._goal_started = started_at
+        goal_span = TraceCollector.start_span(
+            goal.id, component="orchestrator", action="schedule",
+            input_summary=f"goal_desc={goal.description[:128] if goal.description else ''}",
+        )
+        self._current_goal_span = goal_span
 
         # 减熵闭环-3 B8: 自动生成 CLAUDE.md
         try:
@@ -165,7 +173,9 @@ class MetaOrchestrator:
 
             # 复数文档→依赖分析+DAG调度
             if decision.is_batch:
-                return await self._run_batch(goal)
+                result = await self._run_batch(goal)
+                self._record_goal_end(result.status)
+                return result
 
             # 按需澄清
             if decision.needs_clarify and self.clarifier:
@@ -180,6 +190,7 @@ class MetaOrchestrator:
                     spec = await self.compose_bridge.generate_spec(goal)
                     confirmed = await self._present_for_confirmation(estimate, spec, goal)
                     if not confirmed:
+                        self._record_goal_end("cancelled")
                         return GoalResult(status="cancelled", reason="用户取消")
                     goal.spec = spec.model_dump() if hasattr(spec, "model_dump") else spec
                     goal.sub_tasks = {t.id: "pending" for t in spec.tasks}
@@ -188,7 +199,9 @@ class MetaOrchestrator:
             spec_data = goal.spec
             if not spec_data:
                 # 无 spec 且无 compose_bridge——单任务模式
-                return await self._run_single_task(goal)
+                result = await self._run_single_task(goal)
+                self._record_goal_end(result.status)
+                return result
 
             spec = _deserialize_spec(spec_data)
 
@@ -200,7 +213,9 @@ class MetaOrchestrator:
                 )
                 elapsed = time.time() - started_at
                 ok = compose_result.get("status") == "ok"
-                return GoalResult(status="done" if ok else "partial", total_time_seconds=elapsed)
+                status = "done" if ok else "partial"
+                self._record_goal_end(status)
+                return GoalResult(status=status, total_time_seconds=elapsed)
 
             layers = _topological_layers(spec.tasks)
             previous_merge_shas: dict[str, str] = {}
@@ -240,6 +255,7 @@ class MetaOrchestrator:
                             await self.regression_guard.check()
                         completed_count += 1
                     elif result.status == "critique_loop":
+                        self._record_goal_end("paused")
                         return GoalResult(
                             status="paused",
                             reason=f"Task {task.id} 批判退回超过上限",
@@ -247,6 +263,7 @@ class MetaOrchestrator:
                     else:
                         goal.consecutive_failures += 1
                         if goal.consecutive_failures >= 3:
+                            self._record_goal_end("failed")
                             return GoalResult(
                                 status="failed",
                                 reason=f"连续 {goal.consecutive_failures} 个子任务失败",
@@ -265,12 +282,14 @@ class MetaOrchestrator:
                     if not align.aligned:
                         goal.consecutive_misalignments += 1
                         if goal.consecutive_misalignments >= 2:
+                            self._record_goal_end("paused")
                             return GoalResult(status="paused", reason="连续 2 次对齐失败")
                     else:
                         goal.consecutive_misalignments = 0
 
                 # 预算检查
                 if self._budget_exhausted(goal):
+                    self._record_goal_end("done")
                     return GoalResult(
                         status="done",
                         reason="预算耗尽",
@@ -279,6 +298,7 @@ class MetaOrchestrator:
 
             # 汇总
             elapsed = time.time() - started_at
+            self._record_goal_end("done")
             return GoalResult(
                 status="done",
                 tasks_completed=completed_count,
@@ -291,6 +311,7 @@ class MetaOrchestrator:
             raise
         except Exception as e:
             logger.error("meta_orchestrator_failed", goal_id=goal.id, error=str(e), exc_info=True)
+            self._record_goal_end("failed")
             return GoalResult(
                 status="failed",
                 reason=str(e),
@@ -298,6 +319,20 @@ class MetaOrchestrator:
             )
 
     # ── 内部: 子任务调度 ───────────────────────────────
+
+    def _record_goal_end(self, status: str) -> None:
+        """记录 Goal 终态指标 + 结束 trace span。"""
+        orbit_goal_status_total.labels(status=status).inc()
+        span = getattr(self, "_current_goal_span", None)
+        if span is not None:
+            _start = getattr(self, "_goal_started", 0.0)
+            TraceCollector.end_span(
+                span,
+                status=SpanStatus.OK if status in ("done",) else SpanStatus.ERROR,
+                output_summary=f"goal_{status}",
+                duration_ms=(time.time() - _start) * 1000 if _start else None,
+            )
+            self._current_goal_span = None
 
     async def _run_subtask(
         self,

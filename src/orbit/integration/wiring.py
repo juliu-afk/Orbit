@@ -158,9 +158,23 @@ class OrbitWiring:
         return None
 
     def enhance_prompt(self, base_prompt: str, category: str = "",
-                       keywords: list[str] | None = None) -> str:
-        """增强 system prompt——注入策略原则 + Agentic 建议。"""
+                       keywords: list[str] | None = None,
+                       type_sig: str = "",  # V14.2+Theory 方向8: 类型签名→生成约束
+                       ) -> str:
+        """增强 system prompt——注入策略原则 + Agentic 建议 + 类型约束。"""
         result = base_prompt
+
+        # 0. V14.2+Theory 方向8: 类型导向合成——在生成前注入约束
+        if type_sig:
+            try:
+                from orbit.hallucination.l4_type import TypeDirectedSynthesizer
+                constraints = TypeDirectedSynthesizer.constrain(type_sig)
+                if constraints:
+                    lines = ["\n\n## 代码生成约束（类型导向）"]
+                    lines.extend(f"- {c}" for c in constraints)
+                    result += "\n".join(lines)
+            except Exception:
+                pass  # fail-open——约束注入失败不阻塞主 prompt 增强
 
         # 1. 注入高效用策略原则
         inj = self._get_injector()

@@ -19,13 +19,8 @@ class FreeEnergyMonitor:
 
     def compute(self, surprise: float, complexity: float,
                 accuracy: float) -> float:
-        """F = complexity - accuracy.
-
-        surprise = -ln p(o|θ)（观察惊奇度）
-        complexity = D_KL(q||p)（模型复杂度）
-        accuracy = E_q[ln p(o|θ)]（预测准确度）
-        """
-        return complexity - accuracy
+        """F = complexity - accuracy + surprise_weight*surprise. P1-3修复."""
+        return complexity - accuracy + 0.1 * surprise
 
     def is_critical(self, free_energy: float) -> bool:
         """ΔF > τ → CRITICAL."""

@@ -148,6 +148,7 @@ fn main() {
             .resizable(true)
             .decorations(true)
             .transparent(false)
+            .shadow(false)
             .center()
             .focused(true)
             .visible(true)

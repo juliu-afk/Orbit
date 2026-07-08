@@ -6,62 +6,44 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
-/// 编译期嵌入启动检查页，运行时作为 data: URI 加载——秒开不依赖后端。
 const BOOT_HTML: &str = include_str!("../boot.html");
-
-/// 编译期嵌入 orbit-backend.exe，运行时解压到临时目录
 const BACKEND_EXE: &[u8] = include_bytes!("../orbit-backend.exe");
 
-/// 将嵌入的后端 exe 写到临时目录，返回路径
 fn extract_backend() -> PathBuf {
     let dir = std::env::temp_dir().join("orbit");
     fs::create_dir_all(&dir).ok();
     let exe_path = dir.join("orbit-backend.exe");
-
-    // WHY 先杀旧进程再写: 上次异常退出（崩溃/强制结束）时旧进程可能
-    // 仍占用 exe 文件，直接 remove+write 会失败（Os code 32）
     kill_existing_backend(&exe_path);
-
     let _ = fs::remove_file(&exe_path);
     fs::write(&exe_path, BACKEND_EXE).expect("无法解压后端程序");
     exe_path
 }
 
-/// 强制结束可能残留的旧后端进程
 #[cfg(target_os = "windows")]
 fn kill_existing_backend(_exe_path: &PathBuf) {
     use std::os::windows::process::CommandExt;
-    // taskkill /F /IM orbit-backend.exe —— 结束所有同名进程
     let _ = std::process::Command::new("taskkill")
         .args(["/F", "/IM", "orbit-backend.exe"])
-        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .creation_flags(0x08000000)
         .output();
-    // 短等进程退出 + 释放文件锁
     std::thread::sleep(std::time::Duration::from_millis(800));
 }
 
 #[cfg(not(target_os = "windows"))]
 fn kill_existing_backend(_exe_path: &PathBuf) {
-    // Unix: pkill orbit-backend
     let _ = std::process::Command::new("pkill")
         .args(["-f", "orbit-backend"])
         .output();
     std::thread::sleep(std::time::Duration::from_millis(800));
 }
 
-/// 启动后端进程，隐藏控制台窗口，stdout/stderr 写入运行时日志
 fn start_backend(exe_path: &PathBuf, log_path: &PathBuf) -> std::io::Result<Child> {
-    // WHY 日志文件: Tauri 用 CREATE_NO_WINDOW 启动后端，stdout/stderr 无控制台可写，
-    // 必须显式管道到文件才能追查运行时错误和崩溃
     let log_file = File::create(log_path)?;
     let err_file = log_file.try_clone()?;
-
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
-        // WHY set ORBIT_HOME: 后端 config 使用相对路径(data/,configs/)，
-        // 双击启动时工作目录不对，需显式传递 exe 所在目录。
         let exe_dir = std::env::current_exe()
             .ok().and_then(|p| p.parent().map(|d| d.to_path_buf()))
             .unwrap_or_default();
@@ -72,11 +54,8 @@ fn start_backend(exe_path: &PathBuf, log_path: &PathBuf) -> std::io::Result<Chil
             .stderr(Stdio::from(err_file))
             .spawn()
     }
-
     #[cfg(not(target_os = "windows"))]
     {
-        let log_file = File::create(log_path)?;
-        let err_file = log_file.try_clone()?;
         Command::new(exe_path)
             .stdout(Stdio::from(log_file))
             .stderr(Stdio::from(err_file))
@@ -84,13 +63,10 @@ fn start_backend(exe_path: &PathBuf, log_path: &PathBuf) -> std::io::Result<Chil
     }
 }
 
-/// 清理临时目录中的后端 exe
 fn cleanup_backend(exe_path: &PathBuf) {
     let _ = fs::remove_file(exe_path);
 }
 
-/// 百分号编码——data: URI 用。正确处理 UTF-8 多字节字符。
-/// 可打印 ASCII 保持原样，特殊字符和 UTF-8 字节百分号编码。
 fn percent_encode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut out = String::with_capacity(bytes.len() * 2);
@@ -100,9 +76,7 @@ fn percent_encode(s: &str) -> String {
             b'#' => out.push_str("%23"),
             b'\n' => out.push_str("%0A"),
             b'\r' => out.push_str("%0D"),
-            // 可打印 ASCII（空格到 ~）保持原样
             b' '..=b'~' => out.push(b as char),
-            // UTF-8 多字节和其他控制字符 → %XX
             _ => {
                 use std::fmt::Write;
                 let _ = write!(out, "%{:02X}", b);
@@ -112,21 +86,50 @@ fn percent_encode(s: &str) -> String {
     out
 }
 
+/// 启动前清理 18888 端口残留进程
+fn free_port_18888() {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let output = std::process::Command::new("netstat")
+            .args(["-ano"])
+            .creation_flags(0x08000000)
+            .output();
+        if let Ok(out) = output {
+            let text = String::from_utf8_lossy(&out.stdout);
+            for line in text.lines() {
+                if line.contains(":18888") && line.contains("LISTENING") {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if let Some(pid) = parts.last() {
+                        let _ = std::process::Command::new("taskkill")
+                            .args(["/F", "/PID", pid])
+                            .creation_flags(0x08000000)
+                            .output();
+                        std::thread::sleep(std::time::Duration::from_millis(500));
+                    }
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = std::process::Command::new("fuser")
+            .args(["-k", "18888/tcp"])
+            .output();
+    }
+}
+
 fn main() {
-    // 解压后端到临时目录
+    free_port_18888();
     let backend_path = extract_backend();
     let log_path = backend_path.parent().unwrap().join("orbit_runtime.log");
-
     println!("Orbit — 启动后端...");
-    println!("运行时日志: {}", log_path.display());
     let mut backend = start_backend(&backend_path, &log_path).unwrap_or_else(|e| {
         let msg = format!("Failed to start backend: {}", e);
         let _ = fs::write(backend_path.parent().unwrap().join("orbit_error.log"), &msg);
         panic!("{}", msg)
     });
 
-    // WHY boot.html: 嵌入式启动检查页，Tauri 窗口秒开，轮询后端探针状态。
-    // 后端就绪后 boot.html 内 JS 自动跳转 http://127.0.0.1:18888 → Vue SPA。
     let boot_url = format!(
         "data:text/html;charset=utf-8,{}",
         percent_encode(BOOT_HTML)
@@ -136,28 +139,29 @@ fn main() {
         .setup(move |app| {
             use tauri::WebviewUrl;
             use tauri::WebviewWindowBuilder;
-
             let _window = WebviewWindowBuilder::new(
-                app,
-                "main",
+                app, "main",
                 WebviewUrl::External(boot_url.parse().unwrap()),
             )
+            .title("Orbit")
+            .inner_size(1400.0, 900.0)
+            .resizable(true)
+            .decorations(true)
+            .transparent(false)
+            .center()
+            .focused(true)
+            .visible(true)
             .build()?;
-
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("Tauri 启动失败")
         .run(move |_app, event| {
-            // WHY Tauri 生命周期: 窗口关闭（正常/异常/崩溃退出）时
-            // 强制杀后端进程+清临时文件，防止残留进程锁文件导致下轮启动失败
             if let tauri::RunEvent::Exit = event {
-                println!("Orbit — 关闭后端进程...");
                 kill_existing_backend(&backend_path);
                 let _ = backend.kill();
                 let _ = backend.wait();
                 cleanup_backend(&backend_path);
-                println!("Orbit 已退出");
             }
         });
 }

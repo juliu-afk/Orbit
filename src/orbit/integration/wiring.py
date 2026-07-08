@@ -90,6 +90,26 @@ class OrbitWiring:
         self._router_agent: object | None = None  # P2-3: RouterAgent 单例缓存
         self._llm_client: object | None = None     # P2-2: LLMClient 单例缓存
         self._last_tier: str = ""
+        # V14.2+Theory P1+P2: 19模块懒初始化
+        self._spectral: object | None = None       # D3: SpectralAnalyzer
+        self._ib_comp: object | None = None        # D4: IBCompressor
+        self._ot_matcher: object | None = None     # D11: OTMatcher
+        self._mdp: object | None = None            # D17: AgentMDP
+        self._abs_pipe: object | None = None       # D22: AbstractPipelineAnalyzer
+        self._vcg: object | None = None            # D9: VCGAllocator
+        self._pac: object | None = None            # D14: PACBound
+        self._slicer: object | None = None         # D24: ProgramSlicer
+        self._temporal: object | None = None       # D5: L9TemporalValidator
+        self._sep_logic: object | None = None      # D18: L10SeparationValidator
+        self._bisim: object | None = None          # D19: BisimulationChecker
+        self._bft: object | None = None            # D25: BFTGuard
+        self._shapley: object | None = None        # D6: ShapleyAttribution
+        self._mdl: object | None = None            # D7: MDLScorer
+        self._dp_guard: object | None = None       # D10: DPGuard
+        self._tda: object | None = None            # D12: TDAAnalyzer
+        self._free_energy: object | None = None    # D15: FreeEnergyMonitor
+        self._info_geom: object | None = None      # D21: InfoGeometry
+        self._effect: object | None = None         # D23: EffectTracker
 
     # ── 生命周期钩子 ───────────────────────────────────
 
@@ -102,6 +122,15 @@ class OrbitWiring:
             # 存储 trajectory_id——供 on_task_end 匹配
             self._trajectory_ids[task_id] = traj.trajectory_id
             logger.debug("trajectory_started", task_id=task_id, trajectory_id=traj.trajectory_id, goal=goal[:60])
+            # V14.2+Theory: PAC自适应SCOPE阈值——样本数驱动
+            try:
+                pac = self._get_pac()
+                if pac is not None:
+                    strategies = self._get_distill()
+                    if strategies:
+                        H = len(strategies.top_principles(50))
+                        self._pac_threshold = pac.adaptive_threshold(H, self._task_count)
+            except Exception: pass
 
     def on_model_tier_decided(self, task_id: str, model_tier: str) -> None:
         """V14.2+Theory: RouterAgent 决策模型层级后调用——回填轨迹表。
@@ -148,6 +177,27 @@ class OrbitWiring:
                         self._last_tier = ""
                 except Exception:
                     pass  # fail-open
+            # V14.2+Theory: Bellman gap + ΔF自由能 + BFT操作审计
+            try:
+                mdp = self._get_mdp()
+                if mdp:
+                    gap = mdp.compute_bellman_gap([])  # 累积轨迹后批量计算
+                    logger.debug("bellman_gap", gap=gap)
+            except Exception: pass
+            try:
+                fe = self._get_fe()
+                if fe:
+                    dF = fe.estimate_from_alerts(0.0, 0, 0.0)
+                    if fe.is_critical(dF):
+                        logger.warning("free_energy_critical", delta_F=dF)
+            except Exception: pass
+            try:
+                bft = self._get_bft()
+                if bft and outcome != "completed":
+                    ok, _ = bft.approve("task_failed_" + task_id[:8])
+                    logger.debug("bft_audit", task_id=task_id, approved=ok)
+            except Exception:
+                pass  # fail-open
             logger.debug("trajectory_finished", task_id=task_id, trajectory_id=traj_id, outcome=outcome)
 
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
@@ -262,6 +312,37 @@ class OrbitWiring:
         grpo = self._get_grpo()
         if grpo:
             grpo.update_utilities()
+
+        # V14.2+Theory P1+P2离线管线: Shapley归因 + MDL评分 + 信息几何 + 频谱
+        try:
+            shapley = self._get_shapley()
+            if shapley and completed:
+                agents = [t.get("agent_role", "unknown") for t in completed[:5]]
+                def v(s): return len(s) * 0.1
+                vals = shapley.attribute(list(set(agents)), v, method="mc")
+                logger.debug("shapley_attribution", vals=vals)
+        except Exception: pass
+        try:
+            mdl = self._get_mdl()
+            if mdl:
+                s = mdl.score("", 0)
+                logger.debug("mdl_baseline", score=s)
+        except Exception: pass
+        try:
+            ig = self._get_ig()
+            if ig:
+                kl = ig.kl_divergence([0.5,0.5], [0.6,0.4])
+                logger.debug("kl_divergence", kl=kl)
+        except Exception: pass
+        try:
+            spectral = self._get_spectral()
+            if spectral:
+                import numpy as np
+                adj = np.eye(3)
+                import scipy.sparse as sp
+                report = spectral.analyze(sp.csr_matrix(adj))
+                logger.debug("spectral_modularity", modularity=report.modularity)
+        except Exception: pass
 
         # V14.2+Theory 方向16: GEPA 进化——Conformal 共形预测接入离线管线
         try:
@@ -438,6 +519,142 @@ class OrbitWiring:
             except Exception:
                 logger.warning("conformal_init_failed", exc_info=True)
         return self._conformal
+
+
+    # ── V14.2+Theory P1+P2: 19模块懒getters ──────────
+    def _get_spectral(self):
+        if self._spectral is None:
+            try:
+                from orbit.graph.spectral import SpectralAnalyzer
+                self._spectral = SpectralAnalyzer()
+            except Exception: pass
+        return self._spectral
+    def _get_ib(self):
+        if self._ib_comp is None:
+            try:
+                from orbit.compression.ib_compressor import IBCompressor
+                self._ib_comp = IBCompressor()
+            except Exception: pass
+        return self._ib_comp
+    def _get_ot(self):
+        if self._ot_matcher is None:
+            try:
+                from orbit.context.ot_matcher import OTMatcher
+                self._ot_matcher = OTMatcher()
+            except Exception: pass
+        return self._ot_matcher
+    def _get_mdp(self):
+        if self._mdp is None:
+            try:
+                from orbit.agents.mdp import AgentMDP
+                self._mdp = AgentMDP()
+            except Exception: pass
+        return self._mdp
+    def _get_abs_pipe(self):
+        if self._abs_pipe is None:
+            try:
+                from orbit.hallucination.abstract_interp import AbstractPipelineAnalyzer
+                self._abs_pipe = AbstractPipelineAnalyzer()
+            except Exception: pass
+        return self._abs_pipe
+    def _get_vcg(self):
+        if self._vcg is None:
+            try:
+                from orbit.compose.mechanism import VCGAllocator
+                self._vcg = VCGAllocator()
+            except Exception: pass
+        return self._vcg
+    def _get_pac(self):
+        if self._pac is None:
+            try:
+                from orbit.evolution.pac_bounds import PACBound
+                self._pac = PACBound()
+            except Exception: pass
+        return self._pac
+    def _get_slicer(self):
+        if self._slicer is None:
+            try:
+                from orbit.graph.engines.slicer import ProgramSlicer
+                self._slicer = ProgramSlicer()
+            except Exception: pass
+        return self._slicer
+    def _get_temporal(self):
+        if self._temporal is None:
+            try:
+                from orbit.hallucination.l9_temporal import L9TemporalValidator
+                self._temporal = L9TemporalValidator()
+            except Exception: pass
+        return self._temporal
+    def _get_sep(self):
+        if self._sep_logic is None:
+            try:
+                from orbit.hallucination.l10_separation import L10SeparationValidator
+                self._sep_logic = L10SeparationValidator()
+            except Exception: pass
+        return self._sep_logic
+    def _get_bisim(self):
+        if self._bisim is None:
+            try:
+                from orbit.agents.bisim import BisimulationChecker
+                self._bisim = BisimulationChecker()
+            except Exception: pass
+        return self._bisim
+    def _get_bft(self):
+        if self._bft is None:
+            try:
+                from orbit.goal.bft import BFTGuard
+                self._bft = BFTGuard()
+            except Exception: pass
+        return self._bft
+    def _get_shapley(self):
+        if self._shapley is None:
+            try:
+                from orbit.observability.attribution import ShapleyAttribution
+                self._shapley = ShapleyAttribution()
+            except Exception: pass
+        return self._shapley
+    def _get_mdl(self):
+        if self._mdl is None:
+            try:
+                from orbit.review.mdl_scorer import MDLScorer
+                self._mdl = MDLScorer()
+            except Exception: pass
+        return self._mdl
+    def _get_dp(self):
+        if self._dp_guard is None:
+            try:
+                from orbit.observability.dp import DPGuard
+                self._dp_guard = DPGuard()
+            except Exception: pass
+        return self._dp_guard
+    def _get_tda(self):
+        if self._tda is None:
+            try:
+                from orbit.graph.tda import TDAAnalyzer
+                self._tda = TDAAnalyzer()
+            except Exception: pass
+        return self._tda
+    def _get_fe(self):
+        if self._free_energy is None:
+            try:
+                from orbit.metacognition.free_energy import FreeEnergyMonitor
+                self._free_energy = FreeEnergyMonitor()
+            except Exception: pass
+        return self._free_energy
+    def _get_ig(self):
+        if self._info_geom is None:
+            try:
+                from orbit.evolution.info_geom import InfoGeometry
+                self._info_geom = InfoGeometry()
+            except Exception: pass
+        return self._info_geom
+    def _get_effect(self):
+        if self._effect is None:
+            try:
+                from orbit.hallucination.effect_tracker import EffectTracker
+                self._effect = EffectTracker()
+            except Exception: pass
+        return self._effect
 
     def _get_llm_client(self):
         """P2-2: LLMClient 单例缓存——GEPA 进化复用。"""

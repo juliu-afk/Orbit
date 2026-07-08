@@ -57,6 +57,7 @@ class AbstractPipelineAnalyzer:
         deps = AbstractPipelineAnalyzer.analyze_dependencies(active_layers)
         info = deps.get(failed_layer, {})
         affected = set(info.get("affects", []))
+        affected.discard(failed_layer)  # P2-4: 不把自己列为受影响层
         # 传递闭包: A→B, B→C → A→C
         changed = True
         while changed:

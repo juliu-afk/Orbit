@@ -46,22 +46,30 @@ class AgentMDP:
         """Bellman误差 = Σ|Q(s,a) - (r + γ max_a' Q(s',a'))|.
 
         gap→0 = 接近最优, gap大 = 有提升空间.
-        transitions: [{s, a, r, s_next}, ...]
+        P2-1修复: 值迭代估计V(s)后计算真实Bellman gap.
         """
         if not transitions:
             return 0.0
-        # 简化: 用经验平均值近似V(s)
+        # 值迭代估计V(s)——3轮够收敛
         V = {}
         for t in transitions:
-            s_key = tuple(round(x, 2) for x in t["s"][:3])
-            if s_key not in V:
-                V[s_key] = 0.0
+            for key in ("s", "s_next"):
+                sk = tuple(round(x, 2) for x in t[key][:3])
+                V[sk] = 0.0
+        for _ in range(3):
+            V_new = dict(V)
+            for t in transitions:
+                sk = tuple(round(x, 2) for x in t["s"][:3])
+                snk = tuple(round(x, 2) for x in t["s_next"][:3])
+                V_new[sk] = max(V_new.get(sk, 0.0),
+                                t["r"] + self.gamma * V.get(snk, 0.0))
+            V = V_new
         total = 0.0
         for t in transitions:
-            s_key = tuple(round(x, 2) for x in t["s"][:3])
-            sn_key = tuple(round(x, 2) for x in t["s_next"][:3])
-            target = t["r"] + self.gamma * V.get(sn_key, 0.0)
-            total += abs(V.get(s_key, 0.0) - target)
+            sk = tuple(round(x, 2) for x in t["s"][:3])
+            snk = tuple(round(x, 2) for x in t["s_next"][:3])
+            target = t["r"] + self.gamma * V.get(snk, 0.0)
+            total += abs(V.get(sk, 0.0) - target)
         return total / len(transitions)
 
 

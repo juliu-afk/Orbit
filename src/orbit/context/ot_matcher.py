@@ -28,21 +28,26 @@ class OTMatcher:
         n, m = len(contexts), len(needs)
         if n == 0 or m == 0:
             return []
+        # P2-3: 维度不匹配→取公共维度，短者补零
+        max_dim = max((len(c) for c in contexts), default=0)
+        max_dim = max(max_dim, max((len(n) for n in needs), default=0))
+        ctx_pad = [c + [0.0] * (max_dim - len(c)) for c in contexts]
+        need_pad = [n + [0.0] * (max_dim - len(n)) for n in needs]
         # 成本矩阵 C[i][j] = ||ctx_i - need_j||²
         C = [[0.0] * m for _ in range(n)]
         for i in range(n):
             for j in range(m):
-                d2 = sum((contexts[i][k] - needs[j][k]) ** 2
-                        for k in range(min(len(contexts[i]), len(needs[j]))))
+                d2 = sum((ctx_pad[i][k] - need_pad[j][k]) ** 2 for k in range(max_dim))
                 C[i][j] = d2
         # Sinkhorn: K = exp(-C/reg), 迭代行/列归一化
         K = [[math.exp(-C[i][j] / self.reg) for j in range(m)] for i in range(n)]
         u = [1.0] * n
-        for _ in range(20):  # 20轮收敛
-            # 列归一化
+        for _ in range(200):  # P2-2修复: 收敛判断替代硬编码20
+            u_old = list(u)
             v = [1.0 / max(sum(K[i][j] * u[i] for i in range(n)), 1e-10) for j in range(m)]
-            # 行归一化
             u = [1.0 / max(sum(K[i][j] * v[j] for j in range(m)), 1e-10) for i in range(n)]
+            if max(abs(u[i] - u_old[i]) for i in range(n)) < 1e-6:
+                break
         # 运输计划 P[i][j] = u[i] * K[i][j] * v[j]
         result = []
         for i in range(n):

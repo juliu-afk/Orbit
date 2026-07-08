@@ -54,6 +54,7 @@ _ROUTE_MODULES: dict[str, tuple[str, str]] = {
     "diagnostics_ws": ("orbit.api.routes.diagnostics_ws", "router"),
     "wechat_routes": ("orbit.api.routes.wechat_routes", "router"),
     "health": ("orbit.api.routes.health", "router"),
+    "app_routes": ("orbit.api.routes.app_routes", "router"),
 }
 
 # 路由懒加载映射——create_app(routes=[...]) 按需导入

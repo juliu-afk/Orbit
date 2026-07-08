@@ -162,6 +162,8 @@ function handleSplitSession() {
   if (!ctxSession.value) return
   emit('split-session', ctxSession.value.session_id)
 }
+
+// ── 窗口控制——通过后端 API 控制 Tauri 窗口 ──
 function winMinimize() { fetch('/api/v1/app/minimize', { method: 'POST' }).catch(() => {}) }
 function winMaximize() { fetch('/api/v1/app/maximize', { method: 'POST' }).catch(() => {}) }
 function winClose()    { fetch('/api/v1/app/quit',     { method: 'POST' }).catch(() => {}) }
@@ -195,7 +197,7 @@ function winClose()    { fetch('/api/v1/app/quit',     { method: 'POST' }).catch
   color: var(--color-orbit-accent);
 }
 .tabs-btn--new:hover { background: rgba(76,175,80,0.12); }
-.tabs-btn--win { font-size: 12px; }
+.tabs-btn--win { font-size: 13px; }
 .tabs-btn--close:hover { background: #f44336 !important; color: #fff; }
 
 /* ── 标签滚动区 ── */

@@ -1,9 +1,8 @@
-"""拓扑数据分析 (V14.2+Theory 方向12). P1修复: 环空间检测替代三角形."""
+"""拓扑数据分析 (V14.2+Theory 方向12). P1修复: MST构建时同步检测环."""
 from __future__ import annotations
 
 class TDAAnalyzer:
     def persistence_barcode(self, adj_matrix, max_dim: int = 1):
-        """简化持久条形码——0维Kruskal + 1维环空间."""
         n = len(adj_matrix)
         if n < 3:
             return {0: [], 1: []}
@@ -19,17 +18,14 @@ class TDAAnalyzer:
             while parent[x] != x:
                 parent[x] = parent[parent[x]]; x = parent[x]
             return x
-        def union(x, y):
-            rx, ry = find(x), find(y)
-            if rx != ry: parent[ry] = rx; return True
-            return False
-        # 0维: MST merge
-        dim0 = [(0.0, e[0]) for e in edges if union(e[1], e[2])]
-        # 1维: 不在MST中的边产生环(未被填充)
-        dim1 = []
+        dim0, dim1 = [], []
         for w, i, j in edges:
-            if find(i) == find(j):
+            ri, rj = find(i), find(j)
+            if ri == rj:
                 dim1.append((w, float("inf")))
+            else:
+                parent[rj] = ri
+                dim0.append((0.0, w))
         return {0: dim0, 1: dim1}
 
     @staticmethod

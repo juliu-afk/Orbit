@@ -1,4 +1,4 @@
-"""代数效应追踪 (V14.2+Theory 方向23). P1修复: 仅遍历顶层函数体非嵌套."""
+"""代数效应追踪 (V14.2+Theory 方向23). P1修复: stmt级过滤防嵌套泄漏."""
 from __future__ import annotations
 import ast
 
@@ -10,20 +10,20 @@ class EffectTracker:
         result = {}
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                effects = EffectTracker._scan_body(node.body)
+                effects = EffectTracker._scan_stmts(node.body)
                 if not effects: effects.add("pure")
                 result[node.name] = effects
         return result
 
     @staticmethod
-    def _scan_body(body: list[ast.stmt]) -> set[str]:
-        """仅扫描直接子节点——不穿透嵌套函数."""
+    def _scan_stmts(body: list[ast.stmt]) -> set[str]:
+        """在stmt级过滤嵌套函数——防ast.walk穿透子节点."""
         effects = set()
         for stmt in body:
+            # P1修复: 跳过整个嵌套函数定义——不是continue在walk内
+            if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
             for child in ast.walk(stmt):
-                # 遇到嵌套函数/类→不穿透
-                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    continue
                 if isinstance(child, ast.Await):
                     effects.add("async")
                 elif isinstance(child, ast.Yield) or isinstance(child, ast.YieldFrom):

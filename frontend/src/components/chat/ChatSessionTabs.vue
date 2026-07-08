@@ -163,10 +163,27 @@ function handleSplitSession() {
   emit('split-session', ctxSession.value.session_id)
 }
 
-// ── 窗口控制——通过后端 API 控制 Tauri 窗口 ──
-function winMinimize() { fetch('/api/v1/app/minimize', { method: 'POST' }).catch(() => {}) }
-function winMaximize() { fetch('/api/v1/app/maximize', { method: 'POST' }).catch(() => {}) }
-function winClose()    { fetch('/api/v1/app/quit',     { method: 'POST' }).catch(() => {}) }
+// ── 窗口控制——双通道: JS原生 + 后端API, 任一成功即可 ──
+function winMinimize() {
+  // @ts-ignore: WebView2 可能支持 minimize
+  if (typeof window.minimize === 'function') { window.minimize(); return }
+  fetch('/api/v1/app/minimize', { method: 'POST' }).catch(() => {})
+}
+function winMaximize() {
+  // @ts-ignore
+  if (typeof window.minimize === 'function') {
+    // 切换最大化: 先移到 0,0 再放大到屏幕尺寸
+    window.moveTo?.(0,0); window.resizeTo?.(screen.width, screen.height)
+    return
+  }
+  fetch('/api/v1/app/maximize', { method: 'POST' }).catch(() => {})
+}
+function winClose() {
+  // WHY: window.close() 在 WebView2 中通常直接关闭窗口
+  window.close()
+  // 兜底: 如果 JS close 无效, 通过后端杀父进程
+  setTimeout(() => { fetch('/api/v1/app/quit', { method: 'POST' }).catch(() => {}) }, 500)
+}
 </script>
 
 <style scoped>

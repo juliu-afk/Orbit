@@ -26,8 +26,9 @@ class TDAAnalyzer:
             else:
                 parent[rj] = ri
                 dim0.append((0.0, w))
-        # P2-6: 最终存活分量——MST构建后剩余连通分量
-        dim0.append((0.0, float("inf")))
+        # P2-6: 每个连通分量一个存活棒——Union-Find根节点数
+        roots = len({find(i) for i in range(n)})
+        dim0.extend([(0.0, float("inf"))] * roots)
         return {0: dim0, 1: dim1}
 
     @staticmethod

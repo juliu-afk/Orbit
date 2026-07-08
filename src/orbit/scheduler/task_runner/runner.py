@@ -134,7 +134,7 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
         keywords = self._extract_keywords(prd)
         context["keywords"] = keywords
 
-        # Phase F: 接线——任务开始 + 轨迹 + 用户画像
+        # Phase F: 接线——任务开始 + 轨迹 + Bandit路由 + 用户画像
         # WHY fail-open: 接线模块是可选的——失败不阻塞任务执行
         try:
             from orbit.integration.wiring import get_wiring
@@ -142,6 +142,20 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
             if w:
                 project_id = context.get("project_id", "")
                 w.on_task_start(task_id, prd, project_id=project_id)
+                # V14.2+Theory 方向2: Bandit 参与模型选择——端到端接线
+                ra = w.get_router_agent()
+                if ra is not None:
+                    try:
+                        # 用 PRD 长度+关键词估算任务复杂度
+                        fc = max(1, prd.count("\n") + 1)
+                        ct = "multi_file" if fc > 5 else "single_file"
+                        dec = await ra.evaluate(
+                            file_count=fc, change_type=ct,
+                            risk="medium", agent_role="developer")
+                        w.on_model_tier_decided(task_id, dec.tier.value)
+                        context["router_tier"] = dec.tier.value
+                    except Exception:
+                        pass  # Bandit 失败不影响任务执行
                 # 加载用户画像
                 if project_id:
                     try:

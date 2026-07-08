@@ -83,6 +83,11 @@ class OrbitWiring:
         self._llm_distill: object | None = None
         self._monitor: object | None = None
         self._mcts: object | None = None
+        self._bandit: object | None = None       # V14.2+Theory 方向2: ThompsonBandit
+        self._drift: object | None = None        # V14.2+Theory 方向20: CUSUMDriftDetector
+        self._pid: object | None = None          # V14.2+Theory 方向13: PIDAgentController
+        self._conformal: object | None = None    # V14.2+Theory 方向16: ConformalPredictor
+        self._last_tier: str = ""  # 最近一次 RouterAgent 选中的 tier——供 on_task_end 更新
 
     # ── 生命周期钩子 ───────────────────────────────────
 
@@ -111,13 +116,26 @@ class OrbitWiring:
 
     def on_task_end(self, task_id: str, outcome: str, quality_score: float = 0.0,
                     turns: int = 0, tool_calls: int = 0) -> None:
-        """任务结束时调用——完成轨迹收集 + 清理 Monitor 资源。"""
+        """任务结束时调用——完成轨迹收集 + Bandit/Drift 反馈更新 + 清理 Monitor。"""
         tc = self._get_trajectory()
         traj_id = self._trajectory_ids.pop(task_id, "")
         if tc and traj_id:
             tc.finish_trajectory(traj_id, final_outcome=outcome, quality_score=quality_score,
                                   total_turns=turns, total_tool_calls=tool_calls)
             logger.debug("trajectory_finished", task_id=task_id, trajectory_id=traj_id, outcome=outcome)
+
+        # V14.2+Theory 方向2+20: Bandit 学习 + CUSUM 变点检测
+        b = self._get_bandit()
+        d = self._get_drift()
+        if b and d and self._last_tier:
+            success = outcome == "completed"
+            # CUSUM 检测变点
+            alert = d.update(model=self._last_tier, latency_ms=0, success=success, output_len=0)
+            if alert is not None and hasattr(b, 'reset_arm'):
+                b.reset_arm(alert.model)
+                logger.info("drift_alert_reset", model=alert.model, score=alert.score)
+            # Bandit 学习
+            b.update(self._last_tier, success)
 
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
         self._cleanup_monitor(task_id)
@@ -319,7 +337,8 @@ class OrbitWiring:
         if self._monitor is None:
             try:
                 from orbit.metacognition.monitor import MonitorAgent
-                self._monitor = MonitorAgent()
+                pid = self._get_pid()  # V14.2+Theory 方向13: PID 连续矫正
+                self._monitor = MonitorAgent(pid_controller=pid)
             except Exception:
                 logger.warning("monitor_init_failed", exc_info=True)
         return self._monitor
@@ -336,6 +355,52 @@ class OrbitWiring:
     def get_mcts_planner(self):
         """获取 MCTSPlanner——供 react_agent 在规划阶段使用。"""
         return self._get_mcts()
+
+    # ── V14.2+Theory P0五方向: 懒初始化 getters ──────────
+
+    def _get_bandit(self):
+        """方向2: ThompsonBandit——多臂 Bandit 模型路由器。"""
+        if self._bandit is None:
+            try:
+                from orbit.router.bandit import ThompsonBandit
+                self._bandit = ThompsonBandit()
+            except Exception:
+                logger.warning("bandit_init_failed", exc_info=True)
+        return self._bandit
+
+    def _get_drift(self):
+        """方向20: CUSUMDriftDetector——LLM 行为变点检测。"""
+        if self._drift is None:
+            try:
+                from orbit.observability.drift_detector import CUSUMDriftDetector
+                self._drift = CUSUMDriftDetector()
+            except Exception:
+                logger.warning("drift_init_failed", exc_info=True)
+        return self._drift
+
+    def _get_pid(self):
+        """方向13: PIDAgentController——连续矫正替代二元告警。"""
+        if self._pid is None:
+            try:
+                from orbit.metacognition.pid_controller import PIDAgentController
+                self._pid = PIDAgentController()
+            except Exception:
+                logger.warning("pid_init_failed", exc_info=True)
+        return self._pid
+
+    def _get_conformal(self):
+        """方向16: ConformalPredictor——95% 置信预测集。"""
+        if self._conformal is None:
+            try:
+                from orbit.testing.conformal import ConformalPredictor
+                self._conformal = ConformalPredictor(alpha=0.05)
+            except Exception:
+                logger.warning("conformal_init_failed", exc_info=True)
+        return self._conformal
+
+    def set_model_tier(self, tier: str) -> None:
+        """记录最近 RouterAgent 选中的 tier——供 on_task_end 反馈 Bandit。"""
+        self._last_tier = tier
 
     async def start_monitor(self, task_id: str, goal: str = "") -> asyncio.Task | None:
         """启动 MonitorAgent 作为独立 asyncio Task——含 HITLManager 接线。

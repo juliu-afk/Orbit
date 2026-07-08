@@ -67,10 +67,11 @@ class GEPAPopulation:
         p > α(=0.05) → 原则可接受，保留。
         """
         # 共形筛选——p-value > 0.05 的原则保留
+        # task=category(原则类别), code=principle(原则文本)——语义分离
         if self._conformal is not None:
             filtered = []
             for p in principles:
-                p_val = self._conformal.p_value(p.principle, p.principle)
+                p_val = self._conformal.p_value(p.category or "general", p.principle)
                 if p_val > 0.05:
                     filtered.append(p)
             # 如果筛选后太少，至少保留 top-1

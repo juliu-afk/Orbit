@@ -51,6 +51,8 @@ class CUSUMDriftDetector:
         self._cusum: dict[str, float] = {}
         # 滚动窗口数据
         self._history: dict[str, list[dict]] = {}
+        self._cooldown: dict[str, int] = {}  # P2-2: 变点后冷却期——防连续触发
+        self._COOLDOWN_WINDOW = 10  # 变点检测后 10 次更新内不重触发
 
     def update(
         self,
@@ -110,9 +112,15 @@ class CUSUMDriftDetector:
         self._cusum[model] = cusum
 
         if cusum > self.h:
-            # 检测到变点——重置 CUSUM + 返回告警
+            # 冷却期检查——变点后 N 次更新内不重触发
+            cd = self._cooldown.get(model, 0)
+            if cd > 0:
+                self._cooldown[model] = cd - 1
+                self._cusum[model] = 0.0
+                return None
+            # 检测到变点——重置 CUSUM + 进入冷却期 + 返回告警
+            self._cooldown[model] = self._COOLDOWN_WINDOW
             self._cusum[model] = 0.0
-            # 更新基线到当前窗口（模型已变化，旧基线无效）
             self._update_baseline(model)
             return DriftAlert(
                 model=model,

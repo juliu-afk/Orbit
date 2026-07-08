@@ -7,7 +7,7 @@
     "frontendDist": "../frontend/dist",
     "devUrl": "http://127.0.0.1:18888",
     "beforeDevCommand": "echo 'Tauri dev mode — start Python backend separately: uvicorn orbit.api.main:app --host 127.0.0.1 --port 18888'",
-    "beforeBuildCommand": "echo 'Skipping frontend build — already built by Makefile/pyinstaller flow'"
+    "beforeBuildCommand": "echo 'Tauri bundling... Use scripts/build-exe.sh or make exe for full pipeline. Frontend must be in backend/static/ and orbit-backend.exe must be fresh.'"
   },
   "app": {
     "windows": [],

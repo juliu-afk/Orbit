@@ -96,6 +96,19 @@ class OrbitWiring:
             self._trajectory_ids[task_id] = traj.trajectory_id
             logger.debug("trajectory_started", task_id=task_id, trajectory_id=traj.trajectory_id, goal=goal[:60])
 
+    def on_model_tier_decided(self, task_id: str, model_tier: str) -> None:
+        """V14.2+Theory: RouterAgent 决策模型层级后调用——回填轨迹表。
+
+        任务开始时 model_tier 未知（start_trajectory 先于 RouterAgent），
+        RouterAgent 决策后通过此方法回填 tier 到轨迹表。
+        """
+        tc = self._get_trajectory()
+        traj_id = self._trajectory_ids.get(task_id, "")
+        if tc and traj_id:
+            tc.set_model_tier(traj_id, model_tier)
+            logger.debug("model_tier_recorded", task_id=task_id,
+                         trajectory_id=traj_id, tier=model_tier)
+
     def on_task_end(self, task_id: str, outcome: str, quality_score: float = 0.0,
                     turns: int = 0, tool_calls: int = 0) -> None:
         """任务结束时调用——完成轨迹收集 + 清理 Monitor 资源。"""

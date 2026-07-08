@@ -70,17 +70,20 @@ class ProjectCreateRequest(BaseModel):
     },
 )
 async def register_project(req: ProjectCreateRequest, background: BackgroundTasks) -> dict:
-    # WHY 服务端验证路径：前端可能绕过或传错误路径，后端必须独立校验
+    # WHY 自动创建目录：用户注册新项目时无需手动创建文件夹
     path = req.local_path
     if not os.path.isdir(path):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "detail": f"路径 {path} 不存在，请检查后重试",
-                "error_code": "PATH_NOT_FOUND",
-                "timestamp": datetime.now(UTC).isoformat(),
-            },
-        )
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "detail": f"无法创建目录 {path}：{e}",
+                    "error_code": "PATH_CREATE_FAILED",
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+            ) from e
     if not os.access(path, os.R_OK):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

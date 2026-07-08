@@ -71,6 +71,13 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function switchToSession(sessionId: string) {
+    // WHY: 空会话自动清理——切换走无消息的会话时自动归档，不残留空标签
+    const prevId = currentSessionId.value
+    const prevMsgCount = messages.value.length
+    if (prevId && prevId !== sessionId && prevMsgCount === 0) {
+      archiveSession(prevId)  // 不 await——后台清理，不阻塞切换
+    }
+
     loading.value = true
     try {
       const r = await fetch(`${SESSIONS_URL}/${sessionId}`)
@@ -99,6 +106,39 @@ export const useSessionStore = defineStore('session', () => {
     })
     clearCurrent()
     await fetchSessions()
+  }
+
+  // WHY: 右键关闭任意 session——不限于当前 session
+  async function archiveSession(sessionId: string) {
+    await fetch(`${SESSIONS_URL}/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'archived' }),
+    })
+    // 从本地列表移除
+    sessions.value = sessions.value.filter(s => s.session_id !== sessionId)
+    // 如果关闭的是当前 session，清空当前并自动切到第一个剩余 session
+    if (currentSessionId.value === sessionId) {
+      clearCurrent()
+      if (sessions.value.length > 0) {
+        await switchToSession(sessions.value[0].session_id)
+      }
+    }
+  }
+
+  // WHY: 会话智能标题——首条用户消息到达后持久化标题到后台
+  async function updateTitle(sessionId: string, title: string) {
+    try {
+      await fetch(`${SESSIONS_URL}/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      })
+      // 同步本地 sessions 列表中的 title
+      const idx = sessions.value.findIndex(s => s.session_id === sessionId)
+      if (idx >= 0) sessions.value[idx] = { ...sessions.value[idx], title }
+      if (currentSessionId.value === sessionId) currentTitle.value = title
+    } catch { /* 静默 */ }
   }
 
   function clearCurrent() {
@@ -156,6 +196,6 @@ export const useSessionStore = defineStore('session', () => {
     currentSessionId, currentProjectName, currentProjectPath, currentTitle,
     sessions, messages, loading, childSessions,
     fetchSessions, createSession, switchToSession, archiveCurrentSession,
-    clearCurrent, getMetricsFilter, forkSession, fetchChildSessions, reset,
+    archiveSession, updateTitle, clearCurrent, getMetricsFilter, forkSession, fetchChildSessions, reset,
   }
 })

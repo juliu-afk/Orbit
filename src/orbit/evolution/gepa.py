@@ -89,9 +89,11 @@ class GEPAEngine:
     def __init__(
         self, llm: LLMClient | None = None,
         distill: DistillationEngine | None = None,
+        causal_analyzer: object | None = None,  # V14.2+Theory: RootCauseAnalyzer
     ) -> None:
         self._llm = llm
         self._distill = distill
+        self._causal = causal_analyzer  # P2: 因果解耦——从全局 stats 切换为因果效应
         self._population = GEPAPopulation()
 
     async def evolve_population(

@@ -1,6 +1,11 @@
-<!-- 文件树面板——Vue 3 递归组件，集成审查状态图标 -->
+<!-- 文件树面板——Vue 3 递归组件，集成审查状态图标 + 项目选择器 -->
 <template>
   <div class="file-tree-panel">
+    <FileTreeProjectBar
+      :current-path="currentProjectPath"
+      @change-project="$emit('change-project', $event)"
+      @create-project="$emit('create-project', $event)"
+    />
     <div class="tree-header"><span>Files</span><span class="file-count">{{ fileCount }}</span></div>
     <div class="tree-body">
       <SkeletonPanel v-if="loading" :lines="8" height="auto" />
@@ -13,6 +18,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import FileTreeNode from './FileTreeNode.vue'
+import FileTreeProjectBar from './FileTreeProjectBar.vue'
 import SkeletonPanel from '@/components/common/SkeletonPanel.vue'  // UX-6
 
 export interface FileNode {
@@ -20,8 +26,15 @@ export interface FileNode {
   reviewStatus?: 'approved' | 'rejected' | 'pending' | null; coveragePct?: number
 }
 
-const props = defineProps<{ treeData: FileNode[]; selectedFile: string | null; loading?: boolean }>()
-defineEmits<{ (e: 'select-file', path: string): void }>()
+const props = defineProps<{
+  treeData: FileNode[]; selectedFile: string | null; loading?: boolean
+  currentProjectPath: string
+}>()
+defineEmits<{
+  (e: 'select-file', path: string): void
+  (e: 'change-project', path: string): void
+  (e: 'create-project', projectName: string): void
+}>()
 
 const fileCount = computed(() => {
   function c(nodes: FileNode[]): number { let n = 0; for (const x of nodes) { if (!x.isDir) n++; if (x.children) n += c(x.children) } return n }

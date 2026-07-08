@@ -247,3 +247,90 @@ class TestTraceCollectorEdgeCases:
         from orbit.observability.trace import TraceCollector
         span = TraceCollector.start_span("t1", component="x", action="y")
         assert span.input_summary == ""
+
+
+@pytest.mark.asyncio
+class TestTraceEndToEnd:
+    """Trace 端到端——span 创建 → worker flush → TraceStore 查询。
+
+    WHY: Phase 1 效能验证的关键——证明 trace 数据能从生产模块
+    (subtask_session/gateway/pipeline 等) 经过 start_span→end_span→queue→SQLite→
+    TraceStore.get_trace_tree 完整流动，最终在 API/仪表板中可查询。
+
+    NOTE: 所有场景合并进一个测试——TraceCollector 的 asyncio.Queue 是类级单例，
+    跨测试的 start/stop worker 可能导致 event loop 绑定错误。
+    """
+
+    async def test_e2e_span_flow_success_and_error(self):
+        """完整流向 + 错误路径——一个测试里覆盖两种场景。"""
+        import asyncio
+        import tempfile
+        from pathlib import Path
+
+        from orbit.observability.trace import SpanStatus, TraceCollector, TraceStore
+
+        db_path = tempfile.mktemp(suffix=".db")
+        try:
+            await TraceCollector.start_worker(db_path)
+
+            # ── 场景1: 正常执行链路（多 span 层级） ──
+            goal_span = TraceCollector.start_span(
+                "task-e2e-001", component="orchestrator", action="schedule",
+                input_summary="goal: 修复 login bug",
+            )
+            subtask_span = TraceCollector.start_span(
+                "task-e2e-001", component="task_runner", action="pipeline_start",
+                parent_span_id=goal_span.span_id,
+                input_summary="subtask: fix_login",
+            )
+            guard_span = TraceCollector.start_span(
+                "task-e2e-001", component="guard", action="check",
+                parent_span_id=goal_span.span_id,
+                input_summary="state=coding",
+            )
+            TraceCollector.end_span(guard_span, status=SpanStatus.OK,
+                                    output_summary="guard passed", duration_ms=5.0)
+            TraceCollector.end_span(subtask_span, status=SpanStatus.OK,
+                                     output_summary="pipeline complete", duration_ms=1500.0)
+            TraceCollector.end_span(goal_span, status=SpanStatus.OK,
+                                    output_summary="goal done", duration_ms=2000.0)
+
+            # ── 场景2: 错误路径（LLM 调用失败） ──
+            error_span = TraceCollector.start_span(
+                "task-e2e-002", component="agent", action="llm_call",
+                input_summary="model=test-model",
+            )
+            TraceCollector.end_span(
+                error_span, status=SpanStatus.ERROR,
+                output_summary="CircuitOpenError: breaker open",
+                duration_ms=1200.0,
+            )
+
+            # 等待 worker flush
+            await asyncio.sleep(1.5)
+
+            store = TraceStore(db_path)
+
+            # 验证正常链路
+            tree1 = await store.get_trace_tree("task-e2e-001")
+            assert tree1 is not None, "正常链路 trace tree 不应为 None"
+            assert tree1.span_count >= 3, f"预期 ≥3 span, 实际 {tree1.span_count}"
+            components = {s.component for s in tree1.root_spans}
+            assert "orchestrator" in components
+
+            # 验证错误链路
+            tree2 = await store.get_trace_tree("task-e2e-002")
+            assert tree2 is not None, "错误链路 trace tree 不应为 None"
+            assert tree2.span_count == 1
+            assert tree2.root_spans[0].status == SpanStatus.ERROR
+            assert "CircuitOpenError" in tree2.root_spans[0].output_summary
+
+            # 验证 recent tasks
+            recent = await store.get_recent_tasks(limit=5)
+            task_ids = [r["task_id"] for r in recent]
+            assert "task-e2e-001" in task_ids
+            assert "task-e2e-002" in task_ids
+
+        finally:
+            await TraceCollector.stop_worker()
+            Path(db_path).unlink(missing_ok=True)

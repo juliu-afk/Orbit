@@ -9,6 +9,7 @@ import MessageItem from '@/components/chat/MessageItem.vue'
 import InputBox from '@/components/chat/InputBox.vue'
 import QuoteChip from '@/components/chat/QuoteChip.vue'
 import ContextMenu from '@/components/chat/ContextMenu.vue'
+import ChatSessionTabs from '@/components/chat/ChatSessionTabs.vue'
 import SkeletonPanel from '@/components/common/SkeletonPanel.vue'  // UX-6
 
 const chat = useChatStore()
@@ -86,11 +87,19 @@ function onOpenCode(code: string) {
 // P2-5 fix: computed 缓存切片结果，避免每次渲染重新 slice
 const visibleMsgs = computed<ChatMessage[]>(() => { if (!enableVS.value) return chat.messages; const s = Math.max(0, chat.messages.length - 100); return chat.messages.slice(s) })
 
+defineEmits<{
+  'switch-session': [sessionId: string]
+  'split-session': [sessionId: string]
+}>()
+
 onMounted(() => scrollBottom())
 </script>
 
 <template>
 <div class="terminal-chat flex flex-col h-full" style="font-family:var(--font-mono)">
+  <!-- 会话标签栏 -->
+  <ChatSessionTabs @switch-session="$emit('switch-session', $event)" @split-session="$emit('split-session', $event)" />
+
   <!-- UX-3: 消息搜索栏 -->
   <div v-if="searchVisible" class="search-bar">
     <input v-model="searchQuery" class="search-input" placeholder="Search messages..." @keydown.escape="searchQuery='';searchVisible=false" />

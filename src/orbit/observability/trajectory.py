@@ -52,6 +52,7 @@ class Trajectory:
     task_id: str = ""
     goal: str = ""                 # 原始目标
     agent_role: str = ""           # Agent 类型
+    model_tier: str = ""           # V14.2+Theory: RouterAgent 选中的模型层级 (T1/T2/T3)
     project_id: str = ""           # per-client 隔离
     steps: list[TrajectoryStep] = field(default_factory=list)
     total_turns: int = 0
@@ -82,6 +83,7 @@ class TrajectoryCollector:
         task_id TEXT NOT NULL,
         goal TEXT NOT NULL DEFAULT '',
         agent_role TEXT NOT NULL DEFAULT '',
+        model_tier TEXT NOT NULL DEFAULT '',        -- V14.2+Theory: 因果推理——RouterAgent 选中的模型层级
         project_id TEXT NOT NULL DEFAULT '',
         total_turns INTEGER NOT NULL DEFAULT 0,
         total_tool_calls INTEGER NOT NULL DEFAULT 0,
@@ -118,25 +120,35 @@ class TrajectoryCollector:
         self._db = sqlite3.connect(db_path)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(self.SCHEMA_SQL)
+        # V14.2+Theory: model_tier 列——RouterAgent 选中的模型层级
+        # ALTER TABLE IF NOT EXISTS 不是标准 SQL——用 try/except 兼容旧表
+        try:
+            self._db.execute(
+                "ALTER TABLE trajectories ADD COLUMN model_tier TEXT NOT NULL DEFAULT ''"
+            )
+        except sqlite3.OperationalError:
+            pass  # 列已存在
         self._db.commit()
 
     def start_trajectory(
         self, task_id: str, goal: str = "", agent_role: str = "",
         project_id: str = "", tags: list[str] | None = None,
+        model_tier: str = "",  # V14.2+Theory: RouterAgent 推送的模型层级
     ) -> Trajectory:
         """开始记录一条新轨迹。"""
         traj_id = _make_traj_id(task_id)
         traj = Trajectory(
             trajectory_id=traj_id, task_id=task_id, goal=goal,
-            agent_role=agent_role, project_id=project_id,
-            tags=tags or [],
+            agent_role=agent_role, model_tier=model_tier,
+            project_id=project_id, tags=tags or [],
         )
         self._db.execute(
             """INSERT OR REPLACE INTO trajectories
-               (trajectory_id, task_id, goal, agent_role, project_id, tags, started_at)
-               VALUES (?,?,?,?,?,?,?)""",
+               (trajectory_id, task_id, goal, agent_role, model_tier, project_id, tags, started_at)
+               VALUES (?,?,?,?,?,?,?,?)""",
             (traj.trajectory_id, traj.task_id, traj.goal, traj.agent_role,
-             traj.project_id, json.dumps(traj.tags, ensure_ascii=False),
+             traj.model_tier, traj.project_id,
+             json.dumps(traj.tags, ensure_ascii=False),
              traj.started_at),
         )
         self._db.commit()
@@ -154,6 +166,18 @@ class TrajectoryCollector:
              step.observation[:2000], step.reflection[:500],
              step.outcome.value, step.duration_ms, step.token_count,
              step.error_message),
+        )
+        self._db.commit()
+
+    def set_model_tier(self, trajectory_id: str, model_tier: str) -> None:
+        """V14.2+Theory: 设置任务使用的模型层级——RouterAgent 决策后调用。
+
+        轨迹开始时 model_tier 未知（start_trajectory 先于 RouterAgent 决策），
+        RouterAgent 决策后通过此方法回填 tier。
+        """
+        self._db.execute(
+            "UPDATE trajectories SET model_tier = ? WHERE trajectory_id = ?",
+            (model_tier, trajectory_id),
         )
         self._db.commit()
 

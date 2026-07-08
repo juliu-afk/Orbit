@@ -113,11 +113,12 @@ class GEPAEngine:
         self, llm: LLMClient | None = None,
         distill: DistillationEngine | None = None,
         causal_analyzer: object | None = None,  # V14.2+Theory: RootCauseAnalyzer
+        conformal: object | None = None,        # V14.2+Theory 方向16: ConformalPredictor
     ) -> None:
         self._llm = llm
         self._distill = distill
-        self._causal = causal_analyzer  # P2: 因果解耦——从全局 stats 切换为因果效应
-        self._population = GEPAPopulation()
+        self._causal = causal_analyzer
+        self._population = GEPAPopulation(conformal=conformal)  # P0-5修复: 注入共形预测器
 
     async def evolve_population(
         self, principles: list[StrategyPrinciple],

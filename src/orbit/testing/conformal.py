@@ -38,13 +38,15 @@ class ConformalPredictor:
 
     @staticmethod
     def _nonconformity(task: str, code: str, success: bool | None = None) -> float:
-        """非一致性评分——越低越好。
-        success=None(默认)→只按代码特征评分。
-        success=False→+3.0惩罚，success=True→无惩罚。
-        """
+        """非一致性评分——越低越好。task 参数影响评分以区分不同任务上下文。"""
         base = 0.0
         if success is not None:
             base = 0.0 if success else 3.0
         lint = code.lower().count("error") * 0.5
         length = len(code) / 5000.0
-        return base + lint + length
+        # task-code 语义距离——共享词越少越不一致（P1-1修复: task 参与计算）
+        task_words = set(task.lower().split()) if task else set()
+        code_words = set(code.lower().split())
+        overlap = len(task_words & code_words) / max(len(task_words | code_words), 1)
+        semantic_penalty = (1.0 - overlap) * 0.5 if task_words else 0.0
+        return base + lint + length + semantic_penalty

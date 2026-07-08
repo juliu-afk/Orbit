@@ -111,6 +111,7 @@ class OrbitWiring:
         traj_id = self._trajectory_ids.get(task_id, "")
         if tc and traj_id:
             tc.set_model_tier(traj_id, model_tier)
+            self._last_tier = model_tier  # P0-1修复: 回填 wiring 内部——供 on_task_end 反馈 Bandit
             logger.debug("model_tier_recorded", task_id=task_id,
                          trajectory_id=traj_id, tier=model_tier)
 
@@ -124,18 +125,13 @@ class OrbitWiring:
                                   total_turns=turns, total_tool_calls=tool_calls)
             logger.debug("trajectory_finished", task_id=task_id, trajectory_id=traj_id, outcome=outcome)
 
-        # V14.2+Theory 方向2+20: Bandit 学习 + CUSUM 变点检测
+        # V14.2+Theory 方向2: Bandit 学习——每任务结束后更新后验
         b = self._get_bandit()
-        d = self._get_drift()
-        if b and d and self._last_tier:
+        if b and self._last_tier:
             success = outcome == "completed"
-            # CUSUM 检测变点
-            alert = d.update(model=self._last_tier, latency_ms=0, success=success, output_len=0)
-            if alert is not None and hasattr(b, 'reset_arm'):
-                b.reset_arm(alert.model)
-                logger.info("drift_alert_reset", model=alert.model, score=alert.score)
-            # Bandit 学习
-            b.update(self._last_tier, success)
+            # 用 turns 估算延迟（每 turn ~2s）——CUSUM 需真实延迟，此处仅 Bandit
+            est_latency = turns * 2000.0 if turns > 0 else 0.0
+            b.update(self._last_tier, success, latency_ms=est_latency)
 
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
         self._cleanup_monitor(task_id)

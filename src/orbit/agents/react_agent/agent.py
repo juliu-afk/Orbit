@@ -517,7 +517,9 @@ class ReActAgent(BaseAgent):
                     return
 
                 # Phase A: ReflAct Reflection——每轮 LLM 返回后自我反思
-                if self._reflection_engine and self._goal:
+                # 消融检查: 效能测量时可禁用以量化 ReflectionEngine 贡献
+                from orbit.effectiveness.ablation import AblationContext
+                if self._reflection_engine and self._goal and not AblationContext.is_disabled("reflection_engine"):
                     last_action_info = ""
                     last_obs_info = ""
                     if reasoning_chain:

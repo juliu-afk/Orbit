@@ -225,7 +225,7 @@ class HallucinationPipeline:
             if self._graph is None:
                 return None
             if self._l1 is None:
-                self._l1 = L1GraphValidator(graph=self._graph)
+                self._l1 = L1GraphValidator(code_engine=self._graph)
             return self._l1
 
         # L2: 动态追踪——需要 Sandbox

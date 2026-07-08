@@ -43,6 +43,8 @@ class L4TypeValidator:
     """
 
     def __init__(self, mypy_path: str = "mypy"):
+        # mypy_path 保留用于向后兼容——实际执行始终用 sys.executable -m mypy
+        # 确保使用当前 venv 的 mypy + 完整依赖
         self._mypy_path = mypy_path
         self._available: bool | None = None  # 缓存 mypy 可用性
 
@@ -135,8 +137,14 @@ class L4TypeValidator:
                 logger.debug("temp_cleanup_failed", path=str(tmp_path), error=str(e))
 
     async def _run_mypy(self, file_path: Path) -> ValidationResult:
-        """执行 mypy 并解析输出。"""
-        cmd = [self._mypy_path, *_MYPY_FLAGS, str(file_path)]
+        """执行 mypy 并解析输出。
+
+        WHY python -m mypy: shutil.which("mypy") 可能找到系统级 mypy
+        （缺 pathspec 依赖），用当前 Python 解释器的 -m mypy 确保
+        使用 venv 内安装的 mypy + 其完整依赖。
+        """
+        import sys
+        cmd = [sys.executable, "-m", "mypy", *_MYPY_FLAGS, str(file_path)]
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -191,12 +199,28 @@ class L4TypeValidator:
         )
 
     async def _check_available(self) -> bool:
-        """检查 mypy 是否可用（缓存结果避免重复检测）。"""
+        """检查 mypy 是否可用——实际试跑验证而非只查路径。
+
+        WHY 实际试跑: shutil.which("mypy") 可能找到系统级 mypy
+        （缺 pathspec 依赖），导致 validate() 返回 mypy crash traceback
+        而非类型错误。试跑 --version 验证 mypy 确实能加载所有依赖。
+        """
+        import sys
+
         if self._available is not None:
             return self._available
-        self._available = shutil.which(self._mypy_path) is not None
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "mypy", "--version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await asyncio.wait_for(proc.communicate(), timeout=10)
+            self._available = proc.returncode == 0
+        except Exception:
+            self._available = False
         if not self._available:
-            logger.debug("l4_mypy_not_found", path=self._mypy_path)
+            logger.debug("l4_mypy_not_available")
         return self._available
 
     @staticmethod

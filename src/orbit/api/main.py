@@ -453,6 +453,12 @@ async def _app_lifespan(app: FastAPI) -> None:
     app.state.trajectory_collector = _wiring.get_trajectory()
     logger.info("orbit_wiring_lifespan_ready", db_path=str(_orbit_data_dir / "orbit_wiring.db"))
 
+    # Trace span 收集器——启动后台 flush worker（2026-07-08 模块效能框架）
+    from orbit.observability.trace import TraceCollector
+    _trace_db = str(_orbit_data_dir / "orbit_trace.db")
+    await TraceCollector.start_worker(_trace_db)
+    logger.info("trace_collector_worker_started", db_path=_trace_db)
+
     # G2: 代码图谱索引构建——Stage 2 符号存在性查询的数据源
     # WHY 启动时构建: 图谱查询是 Stage 2 核心操作，空索引会让 exists() 永远返回 False。
     try:
@@ -479,6 +485,13 @@ async def _app_lifespan(app: FastAPI) -> None:
     yield  # 应用运行中
 
     # ── 关闭阶段 ──
+    # Trace span 收集器——停止 worker，flush 剩余 span
+    try:
+        from orbit.observability.trace import TraceCollector
+        await TraceCollector.stop_worker()
+        logger.info("trace_collector_worker_stopped")
+    except Exception:
+        pass
     # MCP 客户端：断开所有外部连接
     try:
         ToolRegistry.get_instance().disconnect_mcp_servers()

@@ -517,44 +517,47 @@ class ReActAgent(BaseAgent):
                     return
 
                 # Phase A: ReflAct Reflection——每轮 LLM 返回后自我反思
-                # 消融检查: 效能测量时可禁用以量化 ReflectionEngine 贡献
                 from orbit.effectiveness.ablation import AblationContext
-                if self._reflection_engine and self._goal and not AblationContext.is_disabled("reflection_engine"):
-                    last_action_info = ""
-                    last_obs_info = ""
-                    if reasoning_chain:
-                        last_step = reasoning_chain[-1]
-                        last_action_info = last_step.get("action", "")
-                        last_obs_info = last_step.get("result_preview", "")
-                    try:
-                        reflection = await self._reflection_engine.reflect(
-                            goal=self._goal.description
-                            if hasattr(self._goal, "description")
-                            else str(self._goal),
-                            thought="".join(content_parts)[:500],
-                            action=last_action_info,
-                            observation=last_obs_info,
-                            quick=(turn % 3 != 0),
-                        )
-                        yield StreamEvent(
-                            type=StreamEventType.THINKING,
-                            agent_id=agent_id, task_id=task_id, turn=turn,
-                            data={"content": f"[Reflection] goal_alignment={reflection.goal_alignment}, confidence={reflection.confidence}"},
-                        )
-                        if reflection.is_drifting():
-                            logger.info("reflact_drift_detected", task_id=task_id, turn=turn,
-                                         alignment=reflection.goal_alignment, confidence=reflection.confidence)
-                            # Phase F: 记录漂移事件到情节记忆
-                            try:
-                                from orbit.integration.wiring import get_wiring
-                                get_wiring().record_event(task_id, "Goal drift detected", "drifted", ["drift", f"confidence:{reflection.confidence}"])
-                            except Exception:
-                                pass
-                            if reflection.correction_needed:
-                                messages.append({"role": "user", "content": f"任务可能偏离目标——{reflection.correction_needed}。请重新对准原始目标: {self._goal.description if hasattr(self._goal, 'description') else str(self._goal)}"})
-                                continue
-                    except Exception:
-                        logger.debug("reflection_step_failed", task_id=task_id, exc_info=True)
+                if self._reflection_engine and self._goal:
+                    if AblationContext.is_disabled("reflection_engine"):
+                        # 消融跳过——加显式日志确保 CI 可验证消融生效
+                        logger.debug("reflection_skipped_ablation", task_id=task_id, turn=turn)
+                    else:
+                        last_action_info = ""
+                        last_obs_info = ""
+                        if reasoning_chain:
+                            last_step = reasoning_chain[-1]
+                            last_action_info = last_step.get("action", "")
+                            last_obs_info = last_step.get("result_preview", "")
+                        try:
+                            reflection = await self._reflection_engine.reflect(
+                                goal=self._goal.description
+                                if hasattr(self._goal, "description")
+                                else str(self._goal),
+                                thought="".join(content_parts)[:500],
+                                action=last_action_info,
+                                observation=last_obs_info,
+                                quick=(turn % 3 != 0),
+                            )
+                            yield StreamEvent(
+                                type=StreamEventType.THINKING,
+                                agent_id=agent_id, task_id=task_id, turn=turn,
+                                data={"content": f"[Reflection] goal_alignment={reflection.goal_alignment}, confidence={reflection.confidence}"},
+                            )
+                            if reflection.is_drifting():
+                                logger.info("reflact_drift_detected", task_id=task_id, turn=turn,
+                                             alignment=reflection.goal_alignment, confidence=reflection.confidence)
+                                # Phase F: 记录漂移事件到情节记忆
+                                try:
+                                    from orbit.integration.wiring import get_wiring
+                                    get_wiring().record_event(task_id, "Goal drift detected", "drifted", ["drift", f"confidence:{reflection.confidence}"])
+                                except Exception:
+                                    pass
+                                if reflection.correction_needed:
+                                    messages.append({"role": "user", "content": f"任务可能偏离目标——{reflection.correction_needed}。请重新对准原始目标: {self._goal.description if hasattr(self._goal, 'description') else str(self._goal)}"})
+                                    continue
+                        except Exception:
+                            logger.debug("reflection_step_failed", task_id=task_id, exc_info=True)
 
                 # Phase 4 AC-B1: GoalJudge 自检——每轮 LLM 返回后判定
                 if not has_tool_calls and self._goal_judge and self._goal:

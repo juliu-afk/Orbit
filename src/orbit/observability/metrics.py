@@ -142,7 +142,7 @@ orbit_checkpoint_operations_total = Counter(
 
 orbit_intake_accuracy = Gauge(
     "orbit_intake_accuracy",
-    "IntakeRouter 形态判定准确率——最近一批样本的估计值",
+    "IntakeRouter 判定置信度——最近一次 route() 的 clarity_score（0-1 ratio，非百分比）",
     ["form"],  # vague_string | single_file | batch | task_only
 )
 

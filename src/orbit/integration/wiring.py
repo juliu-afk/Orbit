@@ -87,7 +87,8 @@ class OrbitWiring:
         self._drift: object | None = None        # V14.2+Theory 方向20: CUSUMDriftDetector
         self._pid: object | None = None          # V14.2+Theory 方向13: PIDAgentController
         self._conformal: object | None = None    # V14.2+Theory 方向16: ConformalPredictor
-        self._last_tier: str = ""  # 最近一次 RouterAgent 选中的 tier——供 on_task_end 更新
+        self._router_agent: object | None = None  # P2-3: RouterAgent 单例缓存
+        self._last_tier: str = ""
 
     # ── 生命周期钩子 ───────────────────────────────────
 
@@ -133,17 +134,17 @@ class OrbitWiring:
                     tier = (row["model_tier"] if row else "") or self._last_tier
                     if tier:
                         success = outcome == "completed"
-                        est_latency = turns * 2000.0 if turns > 0 else 0.0
+                        # P2-2修复: turns=0→默认2000ms（单轮任务估算）
+                        est_latency = turns * 2000.0 if turns > 0 else 2000.0
                         b.update(tier, success, latency_ms=est_latency)
-                        # V14.2+Theory 方向20: CUSUM 变点检测——与 Bandit 互补
+                        # V14.2+Theory 方向20: CUSUM 变点检测
                         d = self._get_drift()
                         if d:
-                            alert = d.update(model=tier, latency_ms=est_latency,
-                                             success=success, output_len=quality_score * 1000)
+                            alert = d.update(model=tier, latency_ms=est_latency, success=success)
                             if alert is not None:
                                 b.reset_arm(alert.model)
                                 logger.info("drift_reset", model=alert.model)
-                        self._last_tier = ""  # 单次消费——防重复计数
+                        self._last_tier = ""
                 except Exception:
                     pass  # fail-open
             logger.debug("trajectory_finished", task_id=task_id, trajectory_id=traj_id, outcome=outcome)
@@ -260,6 +261,19 @@ class OrbitWiring:
         grpo = self._get_grpo()
         if grpo:
             grpo.update_utilities()
+
+        # V14.2+Theory 方向16: GEPA 进化——Conformal 共形预测接入离线管线
+        try:
+            from orbit.evolution.gepa import GEPAEngine
+            ge = GEPAEngine(
+                distill=de,
+                conformal=self._get_conformal(),
+            )
+            principles = de.top_principles(20) if de else []
+            if principles and len(principles) >= 3:
+                await ge.evolve_population(principles, category="distilled")
+        except Exception:
+            logger.debug("gepa_evolution_skipped", exc_info=True)
 
     # ── 懒初始化 ───────────────────────────────────────
 
@@ -414,14 +428,16 @@ class OrbitWiring:
         self._last_tier = tier
 
     def get_router_agent(self):
-        """V14.2+Theory 方向2+20: 创建带 Bandit+Drift 的 RouterAgent 单例。
+        """V14.2+Theory 方向2+20: 带 Bandit+Drift 的 RouterAgent 单例。
 
-        供 task_runner 在任务开始时调用——Bandit 参与模型选择，Drift 检测模型变点。
+        P2-3修复: 缓存——避免每次任务重新创建 RouterAgent。
         """
+        if self._router_agent is not None:
+            return self._router_agent
         try:
             from orbit.router.agent import RouterAgent
-            return RouterAgent(
-                weights=None,  # 使用默认 ScoreWeights
+            self._router_agent = RouterAgent(
+                weights=None,
                 bandit=self._get_bandit(),
                 drift_detector=self._get_drift(),
             )

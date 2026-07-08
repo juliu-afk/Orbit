@@ -88,6 +88,7 @@ class OrbitWiring:
         self._pid: object | None = None          # V14.2+Theory 方向13: PIDAgentController
         self._conformal: object | None = None    # V14.2+Theory 方向16: ConformalPredictor
         self._router_agent: object | None = None  # P2-3: RouterAgent 单例缓存
+        self._llm_client: object | None = None     # P2-2: LLMClient 单例缓存
         self._last_tier: str = ""
 
     # ── 生命周期钩子 ───────────────────────────────────
@@ -265,12 +266,24 @@ class OrbitWiring:
         # V14.2+Theory 方向16: GEPA 进化——Conformal 共形预测接入离线管线
         try:
             from orbit.evolution.gepa import GEPAEngine
-            from orbit.gateway.client import LLMClient
-            llm_client = LLMClient()
+            # P1-1: 从历史轨迹构建校准集——conformal 有数据才能筛选
+            cp = self._get_conformal()
+            if cp is not None and tc is not None:
+                completed = tc.get_completed(limit=50)
+                cal_data = []
+                for t in completed:
+                    exported = tc.export_for_training(t["trajectory_id"])
+                    goal = exported.get("goal", "")
+                    code = exported.get("output", "")
+                    outcome = t.get("final_outcome", "") == "completed"
+                    if goal and code:
+                        cal_data.append((goal, code, outcome))
+                if cal_data:
+                    cp.calibrate(cal_data)
             ge = GEPAEngine(
-                llm=llm_client,
+                llm=self._get_llm_client(),
                 distill=de,
-                conformal=self._get_conformal(),
+                conformal=cp,
             )
             principles = de.top_principles(20) if de else []
             if principles and len(principles) >= 3:
@@ -425,6 +438,16 @@ class OrbitWiring:
             except Exception:
                 logger.warning("conformal_init_failed", exc_info=True)
         return self._conformal
+
+    def _get_llm_client(self):
+        """P2-2: LLMClient 单例缓存——GEPA 进化复用。"""
+        if self._llm_client is None:
+            try:
+                from orbit.gateway.client import LLMClient
+                self._llm_client = LLMClient()
+            except Exception:
+                logger.warning("llm_client_init_failed", exc_info=True)
+        return self._llm_client
 
     def set_model_tier(self, tier: str) -> None:
         """记录最近 RouterAgent 选中的 tier——供 on_task_end 反馈 Bandit。"""

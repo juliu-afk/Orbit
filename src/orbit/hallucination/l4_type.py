@@ -12,6 +12,7 @@ ADR 决议：使用 --strict 但忽略 no-untyped-def（允许动态函数未标
 from __future__ import annotations
 
 import asyncio
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -312,7 +313,8 @@ class TypeDirectedSynthesizer:
         constraints.extend(imports)
 
         # 3. 安全性约束——禁止 eval/exec
-        if "eval" in type_sig.lower() or "exec" in type_sig.lower():
+        # P2-1: 用单词边界匹配——避免 "evaluation"/"executor" 假阳性
+        if re.search(r'\beval\b|\bexec\b', type_sig, re.IGNORECASE):
             constraints.append("安全约束: 禁止使用 eval()/exec()——静态类型检查无法验证动态代码")
 
         return constraints

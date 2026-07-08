@@ -213,6 +213,30 @@ class RouterAgent:
             fallback_tier=fallback,
         )
 
+    # ── V14.2+Theory 方向2+20: Bandit/Drift 反馈方法 ──────────
+
+    def update_bandit(self, tier: str, success: bool, latency_ms: float = 0.0) -> None:
+        """任务完成后更新 Bandit 后验——供 task_runner 调用。
+
+        WHY 分离: evaluate() 选模型，update_bandit() 学结果——解耦选择与学习。
+        """
+        if self._bandit is not None:
+            from orbit.router.bandit import is_bandit_enabled
+            if is_bandit_enabled():
+                self._bandit.update(tier, success, latency_ms)
+
+    def update_drift(self, model: str, latency_ms: float, success: bool,
+                     output_len: int = 0) -> object | None:
+        """任务完成后检测模型行为变点——供 task_runner 调用。
+
+        Returns:
+            DriftAlert 如果检测到变点，否则 None。
+            调用方应检查返回值，若非 None 则调用 bandit.reset_arm(model)。
+        """
+        if self._drift is None:
+            return None
+        return self._drift.update(model, latency_ms, success, output_len)
+
     def _score_to_tier(self, total: float) -> ModelTier:
         """总分 → Tier 映射。"""
         for threshold, tier in TIER_THRESHOLDS:

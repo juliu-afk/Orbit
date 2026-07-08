@@ -389,3 +389,27 @@ async def _async_install_docker() -> None:
             if check.name == "sandbox" and check.status == "pending":
                 await _probe_engine._run_probe(check)
                 break
+
+
+# ── Grafana 仪表板（2026-07-09 模块效能框架 Phase 3） ──
+
+@router.get("/grafana/dashboard", summary="Grafana 效能仪表板 JSON")
+async def grafana_dashboard():
+    """返回 Orbit 模块效能仪表板 JSON 配置。
+
+    Grafana 可通过此端点导入仪表板：Configuration → Data Sources → Import → URL。
+    6 面板: Module Health Matrix / E2E Success Rate / F1 Gauge /
+           Token Sankey / Error Heatmap / Latency Waterfall
+    """
+    import json
+    from pathlib import Path
+
+    dashboard_path = (
+        Path(__file__).parent.parent.parent.parent
+        / "data" / "benchmarks" / "orbitbench" / "grafana_dashboard.json"
+    )
+    if not dashboard_path.exists():
+        raise HTTPException(status_code=404, detail="Dashboard config not found")
+
+    with open(dashboard_path, encoding="utf-8") as f:
+        return json.load(f)

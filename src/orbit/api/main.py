@@ -486,12 +486,10 @@ async def _app_lifespan(app: FastAPI) -> None:
 
     # ── 关闭阶段 ──
     # Trace span 收集器——停止 worker，flush 剩余 span
-    try:
-        from orbit.observability.trace import TraceCollector
-        await TraceCollector.stop_worker()
-        logger.info("trace_collector_worker_stopped")
-    except Exception:
-        pass
+    # stop_worker 内置幂等检查（_worker_task=None→直接返回），无需 try/except
+    from orbit.observability.trace import TraceCollector as _TCShutdown
+    await _TCShutdown.stop_worker()
+    logger.info("trace_collector_worker_stopped")
     # MCP 客户端：断开所有外部连接
     try:
         ToolRegistry.get_instance().disconnect_mcp_servers()

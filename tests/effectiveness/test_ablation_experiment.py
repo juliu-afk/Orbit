@@ -29,6 +29,8 @@ ABLATION_LAYERS = [
 
 
 def _load_samples() -> list[dict[str, Any]]:
+    if not BENCHMARK_PATH.exists():
+        raise FileNotFoundError(f"Benchmark file not found: {BENCHMARK_PATH}")
     with open(BENCHMARK_PATH, encoding="utf-8") as f:
         return json.load(f)["samples"]
 
@@ -62,6 +64,8 @@ class TestAblationExperiment:
 
     @pytest.fixture
     def samples(self):
+        if not BENCHMARK_PATH.exists():
+            pytest.skip(f"Benchmark file not found: {BENCHMARK_PATH}")
         return _load_samples()
 
     def _run_benchmark(self, pipeline, samples: list[dict]) -> list[bool]:

@@ -51,19 +51,11 @@ function onFileTreeProjectChange(path: string) {
   fileTreeProjectPath.value = path
   fetchFileTree()
 }
-// WHY: FileTree 注册新项目后自动创建会话——注册+建文件夹+创建会话一气呵成
+// WHY: FileTree 注册新项目后自动创建会话——WS 由 watcher 自动重连
 async function onCreateProjectFromFileTree(projectName: string) {
   try {
     await session.createSession(projectName)
     fileTreeProjectPath.value = session.currentProjectPath
-    if (session.messages.length > 0) {
-      chat.restoreMessages(session.messages.map(m => ({
-        role: m.role, content: m.content, created_at: m.created_at,
-      })))
-    }
-    if (session.currentSessionId) {
-      chat.connectChatWs(session.currentSessionId, session.currentProjectName)
-    }
   } catch { /* 静默 */ }
 }
 // WHY: 分屏——在右侧 Monaco 面板区打开指定 session，实现双会话并行查看
@@ -73,9 +65,8 @@ function onSplitSession(_sessionId: string) {
 }
 async function onSelectFile(path:string){ await editor.openFile(path, undefined, undefined, fileTreeProjectPath.value || undefined); shell.openFileReview(path) }
 
-// WHY: 项目文件夹选择后重建上下文——刷新 session/chat/文件树
+// WHY: 项目文件夹选择后重建上下文——WS 由 watcher 自动重连，这里只同步状态
 async function onSessionCreated() {
-  // 同步 FileTree 浏览路径到新会话的项目路径
   fileTreeProjectPath.value = session.currentProjectPath
   if (session.messages.length > 0) {
     chat.restoreMessages(session.messages.map(m => ({
@@ -84,17 +75,12 @@ async function onSessionCreated() {
   }
   agentops.fetchAll()
   fetchFileTree()
-  if (session.currentSessionId) {
-    chat.connectChatWs(session.currentSessionId, session.currentProjectName)
-  }
 }
 
-// WHY: session 切换后刷新上下文——从 session store 恢复消息到 chat store
+// WHY: session 切换后刷新上下文——WS 由 watcher 自动重连，这里只做状态同步
 function onSessionSwitched(_newSessionId: string) {
-  // WHY: 同步 FileTree 路径到新会话——确保切换会话时文件树默认显示当前会话的项目文件
   fileTreeProjectPath.value = session.currentProjectPath
   chat.reset()
-  // WHY: 从 session store 恢复持久化消息——switchToSession 已通过 REST API 加载
   if (session.messages.length > 0) {
     chat.restoreMessages(session.messages.map(m => ({
       role: m.role, content: m.content, created_at: m.created_at,
@@ -102,9 +88,6 @@ function onSessionSwitched(_newSessionId: string) {
   }
   agentops.fetchAll()
   fetchFileTree()
-  if (session.currentSessionId) {
-    chat.connectChatWs(session.currentSessionId, session.currentProjectName)
-  }
 }
 
 // WHY: 代码产物就绪 → 自动弹出抽屉——从 DashboardView 移植到 TerminalShell

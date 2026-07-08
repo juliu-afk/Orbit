@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useShellStore } from '@/stores/shell'
 import { useSessionStore } from '@/stores/session'
 import type { ConnectionStatus } from '@/composables/useWebSocket'
@@ -17,12 +16,8 @@ const emit = defineEmits<{
 const shell = useShellStore()
 const session = useSessionStore()
 const router = useRouter()
-const appWindow = getCurrentWindow()
 
 function goMcp() { router.push('/mcp') }
-
-function winMinimize() { appWindow.minimize() }
-function winClose() { appWindow.close() }
 
 const connectionLabel = computed(() => {
   switch (props.connectionStatus) {
@@ -95,12 +90,6 @@ function handleSwitch(sessionId: string) {
 
     <span class="status-sep">|</span>
 
-    <!-- 窗口控制——Tauri 无边框窗口没有原生标题栏按钮 -->
-    <button class="status-btn" title="最小化" @click="winMinimize">─</button>
-    <button class="status-btn win-close-btn" title="关闭" @click="winClose">✕</button>
-
-    <span class="status-sep">|</span>
-
     <span class="flex items-center gap-1">
       <span class="status-dot" :class="props.connectionStatus"/>{{ connectionLabel }}
     </span>
@@ -112,7 +101,6 @@ function handleSwitch(sessionId: string) {
 .status-btn { background:none;border:none;color:var(--color-orbit-text-secondary);cursor:pointer;font-family:var(--font-mono);font-size:11px;padding:2px 6px;border-radius:3px;display:flex;align-items:center;gap:4px }
 .status-btn:hover { background:rgba(255,255,255,.06) }
 .status-btn.active { background:rgba(255,255,255,.1);color:#e0e0e0 }
-.win-close-btn:hover { background: #f44336 !important; color: #fff }
 
 /* Session 下拉 */
 .session-trigger { color: var(--color-orbit-accent); cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 2px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }

@@ -1,0 +1,63 @@
+{
+  "dashboard": {
+    "title": "Orbit Module Effectiveness",
+    "uid": "orbit-effectiveness",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Module Health Matrix",
+        "type": "stat",
+        "description": "46 modules × green/yellow/red based on KPI thresholds"
+      },
+      {
+        "id": 2,
+        "title": "E2E Goal Success Rate (Weekly)",
+        "type": "timeseries",
+        "targets": [
+          {"expr": "rate(orbit_goal_status_total{status=\"done\"}[7d]) / rate(orbit_goal_status_total[7d])"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Hallucination Detection F1",
+        "type": "gauge",
+        "targets": [
+          {"expr": "orbit_hallucination_validations_total{result=\"flag\"} / (orbit_hallucination_validations_total{result=\"pass\"} + orbit_hallucination_validations_total{result=\"flag\"})"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Token Flow Sankey",
+        "type": "bargauge",
+        "description": "orchestrator vs agent vs hallucination vs context token distribution",
+        "targets": [
+          {"expr": "orbit_llm_tokens_total"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Error Heatmap",
+        "type": "heatmap",
+        "description": "Module × Error Type frequency",
+        "targets": [
+          {"expr": "orbit_tasks_total{status=\"failed\"}"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Latency Waterfall (Per-Module)",
+        "type": "barchart",
+        "description": "End-to-end latency decomposed by module",
+        "targets": [
+          {"expr": "orbit_task_duration_seconds"},
+          {"expr": "orbit_llm_call_duration_seconds"},
+          {"expr": "orbit_scheduling_latency_seconds"}
+        ]
+      }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 38,
+    "tags": ["orbit", "effectiveness", "module-health"],
+    "time": {"from": "now-7d", "to": "now"}
+  }
+}

@@ -24,6 +24,8 @@ _STDLIB_MODULES: frozenset[str] = frozenset({
     "threading", "multiprocessing", "concurrent",
     "http", "urllib", "socket", "ssl", "email",
     "zipfile", "tarfile", "gzip", "bz2", "lzma",
+    "litellm", "mypy", "httpx", "websockets", "tiktoken", "tree_sitter",
+    "networkx", "scipy", "matplotlib", "plotly",
 })
 
 _STDLIB_FUNCTIONS: frozenset[str] = frozenset({
@@ -36,6 +38,14 @@ _STDLIB_FUNCTIONS: frozenset[str] = frozenset({
     "abs", "sum", "min", "max", "round", "all", "any", "id", "dir",
     "vars", "staticmethod", "classmethod", "property",
     "repr", "hex", "oct", "bin", "chr", "ord", "format", "pow", "divmod",
+    "Path", "MagicMock", "Counter", "lru_cache", "defaultdict",
+    "Optional", "List", "Dict", "Any", "Union",
+    "Callable", "Tuple", "TypeVar", "Generic", "Protocol", "Final",
+    "BaseModel", "Field", "Decimal", "JSONDecodeError",
+    "StreamHandler", "DEBUG", "timedelta", "sha256", "hexdigest",
+    "ClientSession", "Queue", "Counter", "Histogram", "Gauge",
+    "connect", "fetchone", "fetchall", "execute",
+    "__name__", "__init__", "main", "test", "app",
 })
 
 

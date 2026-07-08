@@ -218,7 +218,10 @@ class ReActAgent(BaseAgent):
             from orbit.integration.wiring import get_wiring
             wiring = get_wiring()
             kw = getattr(self, "_task_keywords", None) or []
-            system = wiring.enhance_prompt(system, category="", keywords=kw)
+            # V14.2+Theory 方向8: 从任务目标提取类型签名→注入生成约束
+            goal = getattr(self, "_goal", "") or ""
+            # V14.2+Theory 方向8: 将任务目标传入——TypeDirectedSynthesizer 自行判断是否含类型约束
+            system = wiring.enhance_prompt(system, category="", keywords=kw, type_sig=goal)
         except Exception:
             logger.warning("prompt_enhance_failed", exc_info=True)
 

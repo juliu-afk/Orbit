@@ -52,12 +52,35 @@ JSON: {{"merged": "the combined principle"}}"""
 class GEPAPopulation:
     """GEPA 种群——一组候选原则 + 遗传操作。"""
 
-    def __init__(self, population_size: int = 10, elite_size: int = 3) -> None:
+    def __init__(
+        self, population_size: int = 10, elite_size: int = 3,
+        conformal: object | None = None,  # V14.2+Theory 方向16: ConformalPredictor
+    ) -> None:
         self.population_size = population_size
         self.elite_size = elite_size
+        self._conformal = conformal
 
     def select_elite(self, principles: list[StrategyPrinciple]) -> list[StrategyPrinciple]:
-        """选择精英——高效用 top-K。"""
+        """选择精英——高效用 top-K。
+
+        V14.2+Theory 方向16: 若共形预测器可用，用 p-value 替代硬阈值 utility>0.6。
+        p > α(=0.05) → 原则可接受，保留。
+        """
+        # 共形筛选——p-value > 0.05 的原则保留
+        # task=category(原则类别), code=principle(原则文本)——语义分离
+        if self._conformal is not None:
+            filtered = []
+            for p in principles:
+                p_val = self._conformal.p_value(p.category or "general", p.principle)
+                if p_val > 0.05:
+                    filtered.append(p)
+            # 如果筛选后太少，至少保留 top-1
+            if len(filtered) < 1 and principles:
+                filtered = [max(principles, key=lambda p: p.utility_score)]
+            ranked = sorted(filtered, key=lambda p: p.utility_score, reverse=True)
+            return ranked[: self.elite_size]
+
+        # 无共形预测器——退回到原始硬阈值
         ranked = sorted(principles, key=lambda p: p.utility_score, reverse=True)
         return ranked[: self.elite_size]
 
@@ -90,11 +113,12 @@ class GEPAEngine:
         self, llm: LLMClient | None = None,
         distill: DistillationEngine | None = None,
         causal_analyzer: object | None = None,  # V14.2+Theory: RootCauseAnalyzer
+        conformal: object | None = None,        # V14.2+Theory 方向16: ConformalPredictor
     ) -> None:
         self._llm = llm
         self._distill = distill
-        self._causal = causal_analyzer  # P2: 因果解耦——从全局 stats 切换为因果效应
-        self._population = GEPAPopulation()
+        self._causal = causal_analyzer
+        self._population = GEPAPopulation(conformal=conformal)  # P0-5修复: 注入共形预测器
 
     async def evolve_population(
         self, principles: list[StrategyPrinciple],

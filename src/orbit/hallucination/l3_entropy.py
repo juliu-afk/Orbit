@@ -101,6 +101,32 @@ class L3EntropyMonitor:
         self._repeat_count = 0
         self._token_count = 0
 
+    async def validate(self, code: str) -> "ValidationResult":
+        """Pipeline 兼容接口——post-hoc 代码熵检测。
+
+        WHY passed=True: L3 是流式监控器，需要逐 token 的 logprobs 才能计算熵。
+        对已完成的代码片段，熵检测不适用——返回 passed=True，
+        实际熵监控由 LLMClient.generate_stream_with_tools() 在生成过程中实时执行。
+
+        对代码片段做启发式重复检测:
+        - 重复行比例 > 50% → 高熵信号 → passed=False
+        """
+        from orbit.hallucination.schemas import HallucinationLevel, ValidationResult
+
+        # 启发式: 检测异常重复（LLM 幻觉的常见模式）
+        lines = [l.strip() for l in code.splitlines() if l.strip()]
+        if len(lines) >= 5:
+            unique = len(set(lines))
+            repeat_ratio = 1.0 - (unique / len(lines))
+            if repeat_ratio > 0.5:
+                return ValidationResult(
+                    passed=False,
+                    level=HallucinationLevel.L3_ENTROPY,
+                    errors=[f"High repetition detected: {repeat_ratio:.0%} lines are duplicates"],
+                )
+
+        return ValidationResult(passed=True, level=HallucinationLevel.L3_ENTROPY)
+
     # ---- 内部 ----
 
     def _compute_entropy(self, logprobs: list[float]) -> float:

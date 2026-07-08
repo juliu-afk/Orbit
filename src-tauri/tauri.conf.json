@@ -10,7 +10,18 @@
     "beforeBuildCommand": "echo 'Tauri bundling... Use scripts/build-exe.sh or make exe for full pipeline. Frontend must be in backend/static/ and orbit-backend.exe must be fresh.'"
   },
   "app": {
-    "windows": [],
+    "windows": [
+      {
+        "label": "main",
+        "title": "Orbit — 多 Agent 驾驶舱",
+        "width": 1400,
+        "height": 900,
+        "resizable": true,
+        "decorations": true,
+        "transparent": false,
+        "center": true
+      }
+    ],
     "security": {
       "csp": null
     }

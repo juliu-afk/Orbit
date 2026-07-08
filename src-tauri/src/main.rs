@@ -142,15 +142,6 @@ fn main() {
                 "main",
                 WebviewUrl::External(boot_url.parse().unwrap()),
             )
-            .title("Orbit — 多 Agent 驾驶舱")
-            .inner_size(1400.0, 900.0)
-            .resizable(true)
-            .decorations(false)
-            .transparent(true)
-            .center()
-            .focused(true)
-            .visible(true)
-            .shadow(false)
             .build()?;
 
             Ok(())

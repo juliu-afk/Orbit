@@ -59,11 +59,13 @@ class MonitorAgent:
         goal: str = "",
         hitl_manager: HITLManager | None = None,
         triggers: TriggerEngine | None = None,
+        pid_controller: object | None = None,  # V14.2+Theory 方向13: PIDAgentController
     ) -> None:
         self._goal = goal
         self._hitl = hitl_manager
         self._triggers = triggers or TriggerEngine()
         self._classifier = ErrorClassifier()
+        self._pid = pid_controller
 
         # 运行时状态
         self._action_history: list[dict] = []
@@ -141,13 +143,33 @@ class MonitorAgent:
         Returns:
             当前检测到的所有告警
         """
-        return self._triggers.check_all(
+        alerts = self._triggers.check_all(
             recent_actions=self._action_history,
             goal=self._goal,
             last_tool=last_tool,
             action_start=self._action_start,
             task_start=self._task_start,
         )
+        # V14.2+Theory 方向13: PID 连续矫正——不完全依赖二元告警
+        if self._pid is not None:
+            drift = 0.0
+            if hasattr(self._triggers, 'goal_drift') and self._triggers.goal_drift:
+                drift = getattr(self._triggers.goal_drift, 'drift_score', 0.0)
+            now = __import__("time").time()
+            latency = (now - self._action_start) * 1000 if self._action_start > 0 else 0.0
+            rep_count = len(self._action_history)
+            signal = self._pid.compute(
+                drift_score=drift, repetition_count=rep_count, latency_ms=latency)
+            if signal.level in ("firm", "urgent"):
+                # 将 PID urgent/firm 信号作为额外告警附上
+                from orbit.metacognition.triggers import Alert, AlertType, Severity
+                sev = Severity.CRITICAL if signal.level == "urgent" else Severity.WARNING
+                alerts.append(Alert(
+                    type=AlertType.GOAL_DRIFT,
+                    severity=sev,
+                    message=f"[PID:{signal.level}] {signal.text} (correction={signal.correction:.2f})",
+                ))
+        return alerts
 
     # ── 内部 ──────────────────────────────────────────
 

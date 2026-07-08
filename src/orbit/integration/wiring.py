@@ -83,6 +83,13 @@ class OrbitWiring:
         self._llm_distill: object | None = None
         self._monitor: object | None = None
         self._mcts: object | None = None
+        self._bandit: object | None = None       # V14.2+Theory 方向2: ThompsonBandit
+        self._drift: object | None = None        # V14.2+Theory 方向20: CUSUMDriftDetector
+        self._pid: object | None = None          # V14.2+Theory 方向13: PIDAgentController
+        self._conformal: object | None = None    # V14.2+Theory 方向16: ConformalPredictor
+        self._router_agent: object | None = None  # P2-3: RouterAgent 单例缓存
+        self._llm_client: object | None = None     # P2-2: LLMClient 单例缓存
+        self._last_tier: str = ""
 
     # ── 生命周期钩子 ───────────────────────────────────
 
@@ -106,17 +113,41 @@ class OrbitWiring:
         traj_id = self._trajectory_ids.get(task_id, "")
         if tc and traj_id:
             tc.set_model_tier(traj_id, model_tier)
+            self._last_tier = model_tier  # P0-1修复: 回填 wiring 内部——供 on_task_end 反馈 Bandit
             logger.debug("model_tier_recorded", task_id=task_id,
                          trajectory_id=traj_id, tier=model_tier)
 
     def on_task_end(self, task_id: str, outcome: str, quality_score: float = 0.0,
                     turns: int = 0, tool_calls: int = 0) -> None:
-        """任务结束时调用——完成轨迹收集 + 清理 Monitor 资源。"""
+        """任务结束时调用——完成轨迹收集 + Bandit 反馈更新 + 清理 Monitor。"""
         tc = self._get_trajectory()
         traj_id = self._trajectory_ids.pop(task_id, "")
         if tc and traj_id:
             tc.finish_trajectory(traj_id, final_outcome=outcome, quality_score=quality_score,
                                   total_turns=turns, total_tool_calls=tool_calls)
+            # V14.2+Theory 方向2: 从轨迹表读取 model_tier→Bandit 学习
+            b = self._get_bandit()
+            if b:
+                try:
+                    row = tc._db.execute(
+                        "SELECT model_tier FROM trajectories WHERE trajectory_id=?",
+                        (traj_id,)).fetchone()
+                    tier = (row["model_tier"] if row else "") or self._last_tier
+                    if tier:
+                        success = outcome == "completed"
+                        # P2-2修复: turns=0→默认2000ms（单轮任务估算）
+                        est_latency = turns * 2000.0 if turns > 0 else 2000.0
+                        b.update(tier, success, latency_ms=est_latency)
+                        # V14.2+Theory 方向20: CUSUM 变点检测
+                        d = self._get_drift()
+                        if d:
+                            alert = d.update(model=tier, latency_ms=est_latency, success=success)
+                            if alert is not None:
+                                b.reset_arm(alert.model)
+                                logger.info("drift_reset", model=alert.model)
+                        self._last_tier = ""
+                except Exception:
+                    pass  # fail-open
             logger.debug("trajectory_finished", task_id=task_id, trajectory_id=traj_id, outcome=outcome)
 
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
@@ -158,9 +189,23 @@ class OrbitWiring:
         return None
 
     def enhance_prompt(self, base_prompt: str, category: str = "",
-                       keywords: list[str] | None = None) -> str:
-        """增强 system prompt——注入策略原则 + Agentic 建议。"""
+                       keywords: list[str] | None = None,
+                       type_sig: str = "",  # V14.2+Theory 方向8: 类型签名→生成约束
+                       ) -> str:
+        """增强 system prompt——注入策略原则 + Agentic 建议 + 类型约束。"""
         result = base_prompt
+
+        # 0. V14.2+Theory 方向8: 类型导向合成——在生成前注入约束
+        if type_sig:
+            try:
+                from orbit.hallucination.l4_type import TypeDirectedSynthesizer
+                constraints = TypeDirectedSynthesizer.constrain(type_sig)
+                if constraints:
+                    lines = ["\n\n## 代码生成约束（类型导向）"]
+                    lines.extend(f"- {c}" for c in constraints)
+                    result += "\n".join(lines)
+            except Exception:
+                pass  # fail-open——约束注入失败不阻塞主 prompt 增强
 
         # 1. 注入高效用策略原则
         inj = self._get_injector()
@@ -217,6 +262,34 @@ class OrbitWiring:
         grpo = self._get_grpo()
         if grpo:
             grpo.update_utilities()
+
+        # V14.2+Theory 方向16: GEPA 进化——Conformal 共形预测接入离线管线
+        try:
+            from orbit.evolution.gepa import GEPAEngine
+            # P1-1: 从历史轨迹构建校准集——conformal 有数据才能筛选
+            cp = self._get_conformal()
+            if cp is not None and tc is not None:
+                completed = tc.get_completed(limit=50)
+                cal_data = []
+                for t in completed:
+                    exported = tc.export_for_training(t["trajectory_id"])
+                    goal = exported.get("goal", "")
+                    code = exported.get("output", "")
+                    outcome = t.get("final_outcome", "") == "completed"
+                    if goal and code:
+                        cal_data.append((goal, code, outcome))
+                if cal_data:
+                    cp.calibrate(cal_data)
+            ge = GEPAEngine(
+                llm=self._get_llm_client(),
+                distill=de,
+                conformal=cp,
+            )
+            principles = de.top_principles(20) if de else []
+            if principles and len(principles) >= 3:
+                await ge.evolve_population(principles, category="distilled")
+        except Exception:
+            logger.debug("gepa_evolution_skipped", exc_info=True)
 
     # ── 懒初始化 ───────────────────────────────────────
 
@@ -305,7 +378,8 @@ class OrbitWiring:
         if self._monitor is None:
             try:
                 from orbit.metacognition.monitor import MonitorAgent
-                self._monitor = MonitorAgent()
+                pid = self._get_pid()  # V14.2+Theory 方向13: PID 连续矫正
+                self._monitor = MonitorAgent(pid_controller=pid)
             except Exception:
                 logger.warning("monitor_init_failed", exc_info=True)
         return self._monitor
@@ -322,6 +396,81 @@ class OrbitWiring:
     def get_mcts_planner(self):
         """获取 MCTSPlanner——供 react_agent 在规划阶段使用。"""
         return self._get_mcts()
+
+    # ── V14.2+Theory P0五方向: 懒初始化 getters ──────────
+
+    def _get_bandit(self):
+        """方向2: ThompsonBandit——多臂 Bandit 模型路由器。"""
+        if self._bandit is None:
+            try:
+                from orbit.router.bandit import ThompsonBandit
+                self._bandit = ThompsonBandit()
+            except Exception:
+                logger.warning("bandit_init_failed", exc_info=True)
+        return self._bandit
+
+    def _get_drift(self):
+        """方向20: CUSUMDriftDetector——LLM 行为变点检测。"""
+        if self._drift is None:
+            try:
+                from orbit.observability.drift_detector import CUSUMDriftDetector
+                self._drift = CUSUMDriftDetector()
+            except Exception:
+                logger.warning("drift_init_failed", exc_info=True)
+        return self._drift
+
+    def _get_pid(self):
+        """方向13: PIDAgentController——连续矫正替代二元告警。"""
+        if self._pid is None:
+            try:
+                from orbit.metacognition.pid_controller import PIDAgentController
+                self._pid = PIDAgentController()
+            except Exception:
+                logger.warning("pid_init_failed", exc_info=True)
+        return self._pid
+
+    def _get_conformal(self):
+        """方向16: ConformalPredictor——95% 置信预测集。"""
+        if self._conformal is None:
+            try:
+                from orbit.testing.conformal import ConformalPredictor
+                self._conformal = ConformalPredictor(alpha=0.05)
+            except Exception:
+                logger.warning("conformal_init_failed", exc_info=True)
+        return self._conformal
+
+    def _get_llm_client(self):
+        """P2-2: LLMClient 单例缓存——GEPA 进化复用。"""
+        if self._llm_client is None:
+            try:
+                from orbit.gateway.client import LLMClient
+                self._llm_client = LLMClient()
+            except Exception:
+                logger.warning("llm_client_init_failed", exc_info=True)
+        return self._llm_client
+
+    def set_model_tier(self, tier: str) -> None:
+        """记录最近 RouterAgent 选中的 tier——供 on_task_end 反馈 Bandit。"""
+        self._last_tier = tier
+
+    def get_router_agent(self):
+        """V14.2+Theory 方向2+20: 带 Bandit+Drift 的 RouterAgent 单例。
+
+        P2-3修复: 缓存——避免每次任务重新创建 RouterAgent。
+        """
+        if self._router_agent is not None:
+            return self._router_agent
+        try:
+            from orbit.router.agent import RouterAgent
+            self._router_agent = RouterAgent(
+                weights=None,
+                bandit=self._get_bandit(),
+                drift_detector=self._get_drift(),
+            )
+            return self._router_agent
+        except Exception:
+            logger.warning("router_agent_init_failed", exc_info=True)
+            return None
 
     async def start_monitor(self, task_id: str, goal: str = "") -> asyncio.Task | None:
         """启动 MonitorAgent 作为独立 asyncio Task——含 HITLManager 接线。

@@ -68,14 +68,15 @@ class SpectralAnalyzer:
         )
 
     def _modularity(self, adj, partition) -> float:
-        """Newman-Girvan modularity."""
+        """Newman-Girvan modularity——P2-2修复: O(m)稀疏迭代替代 O(n²) 全矩阵."""
         m = adj.sum() / 2.0
         if m == 0:
             return 0.0
         degrees = np.array(adj.sum(axis=1)).flatten()
+        # O(m): 遍历非零边
+        rows, cols = adj.nonzero()
         Q = 0.0
-        for i in range(adj.shape[0]):
-            for j in range(adj.shape[0]):
-                if partition[i] == partition[j] and i != j:
-                    Q += adj[i, j] - degrees[i] * degrees[j] / (2.0 * m)
+        for i, j in zip(rows, cols):
+            if partition[i] == partition[j]:
+                Q += adj[i, j] - degrees[i] * degrees[j] / (2.0 * m)
         return float(Q / (2.0 * m))

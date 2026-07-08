@@ -63,6 +63,7 @@ class VCGAllocator:
             assignments.append(Assignment(
                 task_id=tid,
                 agent_name=best.agent_name,
-                payment=best.cost + second_val,  # VCG: cost + externality
+                # VCG: payment = second-best value (标准 Vickrey 第二价格)
+                payment=second_val,
             ))
         return assignments

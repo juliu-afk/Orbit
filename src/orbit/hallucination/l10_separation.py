@@ -59,11 +59,17 @@ class L10SeparationValidator:
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         og.owned.setdefault("<module>", set()).add(target.id)
-            # 别名: x = y
-            if isinstance(node, ast.Assign) and isinstance(node.value, ast.Name):
-                for t in node.targets:
-                    if isinstance(t, ast.Name):
-                        og.aliases.append((t.id, node.value.id, node.lineno))
+            # 别名: x = y (直接) 或 x = obj.y (间接,P2-4修复)
+            if isinstance(node, ast.Assign):
+                src_name = None
+                if isinstance(node.value, ast.Name):
+                    src_name = node.value.id
+                elif isinstance(node.value, ast.Attribute) and isinstance(node.value.value, ast.Name):
+                    src_name = node.value.value.id  # indirect
+                if src_name:
+                    for t in node.targets:
+                        if isinstance(t, ast.Name):
+                            og.aliases.append((t.id, src_name, node.lineno))
         return og
 
     def _check_frame(self, func, og) -> list[str]:

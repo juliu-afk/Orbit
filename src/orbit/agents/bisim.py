@@ -1,57 +1,43 @@
 """互模拟 (V14.2+Theory 方向19).
 
-两个Agent策略→标号迁移系统→bisimilarity评分→等价者选低成本.
-标号: 工具调用(action name), 状态: 任务上下文.
-
-用法:
-    checker = BisimulationChecker()
-    score = checker.bisimilarity_score(lts_a, lts_b)
-    if score > 0.9:  # 可互换
+P2-5修复: 逐状态最佳匹配而非全Cartesian积.
 """
 from __future__ import annotations
 
-
 class BisimulationChecker:
-    """Agent策略行为等价检查器——标号迁移系统互模拟."""
-
     def bisimilarity_score(self, lts_a: dict, lts_b: dict) -> float:
-        """计算两个LTS的逼近bisimilarity评分(0-1).
-
-        lts: {state: {action: next_state, ...}, ...}
-        """
+        """比较两个LTS的行为等价程度."""
         if not lts_a or not lts_b:
             return 0.0
-        # 收集所有标号
-        actions_a = set()
-        actions_b = set()
-        for s, trans in lts_a.items():
-            actions_a.update(trans.keys())
-        for s, trans in lts_b.items():
-            actions_b.update(trans.keys())
-        all_actions = actions_a | actions_b
-        if not all_actions:
+        # 对A中每状态找B中最佳匹配→均值
+        scores = []
+        for sa, ta in lts_a.items():
+            best = max((self._state_sim(ta, lts_b.get(sb, {}))
+                        for sb in lts_b), default=0.0)
+            scores.append(best)
+        return sum(scores) / len(scores) if scores else 0.0
+
+    @staticmethod
+    def _state_sim(ta: dict, tb: dict) -> float:
+        """两状态转移结构相似度——Jaccard+目标匹配."""
+        acts = set(ta.keys()) | set(tb.keys())
+        if not acts:
             return 1.0
-        # 对每对标号检查转移是否匹配
         matches = 0
-        for action in all_actions:
-            in_a = action in actions_a
-            in_b = action in actions_b
+        for a in acts:
+            in_a = a in ta
+            in_b = a in tb
             if in_a and in_b:
-                matches += 1
-            elif in_a == in_b:  # 都不在
-                matches += 1
-        return matches / len(all_actions)
+                # 共享动作→检查转移目标是否相同
+                matches += 1.0 if ta[a] == tb[a] else 0.5
+            elif not in_a and not in_b:
+                matches += 1.0
+        return matches / len(acts)
 
     @staticmethod
     def is_replaceable(score: float, cost_a: float, cost_b: float,
                        threshold: float = 0.9) -> tuple[bool, str]:
-        """基于bisimilarity评分和成本决定是否可替换.
-
-        Returns: (可替换?, 原因)
-        """
         if score >= threshold:
-            if cost_a < cost_b:
-                return (True, f"策略A成本更低({cost_a}<{cost_b}), bisim={score:.2f}")
-            else:
-                return (True, f"策略B成本更低({cost_b}<{cost_a}), bisim={score:.2f}")
+            cheaper = "A" if cost_a < cost_b else "B"
+            return (True, f"策略{cheaper}成本更低, bisim={score:.2f}")
         return (False, f"不等价(bisim={score:.2f}<{threshold})")

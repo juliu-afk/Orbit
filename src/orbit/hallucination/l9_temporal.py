@@ -51,7 +51,7 @@ class L9TemporalValidator:
         violations = []
         counterexamples = []
         # 检查每条属性——简化BFS路径枚举
-        all_paths = self._enumerate_paths(state_graph, initial, max_depth=20)
+        all_paths = self._enumerate_paths(state_graph, initial, max_depth=50)
         for name, (op, formula) in {**self.SAFETY, **self.LIVENESS}.items():
             ce = self._check_formula(all_paths, state_labels, op, formula)
             if ce:

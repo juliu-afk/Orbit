@@ -404,8 +404,9 @@ async def grafana_dashboard():
     import json
     from pathlib import Path
 
+    # __file__ = src/orbit/api/routes/observability.py → 5x.parent = repo root
     dashboard_path = (
-        Path(__file__).parent.parent.parent.parent
+        Path(__file__).parent.parent.parent.parent.parent
         / "data" / "benchmarks" / "orbitbench" / "grafana_dashboard.json"
     )
     if not dashboard_path.exists():

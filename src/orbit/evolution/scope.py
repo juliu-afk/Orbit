@@ -59,8 +59,9 @@ class ScopeMemory:
         rules = scope.get_strategic("API限流")  # → ["此API限流10次/分钟"]
     """
 
-    # 升级阈值：同一规则在 N 个不同任务中出现
-    UPGRADE_THRESHOLD = 3
+    # V14.2+Theory 方向14: PAC自适应阈值——替代硬编码3
+    # 样本少→阈值高(需更多重复), 样本多→阈值低(泛化保证强)
+    UPGRADE_THRESHOLD = 3  # 基线值——可被PAC覆盖
     # 语义去重阈值
     DEDUP_THRESHOLD = 0.75
 

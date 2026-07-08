@@ -265,7 +265,10 @@ class OrbitWiring:
         # V14.2+Theory 方向16: GEPA 进化——Conformal 共形预测接入离线管线
         try:
             from orbit.evolution.gepa import GEPAEngine
+            from orbit.gateway.client import LLMClient
+            llm_client = LLMClient()
             ge = GEPAEngine(
+                llm=llm_client,
                 distill=de,
                 conformal=self._get_conformal(),
             )
@@ -441,6 +444,7 @@ class OrbitWiring:
                 bandit=self._get_bandit(),
                 drift_detector=self._get_drift(),
             )
+            return self._router_agent
         except Exception:
             logger.warning("router_agent_init_failed", exc_info=True)
             return None

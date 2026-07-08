@@ -111,6 +111,8 @@ async def validate_task(task: dict) -> dict:
 
 
 def main():
+    # 确保项目根目录在 sys.path 中——直接运行脚本时需要
+    sys.path.insert(0, str(PROJECT_ROOT))
     parser = argparse.ArgumentParser(description="OrbitBench 自动运行器")
     parser.add_argument("--level", help="仅跑指定级别 (L0_syntax_fix, L1_single_file, ...)")
     parser.add_argument("--list", action="store_true", help="列出所有模板")

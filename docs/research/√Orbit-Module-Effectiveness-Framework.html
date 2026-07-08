@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit 模块效能评估与优化框架</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --border: #30363d;
+  --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff;
+  --green: #3fb950; --red: #f85149; --yellow: #d2991d;
+  --orange: #db6d28; --purple: #a371f7; --cyan: #39d2c0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.7;
+}
+body { max-width: 1400px; margin: 0 auto; padding: 20px; }
+h1 { font-size: 2em; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+h2 { font-size: 1.5em; color: var(--accent); margin-top: 48px; border-left: 4px solid var(--accent); padding-left: 12px; }
+h3 { color: var(--purple); margin-top: 32px; }
+h4 { color: var(--cyan); margin-top: 20px; }
+.section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin: 20px 0; }
+.mermaid { background: #fff; border-radius: 6px; padding: 16px; margin: 16px 0; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 0.92em; }
+th, td { border: 1px solid var(--border); padding: 10px 14px; text-align: left; vertical-align: top; }
+th { background: #21262d; font-weight: 600; }
+tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78em; font-weight: 600; }
+.bg-green { background:#1b3a1b; color:var(--green) }
+.bg-red { background:#3a1b1b; color:var(--red) }
+.bg-yellow { background:#3a351b; color:var(--yellow) }
+.bg-purple { background:#2a1b3a; color:var(--purple) }
+.bg-cyan { background:#1b3a3a; color:var(--cyan) }
+.bg-orange { background:#3a2a1b; color:var(--orange) }
+.metric-box { display:inline-block; background:#21262d; border-radius:4px; padding:4px 10px; margin:2px; font-family:monospace; font-size:0.85em; }
+.card-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:14px; margin:12px 0; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:16px; }
+.card h4 { margin:0 0 8px; color:var(--accent); }
+.card-urgent { border-left:3px solid var(--red) }
+.card-important { border-left:3px solid var(--orange) }
+.card-nice { border-left:3px solid var(--cyan) }
+.formula { background:#0d1117; padding:10px 16px; border-radius:4px; font-family:monospace; margin:8px 0; border-left:2px solid var(--purple); }
+.toc { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:20px; margin:20px 0; }
+.toc ol { columns:2; column-gap:40px; }
+.toc a { color:var(--accent); text-decoration:none; }
+code { background:#21262d; padding:1px 6px; border-radius:3px; font-size:0.9em; }
+.note { background:#1b2a3a; border-left:3px solid var(--accent); padding:10px 14px; margin:10px 0; border-radius:0 6px 6px 0; }
+.warn { background:#3a351b; border-left:3px solid var(--yellow); padding:10px 14px; margin:10px 0; border-radius:0 6px 6px 0; }
+</style>
+</head>
+<body>
+
+<h1>📐 Orbit 模块效能评估与优化框架</h1>
+<p style="color:var(--muted)">
+  版本 1.1 · 2026-07-08 · 覆盖全部 46 个模块的测量标准、基准测试设计、优化策略<br>
+  核心命题：<strong>如何确保每个模块真的在起作用，而不是只存在于代码中</strong>
+</p>
+
+<!-- ===== 校准批注（2026-07-08 代码摸底） ===== -->
+<div class="warn">
+<strong>⚠️ 2026-07-08 代码摸底校准</strong>：开工前对照 <code>src/orbit/</code> 实际代码核对本框架。核心发现——<strong>「没测试」≠「没效能测量」</strong>：correctness 测试（L0/L1 层）大部分<strong>已存在</strong>，真正缺的是本文定义的 <strong>L2 效能层</strong>（benchmark / 消融 / trace 归因）。逐项核对：
+<table>
+<tr><th>本文声称</th><th>代码实际</th><th>结论</th></tr>
+<tr><td>45 模块</td><td><code>src/orbit/</code> 有 <strong>46</strong> 个模块目录</td><td>已修正为 46</td></tr>
+<tr><td>trace.py 存在但未接入所有模块</td><td>✅ 存在，但<strong>仅 2 处 import / 1 处 span</strong></td><td><span class="badge bg-red">确认——严重欠接线</span>（本文说对了，仍是首要瓶颈）</td></tr>
+<tr><td>Prometheus 需补 7 指标（§12.3）</td><td><strong>已有 14 个</strong> <code>orbit_*</code>；<code>task_duration</code>/<code>llm_tokens</code>/<code>circuit_breaker_state</code>/<code>scheduling_latency</code> 均已存在</td><td><span class="badge bg-yellow">本文过期</span>——真缺仅 4 个，见 §12.3 已重写</td></tr>
+<tr><td>防幻觉 L1-L9（9 层）</td><td>pipeline 跑 <strong>L1-L8</strong>（顺序 L1→L4→L3→L2→L6→L8→L7→L5，与 §3.3 一致）；L9 动态合规住在 <code>compliance/</code> 独立模块</td><td><span class="badge bg-green">层模型正确</span>（本文与代码吻合；开发计划旧描述才是错的）</td></tr>
+<tr><td>ProcessGuard/CircuitBreaker/checkpoint/intake/resource_guard 需测试</td><td>✅ <code>tests/unit/</code> + <code>tests/lib/scenarios/</code> + e2e <strong>全部已有</strong></td><td><span class="badge bg-yellow">非绿地</span>——Phase 1/2 应「升级现有测试为效能断言」而非从零写</td></tr>
+<tr><td>ProcessGuard 100 注入→100% 拦截套件</td><td><code>test_goal_process_guard.py</code> 仅 93 行 / 5 处 violation</td><td><span class="badge bg-orange">部分</span>——需扩展到注入压测</td></tr>
+<tr><td>基准数据集 / OrbitBench / 消融 harness</td><td>❌ <code>.benchmarks/</code> 空，无 <code>data/benchmarks</code>，全仓库<strong>零</strong> ablation 代码</td><td><span class="badge bg-red">真缺</span>——本文「消融=金标准」（§17）完全未落地</td></tr>
+</table>
+<strong>净结论</strong>：真 gap 收敛为 4 项 —— ① Trace 全链路接线 ② 消融 harness ③ Benchmark 数据集 ④ 4 个效能指标。测试类任务多为「升级」而非「新建」。
+</div>
+
+<div class="toc">
+<h3>目录</h3>
+<ol>
+<li><a href="#framework">效能评估总体框架</a></li>
+<li><a href="#contracts">模块契约模型</a></li>
+<li><a href="#hallucination">防幻觉管道 (L1-L9) 测量与优化</a></li>
+<li><a href="#gateway">LLM 网关 & 熔断器 测量与优化</a></li>
+<li><a href="#orchestration">编排层 (Goal/Scheduler/Compose) 测量与优化</a></li>
+<li><a href="#agents">Agent 执行引擎 测量与优化</a></li>
+<li><a href="#context">上下文系统 测量与优化</a></li>
+<li><a href="#checkpoint">检查点 & 资源熔断 测量与优化</a></li>
+<li><a href="#knowledge">知识图谱 & 记忆系统 测量与优化</a></li>
+<li><a href="#evolution">自我进化系统 测量与优化</a></li>
+<li><a href="#sandbox-sec">沙箱 & 安全模块 测量与优化</a></li>
+<li><a href="#observability">可观测性 & 审计 测量与优化</a></li>
+<li><a href="#auxiliary">辅助模块 (15个) 测量与优化</a></li>
+<li><a href="#cross-cutting">跨模块测量基础设施</a></li>
+<li><a href="#benchmark">基准数据集设计</a></li>
+<li><a href="#priority">优先级矩阵 & 实施路线图</a></li>
+<li><a href="#summary">总结: 量化闭环</a></li>
+</ol>
+</div>
+
+<!-- ===== 1. 总体框架 ===== -->
+<h2 id="framework">1. 效能评估总体框架</h2>
+<div class="section">
+
+<h3>1.1 核心问题</h3>
+<p>Orbit 有 46 个模块（<code>src/orbit/</code> 实际目录数）。每个模块的代码存在 ≠ 模块在运行中有正向贡献。目前缺失的是<strong>模块级效能闭环</strong>：</p>
+
+<div class="mermaid">
+flowchart LR
+    A["模块存在<br/>(代码已写)"] --> B["模块运行<br/>(被调用)"] --> C["模块有效<br/>(正向贡献)"] --> D["模块优化<br/>(参数调优)"]
+    B -.->|"当前断层"| E["❓ 不知道是否有效"]
+    C -.->|"当前断层"| F["❓ 不知道如何量化"]
+    style E fill:#3a1b1b,stroke:#f85149
+    style F fill:#3a1b1b,stroke:#f85149
+</div>
+
+<h3>1.2 三层评估模型</h3>
+<table>
+<tr><th>层</th><th>问题</th><th>方法</th><th>频率</th></tr>
+<tr>
+  <td><strong>L0 存在性验证</strong></td>
+  <td>模块代码是否被正确调用？</td>
+  <td>代码覆盖追踪 + 调用链日志</td>
+  <td>每次 CI</td>
+</tr>
+<tr>
+  <td><strong>L1 正确性验证</strong></td>
+  <td>模块输出是否符合契约？</td>
+  <td>单元测试 + 契约测试 + 注入故障</td>
+  <td>每次 CI + 按需</td>
+</tr>
+<tr>
+  <td><strong>L2 效能验证</strong></td>
+  <td>模块是否正向贡献于系统目标？</td>
+  <td>A/B 对照实验 + 基准数据集 + 长期指标追踪</td>
+  <td>每迭代 + 每周趋势</td>
+</tr>
+</table>
+
+<h3>1.3 每个模块的 5 个必答问题</h3>
+<div class="card-grid">
+  <div class="card"><h4>Q1: 契约是什么？</h4><p>输入什么、输出什么、副作用是什么、在什么条件下失败？</p></div>
+  <div class="card"><h4>Q2: 正样本是什么？</h4><p>什么场景下模块<strong>应该</strong>生效？如何构造这种场景？</p></div>
+  <div class="card"><h4>Q3: 负样本是什么？</h4><p>什么场景下模块<strong>应该拒绝/拦截</strong>？如何构造？</p></div>
+  <div class="card"><h4>Q4: KPI 是什么？</h4><p>用什么数字衡量模块表现？这个数字的目标值是多少？</p></div>
+  <div class="card"><h4>Q5: 怎么优化？</h4><p>当 KPI 不达标时，调整什么参数？</p></div>
+</div>
+
+<h3>1.4 全局效能指标体系</h3>
+<table>
+<tr><th>指标</th><th>定义</th><th>目标</th><th>测量方法</th></tr>
+<tr>
+  <td><strong>E2E 任务成功率</strong></td>
+  <td>用户 Goal 从输入到成功完成的比例</td>
+  <td class="bg-green">≥ 85%</td>
+  <td>统计 GoalResult.status="done" / 总数</td>
+</tr>
+<tr>
+  <td><strong>返工率</strong></td>
+  <td>CritiqueAgent 退回后重新 CODING 的比例</td>
+  <td class="bg-yellow">≤ 20%</td>
+  <td>critique_attempts > 0 的子任务 / 总子任务</td>
+</tr>
+<tr>
+  <td><strong>幻觉漏报率</strong></td>
+  <td>防幻觉管道未检测到但实际导致运行时失败的比例</td>
+  <td class="bg-red">≤ 3%</td>
+  <td>沙箱执行失败但管道 passed=true 的代码 / 总生成代码</td>
+</tr>
+<tr>
+  <td><strong>幻觉误报率</strong></td>
+  <td>正确代码被防幻觉管道错误标记的比例</td>
+  <td class="bg-green">≤ 5%</td>
+  <td>管道 errors[] 非空但沙箱执行成功的代码 / 总生成代码</td>
+</tr>
+<tr>
+  <td><strong>编排开销比</strong></td>
+  <td>编排层 Token / 总 Token 消耗</td>
+  <td class="bg-yellow">≤ 30%</td>
+  <td>编排层 Agent Token / 所有 Agent Token</td>
+</tr>
+<tr>
+  <td><strong>平均任务完成时间</strong></td>
+  <td>Goal 从创建到终态的时间</td>
+  <td class="bg-cyan">≤ 10min (简单)/ ≤ 30min (复杂)</td>
+  <td>GoalResult.total_time_seconds 分布</td>
+</tr>
+<tr>
+  <td><strong>检查点恢复成功率</strong></td>
+  <td>从检查点恢复后成功继续的比例</td>
+  <td class="bg-green">≥ 95%</td>
+  <td>resume 调用成功 / 总 resume 调用</td>
+</tr>
+<tr>
+  <td><strong>进化有效性</strong></td>
+  <td>GEPA 蒸馏后的 Agent 表现是否提升</td>
+  <td class="bg-purple">≥ 同比提升 5%</td>
+  <td>蒸馏前后同任务成功率对比</td>
+</tr>
+</table>
+</div>
+
+<!-- ===== 2. 模块契约模型 ===== -->
+<h2 id="contracts">2. 模块契约模型</h2>
+<div class="section">
+
+<p>每个模块必须声明 4 种契约。测试 = 验证契约是否成立。优化 = 在满足契约的前提下提升性能。</p>
+
+<h3>2.1 契约模板</h3>
+<div class="formula">
+<pre>
+ModuleContract:
+  name: "ModuleName"
+
+  input_contract:
+    required: [param1: Type, param2: Type]     # 如果缺失→立即失败
+    optional: [param3: Type = default]          # 缺失→使用默认值
+    preconditions: [cond1, cond2]               # 调用前必须满足的条件
+
+  output_contract:
+    success: { shape: ..., invariants: [...] }   # 成功返回的形状和不变式
+    failure_modes:                               # 每种失败模式
+      - mode: TimeoutError
+        condition: "执行超过 timeout 秒"
+        return: ErrorType
+      - mode: InvalidInput
+        condition: "输入不符合 preconditions"
+        return: ErrorType
+
+  performance_contract:
+    p50_latency_ms: number
+    p99_latency_ms: number
+    max_memory_mb: number
+
+  side_effects:
+    - type: "db_write" | "http_call" | "file_write" | "none"
+      description: "..."
+</pre>
+</div>
+
+<h3>2.2 契约验证自动化</h3>
+<div class="mermaid">
+flowchart TD
+    MOD["模块代码"] --> CT["契约测试生成器<br/>自动从契约声明生成测试"]
+    CT --> POS["正向测试<br/>合法输入→正确输出"]
+    CT --> NEG["负向测试<br/>非法输入→预期错误"]
+    CT --> PERF["性能测试<br/>P50/P99 是否达标"]
+    CT --> FUZZ["模糊测试<br/>随机输入→不崩溃"]
+
+    POS & NEG & PERF & FUZZ --> REPORT["契约符合性报告<br/>通过率 + 违规详情"]
+
+    style MOD fill:#1b2a3a,stroke:#58a6ff
+    style REPORT fill:#1b3a1b,stroke:#3fb950
+</div>
+</div>
+
+<!-- ===== 3. 防幻觉管道 ===== -->
+<h2 id="hallucination">3. 防幻觉管道 (L1-L9) 测量与优化</h2>
+<div class="section">
+
+<h3>3.1 总览</h3>
+<table>
+<tr><th>层</th><th>当前状态</th><th>核心KPI</th><th>测量难度</th><th>优化潜力</th></tr>
+<tr><td>L1 图谱验证</td><td><span class="badge bg-green">已接入管道</span></td><td>漏报率 / 误报率</td><td>低</td><td><span class="badge bg-green">高</span></td></tr>
+<tr><td>L2 动态追踪</td><td><span class="badge bg-yellow">需 Sandbox</span></td><td>预测偏差率</td><td>中</td><td><span class="badge bg-yellow">中</span></td></tr>
+<tr><td>L3 熵监控</td><td><span class="badge bg-green">独立运行</span></td><td>幻觉检测 AUC</td><td>中</td><td><span class="badge bg-yellow">中</span></td></tr>
+<tr><td>L4 类型检查</td><td><span class="badge bg-green">独立运行</span></td><td>类型错误发现率</td><td>低</td><td><span class="badge bg-green">高</span></td></tr>
+<tr><td>L5 Z3 形式化</td><td><span class="badge bg-orange">最重</span></td><td>性质验证通过率</td><td>高</td><td><span class="badge bg-red">低</span></td></tr>
+<tr><td>L6 合约验证</td><td><span class="badge bg-green">独立运行</span></td><td>合约违规发现率</td><td>中</td><td><span class="badge bg-yellow">中</span></td></tr>
+<tr><td>L7 沙箱运行时</td><td><span class="badge bg-red">需要 Sandbox (致命)</span></td><td>运行时错误捕获率</td><td>低</td><td><span class="badge bg-green">高</span></td></tr>
+<tr><td>L8 配置漂移</td><td><span class="badge bg-green">独立运行</span></td><td>配置差异检测率</td><td>低</td><td><span class="badge bg-yellow">中</span></td></tr>
+<tr><td>L9 动态合规</td><td><span class="badge bg-cyan">独立模块</span></td><td>规则违规检出率</td><td>中</td><td><span class="badge bg-yellow">中</span></td></tr>
+</table>
+
+<h3>3.2 核心测量方法：基准幻觉数据集</h3>
+
+<div class="note">
+<strong>关键洞察</strong>：防幻觉管道没有 ground truth 数据集就无法量化。需要构建一个包含<strong>已知有幻觉的代码 + 已知正确的代码</strong>的测试集。
+</div>
+
+<h4>3.2.1 幻觉注入策略（构造负样本）</h4>
+<table>
+<tr><th>幻觉类型</th><th>注入方法</th><th>预期捕获层</th><th>难度</th></tr>
+<tr><td>不存在的函数调用</td><td>替换代码中的函数名为随机 UUID</td><td>L1</td><td>低</td></tr>
+<tr><td>不存在的类引用</td><td>替换 import 的目标为不存在的类</td><td>L1</td><td>低</td></tr>
+<tr><td>类型不匹配</td><td>将 int 赋值给 str 类型变量</td><td>L4</td><td>低</td></tr>
+<tr><td>运行时 NameError</td><td>引用未定义的变量</td><td>L7</td><td>低</td></tr>
+<tr><td>运行时 ImportError</td><td>import 不存在的模块</td><td>L7</td><td>低</td></tr>
+<tr><td>逻辑死循环</td><td>while True 无退出条件</td><td>L7</td><td>中</td></tr>
+<tr><td>除零错误</td><td>动态除零路径</td><td>L7</td><td>低</td></tr>
+<tr><td>配置漂移</td><td>代码引用不存在的环境变量</td><td>L8</td><td>低</td></tr>
+<tr><td>合约违规</td><td>函数返回值不符合声明的类型</td><td>L6</td><td>中</td></tr>
+<tr><td>API 不存在</td><td>调用不存在的 REST 端点</td><td>L1+L6</td><td>中</td></tr>
+<tr><td>高熵输出</td><td>使用低 temperature 生成含大量同义词替换的文本</td><td>L3</td><td>高</td></tr>
+</table>
+
+<h4>3.2.2 数据集构造流水线</h4>
+<div class="mermaid">
+flowchart TD
+    REPO["开源 Python 仓库<br/>(100+ 个不同规模)"] --> EXTRACT["提取函数/类片段<br/>(Tree-sitter AST 切分)"]
+    EXTRACT --> CORRECT["正确代码池<br/>(通过现有测试的代码)"]
+    EXTRACT --> MUTATE["幻觉注入器<br/>(11种注入策略, 可配置)"]
+    MUTATE --> HALLU["已知幻觉代码池<br/>(含注入类型标签)"]
+
+    CORRECT --> MIX["混合数据集<br/>70%正确 + 30%含幻觉<br/>标签: file/line/hallucination_type"]
+    HALLU --> MIX
+
+    MIX --> EVAL["评估流水线"]
+    EVAL --> PIPE["HallucinationPipeline.validate()"]
+    PIPE --> COMPARE["逐样本对比: 管道判定 vs 真实标签"]
+
+    COMPARE --> METRICS["输出: 每层 Precision/Recall/F1<br/>+ 混淆矩阵 + 延迟分布"]
+
+    style REPO fill:#1b2a3a,stroke:#58a6ff
+    style METRICS fill:#1b3a1b,stroke:#3fb950
+</div>
+
+<h4>3.2.3 逐层 KPI 定义</h4>
+<table>
+<tr><th>层</th><th>KPI</th><th>公式</th><th>目标</th><th>测量频率</th></tr>
+<tr>
+  <td>L1</td>
+  <td>符号漏报率</td>
+  <td class="formula">FN / (TP + FN) 其中 FN=已知不存在的符号未被检测到</td>
+  <td>≤ 1%</td>
+  <td>每次 CI</td>
+</tr>
+<tr>
+  <td>L1</td>
+  <td>符号误报率</td>
+  <td class="formula">FP / (FP + TN) 其中 FP=正确符号被标记为不存在</td>
+  <td>≤ 3%</td>
+  <td>每次 CI</td>
+</tr>
+<tr>
+  <td>L3</td>
+  <td>熵阈值 AUC</td>
+  <td class="formula">ROC AUC of entropy_threshold vs actual hallucination label</td>
+  <td>≥ 0.70</td>
+  <td>每周</td>
+</tr>
+<tr>
+  <td>L4</td>
+  <td>类型错误检出率</td>
+  <td class="formula">检测到的类型错误 / 总注入的类型错误</td>
+  <td>≥ 90%</td>
+  <td>每次 CI</td>
+</tr>
+<tr>
+  <td>L7</td>
+  <td>运行时错误捕获率</td>
+  <td class="formula">沙箱中代码运行失败且被 L7 标记的 / 沙箱中代码运行失败总数</td>
+  <td>≥ 95%</td>
+  <td>每次 CI</td>
+</tr>
+<tr>
+  <td>ALL</td>
+  <td>管道整体 F1</td>
+  <td class="formula">2 × Precision × Recall / (Precision + Recall)</td>
+  <td>≥ 0.85</td>
+  <td>每次 CI</td>
+</tr>
+</table>
+
+<h3>3.3 优化策略</h3>
+
+<div class="card-grid">
+  <div class="card card-urgent">
+    <h4>🔴 立即: 逐层消融实验</h4>
+    <p><strong>方法</strong>: 在基准数据集上，逐层禁用→测量 F1 变化→量化每层贡献</p>
+    <div class="formula">Layer_Contribution[i] = F1(all_layers) - F1(all_layers \ {i})</div>
+    <p><strong>预期</strong>: L5 贡献应该最低。如果确实如此→降级 L5 为默认关闭（需显式开启）。</p>
+    <p><strong>行动</strong>: 写一个 50 行的消融实验脚本，跑完即知哪些层是 token 黑洞。</p>
+  </div>
+  <div class="card card-important">
+    <h4>🟠 短期: L1 阈值调优</h4>
+    <p>当前 L1 是二值的（符号存在/不存在）。改为三级:</p>
+    <ul>
+      <li><strong>DEFINITELY_ABSENT</strong>: 在当前项目+依赖+标准库中都不存在 → 高置信阻断</li>
+      <li><strong>UNCERTAIN</strong>: 仅在部分路径中不存在（可能动态导入）→ 告警不阻断</li>
+      <li><strong>PRESENT</strong>: 存在 → 通过</li>
+    </ul>
+    <p>预期: 误报率下降 50%+</p>
+  </div>
+  <div class="card card-important">
+    <h4>🟠 短期: L3 阈值校准</h4>
+    <p>当前 L3 的熵阈值是硬编码的 (DeepSeek 0.75 / GLM 0.70)。需要:</p>
+    <ol>
+      <li>收集 1000+ 个正确输出和 100+ 个幻觉输出的熵值分布</li>
+      <li>用 Youden's J 统计量计算最优阈值（而非硬编码）</li>
+      <li>每个模型独立校准</li>
+    </ol>
+  </div>
+  <div class="card card-nice">
+    <h4>🔵 中期: L5 范围限定</h4>
+    <p>Z3 形式化验证不可能对所有代码有效。限定:</p>
+    <ul>
+      <li>仅验证 <strong>纯函数</strong>（无副作用，无 IO）</li>
+      <li>仅验证 ≤ 30 行的函数</li>
+      <li>自动检测可形式化的性质（如 range check, null check）</li>
+    </ul>
+    <p>不满足条件的函数直接跳过 L5，不浪费 token</p>
+  </div>
+  <div class="card card-nice">
+    <h4>🔵 中期: 管道并行化</h4>
+    <p>当前是串行执行 L1→L4→L3→L2→L6→L8→L7→L5</p>
+    <p>优化: L1+L4+L3+L6+L8 可以<strong>并行</strong>运行（均无外部依赖），L2+L7 串行（需沙箱），L5 可选</p>
+    <p>预期延迟下降 40-60%</p>
+  </div>
+</div>
+
+<h3>3.4 防幻觉管道契约</h3>
+<div class="formula">
+<pre>
+HallucinationPipeline.contract:
+  input:  code: str (LLM生成的代码片段)
+  output: ValidationResult { passed: bool, errors: [str], warnings: [str], level }
+
+  performance:
+    validate_quick(): p99 ≤ 500ms   # 仅 L1+L4+L3
+    validate_full():   p99 ≤ 5000ms  # 全量
+
+  invariants:
+    - passed=true AND code 含 NameError → BUG (漏报)
+    - passed=false AND code 在沙箱中成功运行 → 误报 (需记录)
+    - 单层崩溃不影响其他层 (fail-open per layer)
+</pre>
+</div>
+</div>
+
+<!-- ===== 4. LLM 网关 & 熔断 ===== -->
+<h2 id="gateway">4. LLM 网关 & 熔断器 测量与优化</h2>
+<div class="section">
+
+<h3>4.1 CircuitBreaker</h3>
+<table>
+<tr><th>契约项</th><th>内容</th></tr>
+<tr><td><strong>输入</strong></td><td>model_key: str, 每次调用的成功/失败标记</td></tr>
+<tr><td><strong>核心行为</strong></td><td>CLOSED→连续5次失败→OPEN(60s冷却)→HALF_OPEN→探测→CLOSED</td></tr>
+<tr><td><strong>关键不变量</strong></td><td>OPEN 状态下 <strong>必须</strong> 拒绝所有请求 (bypass率=0)</td></tr>
+</table>
+
+<h4>4.1.1 测量方法</h4>
+<div class="card-grid">
+  <div class="card">
+    <h4>测试: 故障注入</h4>
+    <p>Mock LLM 返回连续失败 → 验证:</p>
+    <ol>
+      <li>第 5 次失败后状态=OPEN</li>
+      <li>OPEN 期间所有请求被 CircuitOpenError 拒绝</li>
+      <li>60s 后自动进入 HALF_OPEN</li>
+      <li>HALF_OPEN 探测成功→CLOSED</li>
+      <li>HALF_OPEN 探测失败→重回 OPEN</li>
+    </ol>
+    <p><strong>测试框架</strong>: pytest + asyncio + freezegun (控制时间)</p>
+    <p><strong>已有</strong>: tests/unit/ 应已有部分覆盖</p>
+  </div>
+  <div class="card">
+    <h4>测试: 并发 RMW 安全</h4>
+    <p>10 个协程同时请求 HALF_OPEN 状态→验证仅 1 个获得探测权</p>
+    <div class="formula">assert sum(1 for probe in results if probe) == 1</div>
+  </div>
+</div>
+
+<h4>4.1.2 KPI</h4>
+<table>
+<tr><th>KPI</th><th>目标</th><th>测量方法</th></tr>
+<tr><td>故障检测延迟</td><td class="bg-green">≤ 5 次调用内检测到</td><td>failure_count 到 failure_threshold 的调用数</td></tr>
+<tr><td>恢复时间</td><td class="bg-green">≤ 60s (cooldown)</td><td>opened_at 到 HALF_OPEN 的时间差</td></tr>
+<tr><td>误熔断率</td><td class="bg-red">0% (不容忍)</td><td>OPEN 期间模型实际可用的次数 / 总 OPEN 次数</td></tr>
+<tr><td>状态持久化</td><td class="bg-green">重启不丢失</td><td>进程重启后 SQLite 中的状态与重启前一致</td></tr>
+<tr><td>半开冲突</td><td class="bg-green">0 次并发探测</td><td>probe_in_flight > 1 的情况</td></tr>
+</table>
+
+<h4>4.1.3 优化</h4>
+<ul>
+  <li><strong>自适应阈值</strong>: 根据历史失败模式动态调整 failure_threshold。如果某模型稳定→提高阈值避免误熔断；如果某模型不稳定→降低阈值快速隔离</li>
+  <li><strong>预热机制</strong>: OPEN 状态下定期（如每 30s）对模型发送低成本探针（如简单 echo），提前检测模型恢复</li>
+</ul>
+
+<h3>4.2 LLMClient 模型路由</h3>
+<table>
+<tr><th>KPI</th><th>目标</th><th>测量方法</th></tr>
+<tr><td>路由准确率</td><td class="bg-green">architect→GLM-5.2, developer→DSv4-Pro, clarifier→DSv4-Flash 匹配率 ≥ 90%</td><td>统计 model_source 与预期模型的匹配</td></tr>
+<tr><td>降级频率</td><td class="bg-yellow">≤ 5% 的调用需要降级</td><td>model_source="fallback" 的调用 / 总调用</td></tr>
+<tr><td>降级延迟增量</td><td class="bg-yellow">≤ 500ms</td><td>降级调用的延迟 - 正常调用的延迟中位数</td></tr>
+<tr><td>成本偏差</td><td class="bg-green">实际成本 ≤ 预估成本的 120%</td><td>总 cost_usd / budget_estimate</td></tr>
+</table>
+</div>
+
+<!-- ===== 5. 编排层 ===== -->
+<h2 id="orchestration">5. 编排层 (Goal / Scheduler / Compose) 测量与优化</h2>
+<div class="section">
+
+<h3>5.1 MetaOrchestrator</h3>
+<div class="card-grid">
+  <div class="card card-urgent">
+    <h4>🔴 核心KPI: 任务拆分准确率</h4>
+    <p><strong>定义</strong>: 生成的 TaskDAG 中，子任务划分正确且依赖关系与实际代码改动匹配的比例</p>
+    <p><strong>测量</strong>: 人工标注 20 个典型需求，定义"标准 TaskDAG"→对比 MetaOrchestrator 生成的 DAG vs 标准 DAG</p>
+    <div class="formula">Accuracy = |generated_edges ∩ reference_edges| / |reference_edges ∪ generated_edges|</div>
+    <p><strong>目标</strong>: ≥ 80%</p>
+  </div>
+  <div class="card card-important">
+    <h4>🟠 核心KPI: 并行效率</h4>
+    <p><strong>定义</strong>: 层内并行的实际加速比</p>
+    <div class="formula">Speedup = Σ单任务时间 / 实际层完成时间</div>
+    <p><strong>目标</strong>: 3个并行任务时 speedup ≥ 2.0x</p>
+    <p><strong>瓶颈排查</strong>: 如果 speedup 低→检查 asyncio.gather 是否被某个慢任务拖累→检查 Semaphore 是否正确释放→检查 Worktree 创建是否串行化</p>
+  </div>
+  <div class="card card-important">
+    <h4>🟠 核心KPI: 预算分配效率</h4>
+    <p><strong>定义</strong>: BudgetAllocator 分配预算与实际消耗的相关性</p>
+    <div class="formula">Corr = Pearson(allocated_budget[], actual_consumption[]) 对所有子任务</div>
+    <p><strong>目标</strong>: ≥ 0.7</p>
+    <p>相关性低→BudgetAllocator 在瞎猜→改进: 基于历史任务复杂度（代码行数/文件数/依赖深度）而非纯 PRD 长度</p>
+  </div>
+</div>
+
+<h3>5.2 IntakeRouter</h3>
+<table>
+<tr><th>KPI</th><th>目标</th><th>测量</th></tr>
+<tr><td>形态检测准确率</td><td class="bg-green">≥ 90% (vs 人工标注)</td><td>100 个输入样本, 人工标注真实形态, 对比 router 判定</td></tr>
+<tr><td>清晰度评分校准</td><td class="bg-green">评分与人工评分的 Spearman ρ ≥ 0.7</td><td>人工打分 1-5 → 与 IntakeRouter 的 0-1 做相关分析</td></tr>
+<tr><td>跳过决策正确率</td><td class="bg-red">误跳过率=0% (跳过了需要澄清的需求 → 后果严重)</td><td>needs_clarify=false 但后续仍需人工澄清的样本比例</td></tr>
+</table>
+
+<h4>优化: 从启发式→轻量 ML</h4>
+<p>当前是关键词匹配评分。收集 500+ 标注样本后，可训练轻量分类器（如 scikit-learn 的 LogisticRegression + TF-IDF），精度可从 ~75% 提升到 ~90%。但<strong>必须保留 fail-open 安全机制</strong>: ML 模型输出不确定时 → 走完整流程。</p>
+
+<h3>5.3 ProcessGuard</h3>
+<div class="card card-urgent">
+  <h4>🔴 最高优先级测试</h4>
+  <p><strong>ProcessGuard 是安全关键模块——LLM 不可绕过的代码级守卫。</strong>如果它坏了，整个流程的安全性就没了。</p>
+  <p><strong>必须测试</strong>: 模拟 LLM 尝试跳过 PARSING 直接进入 CODING→验证 ProcessViolationError 被抛出</p>
+  <p><strong>必须测试</strong>: 模拟 LLM 尝试未经 ComplexityScorer 授权使用快车道→验证被拒绝</p>
+  <p><strong>契约不变量</strong>:</p>
+  <div class="formula">∀ 状态转换: PARSING 和 CODING 这两个强制状态 100% 被执行（不可绕过）</div>
+  <p><strong>测量</strong>: 注入 100 次违规尝试→100% 被拦截。任何一次未被拦截 = P0 bug。</p>
+</div>
+
+<h3>5.4 SubTaskSession</h3>
+<table>
+<tr><th>KPI</th><th>目标</th><th>测量</th></tr>
+<tr><td>流水线完成率</td><td class="bg-green">≥ 85% 的 SubTaskSession 到达 DONE</td><td>status="ok" / 总 session 数</td></tr>
+<tr><td>Critique 有效率</td><td class="bg-yellow">退回后有实质性改进的比例 ≥ 60%</td><td>人工审查退回前后的代码 diff, 判断改进是否有效</td></tr>
+<tr><td>Critique 误拒率</td><td class="bg-red">≤ 5% (正确的代码被 Critique 拒绝)</td><td>APPROVED=false 但 ExpertExecutor 判定代码实际可用的比例</td></tr>
+<tr><td>Worktree 创建成功率</td><td class="bg-green">≥ 99%</td><td>Worktree 创建异常 / 总 session 数</td></tr>
+</table>
+</div>
+
+<!-- ===== 6. Agent 执行引擎 ===== -->
+<h2 id="agents">6. Agent 执行引擎 测量与优化</h2>
+<div class="section">
+
+<h3>6.1 AgentFactory</h3>
+<table>
+<tr><th>KPI</th><th>目标</th></tr>
+<tr><td>角色创建成功率</td><td class="bg-green">≥ 99.9% (任何角色创建失败都是严重的)</td></tr>
+<tr><td>角色正确性</td><td>给定 task→role 映射，Agent 产生的输出类型与预期匹配率 ≥ 95%（如 architect 应输出 design, developer 应输出 code）</td></tr>
+</table>
+
+<h3>6.2 五大能力引擎 (Reflection/PreAct/VIGIL/MCTS/ReAct)</h3>
+<p><strong>核心问题</strong>: 这些引擎是否真的在提升 Agent 质量？还是只是增加了延迟？</p>
+
+<div class="card-grid">
+  <div class="card card-urgent">
+    <h4>🔴 ReflectionEngine 消融测试</h4>
+    <p><strong>方法</strong>: 用同一批 50 个编码任务，分别跑:</p>
+    <ol>
+      <li>Agent + ReflectionEngine (当前)</li>
+      <li>Agent 无 ReflectionEngine (对照)</li>
+    </ol>
+    <p><strong>测量</strong>: 两个组别的代码质量（沙箱通过率 + CritiqueAgent APPROVED 率）</p>
+    <p><strong>判定</strong>: 如果无显著差异 (p > 0.05)→ReflectionEngine 是摆设→考虑移除或重构</p>
+  </div>
+  <div class="card card-important">
+    <h4>🟠 MCTSPlanner 消融测试</h4>
+    <p><strong>方法</strong>: ArchitectAgent 分别使用 MCTS vs 单路径，比较生成的 Plan 质量</p>
+    <p><strong>测量</strong>: Plan 的可行性（后续 SubTask 成功完成的概率）</p>
+    <p><strong>优化</strong>: MCTS 模拟次数可调 (当前是多少？文档无记载)。在 5/10/20 次模拟间找 sweet spot</p>
+  </div>
+  <div class="card card-important">
+    <h4>🟠 VIGIL SelfHealer 有效性</h4>
+    <p><strong>方法</strong>: 注入 Agent 故障（如故意给错误上下文）→观察 VIGIL 是否能检测并修复</p>
+    <p><strong>测量</strong>: 故障检出率 + 自动修复率</p>
+    <p><strong>目标</strong>: 检出率 ≥ 80%, 修复率 ≥ 50%</p>
+  </div>
+</div>
+
+<h3>6.3 Agent 角色评估 (10 个角色)</h3>
+<p>每个角色定义: 职责声明 + 输入格式 + 输出格式 + 成功标准。</p>
+<table>
+<tr><th>角色</th><th>成功标准</th><th>测量方法</th></tr>
+<tr><td>clarifier</td><td>澄清后需求的结构化程度提升 ≥ 30% (用 IntakeRouter 清晰度评分前后对比)</td><td>clarify 前后 clarity_score 差值</td></tr>
+<tr><td>architect</td><td>生成的 Plan 可实现率 ≥ 80% (后续 CODING 无阻赛)</td><td>CODING 阶段无因设计缺陷导致的阻塞</td></tr>
+<tr><td>developer</td><td>生成的代码在沙箱中通过率 ≥ 70%</td><td>沙箱执行成功 / 总生成次数</td></tr>
+<tr><td>reviewer</td><td>与 CritiqueAgent 的一致性 ≥ 70% (不应互相矛盾)</td><td>两个 Reviewer 对同一段代码的判定一致率</td></tr>
+<tr><td>chatter</td><td>意图识别准确率 ≥ 90% (_intent 标记与用户实际意图匹配)</td><td>人工标注 50 次对话</td></tr>
+</table>
+</div>
+
+<!-- ===== 7. 上下文系统 ===== -->
+<h2 id="context">7. 上下文系统 测量与优化</h2>
+<div class="section">
+
+<h3>7.1 核心 KPI: 上下文 ROI</h3>
+<div class="formula">ROI = (Agent 任务成功率提升%) / (额外 Token 消耗%)</div>
+<p>如果 ROI < 1.0 → 上下文系统在消耗 Token 但没带来等比例的收益。</p>
+
+<div class="card-grid">
+  <div class="card">
+    <h4>Prebuilder 有效性</h4>
+    <p><strong>5 个 Prebuilder 各自</strong>的上下文被 Agent 实际引用的比例</p>
+    <p>收集: Agent 输出中引用了 Prebuilder 提供的哪些信息</p>
+    <p>目标: 引用率 ≥ 20%。低于 10% 的 Prebuilder→考虑移除</p>
+  </div>
+  <div class="card">
+    <h4>Builder 有效性</h4>
+    <p><strong>7 个 Builder</strong>各自构建的上下文是否被 Agent 使用</p>
+    <p>同样追踪引用率。低引用率 Builder → 移除或降级为可选</p>
+  </div>
+  <div class="card">
+    <h4>Scanner 覆盖率</h4>
+    <p><strong>5 个 Scanner</strong>发现的文件是否覆盖了 Agent 最终修改的文件</p>
+    <div class="formula">覆盖率 = |Scanner发现文件 ∩ Agent实际修改文件| / |Agent实际修改文件|</div>
+    <p>目标: ≥ 80%</p>
+  </div>
+</div>
+
+<h3>7.2 3 级上下文加载的阶梯测试</h3>
+<div class="mermaid">
+flowchart LR
+    SAME["同一任务 × 3"] --> S1["Stage1 上下文<br/>(~500-1000t)"] --> R1["成功率 R1"]
+    SAME --> S2["Stage2 上下文<br/>(~3000-8000t)"] --> R2["成功率 R2"]
+    SAME --> S3["Stage3 上下文<br/>(~12000-50000t)"] --> R3["成功率 R3"]
+
+    R1 & R2 & R3 --> DECIDE{"R3 > R2 > R1?"}
+    DECIDE -->|"否 (Stage3 没帮助)"| S3_WASTE["Stage3 是 Token 浪费<br/>→ 削减 Stage3 内容"]
+    DECIDE -->|"是 (递增)"| GOOD["上下文阶梯有效<br/>→ 保持"]
+</div>
+
+<h3>7.3 Compression Pipeline</h3>
+<table>
+<tr><th>KPI</th><th>目标</th></tr>
+<tr><td>压缩比</td><td class="bg-green">≥ 3:1 (压缩后 ≤ 原始 33%)</td></tr>
+<tr><td>信息保留率</td><td class="bg-red">≥ 90% (压缩后 Agent 成功率不应下降 10%+ vs 未压缩)</td></tr>
+<tr><td>压缩延迟</td><td class="bg-yellow">≤ 2s (不应成为瓶颈)</td></tr>
+</table>
+</div>
+
+<!-- ===== 8. 检查点 & 资源熔断 ===== -->
+<h2 id="checkpoint">8. 检查点 & 资源熔断 测量与优化</h2>
+<div class="section">
+
+<h3>8.1 CheckpointManager</h3>
+<div class="card card-urgent">
+  <h4>🔴 最重要测试: 故障恢复</h4>
+  <p><strong>测试场景</strong>:</p>
+  <ol>
+    <li>启动任务 → 运行到 CODING → 模拟进程崩溃 (kill -9)</li>
+    <li>重启进程 → 调用 resume(task_id)</li>
+    <li>验证: 任务从 CODING 状态恢复，上下文 artifact 被还原，任务最终成功完成</li>
+  </ol>
+  <p><strong>4 层降级全路径验证</strong>:</p>
+  <ol>
+    <li>Redis 可用→PG 不可用→验证从 Redis 恢复</li>
+    <li>Redis 不可用→PG 可用→验证从 PG 恢复</li>
+    <li>Redis+PG 都不可用→验证从磁盘恢复</li>
+    <li>全部不可用→验证返回 None (不崩溃)</li>
+  </ol>
+</div>
+
+<table>
+<tr><th>KPI</th><th>目标</th></tr>
+<tr><td>保存成功率</td><td class="bg-green">≥ 99.9%</td></tr>
+<tr><td>恢复成功率</td><td class="bg-green">≥ 95% (从崩溃点恢复后任务可继续)</td></tr>
+<tr><td>保存延迟</td><td class="bg-yellow">P99 ≤ 100ms (不应阻塞状态转换)</td></tr>
+<tr><td>存储开销</td><td class="bg-yellow">每个任务 ≤ 1MB (context 截断到 500 字摘要)</td></tr>
+<tr><td>乐观锁冲突率</td><td class="bg-green">≤ 1% (PG version 冲突)</td></tr>
+</table>
+
+<h3>8.2 ResourceGuard</h3>
+<table>
+<tr><th>KPI</th><th>目标</th><th>测量</th></tr>
+<tr><td>TokenBucket 限流准确率</td><td class="bg-green">±5% 误差 (实际限流 vs 理论限流)</td><td>1 秒内 allow() 返回 true 的次数 vs 理论 refill rate</td></tr>
+<tr><td>BudgetGuard 超预算检出率</td><td class="bg-red">100% (超预算的任务必须被拦截)</td><td>超预算但未被拦截的调用次数</td></tr>
+<tr><td>allow_request() 延迟</td><td class="bg-green">P99 ≤ 12ms</td><td>纯内存, 无 IO</td></tr>
+<tr><td>降级触发准确率</td><td class="bg-yellow">降级后不应再出现同类型资源耗尽</td><td>降级后 still_over_budget 的比例</td></tr>
+</table>
+</div>
+
+<!-- ===== 9. 知识图谱 & 记忆 ===== -->
+<h2 id="knowledge">9. 知识图谱 & 记忆系统 测量与优化</h2>
+<div class="section">
+
+<h3>9.1 知识图谱 (knowledge/)</h3>
+<table>
+<tr><th>KPI</th><th>目标</th><th>测量</th></tr>
+<tr><td>语义搜索 Recall@5</td><td class="bg-green">≥ 80% (前5个结果含正确答案)</td><td>构造 100 个知识查询, 人工标注正确答案, 计算 Recall</td></tr>
+<tr><td>语义搜索 MRR</td><td class="bg-green">≥ 0.7 (Mean Reciprocal Rank)</td><td>正确答案的排名倒数均值</td></tr>
+<tr><td>BGE vs TF-IDF 降级频率</td><td class="bg-yellow">≤ 10% (BGE 应 90%+ 时间可用)</td><td>TF-IDF 降级次数 / 总搜索次数</td></tr>
+<tr><td>CodeGraph 查询延迟</td><td class="bg-yellow">P99 ≤ 200ms</td><td>符号查找/引用查找的延迟</td></tr>
+<tr><td>CodeGraph 数据新鲜度</td><td class="bg-green">≤ 5min 延迟 (代码变更→图谱更新)</td><td>git commit 时间 vs 图谱更新时间</td></tr>
+</table>
+
+<h3>9.2 分层记忆 (memory/)</h3>
+<table>
+<tr><th>记忆类型</th><th>KPI</th><th>目标</th></tr>
+<tr><td>情节记忆</td><td>检索准确率 (Recall@10)</td><td>≥ 70%</td></tr>
+<tr><td>用户画像</td><td>新对话中 Agent 行为与历史偏好的一致性</td><td>≥ 80%</td></tr>
+<tr><td>决策日志</td><td>相似场景下避免重复错误的比例</td><td>≥ 60% (跨会话同类型错误对比)</td></tr>
+</table>
+
+<h4>优化: 记忆压缩度测试</h4>
+<p>同类型错误在不同会话中出现的频率。如果记忆系统有效，这个频率应该递减。</p>
+<div class="formula">Error_Recurrence_Rate(week_n) = 同类错误重复次数 / 总错误数</div>
+<p>目标: 每 4 周下降 10%+</p>
+</div>
+
+<!-- ===== 10. 自我进化 ===== -->
+<h2 id="evolution">10. 自我进化系统 (evolution/) 测量与优化</h2>
+<div class="section">
+
+<p><strong>这是 Orbit 最独特的模块，也是最难测量的。</strong>进化系统声称"让系统越用越好"——如何量化？</p>
+
+<div class="card-grid">
+  <div class="card card-urgent">
+    <h4>🔴 GEPA 进化效果</h4>
+    <p><strong>A/B 测试</strong>: 同一批 50 个任务，分别用 GEPA 进化后的 Prompt vs 初始 Prompt</p>
+    <p><strong>测量</strong>: 任务成功率差异</p>
+    <div class="formula">GEPA_gain = SuccessRate(after_GEPA) - SuccessRate(before_GEPA)</div>
+    <p><strong>目标</strong>: ≥ +5% (如果 ≤ 0% → GEPA 无效)</p>
+  </div>
+  <div class="card card-important">
+    <h4>🟠 SCOPE 双流有效性</h4>
+    <p>SCOPE 声称"分离成功路径和失败路径"→ 需要验证:</p>
+    <ol>
+      <li>成功路径上的 Agent 成功率是否高于平均水平</li>
+      <li>失败路径是否被逐渐废弃（使用频率下降）</li>
+    </ol>
+  </div>
+  <div class="card card-important">
+    <h4>🟠 蒸馏保真度</h4>
+    <p><strong>方法</strong>: 蒸馏后的 Agent vs 原始 Agent 在 50 个测试任务上对比</p>
+    <p><strong>测量</strong>: 成功率保持率 + 延迟下降率</p>
+    <div class="formula">Fidelity = SuccessRate(distilled) / SuccessRate(original)</div>
+    <p><strong>目标</strong>: ≥ 0.95 (蒸馏后质量不应明显下降)</p>
+  </div>
+  <div class="card card-nice">
+    <h4>🔵 ANCHOR 对齐度</h4>
+    <p><strong>定义</strong>: Agent 行为与 ANCHOR 基准的偏离程度</p>
+    <p><strong>测量</strong>: 定期运行 ANCHOR 对齐测试套件 (预定义的 20 个关键行为检查点)</p>
+    <p><strong>目标</strong>: 对齐度 ≥ 90%</p>
+  </div>
+</div>
+
+<h3>10.1 进化系统核心挑战: 归因</h3>
+<div class="note">
+<strong>最难的问题</strong>: 如果任务成功率从 70% 提升到 75%，这 5% 的提升应该归因于:
+<ul>
+  <li>GEPA 进化了 Prompt？</li>
+  <li>SCOPE 优化了路径选择？</li>
+  <li>LLM 模型本身升级了？</li>
+  <li>Context 系统改进了？</li>
+  <li>随机波动？</li>
+</ul>
+<p><strong>解决方法</strong>: 每次只改一个模块，保持其他模块不变。建立<strong>对照时间线</strong>——每周固定一天跑全量基准测试，记录所有模块版本和表现。用因果分析（如 DoWhy 库）而非纯相关性。</p>
+</div>
+</div>
+
+<!-- ===== 11. 沙箱 & 安全 ===== -->
+<h2 id="sandbox-sec">11. 沙箱 & 安全模块 测量与优化</h2>
+<div class="section">
+
+<h3>11.1 Docker 沙箱 vs ProcessSandbox</h3>
+<table>
+<tr><th>KPI</th><th>Docker</th><th>ProcessSandbox</th></tr>
+<tr><td>隔离级别</td><td class="bg-green">进程+文件系统+网络 全隔离</td><td class="bg-yellow">仅进程级 (subprocess)</td></tr>
+<tr><td>启动延迟</td><td>~500-2000ms</td><td class="bg-green">~10-50ms</td></tr>
+<tr><td>执行超时强杀率</td><td class="bg-green">100%</td><td class="bg-green">100% (SIGKILL)</td></tr>
+<tr><td>降级触发率</td><td colspan="2" class="bg-yellow">目标 ≤ 5% (Docker 应在 95%+ 环境可用)</td></tr>
+</table>
+
+<h4>优化: 沙箱预热池</h4>
+<p>Docker 容器启动 ~2s 延迟。预启动 3-5 个容器保持热备，Agent 需要时直接分配→延迟降到 ~50ms。</p>
+
+<h3>11.2 安全模块 (security/)</h3>
+<table>
+<tr><th>KPI</th><th>目标</th></tr>
+<tr><td>命令注入检出率</td><td class="bg-red">≥ 99% (漏检一个即严重安全事故)</td></tr>
+<tr><td>硬编码密钥检出率</td><td class="bg-red">≥ 95%</td></tr>
+<tr><td>PermissionEngine 权限越界拦截率</td><td class="bg-red">100%</td></tr>
+</table>
+</div>
+
+<!-- ===== 12. 可观测性 ===== -->
+<h2 id="observability">12. 可观测性 & 审计 测量与优化</h2>
+<div class="section">
+
+<h3>12.1 AuditLogger</h3>
+<table>
+<tr><th>KPI</th><th>目标</th></tr>
+<tr><td>审计覆盖率</td><td class="bg-red">100% (每个 Agent 动作必须有审计记录)</td></tr>
+<tr><td>审计查询延迟</td><td class="bg-yellow">P99 ≤ 500ms</td></tr>
+<tr><td>审计保留期</td><td>≥ 90 天 (合规)</td></tr>
+</table>
+
+<h3>12.2 EventBus</h3>
+<table>
+<tr><th>KPI</th><th>目标</th></tr>
+<tr><td>事件发布延迟</td><td class="bg-green">P99 ≤ 5ms</td></tr>
+<tr><td>事件丢失率</td><td class="bg-red">0%</td></tr>
+<tr><td>订阅者响应延迟</td><td class="bg-yellow">P99 ≤ 50ms</td></tr>
+</table>
+
+<h3>12.3 Metrics (Prometheus)</h3>
+<div class="card">
+  <h4>现状（2026-07-08 核对 <code>observability/metrics.py</code>）</h4>
+  <p><strong>已有 14 个</strong> <code>orbit_*</code> 指标——本文 v1.0 的「需补充」表大部已过期。已存在：<code>active_tasks</code>、<code>tasks_total</code>、<code>task_duration_seconds</code>、<code>circuit_breaker_state</code>、<code>scheduling_latency_seconds</code>、<code>llm_call_duration_seconds</code>、<code>llm_tokens_total</code>、<code>hallucination_validations_total</code>、<code>hallucination_intercepted_total</code>、<code>hallucination_entropy_gauge</code>、<code>compliance_checks_total</code>、<code>knowledge_queries_total</code>、<code>sandbox_executions_total</code>、<code>sandbox_pool_available</code>。</p>
+  <h4>真正待补（仅 4 个）</h4>
+  <table>
+    <tr><th>指标</th><th>类型</th><th>标签</th><th>状态</th></tr>
+    <tr><td><code>orbit_critique_decisions_total</code></td><td>Counter</td><td>verdict, severity</td><td><span class="badge bg-red">缺</span></td></tr>
+    <tr><td><code>orbit_checkpoint_operations_total</code></td><td>Counter</td><td>operation, tier, status</td><td><span class="badge bg-red">缺</span></td></tr>
+    <tr><td><code>orbit_intake_accuracy</code></td><td>Gauge</td><td>form, clarity_bucket</td><td><span class="badge bg-red">缺</span></td></tr>
+    <tr><td><code>orbit_goal_status_total</code></td><td>Counter</td><td>status, task_count</td><td><span class="badge bg-yellow">部分</span>（<code>tasks_total</code>+<code>active_tasks</code> 已覆盖大半，可细化 status 标签）</td></tr>
+    <tr><td colspan="4"><code>orbit_task_duration_seconds</code> / <code>orbit_hallucination_*</code> / <code>orbit_llm_tokens_total</code></td></tr>
+    <tr><td colspan="4" class="bg-green">↑ 本文 v1.0 列为待补，实际<strong>已存在</strong>，无需重复实现</td></tr>
+  </table>
+</div>
+</div>
+
+<!-- ===== 13. 辅助模块 ===== -->
+<h2 id="auxiliary">13. 辅助模块 (15 个) 测量与优化</h2>
+<div class="section">
+
+<p>以下模块不直接参与核心执行管线，但提供支撑能力。测量重点: <strong>可用性</strong> + <strong>故障隔离</strong>。</p>
+
+<table>
+<tr><th>模块</th><th>核心KPI</th><th>目标</th><th>优化方向</th></tr>
+<tr>
+  <td>loop/ (定时调度)</td>
+  <td>调度准时率</td>
+  <td class="bg-green">±5s 误差内触发率 ≥ 95%</td>
+  <td>可用 <code>asyncio.create_task</code> 的调度精度统计</td>
+</tr>
+<tr>
+  <td>dream/ (后台任务)</td>
+  <td>Dream 任务完成率</td>
+  <td class="bg-green">≥ 90%</td>
+  <td>失败不阻塞主流程</td>
+</tr>
+<tr>
+  <td>compose/ (多Agent编排)</td>
+  <td>Spec 解析成功率</td>
+  <td class="bg-green">≥ 95% (格式良好的 Spec)</td>
+  <td>增加 Spec 格式校验 + 错误提示</td>
+</tr>
+<tr>
+  <td>worktree/ (Git隔离)</td>
+  <td>创建成功率</td>
+  <td class="bg-green">≥ 99%</td>
+  <td>磁盘空间不足时的降级策略</td>
+</tr>
+<tr>
+  <td>sharding/ (任务分片)</td>
+  <td>分片合理性</td>
+  <td class="bg-yellow">分片后任务完成率 ≥ 不分片</td>
+  <td>段落边界检测准确性</td>
+</tr>
+<tr>
+  <td>review/ (代码审查引擎)</td>
+  <td>与 CritiqueAgent 一致性</td>
+  <td class="bg-green">≥ 70%</td>
+  <td>避免两个审查系统的矛盾判决</td>
+</tr>
+<tr>
+  <td>router/ (智能路由)</td>
+  <td>路由决策正确率</td>
+  <td class="bg-green">≥ 90%</td>
+  <td>CC_SWITCH 触发条件合理性</td>
+</tr>
+<tr>
+  <td>communication/ (消息总线)</td>
+  <td>消息投递成功率</td>
+  <td class="bg-red">≥ 99.9%</td>
+  <td>幂等性保证 + 重试机制</td>
+</tr>
+<tr>
+  <td>modes/ (交互协议)</td>
+  <td>模式切换准确率</td>
+  <td class="bg-green">≥ 85%</td>
+  <td>三维度评分校准</td>
+</tr>
+<tr>
+  <td>backup/ (快照恢复)</td>
+  <td>恢复成功率 + SHA256 校验通过率</td>
+  <td class="bg-red">100%</td>
+  <td>定期演练 (每月1次)</td>
+</tr>
+<tr>
+  <td>versioning/ (版本迁移)</td>
+  <td>Schema 迁移成功率</td>
+  <td class="bg-red">100%</td>
+  <td>迁移脚本必须可重复执行</td>
+</tr>
+<tr>
+  <td>files/ (文件操作)</td>
+  <td>操作成功率</td>
+  <td class="bg-green">≥ 99.9%</td>
+  <td>大文件处理 + 权限错误处理</td>
+</tr>
+<tr>
+  <td>lsp/ (LSP 协议)</td>
+  <td>诊断响应延迟</td>
+  <td class="bg-yellow">P99 ≤ 500ms</td>
+  <td>缓存诊断结果</td>
+</tr>
+<tr>
+  <td>integration/ (微信等)</td>
+  <td>连接可用性</td>
+  <td class="bg-yellow">≥ 99% uptime</td>
+  <td>重连机制 + 消息队列缓冲</td>
+</tr>
+<tr>
+  <td>cli/ (命令行入口)</td>
+  <td>CLI 命令成功率</td>
+  <td class="bg-green">≥ 99%</td>
+  <td>错误提示可读性</td>
+</tr>
+</table>
+</div>
+
+<!-- ===== 14. 跨模块测量基础设施 ===== -->
+<h2 id="cross-cutting">14. 跨模块测量基础设施</h2>
+<div class="section">
+
+<h3>14.1 分布式调用链追踪</h3>
+<p>当前缺失: 一次 Goal 执行，经过 MetaOrchestrator→SubTaskSession→Agent→LLM→防幻觉→沙箱→检查点→审计。如果任务失败，<strong>无法知道是哪个环节出了问题</strong>。</p>
+
+<div class="mermaid">
+flowchart LR
+    GOAL["Goal: task-001"] --> ORCH["MetaOrchestrator<br/>span: orchestrator"]
+    ORCH --> SUB1["SubTask: task-0<br/>span: subtask-0"]
+    SUB1 --> AGT1["Agent: developer<br/>span: agent-dev-0"]
+    AGT1 --> LLM1["LLM: generate()<br/>span: llm-call-1"]
+    AGT1 --> HALLU["防幻觉: validate()<br/>span: halluc-1"]
+    SUB1 --> CKPT["检查点: save()<br/>span: checkpoint-1"]
+
+    LLM1 -.-> TRACE["OpenTelemetry Trace<br/>trace_id=xxx<br/>每个 span: duration, status, attributes"]
+    HALLU -.-> TRACE
+    CKPT -.-> TRACE
+
+    TRACE --> JAEGER["Jaeger / Grafana Tempo<br/>查询: 哪个模块最慢？<br/>哪个模块导致最多失败？"]
+
+    style TRACE fill:#1b2a3a,stroke:#58a6ff
+</div>
+
+<div class="card card-urgent">
+  <h4>🔴 最高的优先级基础设施</h4>
+  <p>当前 <code>observability/trace.py</code> 文件存在但未接入所有模块。必须:</p>
+  <ol>
+    <li>在每个模块的入口/出口创建 span</li>
+    <li>span 记录: 输入摘要 (前 200 字符) + 输出状态 + 耗时 + 错误信息</li>
+    <li>导出到 Jaeger 或至少 JSON 日志文件</li>
+  </ol>
+  <p>没有这个，所有"模块效能评估"都是盲人摸象。</p>
+</div>
+
+<h3>14.2 模块效能仪表板 (Grafana)</h3>
+<table>
+<tr><th>面板</th><th>展示内容</th><th>数据源</th></tr>
+<tr><td>模块健康矩阵</td><td>45 个模块 × 3 色 (绿/黄/红)，基于 KPI 达标情况</td><td>Prometheus</td></tr>
+<tr><td>端到端成功率趋势</td><td>每周 Goal success rate 折线图</td><td>Prometheus + PG</td></tr>
+<tr><td>模块贡献瀑布图</td><td>每个模块对最终成功率的边际贡献 (消融实验结果)</td><td>离线分析</td></tr>
+<tr><td>Token 流向桑基图</td><td>编排层 vs Agent层 vs 防幻觉层 vs 上下文层的 Token 分配</td><td>LLMClient usage log</td></tr>
+<tr><td>错误热力图</td><td>哪个模块 × 哪种错误类型 的出现频率最高</td><td>AuditLogger + Trace</td></tr>
+<tr><td>延迟瀑布图</td><td>端到端延迟按模块分解 (Gantt 风格)</td><td>Trace spans</td></tr>
+</table>
+
+<h3>14.3 自动化回归测试套件</h3>
+<div class="formula">
+<pre>
+# 模块效能回归套件——每次 PR 合并前运行
+tests/
+├── effectiveness/                    # 新建目录
+│   ├── test_hallucination_l1.py      # L1 基准数据集 + 断言
+│   ├── test_hallucination_l3.py      # L3 熵阈值校准回归
+│   ├── test_hallucination_l7.py      # L7 沙箱验证回归
+│   ├── test_circuit_breaker.py       # 熔断器状态机完整性
+│   ├── test_critique_gate.py         # Critique 门禁正确性
+│   ├── test_process_guard.py         # ProcessGuard 不可绕过性
+│   ├── test_checkpoint_recovery.py   # 检查点恢复端到端
+│   ├── test_intake_router.py         # IntakeRouter 形态判定
+│   ├── test_resource_guard.py        # ResourceGuard 限流准确性
+│   ├── test_evolution_effect.py      # GEPA/SCOPE 进化效果
+│   └── conftest.py                   # 共享 fixture (基准数据集等)
+</pre>
+</div>
+</div>
+
+<!-- ===== 15. 基准数据集 ===== -->
+<h2 id="benchmark">15. 基准数据集设计</h2>
+<div class="section">
+
+<h3>15.1 OrbitBench——Orbit 能力基准测试集</h3>
+<p>一个包含不同复杂度、不同语言、不同领域的需求-代码对的基准数据集。</p>
+
+<table>
+<tr><th>难度</th><th>任务数</th><th>示例</th><th>评估指标</th></tr>
+<tr>
+  <td>L0 语法修复</td>
+  <td>50</td>
+  <td>"修复这个 typo: prin('hello') → print('hello')"</td>
+  <td>成功率 100%</td>
+</tr>
+<tr>
+  <td>L1 单文件功能</td>
+  <td>100</td>
+  <td>"给这个函数添加 memoization" / "添加类型注解"</td>
+  <td>正确率 ≥ 90%</td>
+</tr>
+<tr>
+  <td>L2 多文件改动</td>
+  <td>60</td>
+  <td>"把 UserService 的 SQL 查询改为 SQLAlchemy ORM"</td>
+  <td>成功率 ≥ 80%</td>
+</tr>
+<tr>
+  <td>L3 跨模块重构</td>
+  <td>30</td>
+  <td>"将认证逻辑从 JWT 改为 OAuth2,涉及 5 个文件"</td>
+  <td>成功率 ≥ 60%</td>
+</tr>
+<tr>
+  <td>L4 新功能开发</td>
+  <td>20</td>
+  <td>"实现一个带分页和过滤的 REST API 端点"</td>
+  <td>成功率 ≥ 50%</td>
+</tr>
+<tr>
+  <td>L5 系统级任务</td>
+  <td>10</td>
+  <td>"为这个项目添加完整的 CI/CD pipeline"</td>
+  <td>成功率 ≥ 30%</td>
+</tr>
+</table>
+
+<p><strong>每个任务附带</strong>: 项目上下文 (git repo snapshot)、ground truth (正确实现)、验证脚本 (pytest)、幻觉标签 (哪行是幻觉)</p>
+
+<h3>15.2 基准数据集维护</h3>
+<ul>
+  <li><strong>来源</strong>: 从 Orbit 自身开发历史中提取 (真实需求) + 从开源项目贡献中提取 (已有 ground truth)</li>
+  <li><strong>更新频率</strong>: 每个迭代添加 10+ 个新案例 (特别是发现的新失败模式)</li>
+  <li><strong>防污染</strong>: 基准数据集不能用于训练/进化——仅用于评估。进化系统的训练数据独立管理</li>
+</ul>
+</div>
+
+<!-- ===== 16. 优先级矩阵 ===== -->
+<h2 id="priority">16. 优先级矩阵 & 实施路线图</h2>
+<div class="section">
+
+<h3>16.1 优先级矩阵 (Impact × Effort)</h3>
+<div class="mermaid">
+quadrantChart
+    title 模块效能评估优先级矩阵
+    x-axis "实施难度 低" --> "实施难度 高"
+    y-axis "影响力 低" --> "影响力 高"
+    quadrant-1 "立即做 (Quick Wins)"
+    quadrant-2 "重点投入 (Strategic)"
+    quadrant-3 "低优先级"
+    quadrant-4 "谨慎评估"
+    "Trace 全链路接入": [0.15, 0.85]
+    "防幻觉层消融实验": [0.2, 0.9]
+    "ProcessGuard 安全测试": [0.1, 0.95]
+    "基准幻觉数据集": [0.4, 0.88]
+    "CircuitBreaker 并发测试": [0.1, 0.8]
+    "CritiqueAgent 消融": [0.3, 0.75]
+    "ReflectionEngine 消融": [0.25, 0.7]
+    "检查点恢复端到端测试": [0.35, 0.78]
+    "OrbitBench 数据集": [0.6, 0.85]
+    "GEPA 进化 A/B 测试": [0.55, 0.65]
+    "MCTSPlanner 消融": [0.3, 0.55]
+    "IntakeRouter ML 升级": [0.5, 0.6]
+    "Pipeline 并行化": [0.45, 0.7]
+    "3级上下文阶梯测试": [0.4, 0.6]
+    "Grafana 仪表板": [0.35, 0.55]
+    "Z3 范围限定": [0.5, 0.4]
+    "SCOPE 双流验证": [0.7, 0.5]
+    "全消融实验自动化": [0.8, 0.55]
+    "Memory 跨会话效果": [0.75, 0.6]
+    "ANCHOR 对齐验证": [0.65, 0.4]
+</div>
+
+<h3>16.2 三阶段实施路线图</h3>
+
+<div class="note">
+<strong>2026-07-08 校准</strong>：Phase 1 任务 2/3（ProcessGuard、CircuitBreaker）及 Phase 2 任务 7-10（Critique/checkpoint/intake/resource_guard）的<strong>基础测试已存在</strong>——实际工作是「<strong>升级现有 correctness 测试为效能断言</strong>（注入压测 / KPI 阈值 / 消融对照）」，非从零新建。Phase 1 任务 4（Prometheus）缩为补 4 个指标（见 §12.3）。<strong>真正的绿地</strong>：全链路 Trace 接线、消融 harness、benchmark 数据集。
+</div>
+
+<h4>第一阶段: 基础可观测 + Quick Wins (1-2 迭代)</h4>
+<table>
+<tr><th>任务</th><th>产出</th><th>验收标准</th></tr>
+<tr>
+  <td>1. 全链路 Trace 接入</td>
+  <td>每个核心模块有 OpenTelemetry span</td>
+  <td>Jaeger 中可查询一次 Goal 执行的完整 trace</td>
+</tr>
+<tr>
+  <td>2. ProcessGuard 完整测试套件</td>
+  <td>tests/effectiveness/test_process_guard.py</td>
+  <td>100 次违规注入 → 100% 拦截</td>
+</tr>
+<tr>
+  <td>3. CircuitBreaker 并发安全测试</td>
+  <td>tests/effectiveness/test_circuit_breaker.py</td>
+  <td>状态机转移 100% 覆盖, RMW 并发无竞态</td>
+</tr>
+<tr>
+  <td>4. Prometheus 指标补全</td>
+  <td>8 个核心 Counter/Histogram</td>
+  <td>Prometheus 端点可查询所有指标</td>
+</tr>
+</table>
+
+<h4>第二阶段: 逐层有效性验证 (3-5 迭代)</h4>
+<table>
+<tr><th>任务</th><th>产出</th><th>验收标准</th></tr>
+<tr>
+  <td>5. 基准幻觉数据集 v1 (100+ 样本)</td>
+  <td>data/benchmarks/hallucination_v1.json</td>
+  <td>含标签的真实幻觉样本</td>
+</tr>
+<tr>
+  <td>6. 防幻觉管道消融实验</td>
+  <td>每层贡献度数据</td>
+  <td>确定哪些层有效 (F1 贡献 > 0.05)</td>
+</tr>
+<tr>
+  <td>7. CritiqueAgent 消融 (有/无门禁对比)</td>
+  <td>30 任务 × 2 组对照</td>
+  <td>量化 Critique 对最终代码质量的影响</td>
+</tr>
+<tr>
+  <td>8. ReflectionEngine 消融</td>
+  <td>50 任务 × 2 组对照</td>
+  <td>有/无 Reflection 的代码质量对比</td>
+</tr>
+<tr>
+  <td>9. 检查点恢复端到端测试</td>
+  <td>4 层降级全覆盖</td>
+  <td>恢复成功率 ≥ 95%</td>
+</tr>
+<tr>
+  <td>10. ResourceGuard 限流准确性测试</td>
+  <td>TokenBucket 偏差 ±5%</td>
+  <td>1M 次调用统计</td>
+</tr>
+</table>
+
+<h4>第三阶段: 系统级优化 + 持续闭环 (6+ 迭代)</h4>
+<table>
+<tr><th>任务</th><th>产出</th><th>验收标准</th></tr>
+<tr>
+  <td>11. OrbitBench v1 (270 任务)</td>
+  <td>完整基准数据集</td>
+  <td>L0-L5 全覆盖</td>
+</tr>
+<tr>
+  <td>12. GEPA 进化 A/B 测试框架</td>
+  <td>自动化进化效果评估</td>
+  <td>每周跑一次，输出进化收益报告</td>
+</tr>
+<tr>
+  <td>13. Grafana 模块效能仪表板</td>
+  <td>6 个面板全部上线</td>
+  <td>任一团队可查看模块健康状态</td>
+</tr>
+<tr>
+  <td>14. Pipeline 并行化 + 沙箱预热池</td>
+  <td>延迟下降 40%+</td>
+  <td>P99 端到端延迟降低</td>
+</tr>
+<tr>
+  <td>15. 低效模块处置</td>
+  <td>基于数据的移除/降级决策</td>
+  <td>贡献度 < 0.03 的模块降级为可选</td>
+</tr>
+<tr>
+  <td>16. 持续效能回归 CI</td>
+  <td>每次 PR 自动跑效能基准</td>
+  <td>效能下降 > 5% → CI 红灯</td>
+</tr>
+</table>
+</div>
+
+<!-- ===== 17. 总结 ===== -->
+<h2 id="summary">17. 总结: 量化闭环</h2>
+<div class="section">
+
+<div class="mermaid">
+flowchart LR
+    DEFINE["📋 定义契约<br/>(每个模块的输入/输出/SLA)"] --> MEASURE["📏 测量效能<br/>(KPI + 基准数据集 + Trace)"]
+    MEASURE --> DIAGNOSE["🔍 诊断瓶颈<br/>(消融实验 + 归因分析)"]
+    DIAGNOSE --> OPTIMIZE["🔧 优化或移除<br/>(调整参数 / 降级 / 删除)"]
+    OPTIMIZE --> DEFINE
+
+    MEASURE -.-> DASHBOARD["📊 实时仪表板<br/>45 模块健康矩阵"]
+    DIAGNOSE -.-> REPORT["📄 每周效能报告<br/>排名 + 趋势 + 建议"]
+
+    style DEFINE fill:#1b2a3a,stroke:#58a6ff
+    style MEASURE fill:#1b3a3a,stroke:#39d2c0
+    style DIAGNOSE fill:#3a351b,stroke:#d2991d
+    style OPTIMIZE fill:#1b3a1b,stroke:#3fb950
+</div>
+
+<h3>核心原则</h3>
+<div class="card-grid">
+  <div class="card">
+    <h4>原则 1: 无测量不优化</h4>
+    <p>任何模块在被量化评估之前，不投入优化资源。直觉驱动优化 = 随机游走。</p>
+  </div>
+  <div class="card">
+    <h4>原则 2: 消融实验是金标准</h4>
+    <p>证明模块有效的唯一方法: 拿掉它→系统变差。F1 贡献 < 0.03 的模块应降级或移除。</p>
+  </div>
+  <div class="card">
+    <h4>原则 3: 基准数据集防污染</h4>
+    <p>评估数据 ≠ 训练数据。用同一份数据训练和评估 = 自欺欺人。</p>
+  </div>
+  <div class="card">
+    <h4>原则 4: 故障安全优先</h4>
+    <p>ProcessGuard、CircuitBreaker、Sandbox 等安全关键模块→先验证它们不会坏。其他模块可以慢慢测。</p>
+  </div>
+  <div class="card">
+    <h4>原则 5: 持续闭环</h4>
+    <p>不是"一次评估→优化→结束"。是<strong>每迭代</strong>重新评估→找出新的瓶颈→优化→再评估。</p>
+  </div>
+</div>
+
+<h3>最终目标</h3>
+<p>6 个月后，对于 Orbit 的每一个模块，都能回答:</p>
+<div class="formula">
+<pre>
+模块名称: _________
+它的契约 (应该做什么): _________
+它实际在做什么 (KPI 当前值): _________
+它的贡献度 (消融实验 F1 差值): _________
+它每任务消耗 (Token/延迟): _________
+它的 ROI (贡献度 / 消耗): _________
+→ 决策: [保留并优化 / 降级为可选 / 移除]
+</pre>
+</div>
+<div class="note">
+<strong>这一张表的答案 = Orbit 从"研究项目"到"工程工具"的转折点。</strong>
+</div>
+</div>
+
+<footer style="text-align:center;color:var(--muted);margin-top:60px;padding:20px;border-top:1px solid var(--border)">
+  <p>Orbit Module Effectiveness Framework · Version 1.1 · 2026-07-08</p>
+  <p>覆盖: 全部 46 个模块 · 5 个核心原则 · 16 个实施任务 · 3 阶段路线图</p>
+</footer>
+
+<script>mermaid.initialize({startOnLoad:true,theme:'default',securityLevel:'loose',flowchart:{useMaxWidth:true,htmlLabels:true,curve:'basis'}});</script>
+</body>
+</html>

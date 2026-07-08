@@ -80,34 +80,86 @@ class CheckpointManager:
         Redis 写失败时重试一次，仍失败则降级内存模式（SC3 降级路径）。
         PG 写失败不影响主流程（fire-and-forget，仅记日志）。
         """
+        import time as _time
+        from orbit.observability.metrics import orbit_checkpoint_operations_total
+        from orbit.observability.trace import SpanStatus, TraceCollector
+
+        _t0 = _time.monotonic()
+        span = TraceCollector.start_span(
+            task_id, component="infra", action="checkpoint",
+            input_summary=f"save_state={data.state}",
+        )
+
         serialized = orjson.dumps(data.model_dump())
         key = f"{self._key_prefix}:{task_id}"
 
         # 写 Redis（重试一次）
         await self._save_to_redis(key, serialized)
+        orbit_checkpoint_operations_total.labels(
+            operation="save", tier="redis", status="success",
+        ).inc()
         # 异步写 PG（fire-and-forget）
         if self.pg is not None:
             import asyncio
 
             asyncio.create_task(self._save_to_pg(task_id, data, serialized))
 
+        TraceCollector.end_span(
+            span, status=SpanStatus.OK,
+            output_summary=f"checkpoint_saved_state={data.state}",
+            duration_ms=(_time.monotonic() - _t0) * 1000,
+        )
+
     async def load(self, task_id: str) -> CheckpointData | None:
         """加载检查点。Redis → miss → PG → 回填 Redis → 都 miss → None。"""
+        import time as _time
+        from orbit.observability.metrics import orbit_checkpoint_operations_total
+        from orbit.observability.trace import SpanStatus, TraceCollector
+
+        _t0 = _time.monotonic()
+        span = TraceCollector.start_span(
+            task_id, component="infra", action="checkpoint",
+            input_summary="load_checkpoint",
+        )
+
         key = f"{self._key_prefix}:{task_id}"
         # 1. 读 Redis
         redis_data = await self._load_from_redis(key)
         if redis_data is not None:
-            return self._deserialize(redis_data, task_id)
+            orbit_checkpoint_operations_total.labels(
+                operation="load", tier="redis", status="success",
+            ).inc()
+            result = self._deserialize(redis_data, task_id)
+            TraceCollector.end_span(
+                span, status=SpanStatus.OK, output_summary="load_hit_redis",
+                duration_ms=(_time.monotonic() - _t0) * 1000,
+            )
+            return result
         # 2. 降级读 PG
         if self.pg is not None:
             pg_data = await self._load_from_pg(task_id)
             if pg_data is not None:
+                orbit_checkpoint_operations_total.labels(
+                    operation="load", tier="pg", status="success",
+                ).inc()
                 # 回填 Redis
                 await self._save_to_redis(key, orjson.dumps(pg_data.model_dump()))
+                TraceCollector.end_span(
+                    span, status=SpanStatus.OK, output_summary="load_hit_pg",
+                    duration_ms=(_time.monotonic() - _t0) * 1000,
+                )
                 return pg_data
         # 3. 降级内存
         if key in self._memory_store:
-            return self._deserialize(self._memory_store[key], task_id)
+            orbit_checkpoint_operations_total.labels(
+                operation="load", tier="disk", status="success",
+            ).inc()
+            result = self._deserialize(self._memory_store[key], task_id)
+            TraceCollector.end_span(
+                span, status=SpanStatus.OK, output_summary="load_hit_memory",
+                duration_ms=(_time.monotonic() - _t0) * 1000,
+            )
+            return result
         # 4. 降级磁盘（P1-1 PR#139: 进程重启后内存丢失，磁盘兜底恢复）
         import os
         import tempfile
@@ -119,9 +171,21 @@ class CheckpointManager:
                 with open(_path, "rb") as f:
                     _data = f.read()
                 logger.info("checkpoint_disk_load", key=key)
-                return self._deserialize(_data, task_id)
+                orbit_checkpoint_operations_total.labels(
+                    operation="load", tier="disk", status="success",
+                ).inc()
+                result = self._deserialize(_data, task_id)
+                TraceCollector.end_span(
+                    span, status=SpanStatus.OK, output_summary="load_hit_disk",
+                    duration_ms=(_time.monotonic() - _t0) * 1000,
+                )
+                return result
             except OSError as e:
                 logger.warning("checkpoint_disk_load_failed", key=key, error=str(e))
+        TraceCollector.end_span(
+            span, status=SpanStatus.OK, output_summary="load_miss",
+            duration_ms=(_time.monotonic() - _t0) * 1000,
+        )
         return None
 
     async def cleanup_old_checkpoints(self, days: int = 7) -> int:

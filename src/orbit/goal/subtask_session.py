@@ -14,6 +14,7 @@ WHY 独立 Session 非协程: 独立 LLM 消息历史 = 独立上下文窗口。
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -26,6 +27,7 @@ from orbit.goal.process_guard import (
     TERMINAL_STATES,
     ProcessGuard,
 )
+from orbit.observability.trace import SpanStatus, TraceCollector
 
 if TYPE_CHECKING:
     from orbit.agents.factory import AgentFactory
@@ -104,6 +106,13 @@ class SubTaskSession:
         Returns:
             SubTaskResult: 含 status/pr_id/merge_sha/tokens_used
         """
+        _t0 = time.monotonic()
+        task_id = self.task.id
+        span = TraceCollector.start_span(
+            task_id, component="task_runner", action="pipeline_start",
+            input_summary=f"desc={getattr(self.task, 'description', '')[:128]}",
+        )
+
         state = TaskState.IDLE
         context: dict[str, Any] = {
             "task": self.task,
@@ -142,6 +151,11 @@ class SubTaskSession:
                     if not critique_passed:
                         self._critique_attempts += 1
                         if self._critique_attempts > self._MAX_CRITIQUE_RETRIES:
+                            TraceCollector.end_span(
+                                span, status=SpanStatus.ERROR,
+                                output_summary="critique_loop_exceeded",
+                                duration_ms=(time.monotonic() - _t0) * 1000,
+                            )
                             return SubTaskResult(
                                 task_id=self.task.id,
                                 status="critique_loop",
@@ -175,6 +189,11 @@ class SubTaskSession:
                 error=str(e),
                 exc_info=True,
             )
+            TraceCollector.end_span(
+                span, status=SpanStatus.ERROR,
+                output_summary=str(e)[:256],
+                duration_ms=(time.monotonic() - _t0) * 1000,
+            )
             return SubTaskResult(
                 task_id=self.task.id,
                 status="error",
@@ -189,6 +208,11 @@ class SubTaskSession:
                 except Exception:
                     pass
 
+        TraceCollector.end_span(
+            span, status=SpanStatus.OK,
+            output_summary=f"pipeline_ok_state={state.value}",
+            duration_ms=(time.monotonic() - _t0) * 1000,
+        )
         return SubTaskResult(
             task_id=self.task.id,
             status="ok",
@@ -256,8 +280,10 @@ class SubTaskSession:
 
         WHY 门禁而非建议: Goal 模式无人工审查——CritiqueAgent 是品质底线。
         """
-        if not self._critique:
-            return True  # 无批判 Agent → 直接通过
+        from orbit.effectiveness.ablation import AblationContext
+
+        if not self._critique or AblationContext.is_disabled("critique_gate"):
+            return True  # 无批判 Agent 或消融禁用 → 直接通过
 
         code_artifact = context.get("artifacts", {}).get(TaskState.CODING.value, "")
         try:
@@ -271,6 +297,11 @@ class SubTaskSession:
                 "issues": result.issues,
                 "severity": result.max_severity,
             }
+            # 效能指标: 记录批判判定
+            from orbit.observability.metrics import orbit_critique_decisions_total
+            verdict = "approved" if result.approved else "rejected"
+            orbit_critique_decisions_total.labels(verdict=verdict).inc()
+
             if not result.approved:
                 logger.info(
                     "critique_not_approved",

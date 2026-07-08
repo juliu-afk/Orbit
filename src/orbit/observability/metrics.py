@@ -122,6 +122,38 @@ orbit_knowledge_queries_total = Counter(
     ["mode"],  # exact | semantic | hybrid
 )
 
+# ---- 批判门禁指标 -----------------------------------------------
+
+orbit_critique_decisions_total = Counter(
+    "orbit_critique_decisions_total",
+    "CritiqueAgent 判定次数",
+    ["verdict"],  # approved | rejected
+)
+
+# ---- 检查点操作指标 -----------------------------------------------
+
+orbit_checkpoint_operations_total = Counter(
+    "orbit_checkpoint_operations_total",
+    "检查点操作次数——save/load 按 tier + 成败统计",
+    ["operation", "tier", "status"],  # operation: save|load, tier: redis|pg|disk, status: success|failed
+)
+
+# ---- Intake 准确率指标 -------------------------------------------
+
+orbit_intake_accuracy = Gauge(
+    "orbit_intake_accuracy",
+    "IntakeRouter 判定置信度——最近一次 route() 的 clarity_score（0-1 ratio，非百分比）",
+    ["form"],  # vague_string | single_file | batch | task_only
+)
+
+# ---- Goal 终态指标 -----------------------------------------------
+
+orbit_goal_status_total = Counter(
+    "orbit_goal_status_total",
+    "Goal 终态分布——覆盖 MetaOrchestrator 层面而非单个 task",
+    ["status"],  # done | failed | timeout | cancelled
+)
+
 
 def record_hallucination_validation(passed: bool) -> None:
     """记录防幻觉验证结果——用于 Charter SLA 幻觉率计算。
@@ -193,6 +225,27 @@ def snapshot() -> dict[str, Any]:
             "pass": _counter_value(orbit_compliance_checks_total, {"status": "pass"}),
             "warning": _counter_value(orbit_compliance_checks_total, {"status": "warning"}),
             "violation": _counter_value(orbit_compliance_checks_total, {"status": "violation"}),
+        },
+        # 效能指标（2026-07-08 模块效能框架 v1.1）
+        "critique_decisions_total": {
+            "approved": _counter_value(orbit_critique_decisions_total, {"verdict": "approved"}),
+            "rejected": _counter_value(orbit_critique_decisions_total, {"verdict": "rejected"}),
+        },
+        "checkpoint_operations_total": {
+            f"{op}_{tier}": _counter_value(
+                orbit_checkpoint_operations_total,
+                {"operation": op, "tier": tier, "status": "success"},
+            )
+            for op in ["save", "load"]
+            for tier in ["redis", "pg", "disk"]
+        },
+        "intake_accuracy": {
+            form: orbit_intake_accuracy.labels(form=form)._value.get()
+            for form in ["vague_string", "single_file", "batch", "task_only"]
+        },
+        "goal_status_total": {
+            status: _counter_value(orbit_goal_status_total, {"status": status})
+            for status in ["done", "failed", "timeout", "cancelled"]
         },
     }
 

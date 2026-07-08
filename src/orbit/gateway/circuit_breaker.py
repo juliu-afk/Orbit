@@ -69,10 +69,19 @@ class CircuitBreaker:
 
     async def before_call(self, key: str) -> None:
         """调用前检查熔断状态。OPEN 或 HALF_OPEN 满则抛 CircuitOpenError。"""
+        import time as _time
+        from orbit.observability.trace import SpanStatus, TraceCollector
+
+        _t0 = _time.monotonic()
         state = await self._get_state(key)
-        now = time.time()
+        now = _time.time()
         if state.opened_at is None and not state.half_open:
-            return  # CLOSED
+            return  # CLOSED——快速路径，不记录 span 以减少开销
+        # 非 CLOSED 路径——记录 trace span
+        cb_span = TraceCollector.start_span(
+            key, component="gateway", action="circuit_check",
+            input_summary=f"key={key} half_open={state.half_open}",
+        )
         if state.half_open:
             # 半开：P1 LOG-4——限制探测数只放行 HALF_OPEN_PROBE_LIMIT 个
             # P1-2 (PR#138 R2): asyncio.Lock 保护 read-modify-write——
@@ -81,12 +90,22 @@ class CircuitBreaker:
                 # 重新读 state——等锁期间可能已被其他协程变更
                 state = await self._get_state(key)
                 if state.probe_in_flight:
+                    TraceCollector.end_span(
+                        cb_span, status=SpanStatus.ERROR,
+                        output_summary="half_open_probe_full",
+                        duration_ms=(_time.monotonic() - _t0) * 1000,
+                    )
                     raise CircuitOpenError(
                         f"熔断器半开探测已满（key={key}），探测完成后重试"
                     )
                 state.probe_in_flight = True
                 await self._set_state(key, state)
             logger.warning("circuit_half_open_probe", key=key)
+            TraceCollector.end_span(
+                cb_span, status=SpanStatus.OK,
+                output_summary="half_open_probe_allowed",
+                duration_ms=(_time.monotonic() - _t0) * 1000,
+            )
             return
         # OPEN：检查冷却是否到期
         if state.opened_at and (now - state.opened_at) >= self.cooldown:
@@ -95,9 +114,19 @@ class CircuitBreaker:
             state.opened_at = None
             await self._set_state(key, state)
             logger.info("circuit_half_open_entered", key=key)
+            TraceCollector.end_span(
+                cb_span, status=SpanStatus.OK,
+                output_summary="open_to_half_open",
+                duration_ms=(_time.monotonic() - _t0) * 1000,
+            )
             return
         # 仍在冷却期
         remaining = int(self.cooldown - (now - (state.opened_at or 0)))
+        TraceCollector.end_span(
+            cb_span, status=SpanStatus.ERROR,
+            output_summary=f"circuit_open_remaining={remaining}s",
+            duration_ms=(_time.monotonic() - _t0) * 1000,
+        )
         raise CircuitOpenError(f"熔断器开启中（key={key}），{remaining}s 后进入半开探测")
 
     async def record_success(self, key: str) -> None:

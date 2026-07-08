@@ -21,9 +21,12 @@ if TYPE_CHECKING:
     from orbit.graph.engines.code_graph import CodeGraphEngine
     from orbit.sandbox.executor import Sandbox
 
+import time as _time
+
 import structlog
 
 from orbit.hallucination.l1_graph import L1GraphValidator
+from orbit.observability.trace import SpanStatus, TraceCollector
 from orbit.hallucination.l2_dynamic import L2DynamicTracer
 from orbit.hallucination.l3_entropy import L3EntropyMonitor
 from orbit.hallucination.l4_type import L4TypeValidator
@@ -94,12 +97,23 @@ class HallucinationPipeline:
 
         用于每次代码生成后的即时检查。不需要 sandbox/graph 的层可以同步运行。
         """
+        _t0 = _time.monotonic()
+        span = TraceCollector.start_span(
+            "hallucination", component="verify", action="hallucination_quick",
+            input_summary=f"code_len={len(code)}",
+        )
         levels = [
             HallucinationLevel.L1_GRAPH,
             HallucinationLevel.L4_TYPE,
             HallucinationLevel.L3_ENTROPY,
         ]
-        return await self._run_levels(code, levels, stop_on_first_error=False)
+        result = await self._run_levels(code, levels, stop_on_first_error=False)
+        TraceCollector.end_span(
+            span, status=SpanStatus.OK if result.passed else SpanStatus.ERROR,
+            output_summary=f"passed={result.passed} errors={len(result.errors)}",
+            duration_ms=(_time.monotonic() - _t0) * 1000,
+        )
+        return result
 
     async def validate_full(self, code: str) -> ValidationResult:
         """全量验证——运行所有可用层 (L1-L8)。
@@ -107,7 +121,18 @@ class HallucinationPipeline:
         用于 coding 阶段完成后的完整验证。
         依赖 sandbox/graph 的层在依赖缺失时自动跳过。
         """
-        return await self._run_levels(code, _VALIDATION_ORDER, stop_on_first_error=False)
+        _t0 = _time.monotonic()
+        span = TraceCollector.start_span(
+            "hallucination", component="verify", action="hallucination_full",
+            input_summary=f"code_len={len(code)}",
+        )
+        result = await self._run_levels(code, _VALIDATION_ORDER, stop_on_first_error=False)
+        TraceCollector.end_span(
+            span, status=SpanStatus.OK if result.passed else SpanStatus.ERROR,
+            output_summary=f"passed={result.passed} errors={len(result.errors)}",
+            duration_ms=(_time.monotonic() - _t0) * 1000,
+        )
+        return result
 
     async def validate(self, code: str, max_level: HallucinationLevel | None = None) -> ValidationResult:
         """运行验证直到指定层（含）。
@@ -128,13 +153,31 @@ class HallucinationPipeline:
         stop_on_first_error: bool,
     ) -> ValidationResult:
         """按顺序运行指定验证层级。"""
+        from orbit.effectiveness.ablation import AblationContext
+
         all_errors: list[str] = []
         all_warnings: list[str] = []
         all_passed = True
         last_level: HallucinationLevel | None = None
 
+        # 层级→消融目标映射
+        _LAYER_ABLATION_MAP = {
+            "L1_GRAPH": "hallucination_L1",
+            "L2_DYNAMIC": "hallucination_L2",
+            "L3_ENTROPY": "hallucination_L3",
+            "L4_TYPE": "hallucination_L4",
+            "L5_Z3": "hallucination_L5",
+            "L6_CONTRACT": "hallucination_L6",
+            "L7_RUNTIME": "hallucination_L7",
+            "L8_CONFIG": "hallucination_L8",
+        }
+
         for level in levels:
             last_level = level
+            # 消融检查: 该层是否被禁用
+            if AblationContext.is_disabled(_LAYER_ABLATION_MAP.get(level.value, "")):
+                all_warnings.append(f"{level.value}: ablation——已禁用，跳过")
+                continue
             try:
                 validator = self._get_validator(level)
                 if validator is None:

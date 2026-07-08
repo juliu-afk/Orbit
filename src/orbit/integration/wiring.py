@@ -135,6 +135,14 @@ class OrbitWiring:
                         success = outcome == "completed"
                         est_latency = turns * 2000.0 if turns > 0 else 0.0
                         b.update(tier, success, latency_ms=est_latency)
+                        # V14.2+Theory 方向20: CUSUM 变点检测——与 Bandit 互补
+                        d = self._get_drift()
+                        if d:
+                            alert = d.update(model=tier, latency_ms=est_latency,
+                                             success=success, output_len=quality_score * 1000)
+                            if alert is not None:
+                                b.reset_arm(alert.model)
+                                logger.info("drift_reset", model=alert.model)
                         self._last_tier = ""  # 单次消费——防重复计数
                 except Exception:
                     pass  # fail-open

@@ -162,8 +162,8 @@ class CodeGraphEngine(GraphEngineBase):
                         used.append((child.id, child.lineno))
             for var_name, use_line in used:
                 if var_name in assigned:
-                    flow_name = f"{func_name}::{var_name}"
-                    await self._record_data_flow(flow_name, func_name, var_name, file_path, use_line)
+                    # Phase 3: DATA_FLOWS——变量名直接用作节点名（与 _parse_python_ast 中 Assign 一致）
+                    await self._record_data_flow(var_name, func_name, var_name, file_path, use_line)
 
     async def _record_data_flow(
         self, source: str, target: str, variable: str, file_path: str, line: int,

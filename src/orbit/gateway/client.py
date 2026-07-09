@@ -24,7 +24,9 @@ from orbit.core.config import settings
 from orbit.gateway.adapters import ProviderAdapter
 from orbit.gateway.adapters.anthropic import AnthropicAdapter
 from orbit.gateway.adapters.openai import OpenAIAdapter
+from orbit.gateway.adapters.vision import MultimodalAPIError, VisionAdapter  # V15.1 多模态 P0
 from orbit.gateway.circuit_breaker import CircuitBreaker, CircuitOpenError
+from orbit.gateway.multimodal import Tier, TierRouter  # V15.1 多模态 P0
 from orbit.gateway.routing import RoutingStrategy, select_model
 from orbit.gateway.schemas import LLMRequest, LLMResponse, LLMUsage
 from orbit.gateway.task_router import TaskModelRouter, TaskType
@@ -84,6 +86,8 @@ class LLMClient:
             "anthropic": AnthropicAdapter(),
             "openai": OpenAIAdapter(),
         }
+        # V15.1 多模态 P0：VisionAdapter（延迟创建——避免导入时网络检查）
+        self._vision: VisionAdapter | None = None
 
     def _get_adapter(self, model: str, provider: str | None = None) -> ProviderAdapter:
         """按 model 或显式 provider 获取适配器。
@@ -99,6 +103,77 @@ class LLMClient:
             return self._adapters["anthropic"]
         return OpenAIAdapter()  # 默认——大多数 provider 兼容 OpenAI format
 
+    # ── V15.1 多模态 P0 ──
+
+    def _get_vision(self) -> VisionAdapter:
+        """延迟创建 VisionAdapter——避免导入时 httpx client 初始化。"""
+        if self._vision is None:
+            self._vision = VisionAdapter()
+        return self._vision
+
+    async def _generate_multimodal(
+        self, req: LLMRequest, task_id: str
+    ) -> LLMResponse:
+        """多模态生成路径——三梯度路由 + VisionAdapter 直连。
+
+        WHY 独立方法：保持 generate() 入口简洁，多模态逻辑集中管理。
+        降级链：T3→T2→异常（不降级到纯文本）。
+        """
+        import time
+
+        _t0 = time.monotonic()
+
+        # 1. 梯度判定
+        tier = TierRouter.classify(req.content, req.tier)
+        config = TierRouter.get_config(tier)
+        logger.info(
+            "multimodal_route",
+            task_id=task_id,
+            tier=tier.value,
+            model=config.model,
+            thinking=config.thinking,
+        )
+
+        # 2. 构造 content list
+        content_list: list[dict] = []
+        if isinstance(req.content, str):
+            content_list = [{"type": "text", "text": req.content}]
+        elif isinstance(req.content, list):
+            content_list = req.content  # type: ignore[assignment]
+
+        # WHY 保留 req.messages 中的 system 消息：保持 system_prompt 一致性
+        system_msg = req.system_prompt
+        if req.messages:
+            for msg in req.messages:
+                if msg.get("role") == "system":
+                    system_msg = msg.get("content", system_msg)
+                    break
+
+        # 3. 调用 VisionAdapter
+        vision = self._get_vision()
+        response = await vision.generate(
+            config=config,
+            content=content_list,
+            prompt=req.prompt,
+            max_tokens=req.max_tokens,
+        )
+
+        elapsed = time.monotonic() - _t0
+        logger.info(
+            "multimodal_done",
+            task_id=task_id,
+            tier=tier.value,
+            model=response.model,
+            tokens=response.usage.total_tokens,
+            cost_usd=response.usage.cost_usd,
+            elapsed=elapsed,
+            degraded=response.degraded,
+        )
+
+        # 4. 成本记录
+        self._log_usage(task_id, response.usage)
+        return response
+
     async def generate(
         self,
         req: LLMRequest,
@@ -108,6 +183,10 @@ class LLMClient:
         routing_strategy: RoutingStrategy | None = None,  # Phase 3: 路由策略
         task_type: str | None = None,  # Inkeep 借鉴 #1: 任务类型路由
     ) -> LLMResponse:
+        # ── V15.1 多模态 P0：content 非 None → 走多模态路径 ──
+        if req.content is not None:
+            return await self._generate_multimodal(req, task_id)
+
         import time
         from orbit.observability.trace import SpanStatus, TraceCollector
 

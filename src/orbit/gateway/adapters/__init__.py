@@ -61,3 +61,8 @@ class ProviderAdapter:  # noqa: B024 (有意——基类提供默认 no-op，子
             "content_filter": "error",
         }
         return mapping.get(finish_reason, "end_turn")
+
+
+# ── V15.1 多模态 P0：导出 VisionAdapter ──
+# WHY 在此导入：保持 __init__.py 作为 adapters 模块的统一入口
+# VisionAdapter 独立于 ProviderAdapter 继承体系（httpx 直连，不经过 LiteLLM）

@@ -3,9 +3,10 @@
 WHY 手写而非 mcp SDK：MVP 阶段零额外依赖。
 MCP 协议足够简单（JSON-RPC 2.0 + tools/list + tools/call）。
 
-13 个 MCP 工具：query_knowledge + find_symbol + find_referencing_symbols +
+15 个 MCP 工具：query_knowledge + find_symbol + find_referencing_symbols +
 get_symbols_overview + trace_path + get_architecture + search_code + dead_code +
-find_implementations + replace_symbol_body + insert_after/before_symbol + safe_delete_symbol
+find_implementations + replace_symbol_body + insert_after/before_symbol +
+safe_delete_symbol + rename_symbol + type_hierarchy
 
 协议规范：https://spec.modelcontextprotocol.io/
 """

@@ -145,24 +145,29 @@ class CodeGraphEngine(GraphEngineBase):
         return True
 
     async def _build_hierarchy(self, file_path: str) -> None:
-        """为文件创建 Module 节点并链接所有符号→CONTAINS 边。
+        """为文件创建 Module 节点 + 链接符号→CONTAINS 边 + 设 parent_id。
 
         WHY: 节点层级（Module→Class→Function）让 Agent 能做
         "这个模块有哪些符号？" 的结构化查询。
         """
-        # 创建 Module 节点（按文件路径）
-        module_name = file_path.replace("\\", "/").rsplit("/", 1)[-1].rsplit(".", 1)[0]
+        # P2-1 fix: 用去扩展名+去前导src/的相对路径做唯一 module_name
+        clean = file_path.replace("\\", "/")
+        if "/src/" in clean:
+            clean = clean.split("/src/", 1)[1]
+        module_name = clean.rsplit(".", 1)[0]
         module_id = uuid.uuid4().hex
         await self.upsert_node(
             CodeNode, module_id, name=module_name, type="module",
             file_path=file_path, start_line=0, end_line=0,
             meta={"namespace": file_path},
         )
-        # 查该文件下所有符号 → 建 CONTAINS 边
+        # 查该文件下所有符号 → 建 CONTAINS 边 + 设 parent_id
         file_nodes = await self.find_nodes_by_file(CodeNode, file_path)
         for node in file_nodes:
             if node.id == module_id:
                 continue
+            # P1-1 fix: 设 parent_id——Module→Symbol 层级
+            node.parent_id = module_id
             await self.add_edge(
                 source_id=module_id, source_type="code",
                 target_id=node.id, target_type="code",

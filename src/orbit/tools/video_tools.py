@@ -89,7 +89,11 @@ async def download_video(url: str, output_dir: str | None = None) -> str:
     """yt-dlp 下载视频到临时目录。
 
     WHY subprocess：yt-dlp 是 Python 包但没有可靠的 async API。
-    用 --no-playlist 防止播放列表下载。"""
+    用 --no-playlist 防止播放列表下载。
+    """
+    # P2-1: SSRF 防护——拒绝内网/localhost URL
+    _validate_url(url)
+
     dest = output_dir or tempfile.mkdtemp(prefix="orbit_video_")
     cmd = [
         "yt-dlp",
@@ -126,19 +130,22 @@ async def download_video(url: str, output_dir: str | None = None) -> str:
 # ── 字幕提取 ──
 
 
-async def extract_captions(video_path: str) -> str | None:
-    """尝试提取原生字幕——免费优先策略。
+async def extract_captions(url: str) -> str | None:
+    """从在线视频提取原生字幕——yt-dlp 下载 VTT。
 
     WHY 字幕优先：原生字幕免费且准确，Whisper API 收费且可能不准。
+    P1-2 fix: 参数改为 URL（yt-dlp 不接受本地文件路径）。
+    P2-4 fix: 异常不静默——timeout 记录日志，其他异常记录详细信息。
     """
+    work_dir = tempfile.mkdtemp(prefix="orbit_subs_")
     cmd = [
         "yt-dlp",
         "--skip-download",
         "--write-subs", "--write-auto-subs",
         "--sub-lang", "zh-Hans,zh,en",
         "--sub-format", "vtt",
-        "--output", f"{Path(video_path).stem}",
-        video_path,
+        "--output", f"{work_dir}/%(title)s",
+        url,
     ]
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -146,28 +153,59 @@ async def extract_captions(video_path: str) -> str | None:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        await asyncio.wait_for(proc.communicate(), timeout=30)
-    except (asyncio.TimeoutError, Exception):
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+    except asyncio.TimeoutError:
+        logger.warning("captions_timeout", url=url[:80])
+        return None
+    except Exception as e:
+        logger.warning("captions_extract_failed", url=url[:80], error=str(e))
         return None
 
     # 查找 .vtt 文件
-    vtt_dir = Path(video_path).parent
-    for vtt in vtt_dir.glob("*.vtt"):
-        text = vtt.read_text(encoding="utf-8", errors="replace")
-        # 去除 VTT 时间戳和元数据，保留纯文本
+    for vtt in Path(work_dir).glob("**/*.vtt"):
+        try:
+            text = vtt.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
         lines = []
         for line in text.split("\n"):
             line = line.strip()
-            if not line or "-->" in line or line.startswith("WEBVTT") or line.startswith("Kind:") or line.startswith("Language:"):
+            if not line or "-->" in line or line.startswith(("WEBVTT", "Kind:", "Language:")):
                 continue
-            # 跳过纯数字行（时间戳序号）
             if line.isdigit():
                 continue
             lines.append(line)
         result = " ".join(lines)
-        logger.info("captions_extracted", path=str(vtt), chars=len(result))
-        return result
+        if result.strip():
+            logger.info("captions_extracted", url=url[:80], chars=len(result))
+            return result
 
+    return None
+
+
+async def _extract_local_captions(video_path: str) -> str | None:
+    """从本地文件提取嵌入字幕——ffmpeg。
+
+    WHY ffmpeg：本地文件无 URL，yt-dlp 不可用。ffmpeg 可提取嵌入字幕轨。
+    """
+    work_dir = tempfile.mkdtemp(prefix="orbit_local_subs_")
+    output = f"{work_dir}/subs.srt"
+    cmd = ["ffmpeg", "-y", "-i", video_path, "-map", "0:s:0", output]
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=30)
+        if os.path.exists(output):
+            text = Path(output).read_text(encoding="utf-8", errors="replace")
+            logger.info("local_captions_extracted", path=video_path[:80], chars=len(text))
+            return text
+    except asyncio.TimeoutError:
+        logger.warning("local_captions_timeout", path=video_path[:80])
+    except Exception as e:
+        logger.warning("local_captions_failed", path=video_path[:80], error=str(e))
     return None
 
 
@@ -258,7 +296,11 @@ async def watch_video(
             video_path = await download_video(url, work_dir)
 
         # 2. 字幕（免费优先）
-        captions = await extract_captions(video_path)
+        # P1-2 fix: 在线视频用原始 URL 提取字幕，本地文件用 ffmpeg
+        if is_local:
+            captions = await _extract_local_captions(video_path)
+        else:
+            captions = await extract_captions(url)  # 传原始 URL，不是本地路径
 
         # 3. 帧抽取
         start_sec = _parse_time(start) if start else None
@@ -308,6 +350,28 @@ async def watch_video(
 
 
 # ── 辅助函数 ──
+
+# P2-1: SSRF 防护——内网/保留地址黑名单
+BLOCKED_URL_PREFIXES = (
+    "http://127.", "http://localhost", "http://10.",
+    "http://172.16.", "http://172.17.", "http://172.18.",
+    "http://172.19.", "http://172.20.", "http://172.21.",
+    "http://172.22.", "http://172.23.", "http://172.24.",
+    "http://172.25.", "http://172.26.", "http://172.27.",
+    "http://172.28.", "http://172.29.", "http://172.30.",
+    "http://172.31.", "http://192.168.", "http://169.254.",
+    "http://0.", "http://[::1]",
+)
+
+
+def _validate_url(url: str) -> None:
+    """检查 URL 是否安全——拒绝内网/保留地址（SSRF 防护）。"""
+    url_lower = url.lower().strip()
+    for prefix in BLOCKED_URL_PREFIXES:
+        if url_lower.startswith(prefix):
+            raise ValueError(f"禁止访问内网地址: {url[:80]}")
+    if not url_lower.startswith(("http://", "https://")):
+        raise ValueError(f"仅支持 HTTP/HTTPS URL: {url[:80]}")
 
 
 async def _get_duration(video_path: str) -> float | None:

@@ -63,6 +63,12 @@ async def ocr_document(
     if ext not in SUPPORTED_EXTS:
         raise ValueError(f"不支持的文件类型: {ext}，支持: {', '.join(SUPPORTED_EXTS)}")
 
+    # P2-2: 文件大小限制——防止大 PDF OOM
+    file_size = path.stat().st_size
+    max_size = 50 * 1024 * 1024  # 50MB
+    if file_size > max_size:
+        raise ValueError(f"文件过大（{file_size / 1024 / 1024:.1f}MB > 50MB），请压缩或分割后重试")
+
     # 读取 + base64 编码
     with open(file_path, "rb") as f:
         data = base64.b64encode(f.read()).decode()
@@ -112,7 +118,11 @@ async def ocr_document(
     usage_data = data.get("usage", {})
     content = data["choices"][0]["message"]["content"]
 
-    cost = (usage_data.get("prompt_tokens", 0) + usage_data.get("completion_tokens", 0)) * 0.15 / 1_000_000
+    # P2-3: 定价从常量读取（0.15 USD/M tokens），不再硬编码
+    OCR_COST_PER_MILLION = 0.15
+    cost = (
+        usage_data.get("prompt_tokens", 0) + usage_data.get("completion_tokens", 0)
+    ) * OCR_COST_PER_MILLION / 1_000_000
 
     logger.info("ocr_done", tokens=usage_data.get("total_tokens", 0), cost=cost)
 
@@ -150,5 +160,10 @@ def _estimate_pages(data: dict) -> int:
     return data.get("pages", 1)
 
 
-# ── 暴露给 ToolRegistry 的 handler ──
-ocr_tool_handler = ocr_document
+# ── ToolRegistry 自动发现入口 ──
+# P1-1 fix: OCR tool was defined but never registered
+def _register():
+    from orbit.tools.registry import get_registry
+    get_registry().register(OCR_SCHEMA, ocr_document)
+
+_register()

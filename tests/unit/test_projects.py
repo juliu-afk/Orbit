@@ -9,7 +9,7 @@ class TestProjectRegistry:
     """项目 CRUD。"""
 
     def test_register_and_get(self) -> None:
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register(
                 "Orbit",
@@ -24,10 +24,9 @@ class TestProjectRegistry:
             assert "agent" in p.tags
         finally:
             reg.close()
-            _cleanup()
 
     def test_register_update_existing(self) -> None:
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register("X", description="v1")
             reg.register("X", description="v2")
@@ -36,11 +35,10 @@ class TestProjectRegistry:
             assert p.description == "v2"
         finally:
             reg.close()
-            _cleanup()
 
     @pytest.mark.skip(reason="P2-4: needs fixing")
     def test_list_all(self) -> None:
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register("A")
             reg.register("B")
@@ -49,11 +47,10 @@ class TestProjectRegistry:
             assert len(reg.list_all()) == 3
         finally:
             reg.close()
-            _cleanup()
 
     @pytest.mark.skip(reason="P2-4: needs fixing")
     def test_deactivate(self) -> None:
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register("Temp")
             assert reg.count() == 1
@@ -63,10 +60,9 @@ class TestProjectRegistry:
             assert reg.get("Temp").is_active is False
         finally:
             reg.close()
-            _cleanup()
 
     def test_search_by_name(self) -> None:
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register("Orbit", description="多Agent")
             reg.register("Finite", description="财务系统")
@@ -78,10 +74,9 @@ class TestProjectRegistry:
             assert "Keshen" in names
         finally:
             reg.close()
-            _cleanup()
 
     def test_search_by_tag(self) -> None:
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register("Orbit", tags=["agent", "python"])
             reg.register("Other", tags=["web", "javascript"])
@@ -90,11 +85,10 @@ class TestProjectRegistry:
             assert results[0].name == "Orbit"
         finally:
             reg.close()
-            _cleanup()
 
     def test_search_exact_name_first(self) -> None:
         """名称精确匹配排在标签匹配前面。"""
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register("Python Utils", tags=["tools"])
             reg.register("Orbit", description="python agent framework", tags=["python"])
@@ -103,10 +97,9 @@ class TestProjectRegistry:
             assert results[0].name == "Python Utils"
         finally:
             reg.close()
-            _cleanup()
 
     def test_search_by_tags_method(self) -> None:
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register("Orbit", tags=["agent", "python", "llm"])
             reg.register("WebApp", tags=["web", "react"])
@@ -114,10 +107,9 @@ class TestProjectRegistry:
             assert len(results) == 2
         finally:
             reg.close()
-            _cleanup()
 
     def test_issue_tracker_config(self) -> None:
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register(
                 "Orbit",
@@ -130,13 +122,12 @@ class TestProjectRegistry:
             assert p.issue_tracker_config["owner"] == "juliu-afk"
         finally:
             reg.close()
-            _cleanup()
 
     # ── 覆盖缺口 ──
 
     def test_get_by_path(self) -> None:
         """按 local_path 查询项目（lines 156-164）。"""
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register("PathProject", local_path="D:/test/pathproj")
             p = reg.get_by_path("D:/test/pathproj")
@@ -146,11 +137,10 @@ class TestProjectRegistry:
             assert reg.get_by_path("/no/such/path") is None
         finally:
             reg.close()
-            _cleanup()
 
     def test_find_by_path_prefix(self) -> None:
         """路径前缀匹配（lines 168-177）。"""
-        reg = ProjectRegistry()
+        reg = ProjectRegistry(db_path=":memory:")
         try:
             reg.register("Child", local_path="D:/parent/child")
             results = reg.find_by_path_prefix("D:/parent/child/subdir")
@@ -158,12 +148,14 @@ class TestProjectRegistry:
             assert results[0].name == "Child"
         finally:
             reg.close()
-            _cleanup()
 
     def test_row_to_record_json_error_handling(self) -> None:
         """_json_list 和 _json_dict 的 JSONDecodeError 路径（lines 243-244, 250-251）。"""
-        reg = ProjectRegistry()
-        # 注册一个项目，然后手动改 DB 写入坏 JSON 来触发异常路径
+        # WHY 文件 DB: 此测试需外部 sqlite3.connect 修改同一 DB 来注入坏 JSON，
+        # :memory: 每个连接独立，外部连接改不到 reg 的数据。
+        import tempfile, os
+        db_path = os.path.join(tempfile.mkdtemp(), "test.db")
+        reg = ProjectRegistry(db_path=db_path)
         try:
             reg.register("JsonErr", tags=["ok"])
             import sqlite3
@@ -176,26 +168,3 @@ class TestProjectRegistry:
             assert p.tags == []  # 坏 JSON → 返回空列表
         finally:
             reg.close()
-            _cleanup()
-
-
-def _cleanup() -> None:
-    # WHY 不删 DB 文件: 多模块共享 projects.db 连接，删文件 → PermissionError
-    reg = ProjectRegistry()
-    try:
-        for name in (
-            "Orbit",
-            "X",
-            "A",
-            "B",
-            "C",
-            "Temp",
-            "Finite",
-            "Keshen",
-            "Other",
-            "Python Utils",
-            "WebApp",
-        ):
-            reg.deactivate(name)
-    finally:
-        reg.close()

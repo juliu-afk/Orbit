@@ -90,6 +90,12 @@ function handleSwitch(sessionId: string) {
 
     <span class="status-sep">|</span>
 
+    <button class="status-btn" onclick="navigator.sendBeacon('/api/v1/app/minimize','')">─</button>
+    <button class="status-btn" onclick="navigator.sendBeacon('/api/v1/app/maximize','')">□</button>
+    <button class="status-btn win-close" onclick="navigator.sendBeacon('/api/v1/app/quit','')">✕</button>
+
+    <span class="status-sep">|</span>
+
     <span class="flex items-center gap-1">
       <span class="status-dot" :class="props.connectionStatus"/>{{ connectionLabel }}
     </span>
@@ -101,6 +107,8 @@ function handleSwitch(sessionId: string) {
 .status-btn { background:none;border:none;color:var(--color-orbit-text-secondary);cursor:pointer;font-family:var(--font-mono);font-size:11px;padding:2px 6px;border-radius:3px;display:flex;align-items:center;gap:4px }
 .status-btn:hover { background:rgba(255,255,255,.06) }
 .status-btn.active { background:rgba(255,255,255,.1);color:#e0e0e0 }
+.win-close:hover { background:#f44336!important;color:#fff }
+/* TEST COMMENT TO TRACK REVERT */
 
 /* Session 下拉 */
 .session-trigger { color: var(--color-orbit-accent); cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 2px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }

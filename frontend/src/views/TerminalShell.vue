@@ -27,7 +27,6 @@ import CommandPalette from '@/components/layout/CommandPalette.vue'  // UX-11
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 import MonacoDiffEditor from '@/components/editor/MonacoDiffEditor.vue'  // UX-2
 import RulesPanel from '@/components/settings/RulesPanel.vue'  // UX-10
-import TitleBar from '@/components/layout/TitleBar.vue'
 import BranchesPanel from '@/components/session/BranchesPanel.vue'  // UX-13
 
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
@@ -136,9 +135,7 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
 </script>
 
 <template>
-<div class="terminal-root">
-  <TitleBar />
-  <div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{gridTemplateAreas:gridAreas(),gridTemplateColumns:gridColumns()}" @contextmenu.prevent>
+<div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{gridTemplateAreas:gridAreas(),gridTemplateColumns:gridColumns()}" @contextmenu.prevent>
   <div v-show="shell.showFileTree" class="resize-handle resize-left" @pointerdown="handleLeftResize" />
   <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto"><FileTreePanel :tree-data="fileTree" :selected-file="shell.selectedFile" :current-project-path="fileTreeProjectPath" @select-file="onSelectFile" @change-project="onFileTreeProjectChange" @create-project="onCreateProjectFromFileTree" /></aside>
   <main class="panel-center flex flex-col overflow-hidden">
@@ -171,12 +168,10 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
     <MonacoDiffEditor v-if="task.codeOutput" original="" :modified="task.codeOutput" language="python" height="calc(100vh - 80px)" />
   </el-drawer>
 </div>
-</div>
 </template>
 
 <style scoped>
-.terminal-root { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-.terminal-shell { display:grid; grid-template-columns:var(--spacing-filetree) 1fr var(--spacing-right-panel); grid-template-rows:1fr var(--spacing-statusbar); grid-template-areas:v-bind(gridAreas()); flex:1; overflow:hidden }
+.terminal-shell { display:grid; grid-template-columns:var(--spacing-filetree) 1fr var(--spacing-right-panel); grid-template-rows:1fr var(--spacing-statusbar); grid-template-areas:v-bind(gridAreas()); height:100vh; overflow:hidden }
 .terminal-shell[data-filetree-collapsed="true"] { grid-template-columns:0 1fr var(--spacing-right-panel) }
 .panel-left{grid-area:filetree;background:var(--color-orbit-glass);backdrop-filter:blur(var(--glass-blur,12px))}.panel-center{grid-area:chat}.panel-right{grid-area:right;background:var(--color-orbit-glass);backdrop-filter:blur(var(--glass-blur,12px))}.panel-bottom{grid-area:statusbar}
 .resize-handle{width:4px;cursor:col-resize;background:transparent;transition:background 0.15s;z-index:10}

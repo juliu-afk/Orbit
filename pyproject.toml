@@ -52,6 +52,14 @@ tzdata = "^2026.2"
 	# 微信集成——QR 码生成（P1 修复：加入显式依赖）
 	qrcode = ">=8.2"
 	pillow = ">=12.3.0"
+# V15.1 P3: GUI Agent + FileParser + Office
+mss = ">=10.0"
+pyautogui = ">=0.9.54"
+pyperclip = ">=1.9"
+pypdf = ">=5.0"
+python-docx = ">=1.1"
+openpyxl = ">=3.1"
+python-pptx = ">=1.0"
 
 [tool.poetry.group.dev.dependencies]
 # 测试（开发计划 3.4.1）

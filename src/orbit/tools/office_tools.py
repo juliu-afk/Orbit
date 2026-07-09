@@ -11,7 +11,7 @@ from pathlib import Path
 from orbit.tools.models import ToolPermission, ToolSchema
 
 # P1-4: 路径白名单——防止任意文件写入
-_ALLOWED_DIRS = (".", "./output", "/tmp", "./data", "./exports")
+_ALLOWED_DIRS = ("./output", "/tmp", "./data", "./exports")  # P2-A: 移除 "." 防源码覆盖
 
 
 def _validate_output_path(output_path: str) -> Path:

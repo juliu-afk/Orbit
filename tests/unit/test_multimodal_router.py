@@ -122,14 +122,46 @@ class TestTierRouter:
             tier=1
         ) == Tier.LIGHT
 
+    # ── V15.1 P2: PRIVATE tier ──
+
+    def test_privacy_keyword_triggers_private(self):
+        """含'财务'关键词 → PRIVATE"""
+        assert TierRouter.classify([
+            {"type": "text", "text": "这是财务报表"}
+        ]) == Tier.PRIVATE
+
+    def test_privacy_keyword_password(self):
+        """含'密码'关键词 → PRIVATE"""
+        assert TierRouter.classify([
+            {"type": "text", "text": "请输入密码"}
+        ]) == Tier.PRIVATE
+
+    def test_privacy_keyword_audit(self):
+        """含'审计'关键词 → PRIVATE"""
+        assert TierRouter.classify([
+            {"type": "text", "text": "审计报告"}
+        ]) == Tier.PRIVATE
+
+    def test_privacy_beats_heavy(self):
+        """隐私关键词优先于 T3——即使多图"""
+        content = [{"type": "image_url", "image_url": {"url": f"{i}.jpg"}} for i in range(5)]
+        content.append({"type": "text", "text": "财务报表分析"})
+        assert TierRouter.classify(content) == Tier.PRIVATE  # 隐私优先
+
+    def test_manual_tier_private(self):
+        """手动 tier=0 → PRIVATE"""
+        assert TierRouter.classify(
+            [{"type": "image_url", "image_url": {"url": "a.jpg"}}], tier=0
+        ) == Tier.PRIVATE
+
     def test_manual_tier_invalid_raises(self):
-        """手动 tier=0（非法）→ ValueError"""
-        with pytest.raises(ValueError, match="1-3"):
-            TierRouter.classify([], tier=0)
+        """手动 tier=-1（非法）→ ValueError"""
+        with pytest.raises(ValueError, match="0-3"):
+            TierRouter.classify([], tier=-1)
 
     def test_manual_tier_out_of_range_raises(self):
         """手动 tier=5（非法）→ ValueError"""
-        with pytest.raises(ValueError, match="1-3"):
+        with pytest.raises(ValueError, match="0-3"):
             TierRouter.classify([], tier=5)
 
     # ── 综合 ──
@@ -150,11 +182,11 @@ class TestTierConfig:
     """梯度配置完整性。"""
 
     def test_all_tiers_have_config(self):
-        """三个梯度都有配置"""
-        for tier in (Tier.LIGHT, Tier.STANDARD, Tier.HEAVY):
+        """四个梯度都有配置"""
+        for tier in (Tier.PRIVATE, Tier.LIGHT, Tier.STANDARD, Tier.HEAVY):
             cfg = TierRouter.get_config(tier)
             assert cfg.model, f"Tier {tier} missing model"
-            assert cfg.endpoint.startswith("https://"), f"Tier {tier} bad endpoint"
+            assert cfg.endpoint.startswith(("https://", "http://")), f"Tier {tier} bad endpoint"
             assert cfg.max_tokens > 0, f"Tier {tier} bad max_tokens"
 
     def test_t1_t2_free(self):
@@ -186,6 +218,10 @@ class TestTierConfig:
 
 class TestDowngradeChain:
     """降级链完整性。"""
+
+    def test_private_downgrades_to_light(self):
+        """V15.1 P2: PRIVATE → LIGHT（本地失败→云端免费）"""
+        assert TierRouter.get_downgrade(Tier.PRIVATE) == Tier.LIGHT
 
     def test_t3_downgrades_to_t2(self):
         """T3 → T2"""

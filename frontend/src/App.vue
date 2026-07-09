@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useShellStore } from '@/stores/shell'
 import SettingsDialog from '@/components/layout/SettingsDialog.vue'
 
 const shell = useShellStore()
 const showSettings = ref(false)
 
-// WHY try-catch: getCurrentWindow() 在非 Tauri 环境（浏览器/Playwright）throw
-// 直接 throw 会导致整个 App.vue 渲染失败
-let appWindow: any = null
-try { appWindow = getCurrentWindow() } catch { /* 浏览器环境，窗口控制按钮显示但无实际操作 */ }
-
-function minimize() { appWindow?.minimize() }
-function toggleMaximize() { appWindow?.toggleMaximize() }
-function closeWindow() { appWindow?.close() }
+// WHY sendBeacon: @tauri-apps/api 在从 http://127.0.0.1:18888 加载时不可用，
+// 改用后端 API 控制窗口（FindWindowW + ShowWindow / taskkill）
+function minimize() { navigator.sendBeacon('/api/v1/app/minimize', '') }
+function toggleMaximize() { navigator.sendBeacon('/api/v1/app/maximize', '') }
+function closeWindow() { navigator.sendBeacon('/api/v1/app/quit', '') }
 </script>
 
 <template>

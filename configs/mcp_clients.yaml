@@ -1,7 +1,7 @@
 # MCP 客户端配置——Orbit 连接外部 MCP 服务器
 # 每个服务器的工具会自动注册到 ToolRegistry，
 # 并加上 "{name}/" 前缀
-# 当前无外部 MCP 服务器连接——Orbit 自研代码导航工具集替代 Serena。
+# 当前无外部 MCP 服务器连接——Orbit 自研代码导航工具集已覆盖全部需求。
 # 添加新服务器示例：
 # servers:
 #   - name: my-tool

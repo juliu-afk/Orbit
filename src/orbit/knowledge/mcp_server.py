@@ -3,10 +3,11 @@
 WHY 手写而非 mcp SDK：MVP 阶段零额外依赖。
 MCP 协议足够简单（JSON-RPC 2.0 + tools/list + tools/call）。
 
-15 个 MCP 工具：query_knowledge + find_symbol + find_referencing_symbols +
+20 个 MCP 工具：query_knowledge + find_symbol + find_referencing_symbols +
 get_symbols_overview + trace_path + get_architecture + search_code + dead_code +
 find_implementations + replace_symbol_body + insert_after/before_symbol +
-safe_delete_symbol + rename_symbol + type_hierarchy
+safe_delete_symbol + rename_symbol + type_hierarchy +
+query_graph + detect_changes + export_graph_artifact + okf_import + okf_export
 
 协议规范：https://spec.modelcontextprotocol.io/
 """
@@ -129,7 +130,7 @@ class McpServer:
         """注册代码导航工具——基于 CodeGraph AST 索引。
 
         WHY: 让外部 Agent（Claude Code/Codex）能通过 Orbit MCP 做代码导航，
-        不再仅限领域知识查询。50 行实现，偷师 Serena 的 MCP 开放思路。
+        不再仅限领域知识查询。
         """
         self.register_tool(
             name="find_symbol",
@@ -218,7 +219,7 @@ class McpServer:
         )
         self.register_tool(
             name="find_implementations",
-            description="查找指定类的所有子类实现——通过继承边（INHERITS）查询。替代 Serena find_implementations。",
+            description="查找指定类的所有子类实现——通过继承边（INHERITS）查询。",
             inputSchema={
                 "type": "object",
                 "properties": {"class_name": {"type": "string", "description": "基类/接口名"}},
@@ -226,7 +227,7 @@ class McpServer:
             },
             handler=self._handle_find_implementations,
         )
-        # ── Phase 1 新增：语义编辑工具（替代 Serena 编辑能力）────────
+        # ── Phase 1 新增：语义编辑工具 ────────────────────────────
         self.register_tool(
             name="replace_symbol_body",
             description="精确替换函数/方法的函数体。通过符号名定位 start_line..end_line，替换内容后触增增量索引。",
@@ -275,6 +276,62 @@ class McpServer:
                 "required": ["symbol"],
             },
             handler=self._handle_safe_delete_symbol,
+        )
+        # ── 接线：孤立模块 → MCP 工具暴露 ──────────────────────
+        self.register_tool(
+            name="query_graph",
+            description="统一图谱查询——type=code/database/config，支持 symbol/table/key 参数。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "graph_type": {"type": "string", "enum": ["code", "database", "config"]},
+                    "symbol": {"type": "string"},
+                    "table": {"type": "string"},
+                    "key": {"type": "string"},
+                },
+                "required": ["graph_type"],
+            },
+            handler=self._handle_query_graph,
+        )
+        self.register_tool(
+            name="detect_changes",
+            description="Git diff 影响分析——返回变更文件中的受影响符号 + 风险分类。",
+            inputSchema={
+                "type": "object",
+                "properties": {"base_ref": {"type": "string", "default": "HEAD~1"}},
+                "required": [],
+            },
+            handler=self._handle_detect_changes,
+        )
+        self.register_tool(
+            name="export_graph_artifact",
+            description="导出 zstd 压缩图谱产物——团队共享用。",
+            inputSchema={
+                "type": "object",
+                "properties": {"output_path": {"type": "string", "default": ".orbit/graph/graph.db.zst"}},
+                "required": [],
+            },
+            handler=self._handle_export_artifact,
+        )
+        self.register_tool(
+            name="okf_import",
+            description="从 OKF bundle 导入领域知识——支持第三方会计准则/行业知识包。",
+            inputSchema={
+                "type": "object",
+                "properties": {"bundle_dir": {"type": "string", "description": "OKF bundle 目录路径"}},
+                "required": ["bundle_dir"],
+            },
+            handler=self._handle_okf_import,
+        )
+        self.register_tool(
+            name="okf_export",
+            description="导出知识图谱为 OKF bundle——人类可用 Obsidian/VS Code 编辑。",
+            inputSchema={
+                "type": "object",
+                "properties": {"output_dir": {"type": "string", "default": ".orbit/knowledge"}},
+                "required": [],
+            },
+            handler=self._handle_okf_export,
         )
         # ── Phase 2 新增：重命名 + 类型层次 ──────────────────
         self.register_tool(
@@ -900,6 +957,77 @@ class McpServer:
                     queue2.append(sub_id)
         return {"found": True, "class_name": class_name,
                 "supertypes": supertypes, "subtypes": subtypes}
+
+    # ── 接线 handler：孤立模块 → MCP 工具 ───────────────────
+
+    def _handle_query_graph(self, graph_type: str = "code", **kwargs: Any) -> dict[str, Any]:
+        """统一图谱查询——路由到 code/database/config 引擎。"""
+        try:
+            from orbit.graph.query import GraphQuery
+            q = GraphQuery(code_graph=self._code_graph)
+            return self._run_async(q.query(graph_type, **kwargs))  # type: ignore[arg-type]
+        except Exception as e:
+            return {"found": False, "error": str(e)}
+
+    def _handle_detect_changes(self, base_ref: str = "HEAD~1", **_: Any) -> dict[str, Any]:
+        """Git diff 变更影响分析。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        try:
+            from orbit.graph.engines.change_detector import ChangeDetector
+            detector = ChangeDetector(self._code_graph)
+            impacts = self._run_async(detector.analyze(base_ref))
+            return {"base_ref": base_ref, "impacts": [
+                {"name": i.name, "file": i.file_path, "risk": i.risk,
+                 "callers": i.callers[:5], "callees": i.callees[:5]}
+                for i in impacts
+            ]}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _handle_export_artifact(self, output_path: str = ".orbit/graph/graph.db.zst", **_: Any) -> dict[str, Any]:
+        """导出 zstd 压缩图谱产物。"""
+        try:
+            from pathlib import Path as _Path
+            from orbit.graph.artifact import export_graph_artifact
+            # P1-2 fix: 从 settings 或默认位置获取实际 DB 路径
+            try:
+                from orbit.core.config import settings as _s
+                db_url = str(getattr(_s, "DATABASE_URL", "sqlite+aiosqlite:///data/graph.db"))
+                if "///" in db_url:
+                    db_path = db_url.rsplit("///", 1)[-1]
+                else:
+                    db_path = "data/graph.db"
+            except Exception:
+                db_path = "data/graph.db"
+            ok = export_graph_artifact(db_path, output_path)
+            return {"success": ok, "output": output_path}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _handle_okf_import(self, bundle_dir: str = "", **_: Any) -> dict[str, Any]:
+        """从 OKF bundle 导入领域知识。"""
+        if not bundle_dir.strip():
+            return {"success": False, "error": "bundle_dir is required"}
+        try:
+            from orbit.knowledge.okf_importer import OkfImporter
+            importer = OkfImporter(self._engine)
+            count = importer.import_bundle(bundle_dir)
+            return {"success": True, "imported": count, "bundle_dir": bundle_dir}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _handle_okf_export(self, output_dir: str = ".orbit/knowledge", **_: Any) -> dict[str, Any]:
+        """导出知识图谱为 OKF bundle。"""
+        try:
+            from orbit.knowledge.okf_exporter import OkfExporter
+            exporter = OkfExporter(self._engine)
+            count = exporter.export(output_dir)
+            exporter.generate_index(output_dir)
+            exporter.generate_log(output_dir)
+            return {"success": True, "exported": count, "output_dir": output_dir}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     # ── JSON-RPC 请求处理 ──────────────────────────────────
 

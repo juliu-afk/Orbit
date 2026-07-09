@@ -224,7 +224,7 @@ class ToolRegistry:
     }
 
     # MCP 工具自动授予的角色——这些角色需要代码导航/编辑能力
-    # WHY: MCP 工具名是动态的（serena/find_symbol），无法在 ROLE_TOOLS 中
+    # WHY: MCP 工具名是动态的，无法在 ROLE_TOOLS 中硬编码
     # 静态枚举。改为按 toolset 前缀 `mcp:` 自动匹配。
     MCP_ROLES: set[str] = {"architect", "developer", "reviewer", "qa"}
 
@@ -650,7 +650,7 @@ class ToolRegistry:
     ) -> int:
         """连接外部 MCP 服务器，发现并注册其工具。
 
-        WHY: 让 Orbit Agent 透明调用外部 MCP 工具（如 Serena 的语义代码导航），
+        WHY: 让 Orbit Agent 透明调用外部 MCP 工具，通过 MCPClientConnection 桥接。
         通过 MCP 协议桥接——Agent 不感知工具是本地还是远程。
 
         Returns:

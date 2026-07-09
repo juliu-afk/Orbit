@@ -4,7 +4,7 @@ WHY:
   Orbit 已有 MCP Client (mcp_client.py)——消费外部 MCP 工具。
   但 Orbit 自身的工具（code_graph, sandbox, hallucination, checkpoint）
   不能被外部 Agent 调用。MCP Server 将 Orbit 工具暴露为标准 MCP 协议，
-  让外部 Agent (如 Claude Code, Cursor, Serena) 发现和调用。
+  让外部 Agent（Claude Code, Codex 等）发现和调用。
 
 设计:
   - JSON-RPC 2.0 over stdio (标准 MCP transport)

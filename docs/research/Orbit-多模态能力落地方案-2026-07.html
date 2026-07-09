@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit 多模态能力落地方案 —— 国产模型矩阵 + 五大能力 + 场景路线图</title>
+<style>
+  :root {
+    --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#c9d1d9; --text-muted:#8b949e;
+    --accent:#58a6ff; --green:#3fb950; --yellow:#d2991d; --red:#f85149; --purple:#a371f7; --cyan:#39d3d3; --orange:#d18642;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans SC',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;max-width:1320px;margin:0 auto}
+  .hero{background:linear-gradient(135deg,#1a1028 0%,#0d1f3c 40%,#0a2818 70%,#10281a 100%);border-bottom:1px solid var(--border);padding:60px 40px;text-align:center}
+  .hero h1{font-size:2.3em;font-weight:800;margin-bottom:10px;background:linear-gradient(135deg,var(--green),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .hero .sub{color:var(--text-muted);font-size:1.1em;margin-bottom:20px}
+  .badge-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px}
+  .badge{display:inline-block;padding:4px 14px;border-radius:20px;font-size:0.8em;font-weight:600;border:1px solid var(--border)}
+  .badge-domestic{color:var(--red);border-color:var(--red);background:rgba(248,81,73,0.08)}
+  .badge-oss{color:var(--green);border-color:var(--green);background:rgba(63,185,80,0.08)}
+  .badge-plan{color:var(--accent);border-color:var(--accent);background:rgba(88,166,255,0.08)}
+  .container{padding:36px 40px}
+  section{margin-bottom:56px}
+  h2{font-size:1.55em;border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:24px;display:flex;align-items:center;gap:10px}
+  h3{font-size:1.18em;margin:28px 0 14px;color:#e6edf3}
+  h4{font-size:1.02em;margin:20px 0 10px;color:var(--cyan)}
+  p{margin-bottom:12px}
+  ul,ol{margin:10px 0 10px 22px}
+  li{margin-bottom:5px}
+  table{width:100%;border-collapse:collapse;margin:16px 0 24px;font-size:0.91em}
+  th,td{text-align:left;padding:10px 14px;border:1px solid var(--border);vertical-align:top}
+  th{background:var(--surface);font-weight:600;color:var(--text-muted);font-size:0.8em;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap}
+  tr:hover td{background:rgba(255,255,255,0.02)}
+  .row-win{background:rgba(63,185,80,0.06)} .row-rec{background:rgba(63,185,80,0.04)}
+  .tag{display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.76em;font-weight:600;white-space:nowrap}
+  .tag-green{color:var(--green);background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.3)}
+  .tag-red{color:var(--red);background:rgba(248,81,73,0.12);border:1px solid rgba(248,81,73,0.3)}
+  .tag-yellow{color:var(--yellow);background:rgba(210,153,29,0.12)}
+  .tag-purple{color:var(--purple);background:rgba(163,113,247,0.12)}
+  .tag-blue{color:var(--accent);background:rgba(88,166,255,0.12)}
+  .tag-cyan{color:var(--cyan);background:rgba(57,211,211,0.12)}
+  .callout{border-left:3px solid;padding:18px 22px;margin:20px 0;border-radius:0 8px 8px 0;background:var(--surface)}
+  .callout-info{border-color:var(--accent)} .callout-win{border-color:var(--green)}
+  .callout-warn{border-color:var(--yellow)} .callout-danger{border-color:var(--red)}
+  .callout-title{font-weight:700;font-size:0.85em;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:22px}
+  .card.green-left{border-left:3px solid var(--green)} .card.blue-left{border-left:3px solid var(--accent)}
+  .card.purple-left{border-left:3px solid var(--purple)} .card.red-left{border-left:3px solid var(--red)}
+  .card.cyan-left{border-left:3px solid var(--cyan)}
+  pre{background:#0d1117;border:1px solid var(--border);border-radius:6px;padding:14px 18px;overflow-x:auto;font-size:0.82em;line-height:1.45}
+  code{font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace}
+  .arch-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 22px;margin:14px 0;white-space:pre;font-family:'JetBrains Mono','Fira Code',Consolas,monospace;font-size:0.8em;line-height:1.5;overflow-x:auto;color:var(--text-muted)}
+  .timeline{position:relative;padding-left:32px;border-left:2px solid var(--border);margin:24px 0}
+  .tl-item{position:relative;margin-bottom:26px}
+  .tl-item::before{content:'';position:absolute;left:-39px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+  .tl-p0::before{background:var(--red)} .tl-p1::before{background:var(--orange)}
+  .tl-p2::before{background:var(--accent)} .tl-p3::before{background:var(--green)}
+  .tl-phase{font-weight:700;font-size:0.88em;margin-bottom:4px}
+  .tl-desc{font-size:0.85em;color:var(--text-muted)}
+  .self-bar{display:flex;align-items:center;gap:8px;margin:8px 0}
+  .self-fill{height:8px;border-radius:4px;background:var(--purple)}
+  .self-track{flex:1;height:8px;border-radius:4px;background:var(--surface);border:1px solid var(--border)}
+  .toc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:22px 28px;margin-bottom:36px}
+  .toc h3{margin-top:0} .toc ol{columns:2;padding-left:22px}
+  .toc li{margin:4px 0} .toc a{color:var(--accent);text-decoration:none}
+  footer{text-align:center;padding:36px;color:var(--text-muted);font-size:0.85em;border-top:1px solid var(--border)}
+  @media(max-width:768px){.container{padding:20px}.two-col,.three-col{grid-template-columns:1fr}.hero{padding:36px 20px}.toc ol{columns:1}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>🚀 Orbit 多模态能力落地方案</h1>
+  <p class="sub">国产模型矩阵 · 五大能力扩展 · 落地方案 + 必要性说明 + 应用场景</p>
+  <div class="badge-row">
+    <span class="badge badge-domestic">🇨🇳 纯国产模型 · 零外国依赖</span>
+    <span class="badge badge-oss">🔓 开源优先 · 可自部署</span>
+    <span class="badge badge-plan">📐 完整落地方案</span>
+  </div>
+  <div style="margin-top:24px;font-size:0.82em;color:var(--text-muted)">
+    v1.0 · 2026-07-10 · 合并自「五大能力扩展方案 v3」+「国产多模态模型对比 v2.1」<br>
+    源文件：<code>D:/Orbit/docs/research/Orbit-多模态能力落地方案-2026-07.html</code>
+  </div>
+</header>
+
+<div class="container">
+
+<div class="toc">
+  <h3>📑 目录</h3>
+  <ol>
+    <li><a href="#exec">执行摘要</a></li>
+    <li><a href="#matrix">Part A：国产多模态模型矩阵</a></li>
+    <li><a href="#five">Part B：五大能力扩展方案</a></li>
+    <li><a href="#impl">Part C：落地方案——Orbit 具体实现</a></li>
+    <li><a href="#necessity">Part D：必要性说明</a></li>
+    <li><a href="#scenarios">Part E：应用场景</a></li>
+    <li><a href="#roadmap">Part F：实施路线图</a></li>
+    <li><a href="#appendix">附录</a></li>
+  </ol>
+</div>
+
+<!-- ===== EXEC ===== -->
+<section id="exec">
+  <h2>📌 1. 执行摘要</h2>
+
+  <div class="callout callout-win">
+    <div class="callout-title">核心结论</div>
+    <p><strong>Orbit 作为多 Agent 软件开发的 orchestration 层，多模态能力不是锦上添花——是基础设施。</strong>国产多模态模型（Qwen3.7-Plus、GLM-4.1V-Thinking、MiniCPM-V 4.6）已全面成熟，API 可用、免费层存在、开源可自部署。五大能力全部可自研，零外国闭源模型日常依赖。</p>
+  </div>
+
+  <table>
+    <tr><th>维度</th><th>结论</th><th>关键数据</th></tr>
+    <tr class="row-win"><td><strong>国产模型成熟度</strong></td><td>全面可用，多项 Benchmark 登顶</td><td>Qwen3.7-Plus MLVU 87.4% 第1、GLM-4.1V 28项评测23项最佳、Seed 2.1 Pro Video-MME 89.2% 第1</td></tr>
+    <tr class="row-win"><td><strong>API 可用性</strong></td><td>7家国产 provider，全部 OpenAI 兼容</td><td>智谱、阿里百炼、腾讯 VITA、百度千帆、字节火山、阶跃星辰、MiniCPM 免费 API</td></tr>
+    <tr class="row-win"><td><strong>免费层</strong></td><td>GLM-4.1V-Flash 永久免费 + MiniCPM-V 免费 API</td><td>零成本试水 → 付费扩容</td></tr>
+    <tr class="row-win"><td><strong>私有化部署</strong></td><td>3 个可选项，最低 6GB VRAM</td><td>MiniCPM-V 4.6 (1.3B/6GB) · DeepSeek-VL2 (MIT) · MiMo-V2.5 (开源视频最强)</td></tr>
+    <tr class="row-win"><td><strong>五大能力自研度</strong></td><td>5/5 可自研</td><td>零外国闭源 API 日常依赖</td></tr>
+    <tr><td><strong>总工期</strong></td><td>P0+P1 约 6 周</td><td>多模态 LLM 集成(0.5周) + 图片/视频 Tool(3周) + 私有化(1周) + CU(4周)</td></tr>
+  </table>
+
+  <div class="callout callout-warn" style="margin-top:16px;">
+    <div class="callout-title">⚠️ DeepSeek V4 Pro/Flash 是纯文本 API——不在多模态矩阵中</div>
+    <p>DeepSeek 的多模态产品：DeepSeek-VL2（开源自部署）+ DeepSeek-OCR 2（文档 OCR API）。"识图模式" API 预计 2026 Q3。</p>
+  </div>
+</section>
+
+<!-- ===== PART A: MODEL MATRIX ===== -->
+<section id="matrix">
+  <h2>🧠 Part A：国产多模态模型矩阵</h2>
+
+  <h3>A.1 推荐模型栈（Orbit 专用）</h3>
+  <table>
+    <tr><th>角色</th><th>模型</th><th>厂商</th><th>API</th><th>视频</th><th>价格</th><th>自部署</th></tr>
+    <tr class="row-win">
+      <td><strong>🏆 主力 API</strong></td><td><strong>Qwen3.7-Plus</strong></td><td>阿里云</td><td><span class="tag tag-green">OpenAI 兼容</span></td><td>2h / 2GB</td><td>~¥3/M 入</td><td>❌</td></tr>
+    <tr class="row-win">
+      <td><strong>🎬 视频/GUI</strong></td><td><strong>GLM-4.1V-Thinking</strong></td><td>智谱 AI</td><td><span class="tag tag-green">OpenAI 兼容</span></td><td><span class="tag tag-green">原生 2h</span></td><td><span class="tag tag-green">Flash 永久免费</span></td><td>✅ 9B, 24GB</td></tr>
+    <tr class="row-win">
+      <td><strong>💰 极致便宜</strong></td><td><strong>VITA 3.0</strong></td><td>腾讯云</td><td><span class="tag tag-green">OpenAI 兼容</span></td><td>600MB</td><td><span class="tag tag-yellow">¥1.2/M 入</span></td><td>❌</td></tr>
+    <tr class="row-win">
+      <td><strong>🔒 私有化</strong></td><td><strong>MiniCPM-V 4.6</strong></td><td>面壁智能</td><td><span class="tag tag-green">免费 API + 自部署</span></td><td>128帧</td><td>免费</td><td><span class="tag tag-green">🏆 6GB VRAM</span></td></tr>
+    <tr>
+      <td><strong>📄 OCR</strong></td><td>DeepSeek-OCR 2</td><td>DeepSeek</td><td><span class="tag tag-green">API 可用</span></td><td>—</td><td>$0.15/M 均一</td><td>❌</td></tr>
+    <tr>
+      <td>备选</td><td>文心 5.0 / Seed 2.1 Pro / MiMo-V2.5 / InternVL 3.0 / Kimi K2.5 / Qwen3.5-Omni</td><td>百度/字节/小米/上海AI lab/月之暗面/阿里</td><td colspan="4">按需切换——见 A.2 完整矩阵</td></tr>
+  </table>
+
+  <h3>A.2 完整国产模型矩阵（10 家）</h3>
+  <table>
+    <tr><th>模型</th><th>厂商</th><th>视觉</th><th>视频</th><th>GUI</th><th>API 协议</th><th>定价</th><th>开源</th></tr>
+    <tr class="row-win"><td><strong>Qwen3.7-Plus</strong></td><td>阿里云</td><td>⭐⭐⭐⭐⭐</td><td>2h/2GB</td><td>✅ 79.0</td><td>OpenAI</td><td>~¥3/16.5</td><td>部分</td></tr>
+    <tr class="row-win"><td><strong>GLM-4.1V-Thinking</strong></td><td>智谱 AI</td><td>⭐⭐⭐⭐</td><td>原生 2h</td><td>🏆 原生</td><td>OpenAI</td><td>免费/¥2</td><td>✅ 9B</td></tr>
+    <tr class="row-win"><td><strong>VITA 3.0</strong></td><td>腾讯云</td><td>⭐⭐⭐⭐</td><td>600MB</td><td>—</td><td>OpenAI</td><td>¥1.2/3.5</td><td>❌</td></tr>
+    <tr class="row-win"><td><strong>MiniCPM-V 4.6</strong></td><td>面壁智能</td><td>⭐⭐⭐⭐</td><td>128帧</td><td>—</td><td>OpenAI</td><td>免费</td><td>🏆 Apache 2.0</td></tr>
+    <tr><td>文心 5.0</td><td>百度</td><td>⭐⭐⭐⭐</td><td>UCF101 94.1%</td><td>—</td><td>千帆</td><td>¥1.4/5.6</td><td>❌</td></tr>
+    <tr><td>Seed 2.1 Pro</td><td>字节跳动</td><td>⭐⭐⭐⭐</td><td>Video-MME 89.2% 第1</td><td>—</td><td>火山引擎</td><td>待确认</td><td>❌</td></tr>
+    <tr><td>MiMo-V2.5</td><td>小米</td><td>⭐⭐⭐⭐</td><td>开源第1</td><td>—</td><td>自部署</td><td>$0.17/0.34</td><td>✅ 开源</td></tr>
+    <tr><td>DeepSeek-VL2</td><td>DeepSeek</td><td>⭐⭐⭐⭐⭐</td><td><span class="tag tag-red">❌</span></td><td>—</td><td>自部署</td><td>开源=免费</td><td>✅ MIT</td></tr>
+    <tr><td>InternVL 3.0</td><td>上海 AI lab</td><td>⭐⭐⭐⭐⭐</td><td>万帧/4K60fps</td><td>—</td><td>自部署</td><td>开源=免费</td><td>✅ 开源</td></tr>
+    <tr><td>Kimi K2.5</td><td>月之暗面</td><td>⭐⭐⭐⭐</td><td>LVBench 75.9% 第1</td><td>—</td><td>Moonshot API</td><td>待确认</td><td>❌</td></tr>
+  </table>
+</section>
+
+<!-- ===== PART B: FIVE CAPABILITIES ===== -->
+<section id="five">
+  <h2>🔧 Part B：五大能力扩展方案</h2>
+  <p style="color:var(--text-muted);margin-bottom:20px;">基于「五大能力扩展方案 v3」更新至最新模型名。自研度 ≥ 85% 全部。</p>
+
+  <table>
+    <tr><th>#</th><th>能力</th><th>推荐方案</th><th>自研度</th><th>关键依赖</th><th>工期</th></tr>
+    <tr>
+      <td><strong>①</strong></td>
+      <td><strong>文件类型扩展</strong></td>
+      <td>python-magic + FileParserRegistry 插件架构</td>
+      <td><span class="tag tag-green">100%</span></td>
+      <td>python-magic (MIT) · pypdf (BSD)</td>
+      <td>2 周</td>
+    </tr>
+    <tr>
+      <td><strong>②</strong></td>
+      <td><strong>图片/视频多模态</strong></td>
+      <td><strong>GLM-4.1V-Thinking（视频/GUI 专用）+ Qwen3.7-Plus（主力 API）+ MiniCPM-V 4.6（私有化）</strong></td>
+      <td><span class="tag tag-green">90%</span></td>
+      <td>GLM-4.1V (MIT 开源) · Qwen3.7-Plus (API) · MiniCPM-V (Apache 2.0)</td>
+      <td>3 周</td>
+    </tr>
+    <tr>
+      <td><strong>③</strong></td>
+      <td><strong>多模态 LLM 集成</strong></td>
+      <td>LLMRequest content array + 多后端路由（百炼/智谱/火山/Ollama）</td>
+      <td><span class="tag tag-green">100%</span></td>
+      <td>纯扩展现有 Gateway——零新依赖</td>
+      <td><strong>0.5 周</strong></td>
+    </tr>
+    <tr>
+      <td><strong>④</strong></td>
+      <td><strong>Computer Use</strong></td>
+      <td>UFO² 架构 + Qwen3.7-Plus（GUI 定位）+ GLM-4.1V（操作推理）+ PyAutoGUI</td>
+      <td><span class="tag tag-green">85%</span></td>
+      <td>Qwen3.7-Plus (GUI Agent 79.0) · GLM-4.1V (原生 UI2Code) · mss (MIT) · PyAutoGUI (BSD)</td>
+      <td>4 周</td>
+    </tr>
+    <tr>
+      <td><strong>⑤</strong></td>
+      <td><strong>Office 文件读写</strong></td>
+      <td>openpyxl + python-docx + python-pptx</td>
+      <td><span class="tag tag-green">100%</span></td>
+      <td>openpyxl (MIT) · python-docx (MIT) · python-pptx (MIT)</td>
+      <td>2 周</td>
+    </tr>
+  </table>
+
+  <div class="callout callout-info">
+    <div class="callout-title">v3 模型名→最新勘误（基于 2026-07-09 多模态调研）</div>
+    <table style="font-size:0.85em;margin-top:8px">
+      <tr><th>v3 引用</th><th>→ 更新为</th><th>原因</th></tr>
+      <tr><td>GLM-4.6V-Flash (9B)</td><td><strong>GLM-4.1V-Thinking-Flash</strong></td><td>2026-07-02 最新发布；原生 2h 视频 + GUI Agent + CoT 推理</td></tr>
+      <tr><td>Qwen2.5-VL-72B</td><td><strong>Qwen3.7-Plus</strong></td><td>2026-06 最新；Vision Arena 国内第1；MLVU 87.4% 第1</td></tr>
+      <tr><td>Qwen3-VL-8B（本地）</td><td><strong>MiniCPM-V 4.6</strong>（轻量私有化）</td><td>MiniCPM 1.3B 开源，6GB VRAM，性能匹敌 3B 模型</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ===== PART C: IMPLEMENTATION ===== -->
+<section id="impl">
+  <h2>🛠️ Part C：落地方案——Orbit 具体实现</h2>
+
+  <h3>C.1 架构总览</h3>
+  <div class="arch-box">                       ┌──────────────────────────────────────────┐
+                       │         Orbit Agent (orchestration)      │
+                       │         多模态 Tool 调用                    │
+                       └──────────────────┬───────────────────────┘
+                                          │
+          ┌───────────────────────────────┼───────────────────────────────┐
+          ▼                               ▼                               ▼
+ ┌─────────────────┐          ┌─────────────────────┐        ┌──────────────────┐
+ │ watch_video Tool │          │  gui_agent Tool     │        │  ocr Tool        │
+ │ yt-dlp + ffmpeg  │          │  UFO² + PyAutoGUI   │        │  DeepSeek-OCR 2  │
+ └────────┬────────┘          └──────────┬──────────┘        └────────┬─────────┘
+          │                              │                             │
+          ▼                              ▼                             ▼
+ ┌─────────────────────────────────────────────────────────────────────────┐
+ │                    Multimodal Router (智能路由)                           │
+ │   video → GLM-4.1V / Qwen3.7-Plus                                       │
+ │   image → Qwen3.7-Plus / GLM-4.1V / DeepSeek-VL2(私有)                 │
+ │   ocr   → DeepSeek-OCR 2 / Qwen-VL-OCR                                  │
+ │   gui   → GLM-4.1V / Qwen3.7-Plus                                       │
+ │   private → MiniCPM-V 4.6 (vLLM sandbox)                                │
+ └──────────────┬──────────────────────────────────────────────────────────┘
+                │
+    ┌───────────┼───────────┬──────────────┬──────────────┐
+    ▼           ▼           ▼              ▼              ▼
+ ┌──────┐  ┌──────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+ │ 智谱  │  │ 阿里  │  │ 腾讯 VITA │  │ 字节火山  │  │ Ollama   │
+ │GLM-4.1V│ │百炼  │  │          │  │ Seed 2.1 │  │MiniCPM-V │
+ │ FREE   │  │Qwen3.7│  │  ¥1.2/M │  │          │  │ 本地 LLM  │
+ └──────┘  └──────┘  └──────────┘  └──────────┘  └──────────┘
+
+ 降级链：GLM-4.1V-Flash(免费) → 腾讯 VITA(极致便宜) → Qwen3.7-Plus(全能) → 私有化兜底</div>
+
+  <h3>C.2 文件改动清单</h3>
+  <table>
+    <tr><th>文件</th><th>操作</th><th>内容</th><th>阶段</th></tr>
+    <tr><td><code>src/orbit/gateway/schemas.py</code></td><td><strong>修改</strong></td><td>LLMRequest 加 content 字段——支持 image_url/video_url</td><td>P0</td></tr>
+    <tr><td><code>src/orbit/gateway/multimodal.py</code></td><td><strong>新建</strong></td><td>MultimodalRouter——按媒体类型 + 成本 + 可用性自动选模型</td><td>P0</td></tr>
+    <tr><td><code>src/orbit/gateway/adapters/vision.py</code></td><td><strong>新建</strong></td><td>VisionAdapter——OpenAI 兼容直连，支持 content array</td><td>P0</td></tr>
+    <tr><td><code>src/orbit/gateway/client.py</code></td><td><strong>修改</strong></td><td>generate() 加 multimodal 检测分支</td><td>P0</td></tr>
+    <tr><td><code>src/orbit/tools/video_tools.py</code></td><td><strong>新建</strong></td><td>watch_video / extract_frames——视频理解 Tool（P1）</td><td>P1</td></tr>
+    <tr><td><code>src/orbit/tools/gui_tools.py</code></td><td><strong>新建</strong></td><td>gui_agent——Computer Use Tool（UFO² + PyAutoGUI）（P3）</td><td>P3</td></tr>
+    <tr><td><code>src/orbit/tools/ocr_tools.py</code></td><td><strong>新建</strong></td><td>ocr_document / ocr_table——文档 OCR Tool（P1）</td><td>P1</td></tr>
+    <tr><td><code>src/orbit/observability/video_capture.py</code></td><td><strong>新建</strong></td><td>审计截图管线——ffmpeg 抽帧 + 去重 + trajectory 存储（P2）</td><td>P2</td></tr>
+    <tr><td><code>src/orbit/sandbox/docker-compose.vlm.yml</code></td><td><strong>新建</strong></td><td>MiniCPM-V vLLM 容器编排——私有化视觉 LLM（P2）</td><td>P2</td></tr>
+    <tr><td><code>src/orbit/compose/skills/watch.md</code></td><td><strong>新建</strong></td><td>SKILL.md——视频理解 Agent 技能模板（P1）</td><td>P1</td></tr>
+  </table>
+
+  <h3>C.3 智能路由核心逻辑</h3>
+  <pre># src/orbit/gateway/multimodal.py
+from dataclasses import dataclass
+from enum import Enum
+
+class MediaType(Enum):
+    VIDEO = "video"
+    IMAGE = "image"
+    DOCUMENT = "document"
+    GUI = "gui"
+
+@dataclass
+class RouteConfig:
+    primary: str       # model name
+    fallback: str
+    max_cost: float    # max budget per call (yuan)
+
+ROUTES = {
+    MediaType.VIDEO: RouteConfig(
+        primary="glm-4.1v-thinking-flash",     # 免费，原生 2h
+        fallback="qwen3.7-plus",               # 1M ctx, MLVU #1
+        max_cost=0,
+    ),
+    MediaType.IMAGE: RouteConfig(
+        primary="qwen3.7-plus",                # Vision Arena 国内第1
+        fallback="glm-4.1v-thinking-flash",    # 免费
+        max_cost=0.01,
+    ),
+    MediaType.DOCUMENT: RouteConfig(
+        primary="deepseek-ocr-2",              # $0.15/M 均一
+        fallback="qwen-vl-ocr",
+        max_cost=0.005,
+    ),
+    MediaType.GUI: RouteConfig(
+        primary="glm-4.1v-thinking-flash",     # 原生 UI2Code
+        fallback="qwen3.7-plus",               # ScreenSpot 79.0
+        max_cost=0.01,
+    ),
+}
+
+class MultimodalRouter:
+    """按媒体类型 + 成本 + 可用性自动选择模型"""
+    def __init__(self, routes=ROUTES, prefer_private=False):
+        self.routes = routes
+        self.prefer_private = prefer_private
+
+    async def route(self, media_type, content, budget=None):
+        # 1. 私有化优先 → MiniCPM-V localhost:8000
+        # 2. 按 RouteConfig 选择 primary
+        # 3. 失败 → fallback
+        # 4. 全部失败 → MultimodalRouteError
+        ...
+
+    async def call(self, media_type, content, prompt):
+        model = await self.route(media_type, content)
+        return await self._call_openai_compatible(model, content, prompt)</pre>
+</section>
+
+<!-- ===== PART D: NECESSITY ===== -->
+<section id="necessity">
+  <h2>📋 Part D：必要性说明</h2>
+
+  <div class="two-col">
+    <div class="card red-left">
+      <h4>🔴 不做的代价</h4>
+      <ul>
+        <li><strong>Agent 盲视：</strong>只能读代码和日志，无法理解截图、录屏、UI——软件开发 80% 的信息载体</li>
+        <li><strong>Bug 诊断低效：</strong>用户只能文字描述问题，agent 无法直接看录屏定位</li>
+        <li><strong>Computer Use 缺失：</strong>没有 GUI Agent，无法做端到端自动化测试——只能调 API，不能操作真实 UI</li>
+        <li><strong>审计证据单薄：</strong>只有文本日志，缺少截图证据</li>
+        <li><strong>竞品降维打击：</strong>Codex/Cursor 已深度集成视觉理解，Orbit 不跟进则差异化为负</li>
+      </ul>
+    </div>
+    <div class="card green-left">
+      <h4>🟢 做的好处</h4>
+      <ul>
+        <li><strong>差异化护城河：</strong>唯一自研 Computer Use 的多 Agent 系统——Agent 能操作真实桌面软件</li>
+        <li><strong>Bug 诊断提效 10×：</strong>录屏 → QA agent 自动分析 → 定位代码行</li>
+        <li><strong>审计合规：</strong>agent 每一步决策都有截图证据</li>
+        <li><strong>多模态知识摄入：</strong>技术视频 → 自动提取知识点 → Knowledge Graph</li>
+        <li><strong>国产自主可控：</strong>全链路国产模型，零外国闭源 API 依赖</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PART E: SCENARIOS ===== -->
+<section id="scenarios">
+  <h2>🎯 Part E：应用场景</h2>
+
+  <h3>场景 1：Bug 录屏诊断（QA Agent）</h3>
+  <div class="card blue-left">
+    <table>
+      <tr><td style="width:80px"><strong>触发</strong></td><td>用户上传 bug 录屏到 Orbit</td></tr>
+      <tr><td><strong>流程</strong></td><td>yt-dlp/本地文件 → GLM-4.1V 原生视频分析 → 输出时间点 + UI 元素 + 根因 + 相关代码</td></tr>
+      <tr><td><strong>产出</strong></td><td>Bug 报告含截图+代码定位+修复建议</td></tr>
+      <tr><td><strong>模型</strong></td><td>GLM-4.1V-Thinking（视频）→ DeepSeek-V4（文本推理定位代码）</td></tr>
+    </table>
+  </div>
+
+  <h3>场景 2：GUI 自动化回归测试（QA Agent + Computer Use）</h3>
+  <div class="card blue-left">
+    <table>
+      <tr><td style="width:80px"><strong>触发</strong></td><td>每次 PR → Orbit QA agent 自动启动 GUI 测试</td></tr>
+      <tr><td><strong>流程</strong></td><td>启动应用 → Qwen3.7-Plus GUI Agent 操作界面 → 每步截图 → 异常时 GLM-4.1V 分析 → 生成报告</td></tr>
+      <tr><td><strong>产出</strong></td><td>带截图的自动化测试报告，定位到具体 UI 组件</td></tr>
+      <tr><td><strong>模型</strong></td><td>Qwen3.7-Plus（GUI 定位 79.0）+ GLM-4.1V（操作推理+异常分析）+ PyAutoGUI</td></tr>
+    </table>
+  </div>
+
+  <h3>场景 3：设计稿 → 代码（Developer Agent）</h3>
+  <div class="card blue-left">
+    <table>
+      <tr><td style="width:80px"><strong>触发</strong></td><td>用户上传 UI 设计稿/截图</td></tr>
+      <tr><td><strong>流程</strong></td><td>Qwen3.7-Plus 分析 UI 结构 → GLM-4.1V GUI Agent 提取组件层级 → Developer agent 生成代码</td></tr>
+      <tr><td><strong>产出</strong></td><td>可运行的 Vue/React 组件代码</td></tr>
+      <tr><td><strong>模型</strong></td><td>Qwen3.7-Plus（视觉理解）+ GLM-4.1V（UI2Code）</td></tr>
+    </table>
+  </div>
+
+  <h3>场景 4：多 Agent 可视化监控（Orbit Dashboard）</h3>
+  <div class="card blue-left">
+    <table>
+      <tr><td style="width:80px"><strong>触发</strong></td><td>Orbit 多 Agent 任务执行中</td></tr>
+      <tr><td><strong>流程</strong></td><td>实时捕获各 Agent 工作区截图 → 前端 Dashboard 展示 → 用户直观监控每个 Agent 在做什么</td></tr>
+      <tr><td><strong>产出</strong></td><td>多 Agent 协作实时可视化面板</td></tr>
+      <tr><td><strong>技术</strong></td><td>mss + Orbit Dashboard + WebSocket 截图流</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ===== PART F: ROADMAP ===== -->
+<section id="roadmap">
+  <h2>🗺️ Part F：实施路线图</h2>
+
+  <div class="timeline">
+    <div class="tl-item tl-p0">
+      <div class="tl-phase"><span class="tag tag-red">P0 · 第1周</span> 多模态 LLM 集成 + API 接入验证</div>
+      <div class="tl-desc">
+        <strong>目标：Orbit 能调用多模态模型。</strong><br>
+        · 新建 <code>VisionAdapter</code> + <code>MultimodalRouter</code><br>
+        · LLMRequest 支持 content array（image_url/video_url）<br>
+        · 接入智谱 GLM-4.1V API（免费层）+ 阿里百炼 Qwen3.7-Plus<br>
+        · <strong>交付：Agent 看图回答问题</strong>
+      </div>
+    </div>
+
+    <div class="tl-item tl-p1">
+      <div class="tl-phase"><span class="tag tag-orange">P1 · 第2-4周</span> 图片/视频 Tool + OCR</div>
+      <div class="tl-desc">
+        <strong>目标：Agent 能主动调用视频/图片/OCR 工具。</strong><br>
+        · 新建 <code>video_tools.py</code> + <code>ocr_tools.py</code> + <code>watch.md</code> SKILL<br>
+        · yt-dlp 集成（覆盖 1800+ 视频平台）<br>
+        · 智能路由：视频→GLM，图片→Qwen，文档→OCR 2<br>
+        · <strong>交付：Agent 执行 /watch 命令分析视频并回复</strong>
+      </div>
+    </div>
+
+    <div class="tl-item tl-p2">
+      <div class="tl-phase"><span class="tag tag-blue">P2 · 第5周</span> 私有化部署 + 审计截图</div>
+      <div class="tl-desc">
+        <strong>目标：数据不出域 + 审计可视化。</strong><br>
+        · Docker sandbox 集成 MiniCPM-V 4.6（vLLM）<br>
+        · 敏感数据自动路由到本地模型<br>
+        · ffmpeg 抽帧管线 + trajectory 截图存储
+      </div>
+    </div>
+
+    <div class="tl-item tl-p3">
+      <div class="tl-phase"><span class="tag tag-green">P3 · 第6-10周</span> Computer Use + 文件扩展</div>
+      <div class="tl-desc">
+        <strong>目标：Orbit Agent 能操作真实桌面软件。</strong><br>
+        · GUI Agent Tool（UFO² 架构 + PyAutoGUI + mss）<br>
+        · FileParserRegistry（pdf/docx/xlsx/pptx 全支持）<br>
+        · <strong>交付：Agent 自动完成完整会计流程并截图验证</strong>
+      </div>
+    </div>
+  </div>
+
+  <h3>工作量汇总</h3>
+  <table>
+    <tr><th>阶段</th><th>内容</th><th>工期</th><th>新建文件</th><th>修改文件</th></tr>
+    <tr class="row-rec"><td><strong>P0</strong></td><td>多模态 LLM 集成</td><td><strong>0.5 周</strong></td><td>2</td><td>2</td></tr>
+    <tr class="row-rec"><td><strong>P1</strong></td><td>图片/视频 Tool + OCR</td><td><strong>3 周</strong></td><td>4</td><td>1</td></tr>
+    <tr class="row-rec"><td><strong>P2</strong></td><td>私有化 + 审计</td><td><strong>1 周</strong></td><td>2</td><td>1</td></tr>
+    <tr><td>P3</td><td>Computer Use + 文件</td><td>4 周</td><td>2</td><td>0</td></tr>
+    <tr><td><strong>合计</strong></td><td><strong>P0-P2 最小可用</strong></td><td><strong>4.5 周</strong></td><td>8</td><td>4</td></tr>
+  </table>
+</section>
+
+<!-- ===== APPENDIX ===== -->
+<section id="appendix">
+  <h2>📎 附录</h2>
+
+  <h3>附录 A：API Key 申请清单（按优先级）</h3>
+  <table>
+    <tr><th>Provider</th><th>环境变量</th><th>申请地址</th><th>用途</th><th>优先级</th><th>费用</th></tr>
+    <tr class="row-win"><td>智谱</td><td><code>ZHIPU_API_KEY</code></td><td>open.bigmodel.cn</td><td>GLM-4.1V-Flash（免费视频/GUI）</td><td><strong>P0——已有</strong></td><td>免费</td></tr>
+    <tr class="row-win"><td>阿里百炼</td><td><code>DASHSCOPE_API_KEY</code></td><td>bailian.console.aliyun.com</td><td>Qwen3.7-Plus（主力视觉）</td><td><strong>P0</strong></td><td>按量</td></tr>
+    <tr><td>腾讯云</td><td><code>TENCENT_MAAS_KEY</code></td><td>console.cloud.tencent.com</td><td>VITA 3.0（极致便宜视频）</td><td>P1</td><td>¥1.2/M</td></tr>
+    <tr><td>DeepSeek</td><td><code>DEEPSEEK_API_KEY</code></td><td>platform.deepseek.com</td><td>OCR 2（文档 OCR）</td><td>P1</td><td>$0.15/M</td></tr>
+    <tr><td>百度千帆</td><td><code>QIANFAN_API_KEY</code></td><td>console.bce.baidu.com/qianfan</td><td>文心 5.0（备选视觉）</td><td>P2</td><td>¥1.4/M</td></tr>
+    <tr><td>火山引擎</td><td><code>VOLCENGINE_API_KEY</code></td><td>console.volcengine.com/ark</td><td>Seed 2.1 Pro（视频顶级）</td><td>P2</td><td>待确认</td></tr>
+  </table>
+
+  <h3>附录 B：新增依赖（全 MIT/BSD/Apache 2.0）</h3>
+  <table>
+    <tr><th>依赖</th><th>版本</th><th>用途</th><th>Phase</th><th>许可</th></tr>
+    <tr><td><code>pillow</code></td><td>>=12.3</td><td>图片预处理（已安装）</td><td>P0</td><td>MIT-CMU</td></tr>
+    <tr><td><code>httpx</code></td><td>>=0.27</td><td>OpenAI 兼容 API 直连（已安装）</td><td>P0</td><td>BSD</td></tr>
+    <tr><td><code>python-magic</code></td><td>>=0.4.27</td><td>MIME 类型检测</td><td>P3</td><td>MIT</td></tr>
+    <tr><td><code>pypdf</code></td><td>>=5.0</td><td>PDF 文本提取</td><td>P3</td><td>BSD</td></tr>
+    <tr><td><code>ollama</code></td><td>>=0.4</td><td>本地 VLM 推理</td><td>P2</td><td>MIT</td></tr>
+    <tr><td><code>openpyxl</code></td><td>>=3.1</td><td>Excel 读写</td><td>P3</td><td>MIT</td></tr>
+    <tr><td><code>python-docx</code></td><td>>=1.1</td><td>Word 读写</td><td>P3</td><td>MIT</td></tr>
+    <tr><td><code>python-pptx</code></td><td>>=1.0</td><td>PPT 读写</td><td>P3</td><td>MIT</td></tr>
+    <tr><td><code>mss</code></td><td>>=10.0</td><td>屏幕截图（CU）</td><td>P3</td><td>MIT</td></tr>
+    <tr><td><code>PyAutoGUI</code></td><td>>=0.9.54</td><td>鼠标/键盘操作（CU）</td><td>P3</td><td>BSD</td></tr>
+    <tr><td><code>comtypes</code></td><td>>=1.4</td><td>Windows UIA/COM 调用</td><td>P3</td><td>MIT</td></tr>
+    <tr><td><code>faster-whisper</code></td><td>>=1.0</td><td>视频音频转录（备选）</td><td>P1</td><td>MIT</td></tr>
+    <tr><td><code>opencv-python-headless</code></td><td>>=4.10</td><td>视频关键帧抽取</td><td>P1</td><td>Apache 2.0</td></tr>
+  </table>
+</section>
+
+</div><!-- .container -->
+
+<footer>
+  <p><strong>Orbit 多模态能力落地方案 v1.0</strong> · 2026-07-10</p>
+  <p style="margin-top:4px">
+    合并自：「五大能力扩展优化方案 v3」+「国产多模态模型对比 v2.1」<br>
+    源文件：<code>D:/Orbit/docs/research/Orbit-多模态能力落地方案-2026-07.html</code>
+  </p>
+  <p style="margin-top:8px;color:var(--green)">
+    🏆 推荐栈：Qwen3.7-Plus（主力 API）+ GLM-4.1V-Thinking（视频/GUI/免费层）+ MiniCPM-V 4.6（私有化）+ DeepSeek-OCR 2（文档 OCR）
+  </p>
+  <p style="margin-top:4px;color:var(--red);font-size:0.82em">
+    ⚠️ 纯国产 · 零外国闭源模型日常依赖 · DeepSeek V4 API 为纯文本，多模态走 VL2（自部署）或 OCR 2（API）
+  </p>
+</footer>
+
+</body>
+</html>

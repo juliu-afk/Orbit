@@ -355,7 +355,9 @@ class TestOkfExporter:
         from orbit.knowledge.okf_exporter import OkfExporter
         store = KnowledgeStore(db_path=Path(tempfile.mktemp(suffix=".db")))
         store.initialize()
-        store._get_conn().execute("DELETE FROM knowledge_concepts").commit()
+        conn = store._get_conn()
+        conn.execute("DELETE FROM knowledge_concepts")
+        conn.commit()
         engine = KnowledgeEngine()
         engine._store = store  # 避免 initialize() 重新插入种子数据
         with tempfile.TemporaryDirectory() as tmp:

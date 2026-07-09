@@ -174,6 +174,106 @@ class McpServer:
             },
             handler=self._handle_get_symbols_overview,
         )
+        # ── Phase 1 新增：图谱查询工具（借鉴 CBM 设计）───────────
+        self.register_tool(
+            name="trace_path",
+            description="BFS 追踪函数调用路径——谁调了它（callers），它调了谁（callees）。深度 1-5，方向 in/out/both。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "函数名"},
+                    "direction": {"type": "string", "enum": ["in", "out", "both"], "default": "both"},
+                    "max_depth": {"type": "integer", "minimum": 1, "maximum": 5, "default": 3},
+                },
+                "required": ["symbol"],
+            },
+            handler=self._handle_trace_path,
+        )
+        self.register_tool(
+            name="get_architecture",
+            description="返回项目架构概览——语言/模块数/入口点/热点函数（被调用最多 top10）/路由节点。约 2KB。",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+            handler=self._handle_get_architecture,
+        )
+        self.register_tool(
+            name="search_code",
+            description="在已索引文件中执行文本搜索——结果自动关联对应 CodeNode 符号（按行号匹配）。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "正则模式"},
+                    "file_pattern": {"type": "string", "description": "可选 glob 过滤文件名"},
+                },
+                "required": ["pattern"],
+            },
+            handler=self._handle_search_code,
+        )
+        self.register_tool(
+            name="dead_code",
+            description="检测零调用者的函数——排除 main/app 等入口点。用于清理无用代码。",
+            inputSchema={"type": "object", "properties": {}, "required": []},
+            handler=self._handle_dead_code,
+        )
+        self.register_tool(
+            name="find_implementations",
+            description="查找指定类的所有子类实现——通过继承边（INHERITS）。替代 Serena find_implementations。",
+            inputSchema={
+                "type": "object",
+                "properties": {"class_name": {"type": "string", "description": "基类/接口名"}},
+                "required": ["class_name"],
+            },
+            handler=self._handle_find_implementations,
+        )
+        # ── Phase 1 新增：语义编辑工具（替代 Serena）────────────
+        self.register_tool(
+            name="replace_symbol_body",
+            description="精确替换符号体——通过符号名定位 start/end_line 后替换内容并触增增量索引。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "符号名"},
+                    "new_body": {"type": "string", "description": "新代码（不含 def 行）"},
+                },
+                "required": ["symbol", "new_body"],
+            },
+            handler=self._handle_replace_symbol_body,
+        )
+        self.register_tool(
+            name="insert_after_symbol",
+            description="在指定符号的结束位置之后插入代码。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string"},
+                    "code": {"type": "string", "description": "要插入的代码"},
+                },
+                "required": ["symbol", "code"],
+            },
+            handler=self._handle_insert_after_symbol,
+        )
+        self.register_tool(
+            name="insert_before_symbol",
+            description="在指定符号的起始位置之前插入代码。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string"},
+                    "code": {"type": "string"},
+                },
+                "required": ["symbol", "code"],
+            },
+            handler=self._handle_insert_before_symbol,
+        )
+        self.register_tool(
+            name="safe_delete_symbol",
+            description="安全删除符号——先检查 edges 表确保零引用（入度=0），再删代码和图谱节点。若存在引用则返回调用者列表。",
+            inputSchema={
+                "type": "object",
+                "properties": {"symbol": {"type": "string"}},
+                "required": ["symbol"],
+            },
+            handler=self._handle_safe_delete_symbol,
+        )
 
     def register_tool(
         self,

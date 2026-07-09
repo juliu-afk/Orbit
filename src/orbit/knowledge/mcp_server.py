@@ -1,11 +1,15 @@
-"""Step 3.4d MCP Server——JSON-RPC 2.0 over stdio。
+"""Step 3.4d MCP Server——JSON-RPC 2.0 over stdio + Phase 1 图谱工具升级。
 
 WHY 手写而非 mcp SDK：MVP 阶段零额外依赖。
-MCP 协议足够简单（JSON-RPC 2.0 + tools/list + tools/call），
-~150 行实现完整工具注册+调用循环。
+MCP 协议足够简单（JSON-RPC 2.0 + tools/list + tools/call）。
+
+12 个 MCP 工具：query_knowledge + find_symbol + find_referencing_symbols +
+get_symbols_overview + trace_path + get_architecture + search_code + dead_code +
+find_implementations + replace_symbol_body + insert_after/before_symbol + safe_delete_symbol
 
 协议规范：https://spec.modelcontextprotocol.io/
 """
+# Reason: Phase 1 — MCP tools 4→12, refactored async pattern, Serena replacement
 
 from __future__ import annotations
 
@@ -65,6 +69,21 @@ class McpServer:
         self._tools: dict[str, dict[str, Any]] = {}
         self._handlers: dict[str, Callable[..., Any]] = {}
         self._register_builtin_tools()
+
+    def _run_async(self, coro):
+        """同步 handler 中安全执行异步协程。
+
+        WHY 封装：9 个 handler 都调 CodeGraphEngine async 方法，
+        每个重复 asyncio.get_running_loop/try-except ~10 行→消除。
+        """
+        import asyncio, concurrent.futures
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(coro)
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            future = pool.submit(asyncio.run, coro)
+            return future.result(timeout=30)
 
     def set_code_graph(self, code_graph: Any) -> None:
         """注入 CodeGraphEngine——供 main.py 在启动时调用。"""
@@ -188,24 +207,7 @@ class McpServer:
         """查找符号定义——返回文件路径+行号。"""
         if not self._code_graph:
             return {"error": "CodeGraph 未初始化——项目未加载代码图谱"}
-        import asyncio
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-        if loop is not None:
-            # 已有事件循环——用线程池避免冲突
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(
-                    asyncio.run,
-                    self._code_graph.find_definitions_with_positions(symbol),
-                )
-                defs = future.result(timeout=10)
-        else:
-            defs = asyncio.run(
-                self._code_graph.find_definitions_with_positions(symbol),
-            )
+        defs = self._run_async(self._code_graph.find_definitions_with_positions(symbol))
         if not defs:
             return {"found": False, "symbol": symbol}
         return {"found": True, "definitions": defs}
@@ -216,18 +218,7 @@ class McpServer:
         """查找符号的所有调用者。"""
         if not self._code_graph:
             return {"error": "CodeGraph 未初始化——项目未加载代码图谱"}
-        import asyncio
-        try:
-            _ = asyncio.get_running_loop()
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(
-                    asyncio.run,
-                    self._code_graph.get_callers(symbol),
-                )
-                callers = future.result(timeout=10)
-        except RuntimeError:
-            callers = asyncio.run(self._code_graph.get_callers(symbol))
+        callers = self._run_async(self._code_graph.get_callers(symbol))
         return {"symbol": symbol, "callers": callers}
 
     def _handle_get_symbols_overview(

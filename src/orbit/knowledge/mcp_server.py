@@ -965,8 +965,7 @@ class McpServer:
         try:
             from orbit.graph.query import GraphQuery
             q = GraphQuery(code_graph=self._code_graph)
-            import asyncio
-            return asyncio.run(q.query(graph_type, **kwargs))  # type: ignore[arg-type]
+            return self._run_async(q.query(graph_type, **kwargs))  # type: ignore[arg-type]
         except Exception as e:
             return {"found": False, "error": str(e)}
 
@@ -989,14 +988,27 @@ class McpServer:
     def _handle_export_artifact(self, output_path: str = ".orbit/graph/graph.db.zst", **_: Any) -> dict[str, Any]:
         """导出 zstd 压缩图谱产物。"""
         try:
+            from pathlib import Path as _Path
             from orbit.graph.artifact import export_graph_artifact
-            ok = export_graph_artifact("data/graph.db", output_path)
+            # P1-2 fix: 从 settings 或默认位置获取实际 DB 路径
+            try:
+                from orbit.core.config import settings as _s
+                db_url = str(getattr(_s, "DATABASE_URL", "sqlite+aiosqlite:///data/graph.db"))
+                if "///" in db_url:
+                    db_path = db_url.rsplit("///", 1)[-1]
+                else:
+                    db_path = "data/graph.db"
+            except Exception:
+                db_path = "data/graph.db"
+            ok = export_graph_artifact(db_path, output_path)
             return {"success": ok, "output": output_path}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
     def _handle_okf_import(self, bundle_dir: str = "", **_: Any) -> dict[str, Any]:
         """从 OKF bundle 导入领域知识。"""
+        if not bundle_dir.strip():
+            return {"success": False, "error": "bundle_dir is required"}
         try:
             from orbit.knowledge.okf_importer import OkfImporter
             importer = OkfImporter(self._engine)

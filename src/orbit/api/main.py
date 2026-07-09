@@ -470,14 +470,15 @@ async def _app_lifespan(app: FastAPI) -> None:
         logger.warning("code_graph_index_failed", directory=_ws_dir, exc_info=True)
 
     # Phase 3: 后台文件监视——文件变更→自动增量索引
-    # WHY 在这里启动: build_index 之后，watcher 监听到的是增量变更
+    global _graph_watcher
+    _graph_watcher = None
     try:
         from orbit.graph.watcher import GraphWatcher  # noqa: F401
-        _watcher = GraphWatcher(_code_graph_engine, _ws_dir)
-        _watcher.start()
+        _graph_watcher = GraphWatcher(_code_graph_engine, _ws_dir)
+        _graph_watcher.start()
         logger.info("graph_watcher_started", directory=_ws_dir)
     except Exception:
-        logger.info("graph_watcher_unavailable", exc_info=True)
+        logger.warning("graph_watcher_unavailable", exc_info=True)
 
     # 微信集成——初始化绑定管理器 + 消息通道
     # WHY 条件初始化: npx/cc-weixin 在桌面 exe 环境可能不存在，优雅降级
@@ -497,6 +498,13 @@ async def _app_lifespan(app: FastAPI) -> None:
     yield  # 应用运行中
 
     # ── 关闭阶段 ──
+    # P2-2: GraphWatcher shutdown——停文件监视，防残留线程
+    try:
+        if _graph_watcher:
+            _graph_watcher.stop()
+            logger.info("graph_watcher_stopped")
+    except Exception:
+        logger.warning("graph_watcher_stop_failed", exc_info=True)
     # Trace span 收集器——停止 worker，flush 剩余 span
     # stop_worker 内置幂等检查（_worker_task=None→直接返回），无需 try/except
     from orbit.observability.trace import TraceCollector as _TCShutdown

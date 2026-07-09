@@ -443,7 +443,7 @@ async def _app_lifespan(app: FastAPI) -> None:
         app.state.peak_window_manager = _peak_manager
         logger.info("offpeak_scheduler_initialized", config_path=settings.OFFPEAK_CONFIG_PATH)
 
-    # MCP 客户端：连接外部服务器（如 Serena）——启动时自动发现工具
+    # MCP 客户端：连接外部服务器——启动时自动发现工具
     try:
         _load_and_connect_mcp(ToolRegistry.get_instance())
     except Exception:

@@ -228,11 +228,11 @@ class TestToolRegistryMCP:
             },
         }
 
-        result = ToolRegistry._convert_mcp_schema("serena/find_symbol", mcp_tool)
+        result = ToolRegistry._convert_mcp_schema("test_server/find_symbol", mcp_tool)
 
         assert result["type"] == "function"
         func = result["function"]
-        assert func["name"] == "serena/find_symbol"
+        assert func["name"] == "test_server/find_symbol"
         assert func["description"] == "查找符号定义并返回其源代码"
         assert func["parameters"]["type"] == "object"
         assert "name_path" in func["parameters"]["properties"]
@@ -245,7 +245,7 @@ class TestToolRegistryMCP:
         mock_conn.call_tool.return_value = "result text"
 
         registry = ToolRegistry()
-        handler = registry._create_mcp_handler("serena", mock_conn, "find_symbol")
+        handler = registry._create_mcp_handler("test_server", mock_conn, "find_symbol")
 
         result = handler(name_path="MyClass", include_body=True)
         mock_conn.call_tool.assert_called_once_with(
@@ -260,9 +260,9 @@ class TestToolRegistryMCP:
         mock_conn.call_tool.side_effect = MCPClientError("连接超时")
 
         registry = ToolRegistry()
-        handler = registry._create_mcp_handler("serena", mock_conn, "find_symbol")
+        handler = registry._create_mcp_handler("test_server", mock_conn, "find_symbol")
 
         result = handler(name_path="X")
         assert "MCP 工具调用失败" in result
-        assert "serena/find_symbol" in result
+        assert "test_server/find_symbol" in result
         assert "连接超时" in result

@@ -1,9 +1,8 @@
-"""代码图谱引擎（Step 3.1）。
+"""代码图谱引擎（Step 3.1 + Phase 2 多语言扩展）。
 
-用 Python ast 模块解析源码，提取符号定义（函数/类/变量）和调用关系，
+Python 文件用 ast 标准库（零回归），TypeScript/SQL 用 tree-sitter。
+提取符号定义（函数/类/变量）、调用关系、继承关系，
 存入 CodeNode + Edge 表，提供确定性的事实查询（防幻觉 L1/L2 的数据源）。
-
-WHY 用 ast 而非正则：AST 保证准确性，正则解析代码不可靠（PRD 技术约束）。
 """
 
 from __future__ import annotations
@@ -13,6 +12,7 @@ import uuid
 from pathlib import Path
 
 import structlog
+from tree_sitter import Language, Parser, Query  # noqa: F401 — type hints
 
 from orbit.graph.engines.base import GraphEngineBase
 from orbit.graph.models.nodes import CodeNode, Edge
@@ -25,26 +25,47 @@ class CodeGraphError(Exception):
 
 
 class CodeGraphEngine(GraphEngineBase):
-    """代码图谱引擎：解析 Python 源码，提取符号 + 调用关系。
+    """代码图谱引擎：多语言源码解析，提取符号 + 调用/继承关系。
 
-    查询接口：
-    - exists(name, type) → bool：符号是否存在
-    - get_callers(name) → list：谁调用了这个符号
-    - get_callees(name) → list：这个符号调用了谁
+    Python (.py) → ast（零回归）。TypeScript (.ts/.tsx) + SQL (.sql) → tree-sitter。
+    查询接口：exists / get_callers / get_callees / find_definitions_with_positions
     """
 
-    async def build_index(self, directory: str) -> int:
-        """全量构建目录下所有 .py 文件的索引。返回解析文件数。
+    # Phase 2: 多语言 grammar 映射。tree-sitter parser 惰性初始化。
+    _LANG_EXTS: dict[str, str] = {".ts": "typescript", ".tsx": "tsx", ".sql": "sql"}
+    _parsers: dict[str, "Parser"] = {}
 
-        WHY 先清空旧数据：Orbit 单工作区模式，切换项目目录时
-        旧索引残留会导致图谱混合两个项目的数据。清空后全量重建。
-        """
+    def _get_parser(self, lang: str) -> "Parser":
+        """惰性初始化 tree-sitter Parser——仅首次遇到该语言时加载 grammar。"""
+        if lang in self._parsers:
+            return self._parsers[lang]
+        try:
+            # tree-sitter 0.23+ auto-discovers Language via pip-installed grammar packages
+            language = Language(getattr(__import__(f"tree_sitter_{lang}"), "language"))
+            parser = Parser(language)
+            # WHY 只存 parser 不复用 Language：Language 实例线程安全（底层 C 库）
+            self._parsers[lang] = parser
+            logger.info("ts_parser_loaded", lang=lang)
+            return parser
+        except ImportError:
+            logger.warning("ts_grammar_missing", lang=lang)
+            return None
+        except Exception as e:
+            logger.warning("ts_parser_failed", lang=lang, error=str(e))
+            return None
+
+    async def build_index(self, directory: str) -> int:
+        """全量构建目录下所有支持语言的索引。返回解析文件数。"""
         await self.clear_all(CodeNode)
         root = Path(directory)
-        py_files = list(root.rglob("*.py"))
+        # Phase 2: 扩展 glob——不仅 .py，含 .ts/.tsx/.sql
+        patterns = ["*.py", "*.ts", "*.tsx", "*.sql"]
+        files: list[Path] = []
+        for pat in patterns:
+            files.extend(root.rglob(pat))
         count = 0
-        for py_file in py_files:
-            ok = await self._parse_file(py_file)
+        for f in files:
+            ok = await self._parse_file(f)
             if ok:
                 count += 1
         logger.info("code_graph_indexed", directory=directory, files=count)
@@ -64,68 +85,188 @@ class CodeGraphEngine(GraphEngineBase):
         return await self._parse_file(path)
 
     async def _parse_file(self, path: Path) -> bool:
-        """解析单个 .py 文件，提取符号 + 调用关系。"""
+        """解析单个源文件——按扩展名路由到 ast 或 tree-sitter。"""
+        ext = path.suffix
+        if ext in self._LANG_EXTS:
+            return await self._parse_with_tree_sitter(path, self._LANG_EXTS[ext])
+        elif ext == ".py":
+            return await self._parse_python_ast(path)
+        # 不支持的语言静默跳过
+        return False
+
+    async def _parse_python_ast(self, path: Path) -> bool:
+        """Python ast 路径——保持 Phase 1 行为不变（零回归）。"""
         try:
             content = path.read_text(encoding="utf-8")
             tree = ast.parse(content, filename=str(path))
         except SyntaxError as e:
-            # WHY 跳过语法错误文件：不阻断整个构建（PRD 风险缓解）
             logger.warning("parse_syntax_error", file=str(path), error=str(e))
             return False
         except Exception as e:
             logger.warning("parse_failed", file=str(path), error=str(e))
             return False
 
-        # 先删旧数据（文件重新解析）
         await self.delete_nodes_by_file(CodeNode, str(path))
 
-        # 遍历 AST 提取符号
         for node in ast.walk(tree):
             node_id = uuid.uuid4().hex
             if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 namespace = self._get_namespace(node, tree)
                 await self.upsert_node(
-                    CodeNode,
-                    node_id,
-                    name=node.name,
-                    type="function",
-                    file_path=str(path),
-                    start_line=node.lineno,
+                    CodeNode, node_id, name=node.name, type="function",
+                    file_path=str(path), start_line=node.lineno,
                     end_line=getattr(node, "end_lineno", node.lineno),
                     meta={"namespace": namespace, "args": self._get_args(node)},
                 )
             elif isinstance(node, ast.ClassDef):
                 namespace = self._get_namespace(node, tree)
                 await self.upsert_node(
-                    CodeNode,
-                    node_id,
-                    name=node.name,
-                    type="class",
-                    file_path=str(path),
-                    start_line=node.lineno,
+                    CodeNode, node_id, name=node.name, type="class",
+                    file_path=str(path), start_line=node.lineno,
                     end_line=getattr(node, "end_lineno", node.lineno),
                     meta={"namespace": namespace},
                 )
             elif isinstance(node, ast.Assign):
-                # 模块级变量赋值（仅记录简单名称）
                 for target in node.targets:
                     if isinstance(target, ast.Name):
                         await self.upsert_node(
-                            CodeNode,
-                            node_id,
-                            name=target.id,
-                            type="variable",
-                            file_path=str(path),
-                            start_line=node.lineno,
+                            CodeNode, node_id, name=target.id, type="variable",
+                            file_path=str(path), start_line=node.lineno,
                             end_line=getattr(node, "end_lineno", node.lineno),
                             meta={"namespace": "__main__"},
                         )
 
-        # 第二遍：提取调用关系（需在符号定义入库后）
         await self._extract_calls(tree, str(path))
-        # Phase 3: 提取跨文件 import 关系
         await self._extract_imports(tree, str(path))
         return True
+
+    async def _parse_with_tree_sitter(self, path: Path, lang: str) -> bool:
+        """tree-sitter 解析 TypeScript/SQL 文件——提取函数/类/方法。"""
+        parser = self._get_parser(lang)
+        if parser is None:
+            return False
+        try:
+            content = path.read_text(encoding="utf-8")
+            tree = parser.parse(bytes(content, "utf-8"))
+        except Exception as e:
+            logger.warning("ts_parse_failed", file=str(path), error=str(e))
+            return False
+
+        await self.delete_nodes_by_file(CodeNode, str(path))
+        root = tree.root_node
+        await self._walk_ts_tree(root, content, str(path))
+        return True
+
+    async def _walk_ts_tree(self, node, source: str, file_path: str) -> None:
+        """递归遍历 tree-sitter CST——提取函数定义/类定义/调用 + 继承关系。
+
+        WHY 不区分语言节点类型：tree-sitter grammar 各语言的节点类型名不同
+        （Python function_definition, TS function_declaration, SQL statement）。
+        通过 type 字符串 contains 匹配覆盖所有语言。
+        """
+        ntype = node.type
+        # 函数/方法定义
+        if "function" in ntype or "method" in ntype or "arrow_function" in ntype:
+            name = self._ts_get_name(node, source)
+            if name:
+                nid = uuid.uuid4().hex
+                await self.upsert_node(
+                    CodeNode, nid, name=name, type="function",
+                    file_path=file_path, start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    meta={"namespace": self._ts_get_module(file_path)},
+                )
+        # 类定义
+        elif "class" in ntype and "class_body" not in ntype:
+            name = self._ts_get_name(node, source)
+            if name:
+                nid = uuid.uuid4().hex
+                await self.upsert_node(
+                    CodeNode, nid, name=name, type="class",
+                    file_path=file_path, start_line=node.start_point[0] + 1,
+                    end_line=node.end_point[0] + 1,
+                    meta={"namespace": self._ts_get_module(file_path)},
+                )
+        # 调用表达式 → 提取 callee 名
+        if "call" in ntype:
+            callee_name = self._ts_get_callee_name(node, source)
+            if callee_name:
+                # 找到当前函数上下文——向上遍历找最近的 function/method/class
+                func_ctx = self._ts_find_enclosing_function(node)
+                if func_ctx:
+                    caller_name = self._ts_get_name(func_ctx, source)
+                    if caller_name:
+                        await self._record_call_relation(caller_name, callee_name, file_path)
+        # 继承关系
+        if ntype in ("class_heritage", "extends_clause", "implements_clause"):
+            await self._extract_ts_inherits(node, source, file_path)
+        # 递归子节点
+        for child in node.children:
+            await self._walk_ts_tree(child, source, file_path)
+
+    def _ts_get_name(self, node, source: str) -> str | None:
+        """从 tree-sitter 节点提取名称——仅查直接子节点（P1-3 fix: 去递归）。"""
+        for child in node.children:
+            if child.type in ("identifier", "name", "property_identifier", "object_type"):
+                return source[child.start_byte:child.end_byte]
+        return None
+
+    def _ts_get_callee_name(self, node, source: str) -> str | None:
+        """从 call_expression 提取被调用函数名。"""
+        for child in node.children:
+            if child.type in ("identifier", "member_expression", "property_identifier"):
+                if child.type == "member_expression":
+                    # obj.method() → 返回 method 部分
+                    for gc in child.children:
+                        if gc.type == "property_identifier":
+                            return source[gc.start_byte:gc.end_byte]
+                return source[child.start_byte:child.end_byte]
+            name = self._ts_get_callee_name(child, source)
+            if name:
+                return name
+        return None
+
+    def _ts_find_enclosing_function(self, node):
+        """向上遍历找最近的函数/方法/类定义节点。"""
+        current = node
+        while current is not None:
+            ntype = current.type
+            if "function" in ntype or "method" in ntype or "arrow_function" in ntype or "class_declaration" in ntype:
+                return current
+            current = current.parent
+        return None
+
+    def _ts_get_module(self, file_path: str) -> str:
+        """从文件路径推导模块名。"""
+        parts = file_path.replace("\\", "/").split("/")
+        return "/".join(parts[-3:]).rsplit(".", 1)[0] if len(parts) >= 3 else file_path
+
+    async def _extract_ts_inherits(self, node, source: str, file_path: str) -> None:
+        """提取 TypeScript extends/implements 继承关系→INHERITS边。"""
+        # 找父节点 class_declaration → 获取子类名
+        parent = node.parent
+        if parent and "class" in parent.type:
+            subclass_name = self._ts_get_name(parent, source)
+            for child in node.children:
+                if child.type == "identifier":
+                    super_name = source[child.start_byte:child.end_byte]
+                    await self._record_inherit_relation(subclass_name, super_name, file_path)
+
+    async def _record_inherit_relation(self, subclass: str, superclass: str, file_path: str) -> None:
+        """记录继承关系为 INHERITS 边。"""
+        if not subclass or not superclass:
+            return
+        sub_node = await self.find_node_by_name(CodeNode, subclass)
+        if sub_node is None:
+            return
+        super_node = await self.find_node_by_name(CodeNode, superclass)
+        if super_node is None:
+            return
+        await self.add_edge(
+            source_id=sub_node.id, source_type="code",
+            target_id=super_node.id, target_type="code",
+            edge_type="inherits",
+        )
 
     async def _extract_calls(self, tree: ast.AST, file_path: str) -> None:
         """提取函数调用关系。记录 caller（函数内）→ callee（被调用名）。"""

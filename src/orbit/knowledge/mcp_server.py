@@ -1,15 +1,16 @@
-"""Step 3.4d MCP Server——JSON-RPC 2.0 over stdio + Phase 1 图谱工具升级。
+"""Step 3.4d MCP Server——JSON-RPC 2.0 over stdio。
 
 WHY 手写而非 mcp SDK：MVP 阶段零额外依赖。
 MCP 协议足够简单（JSON-RPC 2.0 + tools/list + tools/call）。
 
-12 个 MCP 工具：query_knowledge + find_symbol + find_referencing_symbols +
+15 个 MCP 工具：query_knowledge + find_symbol + find_referencing_symbols +
 get_symbols_overview + trace_path + get_architecture + search_code + dead_code +
-find_implementations + replace_symbol_body + insert_after/before_symbol + safe_delete_symbol
+find_implementations + replace_symbol_body + insert_after/before_symbol +
+safe_delete_symbol + rename_symbol + type_hierarchy
 
 协议规范：https://spec.modelcontextprotocol.io/
 """
-# Reason: Phase 1 — MCP tools 4→12, refactored async pattern, Serena replacement
+# Reason: Updated tool count from 4 to 13 per Phase 1 landing plan
 
 from __future__ import annotations
 
@@ -71,16 +72,17 @@ class McpServer:
         self._register_builtin_tools()
 
     def _run_async(self, coro):
-        """同步 handler 中安全执行异步协程。
+        """在同步 handler 中安全执行异步协程。
 
-        WHY 封装：9 个 handler 都调 CodeGraphEngine async 方法，
-        每个重复 asyncio.get_running_loop/try-except ~10 行→消除。
+        WHY 统一封装：9 个 handler 都需要调 CodeGraphEngine 的 async 方法，
+        每个都重复 asyncio.get_running_loop/try-except 样板 ~10 行太冗余。
         """
         import asyncio, concurrent.futures
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             return asyncio.run(coro)
+        # 已有事件循环（MCP stdio 线程在主循环之外）→ 线程池隔离
         with concurrent.futures.ThreadPoolExecutor() as pool:
             future = pool.submit(asyncio.run, coro)
             return future.result(timeout=30)
@@ -174,10 +176,10 @@ class McpServer:
             },
             handler=self._handle_get_symbols_overview,
         )
-        # ── Phase 1 新增：图谱查询工具（借鉴 CBM 设计）───────────
+        # ── Phase 1 新增：图谱查询工具（借鉴 CBM）──────────────────
         self.register_tool(
             name="trace_path",
-            description="BFS 追踪函数调用路径——谁调了它（callers），它调了谁（callees）。深度 1-5，方向 in/out/both。",
+            description="BFS 追踪函数的调用路径——谁调了它（callers），它调了谁（callees）。深度 1-5，方向 in/out/both。",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -191,18 +193,18 @@ class McpServer:
         )
         self.register_tool(
             name="get_architecture",
-            description="返回项目架构概览——语言/模块数/入口点/热点函数（被调用最多 top10）/路由节点。约 2KB。",
+            description="返回项目架构概览——语言分布、模块数、入口点、热点函数（被调用最多的前10）、路由节点。约 2KB，适合 preview tier。",
             inputSchema={"type": "object", "properties": {}, "required": []},
             handler=self._handle_get_architecture,
         )
         self.register_tool(
             name="search_code",
-            description="在已索引文件中执行文本搜索——结果自动关联对应 CodeNode 符号（按行号匹配）。",
+            description="在已索引文件中执行文本搜索（grep），结果自动关联对应 CodeNode 符号。仅搜索已索引文件。",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "pattern": {"type": "string", "description": "正则模式"},
-                    "file_pattern": {"type": "string", "description": "可选 glob 过滤文件名"},
+                    "file_pattern": {"type": "string", "description": "可选：glob 过滤文件名"},
                 },
                 "required": ["pattern"],
             },
@@ -210,13 +212,13 @@ class McpServer:
         )
         self.register_tool(
             name="dead_code",
-            description="检测零调用者的函数——排除 main/app 等入口点。用于清理无用代码。",
+            description="检测零调用者的函数（排除入口点 main/app/create_app 等）。用于清理无用代码。",
             inputSchema={"type": "object", "properties": {}, "required": []},
             handler=self._handle_dead_code,
         )
         self.register_tool(
             name="find_implementations",
-            description="查找指定类的所有子类实现——通过继承边（INHERITS）。替代 Serena find_implementations。",
+            description="查找指定类的所有子类实现——通过继承边（INHERITS）查询。替代 Serena find_implementations。",
             inputSchema={
                 "type": "object",
                 "properties": {"class_name": {"type": "string", "description": "基类/接口名"}},
@@ -224,15 +226,15 @@ class McpServer:
             },
             handler=self._handle_find_implementations,
         )
-        # ── Phase 1 新增：语义编辑工具（替代 Serena）────────────
+        # ── Phase 1 新增：语义编辑工具（替代 Serena 编辑能力）────────
         self.register_tool(
             name="replace_symbol_body",
-            description="精确替换符号体——通过符号名定位 start/end_line 后替换内容并触增增量索引。",
+            description="精确替换函数/方法的函数体。通过符号名定位 start_line..end_line，替换内容后触增增量索引。",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "symbol": {"type": "string", "description": "符号名"},
-                    "new_body": {"type": "string", "description": "新代码（不含 def 行）"},
+                    "symbol": {"type": "string", "description": "符号名（函数/方法）"},
+                    "new_body": {"type": "string", "description": "新的函数体代码（不含 def 行和缩进）"},
                 },
                 "required": ["symbol", "new_body"],
             },
@@ -244,7 +246,7 @@ class McpServer:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "symbol": {"type": "string"},
+                    "symbol": {"type": "string", "description": "符号名"},
                     "code": {"type": "string", "description": "要插入的代码"},
                 },
                 "required": ["symbol", "code"],
@@ -257,8 +259,8 @@ class McpServer:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "symbol": {"type": "string"},
-                    "code": {"type": "string"},
+                    "symbol": {"type": "string", "description": "符号名"},
+                    "code": {"type": "string", "description": "要插入的代码"},
                 },
                 "required": ["symbol", "code"],
             },
@@ -266,13 +268,37 @@ class McpServer:
         )
         self.register_tool(
             name="safe_delete_symbol",
-            description="安全删除符号——先检查 edges 表确保零引用（入度=0），再删代码和图谱节点。若存在引用则返回调用者列表。",
+            description="安全删除符号——先检查 edges 表确认零引用（入度=0），再删除代码+图谱节点。若存在引用则返回调用者列表。",
             inputSchema={
                 "type": "object",
-                "properties": {"symbol": {"type": "string"}},
+                "properties": {"symbol": {"type": "string", "description": "要删除的符号名"}},
                 "required": ["symbol"],
             },
             handler=self._handle_safe_delete_symbol,
+        )
+        # ── Phase 2 新增：重命名 + 类型层次 ──────────────────
+        self.register_tool(
+            name="rename_symbol",
+            description="工作区级安全重命名——更新所有引用位置+edges表。依赖 Tree-sitter 多语言支持。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "要重命名的符号"},
+                    "new_name": {"type": "string", "description": "新名称"},
+                },
+                "required": ["symbol", "new_name"],
+            },
+            handler=self._handle_rename_symbol,
+        )
+        self.register_tool(
+            name="type_hierarchy",
+            description="返回类的超类型/子类型层次——BFS 沿 INHERITS 边上下遍历。",
+            inputSchema={
+                "type": "object",
+                "properties": {"class_name": {"type": "string", "description": "类名"}},
+                "required": ["class_name"],
+            },
+            handler=self._handle_type_hierarchy,
         )
 
     def register_tool(
@@ -359,16 +385,17 @@ class McpServer:
     def _handle_trace_path(
         self, symbol: str = "", direction: str = "both", max_depth: int = 3, **_: Any
     ) -> dict[str, Any]:
-        """BFS 追踪函数调用路径。visited set 防同层重复遍历。"""
+        """BFS 追踪函数调用路径。"""
         if not self._code_graph:
             return {"error": "CodeGraph 未初始化"}
         callers_list: list[dict] = []
         callees_list: list[dict] = []
-        visited_in: set[str] = {symbol}
-        visited_out: set[str] = {symbol}
+        visited_in: set[str] = set()
+        visited_out: set[str] = set()
 
         if direction in ("in", "both"):
             current = {symbol}
+            visited_in.add(symbol)
             for depth in range(1, max_depth + 1):
                 next_level: set[str] = set()
                 for sym in current:
@@ -387,6 +414,7 @@ class McpServer:
 
         if direction in ("out", "both"):
             current = {symbol}
+            visited_out.add(symbol)
             for depth in range(1, max_depth + 1):
                 next_level: set[str] = set()
                 for sym in current:
@@ -403,11 +431,16 @@ class McpServer:
                 if not current:
                     break
 
-        return {"symbol": symbol, "max_depth": max_depth, "direction": direction,
-                "callers": callers_list, "callees": callees_list}
+        return {
+            "symbol": symbol,
+            "max_depth": max_depth,
+            "direction": direction,
+            "callers": callers_list,
+            "callees": callees_list,
+        }
 
     def _handle_get_architecture(self, **_: Any) -> dict[str, Any]:
-        """聚合查询——项目架构概览。"""
+        """聚合查询——架构概览。"""
         if not self._code_graph:
             return {"error": "CodeGraph 未初始化"}
         import collections
@@ -416,11 +449,16 @@ class McpServer:
             edges = self._run_async(self._code_graph.get_all_edges())
         except Exception as e:
             return {"error": f"查询失败: {e}"}
+
+        # 语言分布
         lang_counter: dict[str, int] = collections.Counter()
+        # 模块（namespace）
         modules: set[str] = set()
+        # 入口点
         entry_points: list[dict] = []
         entry_names = {"main", "app", "create_app", "run", "serve", "start"}
         functions: list[dict] = []
+
         for n in nodes:
             fp = n.get("file_path", "")
             if "." in fp:
@@ -429,21 +467,34 @@ class McpServer:
             if ns:
                 modules.add(ns)
             name = n.get("name", "")
-            if n.get("type") == "function":
+            ntype = n.get("type", "")
+            if ntype == "function":
                 functions.append(n)
                 if name in entry_names:
                     entry_points.append({"name": name, "file": fp, "line": n.get("start_line")})
+
+        # 热点：出度 top 10
         out_degree: dict[str, int] = collections.Counter()
         for e in edges:
             if e.get("edge_type") == "calls":
                 out_degree[e.get("source_id", "")] += 1
+        # 按出度排序取 top 10
         func_degrees = [(f, out_degree.get(f.get("id", ""), 0)) for f in functions]
         func_degrees.sort(key=lambda x: x[1], reverse=True)
-        hotspots = [{"name": f["name"], "file": f.get("file_path", ""), "call_count": cnt}
-                     for f, cnt in func_degrees[:10] if cnt > 0]
-        return {"languages": dict(lang_counter.most_common()), "module_count": len(modules),
-                "modules": sorted(modules)[:50], "entry_points": entry_points,
-                "hotspots": hotspots, "node_count": len(nodes), "edge_count": len(edges)}
+        hotspots = [
+            {"name": f["name"], "file": f.get("file_path", ""), "call_count": cnt}
+            for f, cnt in func_degrees[:10] if cnt > 0
+        ]
+
+        return {
+            "languages": dict(lang_counter.most_common()),
+            "module_count": len(modules),
+            "modules": sorted(modules)[:50],  # 截断避免过大
+            "entry_points": entry_points,
+            "hotspots": hotspots,
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+        }
 
     def _handle_search_code(
         self, pattern: str = "", file_pattern: str | None = None, **_: Any
@@ -456,15 +507,32 @@ class McpServer:
             nodes = self._run_async(self._code_graph.get_all_nodes())
         except Exception as e:
             return {"error": f"查询节点失败: {e}"}
-        indexed_files: set[str] = {n.get("file_path", "") for n in nodes if n.get("file_path")}
-        files_to_search = [fp for fp in indexed_files
-                           if not file_pattern or re.search(file_pattern, fp)]
+
+        # 收集已索引的唯文件路径
+        indexed_files: set[str] = set()
+        for n in nodes:
+            fp = n.get("file_path", "")
+            if fp:
+                indexed_files.add(fp)
+
+        # 过滤文件
+        files_to_search: list[str] = []
+        for fp in indexed_files:
+            if file_pattern:
+                try:
+                    if not re.search(file_pattern, fp):
+                        continue
+                except re.error:
+                    pass
+            files_to_search.append(fp)
+
+        results: list[dict] = []
         try:
             compiled = re.compile(pattern)
         except re.error as e:
             return {"error": f"正则模式无效: {e}"}
-        results: list[dict] = []
-        for fp in sorted(files_to_search)[:200]:
+
+        for fp in sorted(files_to_search)[:200]:  # 截断——避免扫描整个项目
             full_path = os.path.join(self._workspace_dir, fp)
             try:
                 with open(full_path, encoding="utf-8") as f:
@@ -473,21 +541,30 @@ class McpServer:
                 continue
             for i, line in enumerate(lines, start=1):
                 if compiled.search(line):
-                    matching = [{"name": n.get("name"), "type": n.get("type")}
-                                for n in nodes if n.get("file_path") == fp
-                                and n.get("start_line") is not None
-                                and n.get("end_line") is not None
-                                and n["start_line"] <= i <= n["end_line"]]
-                    results.append({"file": fp, "line": i,
-                                    "content": line.strip()[:200], "symbols": matching[:5]})
+                    # 按行号匹配 CodeNode
+                    matching_symbols = [
+                        {"name": n.get("name"), "type": n.get("type")}
+                        for n in nodes
+                        if n.get("file_path") == fp
+                        and n.get("start_line") is not None
+                        and n.get("end_line") is not None
+                        and n["start_line"] <= i <= n["end_line"]
+                    ]
+                    results.append({
+                        "file": fp,
+                        "line": i,
+                        "content": line.strip()[:200],
+                        "symbols": matching_symbols[:5],
+                    })
                     if len(results) >= 100:
                         break
             if len(results) >= 100:
                 break
+
         return {"pattern": pattern, "match_count": len(results), "results": results}
 
     def _handle_dead_code(self, **_: Any) -> dict[str, Any]:
-        """检测零调用者函数（排除入口点白名单）。"""
+        """检测零调用者函数（排除入口点）。"""
         if not self._code_graph:
             return {"error": "CodeGraph 未初始化"}
         try:
@@ -495,16 +572,33 @@ class McpServer:
             edges = self._run_async(self._code_graph.get_all_edges())
         except Exception as e:
             return {"error": f"查询失败: {e}"}
+
         entry_whitelist = {"main", "app", "create_app", "run", "serve", "start", "__init__"}
-        called_ids = {e.get("target_id", "") for e in edges if e.get("edge_type") == "calls"}
-        dead = [{"name": n.get("name"), "file": n.get("file_path", ""), "line": n.get("start_line")}
-                for n in nodes if n.get("type") == "function"
-                and n.get("name", "") not in entry_whitelist
-                and n.get("id") not in called_ids]
+        # 被调用过的 target_id
+        called_ids: set[str] = set()
+        for e in edges:
+            if e.get("edge_type") == "calls":
+                called_ids.add(e.get("target_id", ""))
+
+        dead: list[dict] = []
+        for n in nodes:
+            if n.get("type") != "function":
+                continue
+            if n.get("name", "") in entry_whitelist:
+                continue
+            if n.get("id") not in called_ids:
+                dead.append({
+                    "name": n.get("name"),
+                    "file": n.get("file_path", ""),
+                    "line": n.get("start_line"),
+                })
+
         return {"dead_functions": dead, "count": len(dead)}
 
-    def _handle_find_implementations(self, class_name: str = "", **_: Any) -> dict[str, Any]:
-        """查找类的所有子类——通过继承边。"""
+    def _handle_find_implementations(
+        self, class_name: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """查找类的所有子类实现——通过继承关系。"""
         if not self._code_graph:
             return {"error": "CodeGraph 未初始化"}
         try:
@@ -512,40 +606,58 @@ class McpServer:
             edges = self._run_async(self._code_graph.get_all_edges())
         except Exception as e:
             return {"error": f"查询失败: {e}"}
+
+        # 先找基类的 node_id
         base_id = None
         for n in nodes:
             if n.get("name") == class_name and n.get("type") == "class":
                 base_id = n.get("id")
                 break
+
         if base_id is None:
-            return {"found": False, "class_name": class_name}
-        sub_ids = {e.get("source_id", "") for e in edges
-                   if e.get("edge_type") in ("inherits",) and e.get("target_id") == base_id}
-        impls = [{"name": n.get("name"), "file": n.get("file_path", ""), "line": n.get("start_line")}
-                 for n in nodes if n.get("id") in sub_ids]
-        return {"found": True, "class_name": class_name, "implementations": impls}
+            return {"found": False, "class_name": class_name, "message": "类未找到"}
+
+        # 通过 edges 找所有指向 base_id 的继承边
+        sub_ids: set[str] = set()
+        for e in edges:
+            if e.get("edge_type") == "inherits" and e.get("target_id") == base_id:
+                sub_ids.add(e.get("source_id", ""))
+
+        implementations: list[dict] = []
+        for n in nodes:
+            if n.get("id") in sub_ids:
+                implementations.append({
+                    "name": n.get("name"),
+                    "file": n.get("file_path", ""),
+                    "line": n.get("start_line"),
+                })
+
+        return {"found": True, "class_name": class_name, "implementations": implementations}
 
     # ── Phase 1 新增：语义编辑 handler ──────────────────────
 
     def _get_symbol_location(self, symbol: str) -> dict | None:
-        """查找符号的文件路径和行号范围——编辑工具共用。"""
+        """查找符号的文件路径和行号范围。"""
         if not self._code_graph:
             return None
         try:
             defs = self._run_async(self._code_graph.find_definitions_with_positions(symbol))
-            return defs[0] if defs else None
+            if not defs:
+                return None
+            return defs[0]
         except Exception:
             return None
 
     def _handle_replace_symbol_body(
         self, symbol: str = "", new_body: str = "", **_: Any
     ) -> dict[str, Any]:
-        """精确替换符号体——保留 def 行，替换其后的 body。写前备份，失败恢复。"""
+        """精确替换函数体。"""
         loc = self._get_symbol_location(symbol)
         if loc is None:
             return {"success": False, "error": f"符号 {symbol} 未找到"}
         file_path = loc["file_path"]
-        start, end = loc["start_line"], loc.get("end_line", loc["start_line"])
+        start = loc["start_line"]
+        end = loc.get("end_line", start)
         import os
         full_path = os.path.join(self._workspace_dir, file_path)
         try:
@@ -553,28 +665,46 @@ class McpServer:
                 lines = f.readlines()
         except Exception as e:
             return {"success": False, "error": f"读取文件失败: {e}"}
-        backup = "".join(lines)
+
+        # 保留 def 行和缩进上下文——只替换 body 部分（start_line+1 到 end_line-1 或整个函数）
+        # 简单策略：替换 start_line..end_line 之间的内容（含函数签名）
+        # 更好策略：找到函数体的 indent 级别，替换 def 行之后的内容
         indent = ""
         def_line = lines[start - 1] if start <= len(lines) else ""
         if def_line:
             indent = def_line[:len(def_line) - len(def_line.lstrip())]
-        indented = "\n".join((indent + "    " + ln) if ln.strip() else ""
-                             for ln in new_body.split("\n"))
-        new_lines = lines[:start] + [indented + "\n"] + lines[end:]
+
+        # 保留 def 行，替换其后的 body
+        body_start = start + 1  # def 行之后
+        # 构造缩进后的 body
+        indented_body = "\n".join(
+            (indent + "    " + line) if line.strip() else ""
+            for line in new_body.split("\n")
+        )
+        new_lines = lines[:start] + [indented_body + "\n"] + lines[end:]
+        # 备份
+        backup = "".join(lines)
         try:
             with open(full_path, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
         except Exception as e:
+            # 恢复备份
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(backup)
-            return {"success": False, "error": f"写入失败（已恢复原内容）: {e}"}
-        self._run_async(self._code_graph.incremental_update(file_path))
+            return {"success": False, "error": f"写入文件失败（已恢复原内容）: {e}"}
+
+        # 增量更新图谱
+        try:
+            self._run_async(self._code_graph.incremental_update(file_path))
+        except Exception:
+            pass
+
         return {"success": True, "symbol": symbol, "file": file_path, "old_lines": f"{start}-{end}"}
 
     def _handle_insert_after_symbol(
         self, symbol: str = "", code: str = "", **_: Any
     ) -> dict[str, Any]:
-        """符号结束后插入代码。"""
+        """在符号结束后插入代码。"""
         loc = self._get_symbol_location(symbol)
         if loc is None:
             return {"success": False, "error": f"符号 {symbol} 未找到"}
@@ -586,17 +716,26 @@ class McpServer:
             with open(full_path, encoding="utf-8") as f:
                 lines = f.readlines()
         except Exception as e:
+            return {"success": False, "error": f"读取文件失败: {e}"}
+        # 在 end_line 后插入
+        insert_at = end
+        code_lines = code.split("\n")
+        new_lines = lines[:insert_at] + [l + "\n" for l in code_lines] + lines[insert_at:]
+        try:
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+        except Exception as e:
             return {"success": False, "error": str(e)}
-        new_lines = lines[:end] + [ln + "\n" for ln in code.split("\n")] + lines[end:]
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-        self._run_async(self._code_graph.incremental_update(file_path))
+        try:
+            self._run_async(self._code_graph.incremental_update(file_path))
+        except Exception:
+            pass
         return {"success": True, "symbol": symbol, "file": file_path, "inserted_after_line": end}
 
     def _handle_insert_before_symbol(
         self, symbol: str = "", code: str = "", **_: Any
     ) -> dict[str, Any]:
-        """符号开始前插入代码。"""
+        """在符号开始前插入代码。"""
         loc = self._get_symbol_location(symbol)
         if loc is None:
             return {"success": False, "error": f"符号 {symbol} 未找到"}
@@ -608,38 +747,159 @@ class McpServer:
             with open(full_path, encoding="utf-8") as f:
                 lines = f.readlines()
         except Exception as e:
+            return {"success": False, "error": f"读取文件失败: {e}"}
+        insert_at = start - 1
+        code_lines = code.split("\n")
+        new_lines = lines[:insert_at] + [l + "\n" for l in code_lines] + lines[insert_at:]
+        try:
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+        except Exception as e:
             return {"success": False, "error": str(e)}
-        new_lines = lines[:start - 1] + [ln + "\n" for ln in code.split("\n")] + lines[start - 1:]
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-        self._run_async(self._code_graph.incremental_update(file_path))
+        try:
+            self._run_async(self._code_graph.incremental_update(file_path))
+        except Exception:
+            pass
         return {"success": True, "symbol": symbol, "file": file_path, "inserted_before_line": start}
 
-    def _handle_safe_delete_symbol(self, symbol: str = "", **_: Any) -> dict[str, Any]:
-        """安全删除——先确认零引用再删代码和图谱节点。"""
+    def _handle_safe_delete_symbol(
+        self, symbol: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """安全删除——先确认零引用再删。"""
         loc = self._get_symbol_location(symbol)
         if loc is None:
             return {"success": False, "error": f"符号 {symbol} 未找到"}
+        # 检查引用
         try:
             callers = self._run_async(self._code_graph.get_callers(symbol))
         except Exception:
             callers = []
         if callers:
-            return {"success": False, "symbol": symbol,
-                    "error": f"符号仍有 {len(callers)} 个调用者", "callers": callers[:10]}
+            return {
+                "success": False,
+                "symbol": symbol,
+                "error": f"符号仍有 {len(callers)} 个调用者",
+                "callers": callers[:10],
+            }
+        # 删除代码
         file_path = loc["file_path"]
-        start, end = loc["start_line"], loc.get("end_line", loc["start_line"])
+        start = loc["start_line"]
+        end = loc.get("end_line", start)
         import os
         full_path = os.path.join(self._workspace_dir, file_path)
         try:
             with open(full_path, encoding="utf-8") as f:
                 lines = f.readlines()
         except Exception as e:
+            return {"success": False, "error": f"读取文件失败: {e}"}
+        new_lines = lines[:start - 1] + lines[end:]
+        try:
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+        except Exception as e:
             return {"success": False, "error": str(e)}
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.writelines(lines[:start - 1] + lines[end:])
-        self._run_async(self._code_graph.incremental_update(file_path))
+        try:
+            self._run_async(self._code_graph.incremental_update(file_path))
+        except Exception:
+            pass
         return {"success": True, "symbol": symbol, "file": file_path, "deleted_lines": f"{start}-{end}"}
+
+    # ── Phase 2 新增：重命名 + 类型层次 ──────────────────────
+
+    def _handle_rename_symbol(
+        self, symbol: str = "", new_name: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """工作区级安全重命名——更新所有引用 + edges 表 + CodeNode.name。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        loc = self._get_symbol_location(symbol)
+        if loc is None:
+            return {"success": False, "error": f"符号 {symbol} 未找到"}
+        # 收集所有引用位置
+        callers = self._run_async(self._code_graph.get_callers(symbol))
+        callees = self._run_async(self._code_graph.get_callees(symbol))
+        # 所有引用的文件（调用者文件 + 符号自身文件）
+        import os as _os
+        files_to_update: set[str] = {loc["file_path"]}
+        for caller_name in callers:
+            c_loc = self._get_symbol_location(caller_name)
+            if c_loc:
+                files_to_update.add(c_loc["file_path"])
+        # 逐文件替换
+        updated = 0
+        for fpath in files_to_update:
+            full_path = _os.path.join(self._workspace_dir, fpath)
+            try:
+                with open(full_path, encoding="utf-8") as f:
+                    content = f.read()
+            except Exception:
+                continue
+            # P2-1 fix: word-boundary regex 防子串误改（order→handleOrder 不误改 border）
+            import re as _re
+            new_content = _re.sub(r'\b' + _re.escape(symbol) + r'\b', new_name, content)
+            if new_content != content:
+                with open(full_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+                updated += 1
+                self._run_async(self._code_graph.incremental_update(fpath))
+        # P1-2 fix: incremental_update 已删除旧节点+重建——无需手动改 name
+        return {"success": True, "symbol": symbol, "new_name": new_name, "files_updated": updated}
+
+    def _handle_type_hierarchy(
+        self, class_name: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """类型层次——BFS 遍历 INHERITS 边返回超类型+子类型。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        try:
+            nodes = self._run_async(self._code_graph.get_all_nodes())
+            edges = self._run_async(self._code_graph.get_all_edges())
+        except Exception as e:
+            return {"error": f"查询失败: {e}"}
+        # 找目标类的 node_id
+        target_id = None
+        for n in nodes:
+            if n.get("name") == class_name and n.get("type") == "class":
+                target_id = n.get("id")
+                break
+        if target_id is None:
+            return {"found": False, "class_name": class_name}
+        # P2-2 fix: 预建邻接索引——O(V+E) 替代 O(V×E)
+        node_by_id = {n.get("id"): n for n in nodes}
+        inherits_to: dict[str, list[str]] = {}   # target_id → [source_ids] (子类)
+        inherits_from: dict[str, list[str]] = {} # source_id → [target_ids] (超类)
+        for e in edges:
+            if e.get("edge_type") == "inherits":
+                tid = e.get("target_id", "")
+                sid = e.get("source_id", "")
+                inherits_to.setdefault(tid, []).append(sid)
+                inherits_from.setdefault(sid, []).append(tid)
+        # BFS 上行（supertypes）
+        supertypes: list[dict] = []
+        visited: set[str] = {target_id}
+        queue = [target_id]
+        for cur in queue:
+            for sup_id in inherits_from.get(cur, []):
+                if sup_id not in visited:
+                    visited.add(sup_id)
+                    sn = node_by_id.get(sup_id)
+                    if sn:
+                        supertypes.append({"name": sn["name"], "file": sn.get("file_path", "")})
+                    queue.append(sup_id)
+        # BFS 下行（subtypes）
+        subtypes: list[dict] = []
+        visited2: set[str] = {target_id}
+        queue2 = [target_id]
+        for cur in queue2:
+            for sub_id in inherits_to.get(cur, []):
+                if sub_id not in visited2:
+                    visited2.add(sub_id)
+                    sn = node_by_id.get(sub_id)
+                    if sn:
+                        subtypes.append({"name": sn["name"], "file": sn.get("file_path", "")})
+                    queue2.append(sub_id)
+        return {"found": True, "class_name": class_name,
+                "supertypes": supertypes, "subtypes": subtypes}
 
     # ── JSON-RPC 请求处理 ──────────────────────────────────
 

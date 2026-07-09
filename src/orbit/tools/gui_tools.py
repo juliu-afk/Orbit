@@ -9,8 +9,12 @@ WHY mss 而非 PIL ImageGrab：mss 跨平台，速度快 3-5×。
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import io
 
+import mss
+import pyautogui
 import structlog
 from PIL import Image
 
@@ -36,6 +40,20 @@ GUI_SCHEMA = ToolSchema(
     is_async=True,
 )
 
+# P2-2 fix: 顶层导入 mss，不再在函数内重复导入
+
+
+def _capture_screen() -> Image.Image:
+    """P2-2 + P2-6: 统一截图函数——mss grab → PIL Image。"""
+    try:
+        with mss.mss() as sct:
+            monitor = sct.monitors[1]
+            img = sct.grab(monitor)
+            return Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
+    except Exception as e:
+        logger.error("screenshot_failed", error=str(e))
+        raise RuntimeError(f"截图失败（可能无显示器环境）: {e}")
+
 
 async def gui_agent(
     action: str,
@@ -45,79 +63,74 @@ async def gui_agent(
     amount: int = 0,
     question: str = "",
 ) -> dict:
-    """GUI Agent Tool handler。
-
-    screenshot: 截图，返回 base64 PNG
-    click: 点击指定坐标
-    type: 在当前位置输入文本
-    scroll: 滚轮滚动
-    move: 移动鼠标
-    analyze: 截图→P0 视觉模型分析→返回结果
-    """
-    import mss
-    import pyautogui
-
-    # 安全：PyAutoGUI fail-safe——鼠标移到左上角立即中止
+    """GUI Agent Tool handler。"""
     pyautogui.FAILSAFE = True
 
-    if action == "screenshot":
-        with mss.mss() as sct:
-            monitor = sct.monitors[1]  # 主显示器
-            img = sct.grab(monitor)
-            pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
+    try:
+        if action == "screenshot":
+            pil_img = _capture_screen()
             buf = io.BytesIO()
             pil_img.save(buf, format="PNG")
-            import base64
             b64 = base64.b64encode(buf.getvalue()).decode()
-            return {"action": "screenshot", "width": img.width, "height": img.height, "image_base64": b64[:200] + "..."}
+            # P2-3 fix: 返回完整 base64（不截断）
+            return {"action": "screenshot", "width": pil_img.width, "height": pil_img.height, "image_base64": b64}
 
-    elif action == "click":
-        pyautogui.click(x, y)
-        logger.info("gui_click", x=x, y=y)
-        return {"action": "click", "x": x, "y": y}
+        elif action == "click":
+            pyautogui.click(x, y)
+            logger.info("gui_click", x=x, y=y)
+            return {"action": "click", "x": x, "y": y}
 
-    elif action == "type":
-        pyautogui.typewrite(text, interval=0.05)
-        logger.info("gui_type", text_len=len(text))
-        return {"action": "type", "text_len": len(text)}
+        elif action == "type":
+            # P1-2 fix: 中文用剪贴板粘贴——pyautogui.typewrite 不支持 Unicode
+            if any(ord(c) > 127 for c in text):
+                import pyperclip
+                pyperclip.copy(text)
+                pyautogui.hotkey('ctrl', 'v')
+            else:
+                pyautogui.typewrite(text, interval=0.05)
+            logger.info("gui_type", text_len=len(text))
+            return {"action": "type", "text_len": len(text)}
 
-    elif action == "scroll":
-        pyautogui.scroll(amount)
-        logger.info("gui_scroll", amount=amount)
-        return {"action": "scroll", "amount": amount}
+        elif action == "scroll":
+            pyautogui.scroll(amount)
+            logger.info("gui_scroll", amount=amount)
+            return {"action": "scroll", "amount": amount}
 
-    elif action == "move":
-        pyautogui.moveTo(x, y, duration=0.3)
-        logger.info("gui_move", x=x, y=y)
-        return {"action": "move", "x": x, "y": y}
+        elif action == "move":
+            pyautogui.moveTo(x, y, duration=0.3)
+            logger.info("gui_move", x=x, y=y)
+            return {"action": "move", "x": x, "y": y}
 
-    elif action == "analyze":
-        # 截图 → P0 Gateway 多模态分析
-        import base64
-        import mss as mss_lib
-        with mss_lib.mss() as sct:
-            monitor = sct.monitors[1]
-            img = sct.grab(monitor)
-            pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
+        elif action == "analyze":
+            pil_img = _capture_screen()
             buf = io.BytesIO()
             pil_img.save(buf, format="JPEG", quality=80)
             b64 = base64.b64encode(buf.getvalue()).decode()
 
-        from orbit.gateway.client import LLMClient
-        from orbit.gateway.schemas import LLMRequest
+            from orbit.gateway.client import LLMClient
+            from orbit.gateway.schemas import LLMRequest
 
-        client = LLMClient()
-        req = LLMRequest(
-            prompt=question or "描述这个屏幕上的内容",
-            content=[{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}],
-            tier=2,  # 分析→标准推理
-            max_tokens=2048,
-        )
-        resp = await client.generate(req, task_id=f"gui_analyze_{hash(question) & 0xFFFF:04x}")
-        return {"action": "analyze", "analysis": resp.content, "model": resp.model}
+            # P2-1: hashlib 替代 hash()——确定性 task_id
+            task_id = f"gui_analyze_{hashlib.md5(question.encode()).hexdigest()[:8]}"
 
-    else:
-        raise ValueError(f"不支持的操作: {action}，支持: screenshot/click/type/scroll/move/analyze")
+            # P1-3 fix: async with 上下文管理器——释放 httpx 连接池
+            async with LLMClient() as client:
+                req = LLMRequest(
+                    prompt=question or "描述这个屏幕上的内容",
+                    content=[{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}],
+                    tier=2,
+                    max_tokens=2048,
+                )
+                resp = await client.generate(req, task_id=task_id)
+                return {"action": "analyze", "analysis": resp.content, "model": resp.model}
+
+        else:
+            raise ValueError(f"不支持的操作: {action}，支持: screenshot/click/type/scroll/move/analyze")
+
+    except Exception as e:
+        # P2-6 fix: GUI 操作异常统一捕获
+        logger.error("gui_action_failed", action=action, error=str(e))
+        return {"action": action, "error": str(e)}
 
 
 def _register():

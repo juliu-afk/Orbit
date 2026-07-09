@@ -10,6 +10,23 @@ from pathlib import Path
 
 from orbit.tools.models import ToolPermission, ToolSchema
 
+# P1-4: 路径白名单——防止任意文件写入
+_ALLOWED_DIRS = (".", "./output", "/tmp", "./data", "./exports")
+
+
+def _validate_output_path(output_path: str) -> Path:
+    """验证输出路径在允许的目录内。"""
+    path = Path(output_path).resolve()
+    allowed = [Path(d).resolve() for d in _ALLOWED_DIRS]
+    for d in allowed:
+        try:
+            path.relative_to(d)
+            return path
+        except ValueError:
+            continue
+    raise ValueError(f"禁止写入路径: {output_path}。允许的目录: {_ALLOWED_DIRS}")
+
+
 OFFICE_SCHEMA = ToolSchema(
     name="office_create",
     version="1.0.0",
@@ -29,20 +46,24 @@ OFFICE_SCHEMA = ToolSchema(
 async def office_create(file_type: str, output_path: str, content: dict | list) -> dict:
     """生成 Office 文件。
 
-    Returns:
-        {"path": str, "file_type": str, "size_bytes": int}
+    P1-4 fix: 路径白名单验证。
+    P2-4 fix: asyncio.to_thread 包装同步 I/O。
     """
+    import asyncio
+
+    path = _validate_output_path(output_path)
+
     if file_type == "xlsx":
-        return await _create_xlsx(output_path, content)
+        return await asyncio.to_thread(_create_xlsx, path, content)
     elif file_type == "docx":
-        return await _create_docx(output_path, content)
+        return await asyncio.to_thread(_create_docx, path, content)
     elif file_type == "pptx":
-        return await _create_pptx(output_path, content)
+        return await asyncio.to_thread(_create_pptx, path, content)
     else:
         raise ValueError(f"不支持的文件类型: {file_type}，支持: xlsx/docx/pptx")
 
 
-async def _create_xlsx(path: str, content: dict | list) -> dict:
+def _create_xlsx(path: Path, content: dict | list) -> dict:
     from openpyxl import Workbook
     wb = Workbook()
     ws = wb.active
@@ -52,11 +73,11 @@ async def _create_xlsx(path: str, content: dict | list) -> dict:
     for row in rows:
         ws.append(row if isinstance(row, list) else [row])
 
-    wb.save(path)
-    return {"path": path, "file_type": "xlsx", "size_bytes": Path(path).stat().st_size}
+    wb.save(str(path))
+    return {"path": str(path), "file_type": "xlsx", "size_bytes": path.stat().st_size}
 
 
-async def _create_docx(path: str, content: dict | list) -> dict:
+def _create_docx(path: Path, content: dict | list) -> dict:
     from docx import Document
     doc = Document()
 
@@ -68,18 +89,18 @@ async def _create_docx(path: str, content: dict | list) -> dict:
     for p in paragraphs:
         doc.add_paragraph(str(p))
 
-    doc.save(path)
-    return {"path": path, "file_type": "docx", "size_bytes": Path(path).stat().st_size}
+    doc.save(str(path))
+    return {"path": str(path), "file_type": "docx", "size_bytes": path.stat().st_size}
 
 
-async def _create_pptx(path: str, content: dict | list) -> dict:
+def _create_pptx(path: Path, content: dict | list) -> dict:
     from pptx import Presentation
     from pptx.util import Inches
     prs = Presentation()
 
     slides = content if isinstance(content, list) else content.get("slides", [])
     for slide_data in slides:
-        slide = prs.slides.add_slide(prs.slide_layouts[1])  # Title + Content
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
         if isinstance(slide_data, dict):
             slide.shapes.title.text = slide_data.get("title", "")
             bullets = slide_data.get("bullets", [])
@@ -90,8 +111,8 @@ async def _create_pptx(path: str, content: dict | list) -> dict:
                     p.text = str(b)
                     p.level = 0
 
-    prs.save(path)
-    return {"path": path, "file_type": "pptx", "size_bytes": Path(path).stat().st_size}
+    prs.save(str(path))
+    return {"path": str(path), "file_type": "pptx", "size_bytes": path.stat().st_size}
 
 
 def _register():

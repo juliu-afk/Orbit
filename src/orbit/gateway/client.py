@@ -185,6 +185,12 @@ class LLMClient:
             await self._vision.close()
             self._vision = None
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        await self.close()
+
     async def generate(
         self,
         req: LLMRequest,

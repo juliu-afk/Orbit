@@ -178,26 +178,29 @@ class MergeEngine:
         """不调 LLM 的自动检查——快、零成本、可复现。"""
         scores: dict[str, float] = {}
 
-        # 语法有效
+        # 内容字符串——合并 output + task，安全类检查需覆盖两者
         content = str(output)
+        full_content = f"{content} {task}"
+
+        # 语法有效：output 需有实质内容
         scores["syntax_valid"] = 10.0 if len(content) > 10 else 0.0
 
-        # 非空
-        scores["no_empty_output"] = 10.0 if content.strip() else 0.0
+        # 非空：dict {} 视为空输出
+        scores["no_empty_output"] = 10.0 if (output and content.strip() not in ("", "{}")) else 0.0
 
         # 状态正常
         status = output.get("status", "ok")
         scores["status_is_ok"] = 10.0 if status == "ok" else 0.0
 
-        # 无明显注入
+        # 无明显注入——检查 output + task（task 可能含注入指令）
         risky = ["eval(", "exec(", "__import__", "subprocess", "os.system"]
-        scores["no_eval"] = 0.0 if any(r in content for r in risky) else 10.0
+        scores["no_eval"] = 0.0 if any(r in full_content for r in risky) else 10.0
 
-        # 无硬编码密钥
+        # 无硬编码密钥——检查 output + task
         secret_patterns = ["sk-", "api_key=", "password=", "secret="]
-        scores["no_hardcoded_secret"] = 0.0 if any(p in content for p in secret_patterns) else 10.0
+        scores["no_hardcoded_secret"] = 0.0 if any(p in full_content for p in secret_patterns) else 10.0
 
-        # 错误处理
+        # 错误处理——仅检查 output 代码
         error_indicators = ["try", "except", "catch", "error", "raise", "throw"]
         scores["has_error_handling"] = 10.0 if any(e in content for e in error_indicators) else 5.0
 
@@ -291,7 +294,11 @@ class MergeEngine:
         attempts: list[TierAttempt],
     ) -> dict[str, list[DimensionScore]]:
         """解析 LLM 返回的评分 JSON。"""
-        result = _json.loads(raw)
+        try:
+            result = _json.loads(raw)
+        except (_json.JSONDecodeError, ValueError):
+            logger.warning("merge_parse_scores_invalid_json", raw=raw[:200])
+            return {}  # WHY: 无效 JSON → 返回空 dict，调用方降级处理
         evals = result.get("evaluations", {})
 
         scored: dict[str, list[DimensionScore]] = {}

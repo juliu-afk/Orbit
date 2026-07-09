@@ -97,24 +97,27 @@ def analyze_directory(project_path: str) -> ProjectAnalysis:
     return analysis
 
 
-def _detect_python_framework(file_names: set[str], rel_paths: set[str]) -> str:
+def _detect_python_framework(file_names: set[str], rel_paths: set[str] | None = None) -> str:
     """检测 Python 框架。"""
-    # 读 pyproject.toml 的依赖（如果可访问）
-    frameworks = []
-    for path_str in rel_paths:
+    # WHY 合并两个来源: file_names 来自依赖列表(如 fastapi==0.110.0),
+    # rel_paths 来自目录扫描(如 src/api/routes/)。统一迭代做子串匹配。
+    # set() 转换兼容测试传入 list/dict 的情况。
+    all_paths = set(file_names) | (set(rel_paths) if rel_paths else set())
+    frameworks: list[str] = []
+    for path_str in all_paths:
         if "fastapi" in path_str.lower():
             frameworks.append("FastAPI")
             break
-    for path_str in rel_paths:
+    for path_str in all_paths:
         if "django" in path_str.lower():
             frameworks.append("Django")
             break
-    for path_str in rel_paths:
+    for path_str in all_paths:
         if "flask" in path_str.lower():
             frameworks.append("Flask")
             break
     # 检查是否有 SQLAlchemy 模型
-    for path_str in rel_paths:
+    for path_str in all_paths:
         if "sqlalchemy" in path_str.lower() or "model" in path_str.lower():
             if "SQLAlchemy" not in frameworks:
                 frameworks.append("SQLAlchemy")
@@ -122,22 +125,24 @@ def _detect_python_framework(file_names: set[str], rel_paths: set[str]) -> str:
     return ", ".join(frameworks) if frameworks else ""
 
 
-def _detect_js_framework(file_names: set[str], rel_paths: set[str]) -> str:
+def _detect_js_framework(file_names: set[str], rel_paths: set[str] | None = None) -> str:
     """检测 JS/TS 框架。"""
-    frameworks = []
-    for path_str in rel_paths:
+    # set() 转换兼容测试传入 list/dict 的情况。
+    all_paths = set(file_names) | (set(rel_paths) if rel_paths else set())
+    frameworks: list[str] = []
+    for path_str in all_paths:
         if "next.config" in path_str:
             frameworks.append("Next.js")
             break
-    for path_str in rel_paths:
+    for path_str in all_paths:
         if "vite.config" in path_str:
             frameworks.append("Vite")
             break
-    for path_str in rel_paths:
+    for path_str in all_paths:
         if "react" in path_str.lower():
             frameworks.append("React")
             break
-    for path_str in rel_paths:
+    for path_str in all_paths:
         if "vue" in path_str.lower():
             frameworks.append("Vue")
             break

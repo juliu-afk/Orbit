@@ -27,6 +27,7 @@ import CommandPalette from '@/components/layout/CommandPalette.vue'  // UX-11
 import NewSessionDialog from '@/components/layout/NewSessionDialog.vue'
 import MonacoDiffEditor from '@/components/editor/MonacoDiffEditor.vue'  // UX-2
 import RulesPanel from '@/components/settings/RulesPanel.vue'  // UX-10
+import TitleBar from '@/components/layout/TitleBar.vue'
 import BranchesPanel from '@/components/session/BranchesPanel.vue'  // UX-13
 
 const shell = useShellStore(); const session = useSessionStore(); const agentops = useAgentOpsStore()
@@ -130,12 +131,14 @@ function startResize(edge:"left"|"right",e:PointerEvent){ e.preventDefault();(e.
 const handleLeftResize = (e: PointerEvent) => startResize('left', e)
 const handleRightResize = (e: PointerEvent) => startResize('right', e)
 
-onMounted(async()=>{ window.addEventListener("keydown",onKeydown); ws.setMessageHandler((msg)=>{switch(msg.type){case"task:update":task.handleTaskUpdate(msg.payload as Record<string,unknown>);break;case"metrics:snapshot":agentops.handleWsEvent("metrics:snapshot",msg.payload as Record<string,unknown>);break;case"agentops:alert":agentops.handleWsEvent("agentops:alert",msg.payload as Record<string,unknown>);break}}); ws.connect("ws://"+window.location.host+"/ws/dashboard"); await session.fetchSessions(); if(!session.currentSessionId&&session.sessions.length>0)await session.switchToSession(session.sessions[0].session_id); if(session.currentSessionId)chat.connectChatWs(session.currentSessionId,session.currentProjectName||""); agentops.startPolling(); fileTreeProjectPath.value=session.currentProjectPath; fetchFileTree() })
+onMounted(async()=>{ window.addEventListener("keydown",onKeydown); ws.setMessageHandler((msg)=>{switch(msg.type){case"task:update":task.handleTaskUpdate(msg.payload as Record<string,unknown>);break;case"metrics:snapshot":agentops.handleWsEvent("metrics:snapshot",msg.payload as Record<string,unknown>);break;case"agentops:alert":agentops.handleWsEvent("agentops:alert",msg.payload as Record<string,unknown>);break}}); ws.connect("ws://"+window.location.host+"/ws/dashboard"); await session.fetchSessions(); if(!session.currentSessionId&&session.sessions.length>0)await session.switchToSession(session.sessions[0].session_id); if(session.messages.length>0)chat.restoreMessages(session.messages.map(m=>({role:m.role,content:m.content,created_at:m.created_at}))); if(session.currentSessionId)chat.connectChatWs(session.currentSessionId,session.currentProjectName||""); agentops.startPolling(); fileTreeProjectPath.value=session.currentProjectPath; fetchFileTree() })
 onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect(); chat.disconnect(); agentops.stopPolling(); task.reset() })
 </script>
 
 <template>
-<div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{gridTemplateAreas:gridAreas(),gridTemplateColumns:gridColumns()}" @contextmenu.prevent>
+<div class="terminal-root">
+  <TitleBar />
+  <div class="terminal-shell glass" :data-filetree-collapsed="!shell.showFileTree" :style="{gridTemplateAreas:gridAreas(),gridTemplateColumns:gridColumns()}" @contextmenu.prevent>
   <div v-show="shell.showFileTree" class="resize-handle resize-left" @pointerdown="handleLeftResize" />
   <aside v-show="shell.showFileTree" class="panel-left" style="border-right:1px solid var(--color-orbit-border);overflow-y:auto"><FileTreePanel :tree-data="fileTree" :selected-file="shell.selectedFile" :current-project-path="fileTreeProjectPath" @select-file="onSelectFile" @change-project="onFileTreeProjectChange" @create-project="onCreateProjectFromFileTree" /></aside>
   <main class="panel-center flex flex-col overflow-hidden">
@@ -168,10 +171,12 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
     <MonacoDiffEditor v-if="task.codeOutput" original="" :modified="task.codeOutput" language="python" height="calc(100vh - 80px)" />
   </el-drawer>
 </div>
+</div>
 </template>
 
 <style scoped>
-.terminal-shell { display:grid; grid-template-columns:var(--spacing-filetree) 1fr var(--spacing-right-panel); grid-template-rows:1fr var(--spacing-statusbar); grid-template-areas:v-bind(gridAreas()); height:100%; overflow:hidden }
+.terminal-root { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.terminal-shell { display:grid; grid-template-columns:var(--spacing-filetree) 1fr var(--spacing-right-panel); grid-template-rows:1fr var(--spacing-statusbar); grid-template-areas:v-bind(gridAreas()); flex:1; overflow:hidden }
 .terminal-shell[data-filetree-collapsed="true"] { grid-template-columns:0 1fr var(--spacing-right-panel) }
 .panel-left{grid-area:filetree;background:var(--color-orbit-glass);backdrop-filter:blur(var(--glass-blur,12px))}.panel-center{grid-area:chat}.panel-right{grid-area:right;background:var(--color-orbit-glass);backdrop-filter:blur(var(--glass-blur,12px))}.panel-bottom{grid-area:statusbar}
 .resize-handle{width:4px;cursor:col-resize;background:transparent;transition:background 0.15s;z-index:10}

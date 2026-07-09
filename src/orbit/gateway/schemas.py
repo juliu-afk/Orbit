@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ── V15.1 多模态 P0：ContentBlock 类型 ──
 # WHY 独立类型：Pydantic 校验拒绝非法 content type，避免无效请求发到 API
@@ -76,11 +76,15 @@ class LLMRequest(BaseModel):
         None, ge=1, le=3, description="手动指定梯度（1=轻量/2=标准/3=重量）。None=自动检测"
     )
 
-    @field_validator("prompt", mode="before")
-    @classmethod
-    def _prompt_optional_for_multimodal(cls, v, info):
-        """content 非 None 时 prompt 可为空——视觉任务只需图+简短指令。"""
-        return v  # Pydantic 默认 min_length=1 已在 Field 中移除
+    @model_validator(mode="after")
+    def _validate_prompt_or_content(self):
+        """prompt 和 content 不能同时为空——至少有一个输入源。
+
+        WHY model_validator：field_validator 中 content 字段可能尚未解析（定义顺序问题）。
+        """
+        if not self.prompt and self.content is None:
+            raise ValueError("prompt 和 content 不能同时为空")
+        return self
 
     @field_validator("content")
     @classmethod

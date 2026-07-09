@@ -30,13 +30,19 @@ class TierConfig:
 
     WHY dataclass 而非 Pydantic：不需要校验——配置是常量，编译期保证正确。
     """
-    model: str              # API model name
-    endpoint: str           # API base URL
-    max_tokens: int         # 默认 max_tokens
-    thinking: bool | None   # None=使用模型默认, True=强制开启, False=关闭
-    cost_per_million: float # 元/百万 tokens，0=免费
-    context_window: int     # 上下文窗口（用于自动梯度判定）
-    description: str        # 人类可读描述
+    model: str                     # API model name
+    endpoint: str                  # API base URL
+    max_tokens: int                # 默认 max_tokens
+    thinking: bool | None          # None=使用模型默认, True=强制开启, False=关闭
+    input_cost_per_million: float  # 输入价格（元/百万 tokens），0=免费
+    output_cost_per_million: float # 输出价格（元/百万 tokens），0=免费
+    context_window: int            # 上下文窗口（用于自动梯度判定）
+    description: str               # 人类可读描述
+
+    @property
+    def cost_per_million(self) -> float:
+        """总成本（sum of input+output），0=免费。向后兼容 P0 调用。"""
+        return self.input_cost_per_million + self.output_cost_per_million
 
 
 # ── 三梯度配置表 ──
@@ -48,8 +54,9 @@ TIERS: dict[Tier, TierConfig] = {
         model="glm-4.1v-thinking-flash",
         endpoint="https://open.bigmodel.cn/api/paas/v4",
         max_tokens=4096,
-        thinking=None,           # auto——信任模型判断
-        cost_per_million=0.0,    # 永久免费
+        thinking=None,
+        input_cost_per_million=0.0,   # 永久免费
+        output_cost_per_million=0.0,
         context_window=64_000,
         description="T1 轻量：单截图、短视频(<10min)、UI 定位",
     ),
@@ -57,8 +64,9 @@ TIERS: dict[Tier, TierConfig] = {
         model="glm-4.1v-thinking-flash",
         endpoint="https://open.bigmodel.cn/api/paas/v4",
         max_tokens=8192,
-        thinking=True,           # 强制开启——深度推理
-        cost_per_million=0.0,    # 永久免费
+        thinking=True,
+        input_cost_per_million=0.0,   # 永久免费
+        output_cost_per_million=0.0,
         context_window=64_000,
         description="T2 标准：多图对比、Bug 诊断、视频分析",
     ),
@@ -66,8 +74,9 @@ TIERS: dict[Tier, TierConfig] = {
         model="glm-4.6v",
         endpoint="https://open.bigmodel.cn/api/paas/v4",
         max_tokens=8192,
-        thinking=None,           # GLM-4.6V 无 thinking 参数
-        cost_per_million=4.0,    # ¥1 入 + ¥3 出 ≈ ¥4/M (sum)
+        thinking=None,
+        input_cost_per_million=1.0,    # ¥1/M 输入
+        output_cost_per_million=3.0,   # ¥3/M 输出
         context_window=128_000,
         description="T3 重量：长视频(>10min)、设计稿→代码、批量文档",
     ),

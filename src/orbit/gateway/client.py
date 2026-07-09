@@ -141,7 +141,7 @@ class LLMClient:
         elif isinstance(req.content, list):
             content_list = req.content  # type: ignore[assignment]
 
-        # WHY 保留 req.messages 中的 system 消息：保持 system_prompt 一致性
+        # WHY 传递 system_prompt：保持 Agent 行为一致性——多模态模型也遵循编排层规则
         system_msg = req.system_prompt
         if req.messages:
             for msg in req.messages:
@@ -152,10 +152,12 @@ class LLMClient:
         # 3. 调用 VisionAdapter
         vision = self._get_vision()
         response = await vision.generate(
+            tier=tier,
             config=config,
             content=content_list,
             prompt=req.prompt,
             max_tokens=req.max_tokens,
+            system_prompt=system_msg,
         )
 
         elapsed = time.monotonic() - _t0
@@ -173,6 +175,15 @@ class LLMClient:
         # 4. 成本记录
         self._log_usage(task_id, response.usage)
         return response
+
+    async def close(self):
+        """清理资源——关闭 VisionAdapter 的 httpx 连接池（P2-4 修复）。
+
+        WHY 显式 close：httpx.AsyncClient 不会自动释放连接池。
+        """
+        if self._vision:
+            await self._vision.close()
+            self._vision = None
 
     async def generate(
         self,

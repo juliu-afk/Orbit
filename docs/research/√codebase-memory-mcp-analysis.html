@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>codebase-memory-mcp 调研报告 — Orbit 对接/借鉴分析</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --orange: #d2991d;
+    --purple: #a371f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    max-width: 1100px; margin: 0 auto; padding: 40px 24px;
+  }
+  h1 { font-size: 2em; border-bottom: 2px solid var(--border); padding-bottom: 12px; margin-bottom: 8px; }
+  h2 { font-size: 1.4em; color: var(--accent); margin: 40px 0 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  h3 { font-size: 1.1em; margin: 24px 0 12px; color: #e6edf3; }
+  .meta { color: var(--muted); font-size: 0.9em; margin-bottom: 32px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 0.92em; }
+  th, td { padding: 10px 14px; text-align: left; border: 1px solid var(--border); }
+  th { background: var(--surface); font-weight: 600; color: #e6edf3; }
+  tr:nth-child(even) { background: #0d1117; }
+  tr:nth-child(odd) { background: #161b22; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.78em; font-weight: 600; }
+  .tag-win { background: #1b3a1b; color: var(--green); }
+  .tag-lose { background: #3a1b1b; color: var(--red); }
+  .tag-draw { background: #3a351b; color: var(--orange); }
+  .tag-action { background: #1b2a3a; color: var(--accent); }
+  .verdict { padding: 16px 20px; border-left: 4px solid; border-radius: 6px; margin: 20px 0; background: var(--surface); }
+  .verdict.cbm { border-color: var(--green); }
+  .verdict.orbit { border-color: var(--purple); }
+  .verdict.mix { border-color: var(--accent); }
+  .verdict h4 { margin-bottom: 4px; }
+  .rec { padding: 14px 18px; border-radius: 6px; margin: 12px 0; background: #0d2b1f; border-left: 4px solid var(--green); }
+  .rec h4 { color: var(--green); margin-bottom: 4px; }
+  .gap { background: #2a1b1b; border-left: 4px solid var(--red); }
+  .gap h4 { color: var(--red); }
+  ul, ol { padding-left: 24px; margin: 8px 0 16px; }
+  li { margin: 4px 0; }
+  code { background: var(--surface); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+  pre { background: var(--surface); padding: 16px; border-radius: 6px; overflow-x: auto; font-size: 0.85em; line-height: 1.5; margin: 12px 0 20px; border: 1px solid var(--border); }
+  a { color: var(--accent); }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0; }
+  .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .summary-card h4 { margin-bottom: 12px; font-size: 1.05em; display: flex; align-items: center; gap: 8px; }
+  .score { font-size: 2em; font-weight: 700; }
+  .score.green { color: var(--green); }
+  .score.purple { color: var(--purple); }
+  .score.blue { color: var(--accent); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 24px 0; }
+  .toc ol { margin: 0; }
+  .toc a { text-decoration: none; }
+  .phase-timeline { display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
+  .phase-card { flex: 1; min-width: 200px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .phase-card .label { font-size: 0.8em; color: var(--muted); }
+  .phase-card .title { font-weight: 700; margin-top: 4px; }
+  .phase-card .effort { font-size: 0.85em; color: var(--orange); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>📊 codebase-memory-mcp 调研报告</h1>
+<p class="meta">
+  生成日期：2026-07-09 &nbsp;|&nbsp;
+  仓库：<a href="https://github.com/DeusData/codebase-memory-mcp">DeusData/codebase-memory-mcp</a> &nbsp;|&nbsp;
+  版本：v1.x（2026-02-24 首次发布）&nbsp;|&nbsp;
+  许可证：MIT
+</p>
+
+<div class="toc">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#s1">项目概览</a></li>
+    <li><a href="#s2">架构对比</a></li>
+    <li><a href="#s3">逐维度对决</a></li>
+    <li><a href="#s4">Orbit 差距分析</a></li>
+    <li><a href="#s5">三种对接模式</a></li>
+    <li><a href="#s6">行动路线图</a></li>
+    <li><a href="#s7">结论</a></li>
+  </ol>
+</div>
+
+<h2 id="s1">1. 项目概览</h2>
+
+<h3>codebase-memory-mcp 是什么</h3>
+<p>纯 C 静态二进制文件，<strong>零依赖</strong>。Tree-sitter AST 解析 158 种语言 → SQLite 知识图谱 → 14 个 MCP 工具。单一命令安装，覆盖 11 个编程 Agent（Claude Code / Codex / Gemini CLI / Zed / Aider / Cursor / Windsurf 等）。</p>
+
+<div class="summary-grid">
+  <div class="summary-card">
+    <h4>🏗️ 核心架构</h4>
+    <table>
+      <tr><td>语言</td><td>纯 C（33M 代码），零依赖</td></tr>
+      <tr><td>解析</td><td>Tree-sitter 158 语言（vendored 进二进制）</td></tr>
+      <tr><td>存储</td><td>SQLite（LZ4 压缩、内存优先管道）</td></tr>
+      <tr><td>查询</td><td>openCypher 子集 + 正则 + BFS 遍历</td></tr>
+      <tr><td>语义</td><td>混合 LSP：11 语言类型推断（C 实现）</td></tr>
+      <tr><td>搜索</td><td>BM25 FTS5 + Nomic 代码嵌入（768d int8）</td></tr>
+      <tr><td>MCP</td><td>14 工具（search_graph / trace_path / detect_changes …）</td></tr>
+      <tr><td>分发</td><td>单一二进制 + npm/PyPI/Homebrew/Scoop/Winget/AUR</td></tr>
+      <tr><td>可视化</td><td>内置 3D 图谱 UI（localhost:9749）</td></tr>
+    </table>
+  </div>
+  <div class="summary-card">
+    <h4>⚡ 关键指标</h4>
+    <table>
+      <tr><td>Linux 内核全量索引</td><td><strong>3 分钟</strong>（28M 行，75K 文件）</td></tr>
+      <tr><td>Linux 内核快速索引</td><td>1 分 12 秒（1.88M 节点）</td></tr>
+      <tr><td>Django 全量索引</td><td>~6 秒（49K 节点，196K 边）</td></tr>
+      <tr><td>Cypher 查询</td><td>&lt;1ms（关系遍历）</td></tr>
+      <tr><td>名称搜索（正则）</td><td>&lt;10ms（SQL LIKE 预过滤）</td></tr>
+      <tr><td>死代码检测</td><td>~150ms（全图扫描 + 度过滤）</td></tr>
+      <tr><td>调用路径追踪（深度=5）</td><td>&lt;10ms（BFS 遍历）</td></tr>
+      <tr><td>Token 节省</td><td><strong>99.2%</strong>（3,400 vs 412,000 tokens）</td></tr>
+    </table>
+  </div>
+</div>
+
+<p><strong>研究论文：</strong><a href="https://arxiv.org/abs/2603.27277">Codebase-Memory: Tree-Sitter-Based Knowledge Graphs for LLM Code Exploration via MCP</a>（arXiv:2603.27277）。31 个真实仓库评估：83% 答案质量，10× token 减少，2.1× 工具调用减少。</p>
+
+<hr>
+
+<h2 id="s2">2. 架构对比</h2>
+
+<table>
+  <tr>
+    <th style="width:18%">层</th>
+    <th style="width:41%">codebase-memory-mcp</th>
+    <th style="width:41%">Orbit（当前实现）</th>
+  </tr>
+  <tr>
+    <td><strong>解析引擎</strong></td>
+    <td>Tree-sitter 158 语言，编译进二进制。<br>通用包/模块解析（package.json / go.mod / Cargo.toml / pyproject.toml 等 10+ 清单）</td>
+    <td>Python <code>ast</code> 标准库。<strong>仅 Python 单语言。</strong><br>无包解析——仅文件级解析。</td>
+  </tr>
+  <tr>
+    <td><strong>图谱存储</strong></td>
+    <td>SQLite，LZ4 压缩内存管道。<br>节点标签：Project / Package / Folder / File / Module / Class / Function / Method / Interface / Enum / Type / Route / Resource<br>边类型：CALLS / IMPORTS / DEFINES / IMPLEMENTS / INHERITS / HTTP_CALLS / ASYNC_CALLS / EMITS / LISTENS_ON / DATA_FLOWS / SIMILAR_TO / SEMANTICALLY_RELATED …</td>
+    <td>SQLAlchemy + SQLite。<br>节点：CodeNode（函数/类/变量）+ 少数模型<br>边：Edge（CALLS / IMPORTS / DEFINES）<br>另有 DB 图谱（DDL+MVCC）+ 配置图谱（.env+Nginx+docker-compose）。<strong>无 CBM 不可替代。</strong></td>
+  </tr>
+  <tr>
+    <td><strong>查询语言</strong></td>
+    <td><strong>openCypher 子集</strong>：MATCH / OPTIONAL MATCH / WHERE / WITH / RETURN / ORDER BY / UNWIND / UNION / CASE / 聚合 + EXISTS{} 子查询<br>BFS 遍历（trace_path）<br>正则名称搜索（search_graph）</td>
+    <td>直接 Python 方法调用（<code>get_callers</code> / <code>get_callees</code> / <code>find_definitions_with_positions</code>）。<strong>无声明式查询语言。</strong></td>
+  </tr>
+  <tr>
+    <td><strong>语义层</strong></td>
+    <td><strong>混合 LSP</strong>：参数绑定、返回类型推断、泛型替换、JSX 组件分发、PHP 命名空间+特质、C# 文件作用域命名空间+记录、Java 类层次+重载+λ、Kotlin 扩展函数、Rust 特质方法+UFCS。<br>支持：Python / TS/JS/JSX/TSX / PHP / C# / Go / C / C++ / Java / Kotlin / Rust</td>
+    <td>仅 <code>mypy --strict</code> 诊断输出解析。<strong>无类型推断。</strong><br>支持：仅 Python。</td>
+  </tr>
+  <tr>
+    <td><strong>代码搜索</strong></td>
+    <td><strong>语义搜索</strong>：Nomic nomic-embed-code（40K tokens，768d int8）编译进二进制。11 信号组合评分：TF-IDF / RRI / API/Type/Decorator 签名 / AST profile / 数据流 / Halstead-lite / MinHash / 模块邻近度 / 图扩散。<br><strong>全文搜索</strong>：BM25 FTS5 + cbm_camel_split tokenizer<br><strong>图谱增强 grep</strong>：search_code 仅搜索已索引文件</td>
+    <td>BGE 嵌入向量搜索——仅用于<strong>领域知识图谱</strong>（财务会计概念），不用于代码。</td>
+  </tr>
+  <tr>
+    <td><strong>跨服务链接</strong></td>
+    <td>HTTP 路由 ↔ 调用点匹配（置信度评分）<br>gRPC / GraphQL / tRPC 服务检测 + protobuf Route 提取<br>通道检测（EMITS / LISTENS_ON）：Socket.IO / EventEmitter / 通用 pub-sub（8 语言 + 常量解析）</td>
+    <td>无。</td>
+  </tr>
+  <tr>
+    <td><strong>基础设施即代码</strong></td>
+    <td>Dockerfile / K8s 清单 / Kustomize overlay → 图节点（Resource / Module + IMPORTS 边）</td>
+    <td>配置图谱引擎：.env / Nginx / docker-compose → 图节点。<strong>无 K8s 支持。</strong></td>
+  </tr>
+  <tr>
+    <td><strong>MCP 工具</strong></td>
+    <td><strong>14 个</strong>：index_repository / list_projects / delete_project / index_status / search_graph / trace_path / detect_changes / query_graph / get_graph_schema / get_code_snippet / get_architecture / search_code / manage_adr / ingest_traces</td>
+    <td><strong>4 个</strong>：query_knowledge / find_symbol / find_referencing_symbols / get_symbols_overview</td>
+  </tr>
+  <tr>
+    <td><strong>团队协作</strong></td>
+    <td><strong>共享图谱产物</strong>：<code>.codebase-memory/graph.db.zst</code>（zstd 压缩 SQLite，8-13:1 压缩比）。提交到 repo → 队友 clone 后解压 + 增量索引。</td>
+    <td>无等价功能。每个成员独立重建索引。</td>
+  </tr>
+  <tr>
+    <td><strong>分发</strong></td>
+    <td>单一静态二进制（macOS arm64/amd64 / Linux arm64/amd64 / Windows amd64）。npm / PyPI / Homebrew / Scoop / Winget / Chocolatey / AUR / go install。每个发布版签名+校验和+70+ 杀毒引擎扫描。</td>
+    <td>Poetry 包 + PyInstaller + Tauri 壳（桌面端）。仅本地部署。</td>
+  </tr>
+</table>
+
+<hr>
+
+<h2 id="s3">3. 逐维度对决</h2>
+
+<h3>3.1 代码图谱 —— <span class="tag tag-win">CBM 碾压</span></h3>
+
+<table>
+  <tr><th>子维度</th><th>CBM</th><th>Orbit</th><th>差距</th></tr>
+  <tr>
+    <td>语言覆盖</td><td>158 种</td><td>1 种（Python）</td>
+    <td><span class="tag tag-lose">158×</span></td>
+  </tr>
+  <tr>
+    <td>解析精度</td><td>Tree-sitter 生产级 AST</td><td>Python ast（标准库级）</td>
+    <td><span class="tag tag-draw">Python 无差距，其他语言无限差距</span></td>
+  </tr>
+  <tr>
+    <td>边类型</td><td>15+ 种（HTTP_CALLS / EMITS / DATA_FLOWS / SIMILAR_TO …）</td><td>3 种（CALLS / IMPORTS / DEFINES）</td>
+    <td><span class="tag tag-lose">5×</span></td>
+  </tr>
+  <tr>
+    <td>索引速度</td><td>Django 49K 节点 ~6s</td><td>逐个文件 async 解析，同规模分钟级</td>
+    <td><span class="tag tag-lose">10-100×</span></td>
+  </tr>
+  <tr>
+    <td>查询能力</td><td>openCypher + 正则 + BFS</td><td>Python 方法调用</td>
+    <td><span class="tag tag-lose">声明式 > 命令式</span></td>
+  </tr>
+  <tr>
+    <td>语义搜索</td><td>Nomic 代码嵌入 768d</td><td>无</td>
+    <td><span class="tag tag-lose">∞</span></td>
+  </tr>
+  <tr>
+    <td>类型推断</td><td>混合 LSP 11 语言</td><td>仅 mypy 诊断</td>
+    <td><span class="tag tag-lose">∞</span></td>
+  </tr>
+  <tr>
+    <td>跨库图谱</td><td>CROSS_* 边，multi-galaxy 3D 布局</td><td>无</td>
+    <td><span class="tag tag-lose">∞</span></td>
+  </tr>
+</table>
+
+<div class="verdict cbm">
+  <h4>🏆 CBM 完胜 —— 差距一个数量级</h4>
+  <p>CBM 是专门做代码智能的产品。Orbit 的 <code>code_graph.py</code> 是 MVP 阶段用 ~300 行 <code>ast</code> 凑出来的。CBM 在每个维度上都是数量级碾压。</p>
+</div>
+
+<h3>3.2 数据库图谱 —— <span class="tag tag-win">Orbit 独有</span></h3>
+<p>CBM 不做数据库。Orbit 的 <code>db_graph.py</code> 解析 DDL + MVCC，提取表/列/索引/外键作为图节点，这是 Orbit 独有的能力，CBM 完全没有。</p>
+
+<h3>3.3 配置图谱 —— <span class="tag tag-draw">各有所长</span></h3>
+<div class="summary-grid">
+  <div>
+    <strong>CBM：</strong>Dockerfile / K8s 清单 / Kustomize overlay → Resource/Module 节点 + IMPORTS 边。偏向云原生运维栈。
+  </div>
+  <div>
+    <strong>Orbit：</strong>.env / Nginx 配置 / docker-compose → 配置节点。偏向传统部署 + 本地开发环境。
+  </div>
+</div>
+<p>两者互补，不重叠。</p>
+
+<h3>3.4 知识图谱 —— <span class="tag tag-win">Orbit 独有</span></h3>
+<p>CBM 不做领域知识。Orbit 有完整的领域知识图谱：财务会计本体论 + BGE 向量语义搜索 + 精确/语义/混合三种查询模式。这是 Orbit 作为"财务软件多 Agent 系统"的核心差异化能力。</p>
+
+<h3>3.5 元图谱 —— <span class="tag tag-win">Orbit 独有</span></h3>
+<p>CBM 只有单层代码图谱。Orbit 有 <strong>12 种跨图谱关系</strong>：READS_FROM / WRITES_TO / DEPENDS_ON / REFERENCES / CONFIGURES / IMPLEMENTS_SPEC / TESTS / DEPLOYS_TO / MONITORS / SECURES / MIGRATES / GENERATES。这让 Orbit 能回答"这个 API 端点读了哪个数据库表？它的配置在哪里？谁测它？"——CBM 做不到。</p>
+
+<h3>3.6 防幻觉 + 调度器联动 —— <span class="tag tag-win">Orbit 独有</span></h3>
+<p>Orbit 的图谱查询直接喂给 L1-L4 防幻觉校验层。图谱变更触发调度器任务失效→重新调度。CBM 是独立工具，无此集成。</p>
+
+<h3>3.7 MCP 工具设计 —— <span class="tag tag-win">CBM 碾压</span></h3>
+<table>
+  <tr><th>CBM（14 工具）</th><th>Orbit（4 工具）</th></tr>
+  <tr>
+    <td>
+      ✅ index_repository<br>
+      ✅ list_projects / delete_project / index_status<br>
+      ✅ search_graph（结构化搜索）<br>
+      ✅ trace_path（BFS 调用路径）<br>
+      ✅ detect_changes（git diff → 受影响符号）<br>
+      ✅ query_graph（openCypher）<br>
+      ✅ get_graph_schema<br>
+      ✅ get_code_snippet（按限定名读源码）<br>
+      ✅ get_architecture（架构概览）<br>
+      ✅ search_code（图谱增强 grep）<br>
+      ✅ manage_adr（架构决策记录 CRUD）<br>
+      ✅ ingest_traces（运行时追踪验证）
+    </td>
+    <td>
+      ✅ query_knowledge（领域知识查询）<br>
+      ✅ find_symbol（符号定位）<br>
+      ✅ find_referencing_symbols（反向调用图）<br>
+      ✅ get_symbols_overview（文件符号大纲）
+    </td>
+  </tr>
+</table>
+
+<div class="verdict cbm">
+  <h4>🏆 CBM 工具集更成熟</h4>
+  <p>Orbit 缺的核心工具：<code>trace_path</code>（调用链追踪）、<code>get_architecture</code>（架构概览）、<code>detect_changes</code>（变更影响分析）、<code>search_code</code>（图谱增强 grep）。这些是 Agent 最高频调用的代码查询模式。</p>
+</div>
+
+<hr>
+
+<h2 id="s4">4. Orbit 差距分析</h2>
+
+<p>以下 6 项是 Orbit 最值得从 CBM 借鉴/学习的点，按价值/投入比排序：</p>
+
+<table>
+  <tr><th style="width:5%">#</th><th>借鉴内容</th><th>当前状态</th><th>差距</th><th>工作量</th><th>价值</th></tr>
+  <tr>
+    <td>1</td>
+    <td><strong>Tree-sitter 替代 ast</strong></td>
+    <td>AGENTS.md 提到 Tree-sitter，代码用 ast</td>
+    <td>仅 Python → 需 3-5 语言</td>
+    <td>中</td>
+    <td><span class="tag tag-win">高</span></td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td><strong>openCypher 查询层</strong></td>
+    <td>命令式 Python 方法</td>
+    <td>声明式让 Agent 表达复杂图遍历更容易</td>
+    <td>小（~500 行解析器）</td>
+    <td><span class="tag tag-win">高</span></td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td><strong>detect_changes 工具</strong></td>
+    <td>有 git 变更检测，无法追溯符号</td>
+    <td>git diff → 受影响符号 + 风险分类</td>
+    <td>小</td>
+    <td><span class="tag tag-win">高</span></td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td><strong>共享图谱产物（zstd）</strong></td>
+    <td>每个成员独立重建索引</td>
+    <td>提交压缩图谱 → 队友解压 + 增量</td>
+    <td>小</td>
+    <td><span class="tag tag-draw">中</span></td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td><strong>MCP 工具设计模式</strong></td>
+    <td>4 个工具</td>
+    <td>缺 trace_path / get_architecture / search_code</td>
+    <td>小</td>
+    <td><span class="tag tag-win">高</span></td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td><strong>混合 LSP 类型解析</strong></td>
+    <td>仅 mypy 诊断</td>
+    <td>Python + TypeScript 类型推断</td>
+    <td>大</td>
+    <td><span class="tag tag-draw">中</span></td>
+  </tr>
+</table>
+
+<hr>
+
+<h2 id="s5">5. 三种对接模式</h2>
+
+<h3>模式 A：MCP Sidecar（即插即用）</h3>
+
+<div class="verdict mix">
+  <h4>🔄 连接方式</h4>
+  <p>Orbit 在 MCP 配置中添加 CBM 为外部 MCP Server。Orbit Agent 调用 CBM 工具做代码查询，Orbit 自身守住数据库/配置/知识/元图谱 + 防幻觉 + 调度器。</p>
+</div>
+
+<pre>{
+  "mcpServers": {
+    "codebase-memory-mcp": {
+      "command": "codebase-memory-mcp",
+      "args": []
+    }
+  }
+}</pre>
+
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr>
+    <td>✅ 零代码，立即获得 158 语言代码智能</td>
+    <td>❌ 外部进程依赖（CBM 挂了代码查询就废）</td>
+  </tr>
+  <tr>
+    <td>✅ 享受 CBM 的性能（C 实现，毫秒级）</td>
+    <td>❌ 无法深度集成防幻觉管道</td>
+  </tr>
+  <tr>
+    <td>✅ CBM 更新自动受益</td>
+    <td>❌ 代码图谱数据存在 CBM 的 SQLite 里，和 Orbit 的元图谱分离</td>
+  </tr>
+  <tr>
+    <td>✅ Orbit 专注差异化能力</td>
+    <td>❌ CBM 无数据库/配置/知识图谱 → 代码查询仍孤岛</td>
+  </tr>
+</table>
+
+<h3>模式 B：架构借鉴（自研增强）</h3>
+
+<div class="verdict orbit">
+  <h4>📖 不接，只学</h4>
+  <p>从 CBM 的工具设计、查询模式、共享图谱产物中学习。用 Python 在 Orbit 内实现借鉴内容 #1-#6。保持零外部依赖。</p>
+</div>
+
+<table>
+  <tr><th>优点</th><th>缺点</th></tr>
+  <tr>
+    <td>✅ 完全自主可控，无外部依赖</td>
+    <td>❌ 工作量大——Tree-sitter + LSP 类型推断需要数周到数月</td>
+  </tr>
+  <tr>
+    <td>✅ 深度集成防幻觉管道 + 调度器</td>
+    <td>❌ 性能不可能达到 C 的水平</td>
+  </tr>
+  <tr>
+    <td>✅ 代码图谱数据在 Orbit 的元图谱内</td>
+    <td>❌ 重复造轮子——CBM 已有 33M C 代码的成熟实现</td>
+  </tr>
+</table>
+
+<h3>模式 C：混合模式（推荐 ✅）</h3>
+
+<div class="verdict mix">
+  <h4>🔀 接 CBM 做代码图谱引擎，同时自研增强关键能力</h4>
+  <p><strong>策略：</strong>CBM 负责高性能代码解析+查询（158 语言、毫秒级），Orbit 负责图谱融合（元图谱 12 种跨图关系）+ 防幻觉 + 调度器联动 + 领域知识。</p>
+</div>
+
+<div class="phase-timeline">
+  <div class="phase-card">
+    <div class="label">短期（本周）</div>
+    <div class="title">装 CBM + 学习工具设计</div>
+    <div class="effort">工作量：1-2h</div>
+    <ul>
+      <li>安装 CBM 到 Orbit 环境</li>
+      <li>配 MCP sidecar</li>
+      <li>Orbit Agent 获得即时 158 语言代码智能</li>
+      <li>学习 CBM 14 工具设计 → 为 Orbit MCP 添加 trace_path + get_architecture</li>
+    </ul>
+  </div>
+  <div class="phase-card">
+    <div class="label">中期（2-4 周）</div>
+    <div class="title">Tree-sitter + detect_changes</div>
+    <div class="effort">工作量：1-2 周</div>
+    <ul>
+      <li>code_graph.py 从 ast 迁移到 Tree-sitter</li>
+      <li>先支持 Python/TS/SQL（覆盖 90% 使用场景）</li>
+      <li>实现 detect_changes 等价功能</li>
+      <li>为调度器提供智能任务失效</li>
+    </ul>
+  </div>
+  <div class="phase-card">
+    <div class="label">长期（1-2 月）</div>
+    <div class="title">openCypher + 共享图谱</div>
+    <div class="effort">工作量：2-4 周</div>
+    <ul>
+      <li>openCypher 查询层覆盖内部图谱引擎</li>
+      <li>评估混合 LSP 深度（Python + TS 类型推断）</li>
+      <li>共享图谱产物（zstd 压缩）</li>
+    </ul>
+  </div>
+</div>
+
+<hr>
+
+<h2 id="s6">6. 行动路线图</h2>
+
+<h3>6.1 短期（本周）</h3>
+
+<div class="rec">
+  <h4>动作 1：安装 CBM</h4>
+  <pre># Windows (PowerShell)
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.ps1 -OutFile install.ps1
+Unblock-File .\install.ps1
+.\install.ps1
+
+# 验证
+codebase-memory-mcp --version</pre>
+  <p>预期：Orbit Agent 立即获得 158 语言代码智能。零代码改动。</p>
+</div>
+
+<div class="rec">
+  <h4>动作 2：补 Orbit MCP 工具</h4>
+  <p>从 CBM 14 工具设计中学习，为 Orbit 的 <code>mcp_server.py</code> 添加 2 个高频工具：</p>
+  <ul>
+    <li><code>trace_path</code> — BFS 调用路径追踪（谁调了 X / X 调了谁）</li>
+    <li><code>get_architecture</code> — 项目架构概览（语言/模块/入口点/热点）</li>
+  </ul>
+  <p>每工具 ~50 行。总计 ~100 行改动。</p>
+</div>
+
+<h3>6.2 中期（2-4 周）</h3>
+
+<div class="rec">
+  <h4>动作 3：Tree-sitter 迁移</h4>
+  <p>将 <code>code_graph.py</code> 从 Python <code>ast</code> 迁移到 tree-sitter：</p>
+  <ul>
+    <li>安装 <code>tree-sitter</code> Python binding</li>
+    <li>先支持 Python / TypeScript / SQL 三语言（覆盖 Orbit 使用场景 90%）</li>
+    <li>保持现有 CodeNode / Edge 模型不变——只替换解析层</li>
+    <li>增量索引逻辑不变——只扩展语言支持</li>
+  </ul>
+</div>
+
+<div class="rec">
+  <h4>动作 4：detect_changes 工具</h4>
+  <pre>git diff --name-only → 受影响的符号 → 风险分类（高/中/低）
+→ 调度器任务失效 → 自动重新调度受影响任务</pre>
+</div>
+
+<h3>6.3 长期（1-2 月）</h3>
+
+<div class="rec">
+  <h4>动作 5：openCypher 查询层</h4>
+  <p>为 Orbit 的内部图谱引擎添加声明式查询。约 500 行解析器。让 Agent 能做：</p>
+  <pre>MATCH (api:Route)-[:READS_FROM]->(t:Table)-[:MIGRATES]->(m:Migration)
+WHERE api.file STARTS WITH 'src/api/v2/'
+RETURN api.path, t.name, m.file</pre>
+</div>
+
+<div class="rec">
+  <h4>动作 6：评估混合 LSP</h4>
+  <p>先评估 Python + TypeScript 类型推断的投入产出比。如果 Tree-sitter 迁移后代码图谱质量已足够好，LSP 可推迟。</p>
+</div>
+
+<hr>
+
+<h2 id="s7">7. 结论</h2>
+
+<div class="summary-grid">
+  <div class="summary-card">
+    <h4>🏆 CBM 优势</h4>
+    <div class="score green">代码图谱</div>
+    <ul>
+      <li>158 语言 vs 1</li>
+      <li>Tree-sitter vs ast</li>
+      <li>openCypher vs 方法调用</li>
+      <li>14 MCP 工具 vs 4</li>
+      <li>毫秒级 vs 秒级</li>
+      <li>99.2% token 节省</li>
+      <li>混合 LSP 类型推断</li>
+      <li>Nomic 代码语义搜索</li>
+    </ul>
+  </div>
+  <div class="summary-card">
+    <h4>🏆 Orbit 优势</h4>
+    <div class="score purple">图谱体系 + 防幻觉</div>
+    <ul>
+      <li>数据库图谱（DDL+MVCC）</li>
+      <li>配置图谱（.env+Nginx+docker-compose）</li>
+      <li>知识图谱（领域本体+BGE）</li>
+      <li>元图谱（12 种跨图关系）</li>
+      <li>9 层防幻觉纵深防御</li>
+      <li>调度器状态机联动</li>
+      <li>多 Agent 编排（10 角色）</li>
+    </ul>
+  </div>
+</div>
+
+<h3>核心判断</h3>
+
+<div class="verdict mix">
+  <h4>🔀 不是替代关系，是互补关系</h4>
+  <p>CBM 是<strong>更好的代码图谱引擎</strong>——比 Orbit 现有实现好一个数量级。</p>
+  <p>Orbit 是<strong>更完整的图谱体系</strong>——数据库/配置/知识/元图谱 + 防幻觉 + 调度器是 CBM 没有的。</p>
+  <p><strong>最佳策略：接 CBM 做代码图谱（MCP sidecar），Orbit 聚焦图谱融合 + 防幻觉 + 领域知识。</strong></p>
+</div>
+
+<h3>一句话总结</h3>
+
+<blockquote style="font-size:1.1em;background:var(--surface);padding:20px 24px;border-radius:8px;border-left:4px solid var(--accent);margin:24px 0;">
+  CBM = 完成了 Orbit 代码图谱引擎的 10 倍版本但用 C 语言编写。<br>
+  连接它以立即获得代码智能。采纳其工具设计 + 查询模式。<br>
+  <strong>不要用 Python 重写 33M 行 C 代码。</strong>
+</blockquote>
+
+<hr>
+
+<footer style="color:var(--muted);font-size:0.85em;margin-top:40px;">
+  <p>报告生成：2026-07-09 &nbsp;|&nbsp; 分析对象：<a href="https://github.com/DeusData/codebase-memory-mcp">DeusData/codebase-memory-mcp</a> v1.x &nbsp;|&nbsp; 对照系统：Orbit（Code-Insight-Financial 子项目）</p>
+  <p>数据来源：GitHub 仓库元数据、README 全文（via gh API）、源代码目录结构。所有性能数据来自 CBM 自述 Benchmark。</p>
+</footer>
+
+</body>
+</html>

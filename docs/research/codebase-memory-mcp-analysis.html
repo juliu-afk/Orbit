@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CBM + OKF 双调研报告 — Orbit 对接/借鉴分析</title>
+<style>
+  :root { --bg:#0d1117; --surface:#161b22; --border:#30363d; --text:#c9d1d9; --muted:#8b949e; --accent:#58a6ff; --green:#3fb950; --red:#f85149; --orange:#d2991d; --purple:#a371f7; --teal:#39c5cf; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.6; max-width:1100px; margin:0 auto; padding:40px 24px; }
+  h1 { font-size:2em; border-bottom:2px solid var(--border); padding-bottom:12px; margin-bottom:8px; }
+  h2 { font-size:1.4em; color:var(--accent); margin:40px 0 16px; border-bottom:1px solid var(--border); padding-bottom:8px; }
+  h3 { font-size:1.15em; margin:28px 0 12px; color:#e6edf3; }
+  .meta { color:var(--muted); font-size:0.9em; margin-bottom:32px; }
+  table { width:100%; border-collapse:collapse; margin:16px 0 24px; font-size:0.92em; }
+  th,td { padding:10px 14px; text-align:left; border:1px solid var(--border); }
+  th { background:var(--surface); font-weight:600; color:#e6edf3; }
+  tr:nth-child(even) { background:#0d1117; } tr:nth-child(odd) { background:#161b22; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.78em; font-weight:600; }
+  .tag-win { background:#1b3a1b; color:var(--green); } .tag-lose { background:#3a1b1b; color:var(--red); }
+  .tag-draw { background:#3a351b; color:var(--orange); } .tag-okf { background:#1b2a3a; color:var(--teal); }
+  .verdict { padding:16px 20px; border-left:4px solid; border-radius:6px; margin:20px 0; background:var(--surface); }
+  .verdict.cbm { border-color:var(--green); } .verdict.orbit { border-color:var(--purple); } .verdict.mix { border-color:var(--accent); } .verdict.okf { border-color:var(--teal); }
+  .verdict h4 { margin-bottom:4px; }
+  .rec { padding:14px 18px; border-radius:6px; margin:12px 0; background:#0d2b1f; border-left:4px solid var(--green); }
+  .rec.okf { background:#0d1f2b; border-left:4px solid var(--teal); }
+  .rec h4 { color:var(--green); margin-bottom:4px; } .rec.okf h4 { color:var(--teal); }
+  ul,ol { padding-left:24px; margin:8px 0 16px; } li { margin:4px 0; }
+  code { background:var(--surface); padding:2px 6px; border-radius:4px; font-size:0.9em; }
+  pre { background:var(--surface); padding:16px; border-radius:6px; overflow-x:auto; font-size:0.85em; line-height:1.5; margin:12px 0 20px; border:1px solid var(--border); }
+  a { color:var(--accent); }
+  .summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .summary-grid.triple { grid-template-columns:1fr 1fr 1fr; }
+  .summary-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:20px; }
+  .summary-card h4 { margin-bottom:12px; font-size:1.05em; display:flex; align-items:center; gap:8px; }
+  .score { font-size:2em; font-weight:700; } .score.green { color:var(--green); } .score.purple { color:var(--purple); } .score.teal { color:var(--teal); }
+  hr { border:none; border-top:1px solid var(--border); margin:40px 0; }
+  .toc { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:20px 24px; margin:24px 0; }
+  .toc ol { margin:0; } .toc a { text-decoration:none; }
+  .phase-timeline { display:flex; gap:16px; margin:20px 0; flex-wrap:wrap; }
+  .phase-card { flex:1; min-width:180px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; }
+  .phase-card .label { font-size:0.8em; color:var(--muted); } .phase-card .title { font-weight:700; margin-top:4px; }
+  .phase-card .effort { font-size:0.85em; color:var(--orange); margin-top:8px; }
+  blockquote { font-size:1.05em; background:var(--surface); padding:20px 24px; border-radius:8px; border-left:4px solid var(--accent); margin:24px 0; }
+  .okf-diagram { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:24px; text-align:center; margin:20px 0; font-family:monospace; }
+  .okf-diagram .box { display:inline-block; border:2px solid var(--teal); border-radius:6px; padding:10px 16px; margin:8px; }
+  .okf-diagram .arrow { color:var(--teal); font-size:1.2em; margin:0 8px; }
+  .stats-row { display:flex; gap:16px; margin:20px 0; flex-wrap:wrap; }
+  .stat-card { flex:1; min-width:120px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; text-align:center; }
+  .stat-card .num { font-size:2em; font-weight:700; color:var(--accent); }
+  .stat-card .label { font-size:0.85em; color:var(--muted); margin-top:4px; }
+  .corrected { background:#1b2a1b; border:1px solid var(--green); border-radius:8px; padding:16px 20px; margin:16px 0; }
+  .corrected h4 { color:var(--green); }
+  .cmp-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  .cmp-col { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; }
+  .cmp-col h4 { margin-bottom:8px; }
+  .cmp-col.orbit-h { border-top:3px solid var(--purple); }
+  .cmp-col.cbm-h { border-top:3px solid var(--green); }
+  .cmp-col.okf-h { border-top:3px solid var(--teal); }
+</style>
+</head>
+<body>
+
+<h1>📊 CBM + OKF 双调研报告</h1>
+<p class="meta">
+  生成日期：2026-07-09 &nbsp;|&nbsp;
+  调研对象：<a href="https://github.com/DeusData/codebase-memory-mcp">DeusData/codebase-memory-mcp</a> +
+  <a href="https://github.com/GoogleCloudPlatform/knowledge-catalog">Google OKF v0.1</a> &nbsp;|&nbsp;
+  对照系统：Orbit（Code-Insight-Financial 子项目）
+</p>
+
+<div class="toc">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#s0">Orbit 代码图谱：现状修正</a></li>
+    <li><a href="#s1">Part A — codebase-memory-mcp 调研</a></li>
+    <li><a href="#s2">Part B — Open Knowledge Format (OKF) 调研</a></li>
+    <li><a href="#s3">Part C — 三方对照：CBM vs OKF vs Orbit</a></li>
+    <li><a href="#s4">行动路线图（合并版）</a></li>
+    <li><a href="#s5">结论</a></li>
+  </ol>
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2 id="s0">0. 修正：Orbit 代码图谱现状</h2>
+<!-- ============================================================ -->
+
+<div class="corrected">
+  <h4>⚠️ 此前"~300 行 ast 凑出来的"不准确——修正如下</h4>
+  <p>Orbit 图谱子系统当前实现远不止一个单文件 ast 解析器：</p>
+</div>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="num">12</div><div class="label">文件数</div></div>
+  <div class="stat-card"><div class="num">1,882</div><div class="label">总行数</div></div>
+  <div class="stat-card"><div class="num">3</div><div class="label">引擎（代码/DB/配置）</div></div>
+  <div class="stat-card"><div class="num">4</div><div class="label">节点类型</div></div>
+  <div class="stat-card"><div class="num">12</div><div class="label">跨图谱关系类型</div></div>
+</div>
+
+<table>
+  <tr><th>模块</th><th>行数</th><th>职责</th><th>状态</th></tr>
+  <tr><td><code>engines/code_graph.py</code></td><td>400</td><td>Python ast 解析：函数/类/变量 + 调用边 + 跨文件 import + 增量更新</td><td>✅ 已实现</td></tr>
+  <tr><td><code>engines/base.py</code></td><td>106</td><td>引擎基类：CRUD + upsert + 按名/按文件查询</td><td>✅ 已实现</td></tr>
+  <tr><td><code>engines/db_graph.py</code></td><td>169</td><td>DDL 反射：表/列/外键 + 增量快照</td><td>✅ 已实现</td></tr>
+  <tr><td><code>engines/config_graph.py</code></td><td>217</td><td>.env + Nginx + docker-compose 解析</td><td>✅ 已实现</td></tr>
+  <tr><td><code>models/nodes.py</code></td><td>105</td><td>CodeNode / DbNode / ConfigNode + 统一 Edge 表</td><td>✅ 已实现</td></tr>
+  <tr><td><code>meta_graph.py</code></td><td>235</td><td>12 种跨图谱关系 + 影响面分析 + 架构腐化检测 + 变更追溯</td><td>✅ 已实现</td></tr>
+  <tr><td><code>tier.py</code></td><td>210</td><td>三级结果分级（preview ≤2KB / full ≤64KB / oversized）</td><td>✅ 已实现</td></tr>
+  <tr><td><code>spectral.py</code></td><td>82</td><td>图谱谱分析（聚类/中心性）</td><td>✅ 已实现</td></tr>
+  <tr><td><code>slicer.py</code></td><td>98</td><td>图谱切片（按模块/目录剪枝）</td><td>✅ 已实现</td></tr>
+  <tr><td><code>test_gap_detector.py</code></td><td>203</td><td>测试覆盖缺口检测</td><td>✅ 已实现</td></tr>
+  <tr><td><code>tda.py</code></td><td>38</td><td>拓扑数据分析</td><td>✅ 已实现</td></tr>
+</table>
+
+<h3>设计文档中的完全体（尚未全部实现）</h3>
+<table>
+  <tr><th>能力</th><th>设计文档（PRD+ADR）描述</th><th>当前实现</th><th>差距</th></tr>
+  <tr>
+    <td>多语言解析</td>
+    <td>Tree-sitter 替代 ast，支持 Python/JS/TS/SQL/YAML/Terraform</td>
+    <td>仅 Python ast</td>
+    <td><span class="tag tag-lose">核心差距——设计文档明确写了 Tree-sitter</span></td>
+  </tr>
+  <tr>
+    <td>数据流分析</td>
+    <td>Def-Use 链（10.1 节："符号定义、调用关系、文件依赖、数据流（Def-Use链）"）</td>
+    <td>仅有调用关系，无数据流</td>
+    <td><span class="tag tag-lose">中</span></td>
+  </tr>
+  <tr>
+    <td>运行时追踪反馈</td>
+    <td>L2 增强：动态追踪捕获 __call/eval 目标，反哺 CodeGraph</td>
+    <td>未实现</td>
+    <td><span class="tag tag-draw">规划中</span></td>
+  </tr>
+  <tr>
+    <td>声明式查询</td>
+    <td>设计文档多处提到 Cypher（Neo4j 上下文），但整体存储已切 SQLite</td>
+    <td>命令式 Python 方法</td>
+    <td><span class="tag tag-draw">SQLite 场景下必要性待评估</span></td>
+  </tr>
+  <tr>
+    <td>图谱间统一查询</td>
+    <td>"Agent 通过统一 query_graph() 接口查询：query_graph(type='code',...)"</td>
+    <td>各引擎独立查询</td>
+    <td><span class="tag tag-draw">小</span></td>
+  </tr>
+  <tr>
+    <td>Git post-commit 增量更新</td>
+    <td>"Git post-commit 钩子增量更新"（10.1 节）</td>
+    <td>手动 incremental_update()</td>
+    <td><span class="tag tag-draw">小</span></td>
+  </tr>
+</table>
+
+<div class="verdict mix">
+  <h4>📐 定位修正</h4>
+  <p>Orbit 代码图谱<strong>当前实现</strong>是 1,882 行多引擎图谱体系——不是"~300 行 ast"。</p>
+  <p>但与设计文档中的<strong>完全体</strong>（Tree-sitter 多语言 + Def-Use + 运行时追踪 + 统一查询接口）仍有差距。单语言 Python ast 解析是当前最大的技术债务——这一点设计文档 Step 3.1 的 ADR 已经明确指出："若需支持多语言，需切换至 Tree-sitter。但 MVP 阶段仅 Python，已规划后续扩展。"</p>
+  <p>下面的 CBM 分析基于<strong>"Orbit 完全体 vs CBM 当前"</strong>的对比，而非"Orbit MVP vs CBM"。</p>
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2 id="s1">Part A — codebase-memory-mcp 调研</h2>
+<!-- ============================================================ -->
+
+<h3>A.1 项目概览</h3>
+<p>纯 C 静态二进制，<strong>零依赖</strong>。Tree-sitter AST 解析 158 种语言 → SQLite 知识图谱 → 14 个 MCP 工具。单一命令安装，覆盖 11 个编程 Agent。MIT 许可证。</p>
+
+<div class="summary-grid">
+  <div class="summary-card">
+    <h4>🏗️ 核心架构</h4>
+    <table>
+      <tr><td>语言</td><td>纯 C（33M 代码），零依赖</td></tr>
+      <tr><td>解析</td><td>Tree-sitter 158 语言（grammar 编译进二进制）</td></tr>
+      <tr><td>存储</td><td>SQLite（LZ4 压缩、内存优先管道、WAL）</td></tr>
+      <tr><td>查询</td><td>openCypher 子集 + 正则 + BFS 遍历</td></tr>
+      <tr><td>语义</td><td>混合 LSP：11 语言类型推断（C 实现）</td></tr>
+      <tr><td>搜索</td><td>BM25 FTS5 + Nomic 代码嵌入（768d int8）</td></tr>
+      <tr><td>MCP</td><td>14 工具（index/search/trace/detect/architecture/ADR…）</td></tr>
+      <tr><td>分发</td><td>单一二进制 + npm/PyPI/Homebrew/Scoop/Winget/AUR</td></tr>
+      <tr><td>可视化</td><td>内置 3D 图谱 UI（localhost:9749）</td></tr>
+    </table>
+  </div>
+  <div class="summary-card">
+    <h4>⚡ 关键指标</h4>
+    <table>
+      <tr><td>Linux 内核全量索引</td><td><strong>3 分钟</strong>（28M 行，75K 文件）</td></tr>
+      <tr><td>Django 全量索引</td><td><strong>~6 秒</strong>（49K 节点，196K 边）</td></tr>
+      <tr><td>Cypher 查询</td><td><strong>&lt;1ms</strong>（关系遍历）</td></tr>
+      <tr><td>死代码检测</td><td>~150ms（全图扫描 + 度过滤）</td></tr>
+      <tr><td>调用路径追踪（depth=5）</td><td>&lt;10ms（BFS 遍历）</td></tr>
+      <tr><td>Token 节省</td><td><strong>99.2%</strong>（3,400 vs 412,000 tokens）</td></tr>
+      <tr><td>团队共享产物</td><td>zstd 压缩 SQLite（8-13:1 压缩比）</td></tr>
+      <tr><td>研究论文</td><td>arXiv:2603.27277（31 仓库评估）</td></tr>
+    </table>
+  </div>
+</div>
+
+<h3>A.2 架构分层</h3>
+<table>
+  <tr><th style="width:15%">层</th><th style="width:42%">CBM 实现</th><th style="width:43%">Orbit 设计文档完全体</th></tr>
+  <tr>
+    <td><strong>解析</strong></td>
+    <td>Tree-sitter 158 语言，编译进二进制<br>通用包解析（package.json/go.mod/Cargo.toml/pyproject.toml 等 10+）</td>
+    <td>Tree-sitter（文档明确指定）→ 当前仅 Python ast<br>包解析：未涉及</td>
+  </tr>
+  <tr>
+    <td><strong>图谱存储</strong></td>
+    <td>SQLite。节点：Project/Package/Folder/File/Module/Class/Function/Method/Interface/Enum/Type/Route/Resource<br>边：15+ 种（CALLS/IMPORTS/HTTP_CALLS/EMITS/LISTENS_ON/DATA_FLOWS/SIMILAR_TO/SEMANTICALLY_RELATED/CROSS_*…）</td>
+    <td>SQLite。节点：CodeNode/DbNode/ConfigNode<br>边：统一 Edge 表（calls/inherits/references/depends…）<br>元图谱 12 种跨图关系<br>审计图谱（第四维度）</td>
+  </tr>
+  <tr>
+    <td><strong>查询</strong></td>
+    <td>openCypher 子集（MATCH/WHERE/WITH/RETURN/ORDER BY/UNION/CASE/EXISTS{}…）<br>BFS trace_path<br>正则 search_graph</td>
+    <td>命令式 Python 方法<br>设计未强制查询语言——SQLite 场景下 Cypher 非必需</td>
+  </tr>
+  <tr>
+    <td><strong>语义</strong></td>
+    <td>混合 LSP：参数绑定/返回类型推断/泛型替换/JSX 组件分发/PHP 命名空间+特质/Java λ/Kotlin 扩展/Rust UFCS（11 语言）</td>
+    <td>未涉及——mypy 诊断仅作辅助</td>
+  </tr>
+  <tr>
+    <td><strong>搜索</strong></td>
+    <td>BM25 FTS5 + Nomic 代码嵌入 768d + 11 信号组合评分</td>
+    <td>BGE 嵌入——仅领域知识图谱，不用于代码搜索</td>
+  </tr>
+  <tr>
+    <td><strong>跨服务</strong></td>
+    <td>HTTP 路由↔调用点匹配 + gRPC/GraphQL/tRPC 检测 + 通道检测（EMITS/LISTENS_ON）</td>
+    <td>无</td>
+  </tr>
+  <tr>
+    <td><strong>IaC</strong></td>
+    <td>Dockerfile/K8s/Kustomize → Resource/Module 节点</td>
+    <td>配置图谱：.env/Nginx/docker-compose<br>无 K8s 支持</td>
+  </tr>
+  <tr>
+    <td><strong>MCP</strong></td>
+    <td>14 工具：index/list/delete/status + search_graph/trace_path/detect_changes/query_graph/get_schema/get_snippet/get_architecture/search_code/manage_adr/ingest_traces</td>
+    <td>4 工具：query_knowledge/find_symbol/find_referencing_symbols/get_symbols_overview</td>
+  </tr>
+  <tr>
+    <td><strong>团队</strong></td>
+    <td>共享图谱产物：.codebase-memory/graph.db.zst（zstd 压缩），提交到 repo，队友解压+增量索引</td>
+    <td>无</td>
+  </tr>
+</table>
+
+<h3>A.3 维度对决（Orbit 完全体 vs CBM）</h3>
+
+<div class="cmp-row">
+  <div class="cmp-col cbm-h">
+    <h4>🏆 CBM 胜</h4>
+    <ul>
+      <li><strong>语言覆盖：</strong>158 vs 1（差距最大）</li>
+      <li><strong>解析引擎：</strong>C 实现 Tree-sitter vs 文档规划</li>
+      <li><strong>查询语言：</strong>openCypher vs 命令式 Python</li>
+      <li><strong>语义搜索：</strong>Nomic 768d 代码嵌入</li>
+      <li><strong>类型推断：</strong>混合 LSP 11 语言</li>
+      <li><strong>索引速度：</strong>C 内存管道 vs Python async</li>
+      <li><strong>MCP 工具数：</strong>14 vs 4</li>
+      <li><strong>团队共享：</strong>zstd 图谱产物</li>
+    </ul>
+  </div>
+  <div class="cmp-col orbit-h">
+    <h4>🏆 Orbit 胜</h4>
+    <ul>
+      <li><strong>数据库图谱：</strong>DDL+MVCC 反射，CBM 无</li>
+      <li><strong>配置图谱：</strong>.env/Nginx/docker-compose</li>
+      <li><strong>元图谱：</strong>12 种跨图关系，CBM 无</li>
+      <li><strong>知识图谱：</strong>财务会计领域本体+BGE</li>
+      <li><strong>审计图谱：</strong>第四维度决策追溯</li>
+      <li><strong>防幻觉集成：</strong>L1-L9 纵深防御</li>
+      <li><strong>调度器联动：</strong>图谱变更→任务失效→重调度</li>
+      <li><strong>三级分级：</strong>preview/full/oversized</li>
+    </ul>
+  </div>
+  <div class="cmp-col okf-h">
+    <h4>🔄 各有所长</h4>
+    <ul>
+      <li><strong>IaC：</strong>CBM 有 K8s，Orbit 有 Nginx/docker-compose——不重叠</li>
+      <li><strong>分发：</strong>CBM 多平台二进制，Orbit PyInstaller+Tauri</li>
+      <li><strong>边丰富度：</strong>CBM 15+ 代码边，Orbit 统一边表+12 跨图关系——不同维度</li>
+    </ul>
+  </div>
+</div>
+
+<h3>A.4 CBM 核心判断</h3>
+<div class="verdict mix">
+  <h4>🔀 代码图谱引擎：CBM 是最佳实现参考，但不是替代方案</h4>
+  <p>Orbit 的差异化在于<strong>多图谱融合</strong>（代码+DB+配置+知识+审计+元图谱 12 种跨图关系）+ <strong>防幻觉纵深防御</strong> + <strong>调度器联动</strong>。CBM 只做代码图谱——但它做到了极致。</p>
+  <p><strong>策略：接 CBM 做 MCP sidecar 获得即时 158 语言代码智能。Orbit 按设计文档路线图推进 Tree-sitter 迁移 + Def-Use + 运行时追踪——完成完全体。</strong></p>
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2 id="s2">Part B — Open Knowledge Format (OKF) 调研</h2>
+<!-- ============================================================ -->
+
+<h3>B.1 是什么</h3>
+<p><strong>Open Knowledge Format (OKF)</strong> 是 Google Cloud 于 2026-06-13 发布的<strong>厂商中立、开放标准</strong>（v0.1）。定义了一套用<strong>纯 Markdown + YAML frontmatter</strong>表示组织知识的格式。零数据库、零专有 SDK、零锁定。</p>
+
+<div class="stats-row">
+  <div class="stat-card"><div class="num">v0.1</div><div class="label">规范版本</div></div>
+  <div class="stat-card"><div class="num">1</div><div class="label">必需字段（type）</div></div>
+  <div class="stat-card"><div class="num">~20</div><div class="label">MCP 工具（okf-mcp）</div></div>
+  <div class="stat-card"><div class="num">6+</div><div class="label">独立实现</div></div>
+</div>
+
+<h3>B.2 核心理念</h3>
+<div class="okf-diagram">
+  <div class="box">Markdown 文件<br>+ YAML frontmatter</div>
+  <span class="arrow">→</span>
+  <div class="box">目录层级<br>（Bundle）</div>
+  <span class="arrow">→</span>
+  <div class="box">Markdown 链接<br>= 有向边</div>
+  <span class="arrow">→</span>
+  <div class="box">知识图谱<br>（链接图）</div>
+  <br><br>
+  <span style="color:var(--muted)">任何人可生产（Agent/人类/脚本）→ 任何人可消费（Agent/人类/可视化工具）</span>
+</div>
+
+<h3>B.3 规范核心（v0.1）</h3>
+
+<table>
+  <tr><th style="width:15%">要素</th><th>规范</th></tr>
+  <tr>
+    <td><strong>Bundle</strong></td>
+    <td>一个目录树。可发布为 git repo / tarball / zip / 大仓库子目录。</td>
+  </tr>
+  <tr>
+    <td><strong>Concept</strong></td>
+    <td>一个 .md 文件 = 一个知识单元。Concept ID = 文件路径去掉 .md。</td>
+  </tr>
+  <tr>
+    <td><strong>Frontmatter</strong></td>
+    <td>YAML，仅 <code>type</code> 必需。推荐：<code>title</code> / <code>description</code> / <code>resource</code> / <code>tags</code> / <code>timestamp</code>。可任意扩展。</td>
+  </tr>
+  <tr>
+    <td><strong>Body</strong></td>
+    <td>标准 Markdown。约定段：<code># Schema</code> / <code># Examples</code> / <code># Citations</code>。</td>
+  </tr>
+  <tr>
+    <td><strong>链接 = 边</strong></td>
+    <td>Markdown 链接自动成为有向边。推荐绝对路径 <code>/tables/orders.md</code>——文件移动后仍稳定。断链是警告，不是错误。</td>
+  </tr>
+  <tr>
+    <td><strong>index.md</strong></td>
+    <td>目录清单——支持渐进披露（Agent 先看 index，再决定打开哪个文件）。无 frontmatter。</td>
+  </tr>
+  <tr>
+    <td><strong>log.md</strong></td>
+    <td>更新历史——ISO 8601 日期分组，最新在前。</td>
+  </tr>
+  <tr>
+    <td><strong>符合性</strong></td>
+    <td>宽松消费：未知 type → 不拒绝；缺可选字段 → 不拒绝；断链 → 不拒绝。故意设计——部分生成的 bundle 仍可用。</td>
+  </tr>
+</table>
+
+<h3>B.4 概念文档示例</h3>
+<pre>---
+type: BigQuery Table
+title: Customer Orders
+description: One row per completed customer order across all channels.
+resource: https://console.cloud.google.com/bigquery?p=acme&d=sales&t=orders
+tags: [sales, orders, revenue]
+timestamp: 2026-05-28T14:30:00Z
+---
+
+# Schema
+| Column        | Type      | Description                              |
+|---------------|-----------|------------------------------------------|
+| `order_id`    | STRING    | Globally unique order identifier.        |
+| `customer_id` | STRING    | FK to [customers](/tables/customers.md). |
+| `total_usd`   | NUMERIC   | Order total in US dollars.               |
+
+Part of the [sales dataset](/datasets/sales.md).
+
+# Citations
+[1] [BigQuery table schema](https://console.cloud.google.com/bigquery?p=acme&d=sales&t=orders)</pre>
+
+<h3>B.5 OKF 生态</h3>
+
+<table>
+  <tr><th>项目</th><th>维护方</th><th>类型</th><th>关键能力</th></tr>
+  <tr>
+    <td><strong>okf-mcp</strong></td>
+    <td>Copperbox (npm v0.9.0)</td>
+    <td>MCP Server</td>
+    <td>~20 工具：list/get/search/neighbors/path/export_graph/validate/write/rename/delete。文件系统优先，无数据库，纯内存索引。支持远程 bundle（GitHub tree URL / tarball）。Git 集成（concept_history/diff）。--watch 自动重载。</td>
+  </tr>
+  <tr>
+    <td><strong>okf-skills</strong></td>
+    <td>xSAVIKx (Go)</td>
+    <td>连接器套件</td>
+    <td>一组确定性连接器：SQLite / MySQL / PostgreSQL / BigQuery / Filesystem / Git / CSV / OpenAPI / MongoDB / GraphQL → 生成 OKF bundle。元 MCP Server 自动发现已安装连接器并暴露为 MCP 工具。</td>
+  </tr>
+  <tr>
+    <td><strong>knowledge-catalog</strong></td>
+    <td>Google Cloud</td>
+    <td>参考实现</td>
+    <td>参考 Agent（BigQuery 元数据 → OKF bundle）+ 内置 Cytoscape.js 可视化器（自包含 HTML）。3 个样例 bundle（GA4 / Stack Overflow / Bitcoin）。</td>
+  </tr>
+  <tr>
+    <td><strong>Kage</strong></td>
+    <td>kage-core</td>
+    <td>验证层</td>
+    <td>OKF 上的验证+新鲜度层：写入时拒绝幻觉引用，代码变更时标记过时记忆。导出符合 OKF 的 bundle + x-kage-* 扩展字段。</td>
+  </tr>
+  <tr>
+    <td><strong>data-olympus</strong></td>
+    <td>knaisoma</td>
+    <td>治理扩展</td>
+    <td>OKF 兼容 profile：稳定 id、受控 type/status/tier、supersedes 链。单写者 MCP 管道 + 建议锁 + 持久推送队列。</td>
+  </tr>
+  <tr>
+    <td><strong>OKFy</strong></td>
+    <td>0dust (npm)</td>
+    <td>文档转换</td>
+    <td>文档网站 + 本地 Markdown 文件夹 → OKF bundle，自动刷新 + MCP serving。</td>
+  </tr>
+  <tr>
+    <td><strong>okf-toolset</strong></td>
+    <td>npm</td>
+    <td>TypeScript 工具包</td>
+    <td>解析/渲染/验证/搜索/嵌入/MCP 注册（作为库）。</td>
+  </tr>
+</table>
+
+<h3>B.6 OKF vs MCP vs llms.txt</h3>
+<div class="cmp-row">
+  <div class="cmp-col">
+    <h4>llms.txt</h4>
+    <p>站点根目录路标文件——指向 AI 应优先阅读的页面。轻量入口。</p>
+  </div>
+  <div class="cmp-col">
+    <h4>OKF</h4>
+    <p>一捆 Markdown 知识文件——交付<strong>完整内容库</strong>。多为内部/团队知识。</p>
+  </div>
+  <div class="cmp-col">
+    <h4>MCP</h4>
+    <p>连接协议——让 Agent 调用工具获取<strong>实时数据</strong>。相当于"图书管理员"。</p>
+  </div>
+</div>
+<p style="text-align:center;margin-top:16px;"><strong>三个标准叠加使用，不互斥。</strong></p>
+
+<h3>B.7 OKF 设计原则（与 Orbit 高度共鸣）</h3>
+<table>
+  <tr><th>原则</th><th>OKF</th><th>Orbit</th></tr>
+  <tr><td>最小意见</td><td>仅 type 必需</td><td>Pydantic 模型严格 schema</td></tr>
+  <tr><td>人+Agent 双读</td><td>cat 可读，Agent 可解析</td><td>CLAUDE.md + AGENTS.md 双格式</td></tr>
+  <tr><td>版本控制优先</td><td>Bundle 在 git 里，diff/blame/review 自然工作</td><td>所有知识文档在 git 里</td></tr>
+  <tr><td>渐进披露</td><td>index.md 让 Agent 先看目录再深入</td><td>三级分级（preview/full/oversized）同理念</td></tr>
+  <tr><td>图状非树状</td><td>Markdown 链接 = 有向边</td><td>元图谱 12 种跨图关系</td></tr>
+  <tr><td>格式 > 平台</td><td>目录即格式，无专有 API</td><td>SQLite 即格式，无专有服务</td></tr>
+  <tr><td>可扩展</td><td>任意额外 frontmatter 键</td><td>JSON meta 字段 + 自定义边类型</td></tr>
+</table>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2 id="s3">Part C — 三方对照</h2>
+<!-- ============================================================ -->
+
+<h3>C.1 定位三角</h3>
+<div class="summary-grid triple">
+  <div class="summary-card">
+    <h4>🧠 CBM</h4>
+    <div class="score green">代码智能引擎</div>
+    <p>高性能、深解析、广覆盖。158 语言 AST → SQLite 知识图谱 → MCP 工具。只管代码。</p>
+    <p><strong>核心价值：</strong>速度 + 精度 + Token 节省</p>
+    <p><strong>不做的：</strong>领域知识、跨图谱融合、Agent 编排</p>
+  </div>
+  <div class="summary-card">
+    <h4>📋 OKF</h4>
+    <div class="score teal">知识交换标准</div>
+    <p>厂商中立、人机双读。Markdown + YAML → 目录 bundle → 链接图。只管知识表示和交换。</p>
+    <p><strong>核心价值：</strong>可移植性 + 可版本化 + 免锁定</p>
+    <p><strong>不做的：</strong>代码解析、实时查询、Agent 工具</p>
+  </div>
+  <div class="summary-card">
+    <h4>🔄 Orbit</h4>
+    <div class="score purple">多 Agent 自循环系统</div>
+    <p>五图谱 + 9 层防幻觉 + 调度器 + 多 Agent 编排。代码+DB+配置+知识+元图谱全覆盖。</p>
+    <p><strong>核心价值：</strong>图谱融合 + 防幻觉纵深 + Agent 闭环</p>
+    <p><strong>不做的：</strong>通用代码智能引擎、知识交换标准</p>
+  </div>
+</div>
+
+<h3>C.2 能力矩阵</h3>
+<table>
+  <tr><th>能力维度</th><th>CBM</th><th>OKF</th><th>Orbit 当前</th><th>Orbit 完全体</th></tr>
+  <tr><td>代码解析</td><td><span class="tag tag-win">158 语言 Tree-sitter</span></td><td><span class="tag tag-lose">无</span></td><td><span class="tag tag-draw">Python ast</span></td><td><span class="tag tag-draw">Tree-sitter 3-5 语言</span></td></tr>
+  <tr><td>代码查询</td><td><span class="tag tag-win">openCypher+正则+BFS</span></td><td><span class="tag tag-lose">无</span></td><td><span class="tag tag-draw">Python 方法</span></td><td><span class="tag tag-draw">方法+可能的声明式层</span></td></tr>
+  <tr><td>代码语义</td><td><span class="tag tag-win">混合 LSP 11 语言</span></td><td><span class="tag tag-lose">无</span></td><td><span class="tag tag-lose">mypy 诊断</span></td><td><span class="tag tag-draw">待评估</span></td></tr>
+  <tr><td>代码搜索</td><td><span class="tag tag-win">BM25+Nomic 嵌入</span></td><td><span class="tag tag-lose">无</span></td><td><span class="tag tag-lose">无代码搜索</span></td><td><span class="tag tag-draw">待规划</span></td></tr>
+  <tr><td>DB 图谱</td><td><span class="tag tag-lose">无</span></td><td><span class="tag tag-draw">okf-skills 连接器可生成</span></td><td><span class="tag tag-win">DDL+MVCC 反射</span></td><td><span class="tag tag-win">同当前</span></td></tr>
+  <tr><td>配置图谱</td><td><span class="tag tag-draw">K8s/Dockerfile</span></td><td><span class="tag tag-draw">okf-skills 连接器可生成</span></td><td><span class="tag tag-win">.env/Nginx/docker-compose</span></td><td><span class="tag tag-win">同当前</span></td></tr>
+  <tr><td>领域知识</td><td><span class="tag tag-lose">无</span></td><td><span class="tag tag-win">原生——OKF 设计目标</span></td><td><span class="tag tag-win">财务会计本体+BGE</span></td><td><span class="tag tag-win">同当前+OKF 导入</span></td></tr>
+  <tr><td>跨图融合</td><td><span class="tag tag-lose">CROSS_* 边（仅跨仓库代码）</span></td><td><span class="tag tag-lose">仅链接图</span></td><td><span class="tag tag-win">12 种跨图关系+审计图</span></td><td><span class="tag tag-win">同当前</span></td></tr>
+  <tr><td>防幻觉</td><td><span class="tag tag-lose">无</span></td><td><span class="tag tag-lose">无</span></td><td><span class="tag tag-win">L1-L9 纵深防御</span></td><td><span class="tag tag-win">同当前</span></td></tr>
+  <tr><td>知识交换</td><td><span class="tag tag-draw">zst 图谱产物（自有格式）</span></td><td><span class="tag tag-win">标准规范——核心价值</span></td><td><span class="tag tag-lose">无标准格式</span></td><td><span class="tag tag-draw">可输出 OKF</span></td></tr>
+  <tr><td>团队共享</td><td><span class="tag tag-win">zst 压缩单文件</span></td><td><span class="tag tag-win">git repo = bundle</span></td><td><span class="tag tag-lose">无</span></td><td><span class="tag tag-draw">可采纳 OKF</span></td></tr>
+  <tr><td>可视化</td><td><span class="tag tag-win">3D 图谱 UI</span></td><td><span class="tag tag-win">Cytoscape.js 自包含 HTML</span></td><td><span class="tag tag-draw">Vue3 驾驶舱</span></td><td><span class="tag tag-draw">同当前</span></td></tr>
+</table>
+
+<h3>C.3 三者如何互补</h3>
+
+<div class="okf-diagram">
+  <div class="box" style="border-color:var(--green)"><strong>CBM</strong><br>代码图谱引擎<br>158 语言 · 毫秒查询</div>
+  <span class="arrow">→ MCP 工具 →</span>
+  <div class="box" style="border-color:var(--purple)"><strong>Orbit</strong><br>多 Agent 编排中枢<br>图谱融合 · 防幻觉 · 调度器</div>
+  <span class="arrow">← OKF bundle ←</span>
+  <div class="box" style="border-color:var(--teal)"><strong>OKF</strong><br>知识交换标准<br>领域知识 · 可版本化 · 可移植</div>
+</div>
+
+<p style="text-align:center;margin-top:12px;"><strong>CBM 处理代码。"是什么调用了什么？"。OKF 处理知识。"这张表代表什么？为什么这样设计？"。Orbit 融合两者 + 自己的 DB/配置图谱 → 完整系统记忆。</strong></p>
+
+<h3>C.4 Orbit 如何用 OKF</h3>
+
+<div class="rec okf">
+  <h4>场景 1：领域知识图谱用 OKF 格式存储</h4>
+  <p>Orbit 当前的财务会计领域知识（<code>knowledge/engine.py</code> + BGE 向量搜索）可以输出为 OKF bundle。好处：</p>
+  <ul>
+    <li>人类会计可以直接用 Obsidian/VS Code 编辑知识——不需要学 SQL</li>
+    <li>版本控制：git diff 看知识变更，blame 看谁改的</li>
+    <li>可移植：知识 bundle 可以独立于 Orbit 分发——给审计师、给客户</li>
+  </ul>
+  <pre>Orbit 领域知识 bundle/
+├── index.md
+├── accounting/
+│   ├── index.md
+│   ├── 小企业会计准则.md
+│   ├── 企业会计准则.md
+│   └── 科目表/
+│       ├── index.md
+│       ├── 资产类.md
+│       └── 负债类.md
+└── tax/
+    ├── index.md
+    └── 增值税.md</pre>
+</div>
+
+<div class="rec okf">
+  <h4>场景 2：用 okf-skills 连接器生成 DB 图谱 OKF 视图</h4>
+  <p>Orbit 已有 <code>db_graph.py</code>，但生成的是内部 SQLite 格式。用 okf-skills 连接器（SQLite/MySQL/PostgreSQL）可自动生成 OKF 格式的数据库文档：</p>
+  <ul>
+    <li>每张表 → 一个 OKF concept（frontmatter: type=Table, resource=DDL 位置）</li>
+    <li>Schema 段 → 自动从 DDL 反射生成</li>
+    <li>外键 → Markdown 链接到被引用表</li>
+    <li>非技术人员可读——不学 SQLAlchemy 也能理解数据模型</li>
+  </ul>
+</div>
+
+<div class="rec okf">
+  <h4>场景 3：OKF 作为 Orbit 的"知识交换 API"</h4>
+  <p>Orbit 内部图谱 → 导出为 OKF bundle → 给外部 Agent（Claude Code / Codex）直接消费。OKF bundle 放在项目根目录 <code>.orbit/knowledge/</code> 下，任何 MCP 客户端都能通过 okf-mcp 读取——不依赖 Orbit 进程。</p>
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2 id="s4">行动路线图（合并版）</h2>
+<!-- ============================================================ -->
+
+<div class="phase-timeline">
+  <div class="phase-card">
+    <div class="label">短期（本周）</div>
+    <div class="title">装 CBM + OKF 格式评估</div>
+    <div class="effort">工作量：2-3h</div>
+    <ol>
+      <li>安装 CBM → Orbit 立即获得 158 语言代码智能</li>
+      <li>从 CBM 14 工具设计学习 → 补 Orbit MCP 的 trace_path + get_architecture</li>
+      <li>评估：Orbit 领域知识图谱 → OKF bundle 导出 PoC</li>
+      <li>评估：okf-skills 连接器能否替代/补充 db_graph 的文档生成</li>
+    </ol>
+  </div>
+  <div class="phase-card">
+    <div class="label">中期（2-4 周）</div>
+    <div class="title">Tree-sitter 迁移 + OKF 集成</div>
+    <div class="effort">工作量：2-3 周</div>
+    <ol>
+      <li>code_graph.py 从 ast → tree-sitter（Python/TS/SQL 先）</li>
+      <li>实现 detect_changes 等价功能 → 调度器智能任务失效</li>
+      <li>领域知识引擎输出 OKF bundle（新增 okf_exporter.py）</li>
+      <li>CLAUDE.md / AGENTS.md 生成器 → OKF 格式输出（双格式）</li>
+    </ol>
+  </div>
+  <div class="phase-card">
+    <div class="label">长期（1-2 月）</div>
+    <div class="title">查询层 + 共享图谱 + 知识治理</div>
+    <div class="effort">工作量：3-4 周</div>
+    <ol>
+      <li>openCypher 查询层覆盖内部图谱引擎（评估 SQLite 场景必要性）</li>
+      <li>共享图谱产物（zstd 压缩）——借鉴 CBM</li>
+      <li>知识治理：OKF supersedes 链 + Kage 风格新鲜度校验</li>
+      <li>评估：混合 LSP 类型推断（Python + TS）投入产出比</li>
+    </ol>
+  </div>
+</div>
+
+<h3>4.1 不做的</h3>
+<ul>
+  <li><strong>不用 Python 重写 CBM：</strong>CBM 33M C 代码的实现深度（混合 LSP / Nomic 嵌入 / openCypher 引擎）用 Python 复制不划算。接 MCP 用即可。</li>
+  <li><strong>不替换 Orbit 内部图谱存储为 OKF：</strong>OKF 是交换格式，不是查询引擎。Orbit 图谱查询需要毫秒级性能——SQLite 是正确选择。OKF 是导出/导入层。</li>
+  <li><strong>不引入 Neo4j：</strong>设计文档早期考虑过 Neo4j（元图谱 ADR），但最终落地为 SQLite。保持 SQLite——CBM 也验证了这个选择的正确性。</li>
+</ul>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2 id="s5">结论</h2>
+<!-- ============================================================ -->
+
+<div class="summary-grid triple">
+  <div class="summary-card">
+    <h4>🧠 CBM → 接</h4>
+    <div class="score green">MCP Sidecar</div>
+    <p>立即获得 158 语言代码智能。<br>Orbit 不用重写代码解析引擎。<br>CBM 专注代码，Orbit 专注融合。</p>
+  </div>
+  <div class="summary-card">
+    <h4>📋 OKF → 学 + 出</h4>
+    <div class="score teal">知识交换层</div>
+    <p>学：设计原则（渐进披露、链接即边、宽松消费）<br>出：领域知识导出为 OKF bundle<br>入：用 okf-skills 连接器丰富 DB 文档</p>
+  </div>
+  <div class="summary-card">
+    <h4>🔄 Orbit → 守 + 建</h4>
+    <div class="score purple">图谱融合中枢</div>
+    <p>守：DB/配置/元图谱 + 防幻觉 + 调度器<br>建：Tree-sitter 迁移 + Def-Use + 运行时追踪<br>完成设计文档中的完全体</p>
+  </div>
+</div>
+
+<h3>核心判断</h3>
+
+<blockquote>
+  <strong>CBM</strong> = 完成了 Orbit 代码图谱引擎的 10 倍版本但用 C 语言编写。接它，不要重写它。<br>
+  <strong>OKF</strong> = Google 刚发布的"知识的 Markdown"。用它做交换层，不要替换内部存储。<br>
+  <strong>Orbit</strong> = 唯一一个把代码+DB+配置+知识+审计五图谱融合 + 9 层防幻觉 + Agent 闭环的系统。这是 CBM 和 OKF 都做不到的。
+</blockquote>
+
+<blockquote style="border-left-color:var(--teal)">
+  <strong>一句话：CBM 做代码大脑，OKF 做知识语言，Orbit 做中枢神经——三个各自最强，接起来才是完整系统记忆。</strong>
+</blockquote>
+
+<hr>
+
+<footer style="color:var(--muted);font-size:0.85em;margin-top:40px;">
+  <p>报告生成：2026-07-09 &nbsp;|&nbsp;
+  调研对象：<a href="https://github.com/DeusData/codebase-memory-mcp">codebase-memory-mcp</a> (MIT) +
+  <a href="https://github.com/GoogleCloudPlatform/knowledge-catalog">Open Knowledge Format v0.1</a> (Google) &nbsp;|&nbsp;
+  对照系统：Orbit（Code-Insight-Financial 子项目）</p>
+  <p>数据来源：GitHub API、gh CLI、README 全文、OKF SPEC.md 全文、npm/Go 生态调研。</p>
+</footer>
+
+</body>
+</html>

@@ -462,3 +462,50 @@ class TestOkfExporter:
             assert count == 0
 
         store.close(cleanup=True)
+
+
+# ── Phase 2 新增：rename_symbol + type_hierarchy 测试 ─────
+
+class TestRenameAndHierarchy:
+    """rename_symbol + type_hierarchy 工具。"""
+
+    @pytest.fixture
+    def server(self) -> Generator[McpServer, None, None]:
+        path = Path(tempfile.mktemp(suffix=".db"))
+        store = KnowledgeStore(db_path=path)
+        store.initialize()
+        s = McpServer(engine=KnowledgeEngine(store=store))
+        _install_mock_graph(s)
+        tmp = tempfile.mkdtemp()
+        s._workspace_dir = tmp
+        (Path(tmp) / "services.py").write_text(
+            "def ProcessOrder():\n    return ProcessOrder()\n",
+            encoding="utf-8",
+        )
+        yield s
+        store.close(cleanup=True)
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    def _call(self, server: McpServer, tool: str, args: dict | None = None) -> Any:
+        raw = server._handle_request({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                       "params": {"name": tool, "arguments": args or {}}})
+        assert raw is not None
+        return json.loads(json.loads(raw)["result"]["content"][0]["text"])
+
+    def test_rename_symbol_updates_file(self, server: McpServer) -> None:
+        result = self._call(server, "rename_symbol", {"symbol": "ProcessOrder", "new_name": "HandleOrder"})
+        assert result["success"] is True
+        assert "HandleOrder" in (Path(server._workspace_dir) / "services.py").read_text(encoding="utf-8")
+
+    def test_rename_symbol_not_found(self, server: McpServer) -> None:
+        result = self._call(server, "rename_symbol", {"symbol": "NoSuchFunc", "new_name": "X"})
+        assert result["success"] is False
+
+    def test_type_hierarchy_finds_relation(self, server: McpServer) -> None:
+        result = self._call(server, "type_hierarchy", {"class_name": "BaseHandler"})
+        assert result["found"] is True and "subtypes" in result
+
+    def test_type_hierarchy_not_found(self, server: McpServer) -> None:
+        result = self._call(server, "type_hierarchy", {"class_name": "NoSuch"})
+        assert result["found"] is False

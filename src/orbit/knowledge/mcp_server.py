@@ -842,8 +842,8 @@ class McpServer:
                 self._run_async(self._code_graph.incremental_update(fpath))
         # 更新 CodeNode.name（不影响 id）
         try:
-            node = self._run_async(self._code_graph.find_node_by_name(
-                type(self._code_graph).__bases__[0], symbol))  # type: ignore
+            from orbit.graph.models.nodes import CodeNode
+            node = self._run_async(self._code_graph.find_node_by_name(CodeNode, symbol))
             if node:
                 node.name = new_name
         except Exception:

@@ -354,6 +354,295 @@ class McpServer:
                 items.append({"name": node.name, "kind": "function", "line": node.lineno})
         return {"file": file_path, "symbols": items}
 
+    # ── Phase 1 新增：图谱查询 handler ──────────────────────
+
+    def _handle_trace_path(
+        self, symbol: str = "", direction: str = "both", max_depth: int = 3, **_: Any
+    ) -> dict[str, Any]:
+        """BFS 追踪函数调用路径。visited set 防同层重复遍历。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        callers_list: list[dict] = []
+        callees_list: list[dict] = []
+        visited_in: set[str] = {symbol}
+        visited_out: set[str] = {symbol}
+
+        if direction in ("in", "both"):
+            current = {symbol}
+            for depth in range(1, max_depth + 1):
+                next_level: set[str] = set()
+                for sym in current:
+                    try:
+                        c = self._run_async(self._code_graph.get_callers(sym))
+                        for caller_name in c:
+                            if caller_name not in visited_in:
+                                visited_in.add(caller_name)
+                                callers_list.append({"caller": caller_name, "target": sym, "depth": depth})
+                                next_level.add(caller_name)
+                    except Exception:
+                        pass
+                current = next_level
+                if not current:
+                    break
+
+        if direction in ("out", "both"):
+            current = {symbol}
+            for depth in range(1, max_depth + 1):
+                next_level: set[str] = set()
+                for sym in current:
+                    try:
+                        c = self._run_async(self._code_graph.get_callees(sym))
+                        for callee_name in c:
+                            if callee_name not in visited_out:
+                                visited_out.add(callee_name)
+                                callees_list.append({"caller": sym, "callee": callee_name, "depth": depth})
+                                next_level.add(callee_name)
+                    except Exception:
+                        pass
+                current = next_level
+                if not current:
+                    break
+
+        return {"symbol": symbol, "max_depth": max_depth, "direction": direction,
+                "callers": callers_list, "callees": callees_list}
+
+    def _handle_get_architecture(self, **_: Any) -> dict[str, Any]:
+        """聚合查询——项目架构概览。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        import collections
+        try:
+            nodes = self._run_async(self._code_graph.get_all_nodes())
+            edges = self._run_async(self._code_graph.get_all_edges())
+        except Exception as e:
+            return {"error": f"查询失败: {e}"}
+        lang_counter: dict[str, int] = collections.Counter()
+        modules: set[str] = set()
+        entry_points: list[dict] = []
+        entry_names = {"main", "app", "create_app", "run", "serve", "start"}
+        functions: list[dict] = []
+        for n in nodes:
+            fp = n.get("file_path", "")
+            if "." in fp:
+                lang_counter[fp.rsplit(".", 1)[-1]] += 1
+            ns = (n.get("meta") or {}).get("namespace", "")
+            if ns:
+                modules.add(ns)
+            name = n.get("name", "")
+            if n.get("type") == "function":
+                functions.append(n)
+                if name in entry_names:
+                    entry_points.append({"name": name, "file": fp, "line": n.get("start_line")})
+        out_degree: dict[str, int] = collections.Counter()
+        for e in edges:
+            if e.get("edge_type") == "calls":
+                out_degree[e.get("source_id", "")] += 1
+        func_degrees = [(f, out_degree.get(f.get("id", ""), 0)) for f in functions]
+        func_degrees.sort(key=lambda x: x[1], reverse=True)
+        hotspots = [{"name": f["name"], "file": f.get("file_path", ""), "call_count": cnt}
+                     for f, cnt in func_degrees[:10] if cnt > 0]
+        return {"languages": dict(lang_counter.most_common()), "module_count": len(modules),
+                "modules": sorted(modules)[:50], "entry_points": entry_points,
+                "hotspots": hotspots, "node_count": len(nodes), "edge_count": len(edges)}
+
+    def _handle_search_code(
+        self, pattern: str = "", file_pattern: str | None = None, **_: Any
+    ) -> dict[str, Any]:
+        """图谱增强 grep——仅搜索已索引文件，结果关联 CodeNode。"""
+        import re, os
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        try:
+            nodes = self._run_async(self._code_graph.get_all_nodes())
+        except Exception as e:
+            return {"error": f"查询节点失败: {e}"}
+        indexed_files: set[str] = {n.get("file_path", "") for n in nodes if n.get("file_path")}
+        files_to_search = [fp for fp in indexed_files
+                           if not file_pattern or re.search(file_pattern, fp)]
+        try:
+            compiled = re.compile(pattern)
+        except re.error as e:
+            return {"error": f"正则模式无效: {e}"}
+        results: list[dict] = []
+        for fp in sorted(files_to_search)[:200]:
+            full_path = os.path.join(self._workspace_dir, fp)
+            try:
+                with open(full_path, encoding="utf-8") as f:
+                    lines = f.readlines()
+            except Exception:
+                continue
+            for i, line in enumerate(lines, start=1):
+                if compiled.search(line):
+                    matching = [{"name": n.get("name"), "type": n.get("type")}
+                                for n in nodes if n.get("file_path") == fp
+                                and n.get("start_line") is not None
+                                and n.get("end_line") is not None
+                                and n["start_line"] <= i <= n["end_line"]]
+                    results.append({"file": fp, "line": i,
+                                    "content": line.strip()[:200], "symbols": matching[:5]})
+                    if len(results) >= 100:
+                        break
+            if len(results) >= 100:
+                break
+        return {"pattern": pattern, "match_count": len(results), "results": results}
+
+    def _handle_dead_code(self, **_: Any) -> dict[str, Any]:
+        """检测零调用者函数（排除入口点白名单）。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        try:
+            nodes = self._run_async(self._code_graph.get_all_nodes())
+            edges = self._run_async(self._code_graph.get_all_edges())
+        except Exception as e:
+            return {"error": f"查询失败: {e}"}
+        entry_whitelist = {"main", "app", "create_app", "run", "serve", "start", "__init__"}
+        called_ids = {e.get("target_id", "") for e in edges if e.get("edge_type") == "calls"}
+        dead = [{"name": n.get("name"), "file": n.get("file_path", ""), "line": n.get("start_line")}
+                for n in nodes if n.get("type") == "function"
+                and n.get("name", "") not in entry_whitelist
+                and n.get("id") not in called_ids]
+        return {"dead_functions": dead, "count": len(dead)}
+
+    def _handle_find_implementations(self, class_name: str = "", **_: Any) -> dict[str, Any]:
+        """查找类的所有子类——通过继承边。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        try:
+            nodes = self._run_async(self._code_graph.get_all_nodes())
+            edges = self._run_async(self._code_graph.get_all_edges())
+        except Exception as e:
+            return {"error": f"查询失败: {e}"}
+        base_id = None
+        for n in nodes:
+            if n.get("name") == class_name and n.get("type") == "class":
+                base_id = n.get("id")
+                break
+        if base_id is None:
+            return {"found": False, "class_name": class_name}
+        sub_ids = {e.get("source_id", "") for e in edges
+                   if e.get("edge_type") in ("inherits",) and e.get("target_id") == base_id}
+        impls = [{"name": n.get("name"), "file": n.get("file_path", ""), "line": n.get("start_line")}
+                 for n in nodes if n.get("id") in sub_ids]
+        return {"found": True, "class_name": class_name, "implementations": impls}
+
+    # ── Phase 1 新增：语义编辑 handler ──────────────────────
+
+    def _get_symbol_location(self, symbol: str) -> dict | None:
+        """查找符号的文件路径和行号范围——编辑工具共用。"""
+        if not self._code_graph:
+            return None
+        try:
+            defs = self._run_async(self._code_graph.find_definitions_with_positions(symbol))
+            return defs[0] if defs else None
+        except Exception:
+            return None
+
+    def _handle_replace_symbol_body(
+        self, symbol: str = "", new_body: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """精确替换符号体——保留 def 行，替换其后的 body。写前备份，失败恢复。"""
+        loc = self._get_symbol_location(symbol)
+        if loc is None:
+            return {"success": False, "error": f"符号 {symbol} 未找到"}
+        file_path = loc["file_path"]
+        start, end = loc["start_line"], loc.get("end_line", loc["start_line"])
+        import os
+        full_path = os.path.join(self._workspace_dir, file_path)
+        try:
+            with open(full_path, encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            return {"success": False, "error": f"读取文件失败: {e}"}
+        backup = "".join(lines)
+        indent = ""
+        def_line = lines[start - 1] if start <= len(lines) else ""
+        if def_line:
+            indent = def_line[:len(def_line) - len(def_line.lstrip())]
+        indented = "\n".join((indent + "    " + ln) if ln.strip() else ""
+                             for ln in new_body.split("\n"))
+        new_lines = lines[:start] + [indented + "\n"] + lines[end:]
+        try:
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+        except Exception as e:
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(backup)
+            return {"success": False, "error": f"写入失败（已恢复原内容）: {e}"}
+        self._run_async(self._code_graph.incremental_update(file_path))
+        return {"success": True, "symbol": symbol, "file": file_path, "old_lines": f"{start}-{end}"}
+
+    def _handle_insert_after_symbol(
+        self, symbol: str = "", code: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """符号结束后插入代码。"""
+        loc = self._get_symbol_location(symbol)
+        if loc is None:
+            return {"success": False, "error": f"符号 {symbol} 未找到"}
+        file_path = loc["file_path"]
+        end = loc.get("end_line", loc["start_line"])
+        import os
+        full_path = os.path.join(self._workspace_dir, file_path)
+        try:
+            with open(full_path, encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+        new_lines = lines[:end] + [ln + "\n" for ln in code.split("\n")] + lines[end:]
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+        self._run_async(self._code_graph.incremental_update(file_path))
+        return {"success": True, "symbol": symbol, "file": file_path, "inserted_after_line": end}
+
+    def _handle_insert_before_symbol(
+        self, symbol: str = "", code: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """符号开始前插入代码。"""
+        loc = self._get_symbol_location(symbol)
+        if loc is None:
+            return {"success": False, "error": f"符号 {symbol} 未找到"}
+        file_path = loc["file_path"]
+        start = loc["start_line"]
+        import os
+        full_path = os.path.join(self._workspace_dir, file_path)
+        try:
+            with open(full_path, encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+        new_lines = lines[:start - 1] + [ln + "\n" for ln in code.split("\n")] + lines[start - 1:]
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+        self._run_async(self._code_graph.incremental_update(file_path))
+        return {"success": True, "symbol": symbol, "file": file_path, "inserted_before_line": start}
+
+    def _handle_safe_delete_symbol(self, symbol: str = "", **_: Any) -> dict[str, Any]:
+        """安全删除——先确认零引用再删代码和图谱节点。"""
+        loc = self._get_symbol_location(symbol)
+        if loc is None:
+            return {"success": False, "error": f"符号 {symbol} 未找到"}
+        try:
+            callers = self._run_async(self._code_graph.get_callers(symbol))
+        except Exception:
+            callers = []
+        if callers:
+            return {"success": False, "symbol": symbol,
+                    "error": f"符号仍有 {len(callers)} 个调用者", "callers": callers[:10]}
+        file_path = loc["file_path"]
+        start, end = loc["start_line"], loc.get("end_line", loc["start_line"])
+        import os
+        full_path = os.path.join(self._workspace_dir, file_path)
+        try:
+            with open(full_path, encoding="utf-8") as f:
+                lines = f.readlines()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.writelines(lines[:start - 1] + lines[end:])
+        self._run_async(self._code_graph.incremental_update(file_path))
+        return {"success": True, "symbol": symbol, "file": file_path, "deleted_lines": f"{start}-{end}"}
+
+    # ── JSON-RPC 请求处理 ──────────────────────────────────
+
     def _handle_request(self, request: dict[str, Any]) -> str | None:
         """处理单个 JSON-RPC 请求，返回响应字符串或 None（通知）。"""
         method = request.get("method", "")

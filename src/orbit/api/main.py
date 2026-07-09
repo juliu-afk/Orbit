@@ -469,6 +469,16 @@ async def _app_lifespan(app: FastAPI) -> None:
     except Exception:
         logger.warning("code_graph_index_failed", directory=_ws_dir, exc_info=True)
 
+    # Phase 3: 后台文件监视——文件变更→自动增量索引
+    # WHY 在这里启动: build_index 之后，watcher 监听到的是增量变更
+    try:
+        from orbit.graph.watcher import GraphWatcher  # noqa: F401
+        _watcher = GraphWatcher(_code_graph_engine, _ws_dir)
+        _watcher.start()
+        logger.info("graph_watcher_started", directory=_ws_dir)
+    except Exception:
+        logger.info("graph_watcher_unavailable", exc_info=True)
+
     # 微信集成——初始化绑定管理器 + 消息通道
     # WHY 条件初始化: npx/cc-weixin 在桌面 exe 环境可能不存在，优雅降级
     try:

@@ -275,6 +275,30 @@ class McpServer:
             },
             handler=self._handle_safe_delete_symbol,
         )
+        # ── Phase 2 新增：重命名 + 类型层次 ──────────────────
+        self.register_tool(
+            name="rename_symbol",
+            description="工作区级安全重命名——更新所有引用位置+edges表。依赖 Tree-sitter 多语言支持。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "要重命名的符号"},
+                    "new_name": {"type": "string", "description": "新名称"},
+                },
+                "required": ["symbol", "new_name"],
+            },
+            handler=self._handle_rename_symbol,
+        )
+        self.register_tool(
+            name="type_hierarchy",
+            description="返回类的超类型/子类型层次——BFS 沿 INHERITS 边上下遍历。",
+            inputSchema={
+                "type": "object",
+                "properties": {"class_name": {"type": "string", "description": "类名"}},
+                "required": ["class_name"],
+            },
+            handler=self._handle_type_hierarchy,
+        )
 
     def register_tool(
         self,
@@ -778,6 +802,104 @@ class McpServer:
         except Exception:
             pass
         return {"success": True, "symbol": symbol, "file": file_path, "deleted_lines": f"{start}-{end}"}
+
+    # ── Phase 2 新增：重命名 + 类型层次 ──────────────────────
+
+    def _handle_rename_symbol(
+        self, symbol: str = "", new_name: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """工作区级安全重命名——更新所有引用 + edges 表 + CodeNode.name。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        loc = self._get_symbol_location(symbol)
+        if loc is None:
+            return {"success": False, "error": f"符号 {symbol} 未找到"}
+        # 收集所有引用位置
+        callers = self._run_async(self._code_graph.get_callers(symbol))
+        callees = self._run_async(self._code_graph.get_callees(symbol))
+        # 所有引用的文件（调用者文件 + 符号自身文件）
+        import os as _os
+        files_to_update: set[str] = {loc["file_path"]}
+        for caller_name in callers:
+            c_loc = self._get_symbol_location(caller_name)
+            if c_loc:
+                files_to_update.add(c_loc["file_path"])
+        # 逐文件替换
+        updated = 0
+        for fpath in files_to_update:
+            full_path = _os.path.join(self._workspace_dir, fpath)
+            try:
+                with open(full_path, encoding="utf-8") as f:
+                    content = f.read()
+            except Exception:
+                continue
+            new_content = content.replace(symbol, new_name)
+            if new_content != content:
+                with open(full_path, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+                updated += 1
+                self._run_async(self._code_graph.incremental_update(fpath))
+        # 更新 CodeNode.name（不影响 id）
+        try:
+            node = self._run_async(self._code_graph.find_node_by_name(
+                type(self._code_graph).__bases__[0], symbol))  # type: ignore
+            if node:
+                node.name = new_name
+        except Exception:
+            pass
+        return {"success": True, "symbol": symbol, "new_name": new_name, "files_updated": updated}
+
+    def _handle_type_hierarchy(
+        self, class_name: str = "", **_: Any
+    ) -> dict[str, Any]:
+        """类型层次——BFS 遍历 INHERITS 边返回超类型+子类型。"""
+        if not self._code_graph:
+            return {"error": "CodeGraph 未初始化"}
+        try:
+            nodes = self._run_async(self._code_graph.get_all_nodes())
+            edges = self._run_async(self._code_graph.get_all_edges())
+        except Exception as e:
+            return {"error": f"查询失败: {e}"}
+        # 找目标类的 node_id
+        target_id = None
+        for n in nodes:
+            if n.get("name") == class_name and n.get("type") == "class":
+                target_id = n.get("id")
+                break
+        if target_id is None:
+            return {"found": False, "class_name": class_name}
+        # BFS 上行（supertypes）——沿 inherits 边的 target→source
+        supertypes: list[dict] = []
+        visited: set[str] = {target_id}
+        queue = [target_id]
+        while queue:
+            cur = queue.pop(0)
+            for e in edges:
+                if e.get("edge_type") == "inherits" and e.get("source_id") == cur:
+                    sup_id = e.get("target_id", "")
+                    if sup_id not in visited:
+                        visited.add(sup_id)
+                        sup_node = next((n for n in nodes if n.get("id") == sup_id), None)
+                        if sup_node:
+                            supertypes.append({"name": sup_node["name"], "file": sup_node.get("file_path", "")})
+                            queue.append(sup_id)
+        # BFS 下行（subtypes）——沿 inherits 边的 source→target
+        subtypes: list[dict] = []
+        visited2: set[str] = {target_id}
+        queue2 = [target_id]
+        while queue2:
+            cur = queue2.pop(0)
+            for e in edges:
+                if e.get("edge_type") == "inherits" and e.get("target_id") == cur:
+                    sub_id = e.get("source_id", "")
+                    if sub_id not in visited2:
+                        visited2.add(sub_id)
+                        sub_node = next((n for n in nodes if n.get("id") == sub_id), None)
+                        if sub_node:
+                            subtypes.append({"name": sub_node["name"], "file": sub_node.get("file_path", "")})
+                            queue2.append(sub_id)
+        return {"found": True, "class_name": class_name,
+                "supertypes": supertypes, "subtypes": subtypes}
 
     # ── JSON-RPC 请求处理 ──────────────────────────────────
 

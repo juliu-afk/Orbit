@@ -96,6 +96,14 @@ class GraphEngineBase:
             )
             return list(result.scalars().all())
 
+    async def find_nodes_by_file(self, model: type, file_path: str) -> list[Any]:
+        """按文件路径查所有节点——供 _build_hierarchy 使用。"""
+        async with self.session_factory() as session:
+            result = await session.execute(
+                select(model).where(model.file_path == file_path)  # type: ignore[attr-defined]
+            )
+            return list(result.scalars().all())
+
     async def clear_all(self, model: type) -> int:
         """清空某图谱的所有节点（重建索引用）。"""
         async with self.session_factory() as session:

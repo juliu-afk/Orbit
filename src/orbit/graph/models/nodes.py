@@ -44,6 +44,7 @@ class CodeNode(Base, BaseNode):
     """代码图谱节点：函数/类/模块/变量等源码符号。
 
     数据来源：Tree-sitter 解析源码（Step 3.1）。
+    Phase 3: parent_id ——节点层级（Module→Class→Method）。
     """
 
     __tablename__ = "code_nodes"
@@ -51,6 +52,8 @@ class CodeNode(Base, BaseNode):
     file_path: Mapped[str] = mapped_column(String(512), nullable=False, index=True)
     start_line: Mapped[int | None] = mapped_column(Integer)
     end_line: Mapped[int | None] = mapped_column(Integer)
+    # Phase 3: 节点层级——父节点引用（Module/Class/Function 嵌套）
+    parent_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
 
 class DbNode(Base, BaseNode):

@@ -140,7 +140,34 @@ class CodeGraphEngine(GraphEngineBase):
         await self._extract_imports(tree, str(path))
         # Phase 3: DATA_FLOWS——变量赋值→使用链
         await self._extract_data_flows(tree, str(path))
+        # Phase 3: 节点层级——建模块节点 + CONTAINS 边
+        await self._build_hierarchy(str(path))
         return True
+
+    async def _build_hierarchy(self, file_path: str) -> None:
+        """为文件创建 Module 节点并链接所有符号→CONTAINS 边。
+
+        WHY: 节点层级（Module→Class→Function）让 Agent 能做
+        "这个模块有哪些符号？" 的结构化查询。
+        """
+        # 创建 Module 节点（按文件路径）
+        module_name = file_path.replace("\\", "/").rsplit("/", 1)[-1].rsplit(".", 1)[0]
+        module_id = uuid.uuid4().hex
+        await self.upsert_node(
+            CodeNode, module_id, name=module_name, type="module",
+            file_path=file_path, start_line=0, end_line=0,
+            meta={"namespace": file_path},
+        )
+        # 查该文件下所有符号 → 建 CONTAINS 边
+        file_nodes = await self.find_nodes_by_file(CodeNode, file_path)
+        for node in file_nodes:
+            if node.id == module_id:
+                continue
+            await self.add_edge(
+                source_id=module_id, source_type="code",
+                target_id=node.id, target_type="code",
+                edge_type="contains",
+            )
 
     async def _extract_data_flows(self, tree: ast.AST, file_path: str) -> None:
         """提取函数内变量赋值→使用关系为 DATA_FLOWS 边。
@@ -198,6 +225,8 @@ class CodeGraphEngine(GraphEngineBase):
         await self.delete_nodes_by_file(CodeNode, str(path))
         root = tree.root_node
         await self._walk_ts_tree(root, content, str(path))
+        # Phase 3: 节点层级——建模块节点 + CONTAINS 边
+        await self._build_hierarchy(str(path))
         return True
 
     async def _walk_ts_tree(self, node, source: str, file_path: str) -> None:

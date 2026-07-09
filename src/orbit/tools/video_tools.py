@@ -344,34 +344,35 @@ async def watch_video(
         }
 
     finally:
-        # 清理临时文件
-        if not is_local and os.path.exists(work_dir):
+        # P2-B fix: 始终清理临时目录（本地文件模式也清理空 work_dir）
+        if os.path.exists(work_dir):
             shutil.rmtree(work_dir, ignore_errors=True)
 
 
 # ── 辅助函数 ──
 
-# P2-1: SSRF 防护——内网/保留地址黑名单
-BLOCKED_URL_PREFIXES = (
-    "http://127.", "http://localhost", "http://10.",
-    "http://172.16.", "http://172.17.", "http://172.18.",
-    "http://172.19.", "http://172.20.", "http://172.21.",
-    "http://172.22.", "http://172.23.", "http://172.24.",
-    "http://172.25.", "http://172.26.", "http://172.27.",
-    "http://172.28.", "http://172.29.", "http://172.30.",
-    "http://172.31.", "http://192.168.", "http://169.254.",
-    "http://0.", "http://[::1]",
+# P2-1 + P2-A: SSRF 防护——匹配 host（协议无关），防止 https:// 绕过
+BLOCKED_HOSTS = (
+    "127.", "localhost", "10.",
+    "172.16.", "172.17.", "172.18.", "172.19.", "172.20.",
+    "172.21.", "172.22.", "172.23.", "172.24.", "172.25.",
+    "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.",
+    "192.168.", "169.254.", "0.", "[::1]",
 )
 
 
 def _validate_url(url: str) -> None:
-    """检查 URL 是否安全——拒绝内网/保留地址（SSRF 防护）。"""
+    """检查 URL 是否安全——拒绝内网/保留地址（SSRF 防护）。
+    P2-A fix: strip 协议后匹配 host——防止 https://127.0.0.1 绕过。
+    """
     url_lower = url.lower().strip()
-    for prefix in BLOCKED_URL_PREFIXES:
-        if url_lower.startswith(prefix):
-            raise ValueError(f"禁止访问内网地址: {url[:80]}")
     if not url_lower.startswith(("http://", "https://")):
         raise ValueError(f"仅支持 HTTP/HTTPS URL: {url[:80]}")
+
+    host = url_lower.split("://", 1)[1].split("/", 1)[0].split(":")[0]
+    for blocked in BLOCKED_HOSTS:
+        if host.startswith(blocked) or host == blocked.strip("."):
+            raise ValueError(f"禁止访问内网地址: {url[:80]}")
 
 
 async def _get_duration(video_path: str) -> float | None:

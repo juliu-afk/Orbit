@@ -149,6 +149,10 @@ class CodeGraphEngine(GraphEngineBase):
 
         WHY: 节点层级（Module→Class→Function）让 Agent 能做
         "这个模块有哪些符号？" 的结构化查询。
+
+        P2-3: parent_id 和 CONTAINS 边表达同一关系（Module 包含 Symbol）。
+        两者在同一方法内写入——parent_id 为 SQL 查询加速，CONTAINS 为图遍历。
+        增量更新时 delete_nodes_by_file 同时清理旧节点+旧边，不会悬挂。
         """
         # P2-1 fix: 用去扩展名+去前导src/的相对路径做唯一 module_name
         clean = file_path.replace("\\", "/")
@@ -161,18 +165,26 @@ class CodeGraphEngine(GraphEngineBase):
             file_path=file_path, start_line=0, end_line=0,
             meta={"namespace": file_path},
         )
-        # 查该文件下所有符号 → 建 CONTAINS 边 + 设 parent_id
+        # 查该文件下所有符号 → 建 CONTAINS 边
         file_nodes = await self.find_nodes_by_file(CodeNode, file_path)
         for node in file_nodes:
             if node.id == module_id:
                 continue
-            # P1-1 fix: 设 parent_id——Module→Symbol 层级
-            node.parent_id = module_id
             await self.add_edge(
                 source_id=module_id, source_type="code",
                 target_id=node.id, target_type="code",
                 edge_type="contains",
             )
+        # P0-1 fix: 用 UPDATE 批量设 parent_id——detached 对象 setattr 不持久化
+        from sqlalchemy import update as sa_update
+        async with self.session_factory() as session:
+            stmt = (
+                sa_update(CodeNode)
+                .where(CodeNode.file_path == file_path, CodeNode.id != module_id)
+                .values(parent_id=module_id)
+            )
+            await session.execute(stmt)
+            await session.commit()
 
     async def _extract_data_flows(self, tree: ast.AST, file_path: str) -> None:
         """提取函数内变量赋值→使用关系为 DATA_FLOWS 边。

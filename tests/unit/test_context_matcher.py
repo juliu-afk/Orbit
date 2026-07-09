@@ -15,8 +15,7 @@ class TestContextMatcher:
             assert len(result.candidates) > 0
             assert result.candidates[0].project_name == "Orbit"
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
     def test_match_by_tag(self) -> None:
         reg = _seeded_registry()
@@ -25,8 +24,7 @@ class TestContextMatcher:
             result = matcher.match("agent 系统调度延迟高")
             assert any(c.project_name == "Orbit" for c in result.candidates)
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
     def test_match_by_description(self) -> None:
         reg = _seeded_registry()
@@ -36,8 +34,7 @@ class TestContextMatcher:
             # Finite description 含"财务"
             assert any(c.project_name == "Finite" for c in result.candidates)
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
     def test_match_chinese_query(self) -> None:
         """中文输入"支付超时了修一下"→匹配到含"支付"描述的项目。"""
@@ -53,8 +50,7 @@ class TestContextMatcher:
             assert result.candidates[0].project_name == "PaymentService"
             assert len(result.keywords) > 0
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
     def test_no_match_fallback(self) -> None:
         reg = _seeded_registry()
@@ -64,8 +60,7 @@ class TestContextMatcher:
             assert result.source == "fallback"
             assert result.requires_confirmation is True
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
     def test_empty_query_fallback(self) -> None:
         reg = _seeded_registry()
@@ -74,8 +69,7 @@ class TestContextMatcher:
             result = matcher.match("。，！")
             assert result.source == "fallback"
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
     def test_session_history_priority(self) -> None:
         reg = _seeded_registry()
@@ -86,8 +80,7 @@ class TestContextMatcher:
             assert result.candidates[0].project_name == "Keshen"
             assert result.requires_confirmation is False
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
     def test_high_confidence_no_confirmation(self) -> None:
         """单候选 >0.8 分且无竞品时无需确认。"""
@@ -101,8 +94,7 @@ class TestContextMatcher:
             if result.candidates[0].score > 0.8 and len(result.candidates) == 1:
                 assert result.requires_confirmation is False
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
     def test_stop_words_filtered(self) -> None:
         reg = _seeded_registry()
@@ -115,8 +107,7 @@ class TestContextMatcher:
             assert "我" not in keywords
             assert "一下" not in keywords
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
     def test_result_to_dict(self) -> None:
         reg = _seeded_registry()
@@ -128,35 +119,38 @@ class TestContextMatcher:
             assert len(d["candidates"]) <= 5
             assert "source" in d
         finally:
-            reg.close()
-            _cleanup()
+            _cleanup(reg)
 
 
 # ── 辅助 ─────────────────────────────────────────────────
 
 
 def _seeded_registry() -> ProjectRegistry:
-    """预填测试数据的注册表。"""
-    reg = ProjectRegistry()
+    """预填测试数据的注册表——使用内存 DB 隔离。"""
+    # WHY 内存 DB: 默认 data/projects.db 被 test_projects.py/test_chat_api.py
+    # 共享，_cleanup() 批量 deactivate 会互相污染，导致全量运行时间歇失败。
+    reg = ProjectRegistry(db_path=":memory:")
     reg.register(
         "Orbit",
         repo_url="https://github.com/juliu-afk/Orbit",
         description="多Agent开发自循环系统",
         tags=["agent", "python", "llm", "调度"],
     )
-    reg.register("Finite", description="财务数据分析平台", tags=["财务", "python", "数据分析"])
     reg.register(
-        "Keshen", description="财务软件——凭证录入/报表", tags=["财务", "会计", "react", "python"]
+        "Finite",
+        repo_url="",
+        description="财务数据分析平台",
+        tags=["财务", "python", "数据分析"],
+    )
+    reg.register(
+        "Keshen",
+        repo_url="",
+        description="财务软件——凭证录入/报表",
+        tags=["财务", "会计", "react", "python"],
     )
     return reg
 
 
-def _cleanup() -> None:
-    # WHY 不能删 DB 文件: chat.py 模块级 ProjectRegistry 保持连接，
-    # 删文件会 PermissionError。用 deactivate 清理测试数据。
-    reg = ProjectRegistry()
-    try:
-        for name in ("Orbit", "Finite", "Keshen", "PaymentService", "OrbitAgent"):
-            reg.deactivate(name)
-    finally:
-        reg.close()
+def _cleanup(reg: ProjectRegistry) -> None:
+    """清理——关闭测试专用 DB 连接即可（内存 DB 自动销毁）。"""
+    reg.close()

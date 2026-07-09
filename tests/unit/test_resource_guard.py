@@ -19,37 +19,37 @@ from orbit.resource_guard.token_bucket import TokenBucket
 class TestTokenBucket:
     """令牌桶——创建/消费/补充/拒绝。"""
 
-    def test_allow_within_capacity(self) -> None:
+    async def test_allow_within_capacity(self) -> None:
         bucket = TokenBucket(capacity=100, rate=10)
-        assert bucket.allow(30) is True
+        assert await bucket.allow(30) is True
         assert bucket.available < 100  # 已消耗
 
-    def test_allow_exact_available(self) -> None:
+    async def test_allow_exact_available(self) -> None:
         bucket = TokenBucket(capacity=50, rate=10)
-        assert bucket.allow(50) is True
-        assert bucket.allow(1) is False  # 耗尽
+        assert await bucket.allow(50) is True
+        assert await bucket.allow(1) is False  # 耗尽
 
-    def test_allow_exceeds_available(self) -> None:
+    async def test_allow_exceeds_available(self) -> None:
         bucket = TokenBucket(capacity=10, rate=1)
         bucket._tokens = 0  # 强制排空
-        assert bucket.allow(5) is False
+        assert await bucket.allow(5) is False
 
-    def test_refill_over_time(self) -> None:
+    async def test_refill_over_time(self) -> None:
         bucket = TokenBucket(capacity=100, rate=100)  # 100 tokens/s
         bucket._tokens = 0
         bucket._last_refill = time.monotonic() - 0.5  # 0.5s 前
         # 0.5s * 100/s = 50 tokens refilled
-        assert bucket.allow(40) is True
+        assert await bucket.allow(40) is True
 
-    def test_burst_tolerance(self) -> None:
+    async def test_burst_tolerance(self) -> None:
         """令牌桶允许突发: 满桶时可一次性消耗所有令牌。"""
         bucket = TokenBucket(capacity=5000, rate=100)
-        assert bucket.allow(5000) is True  # 突发通过
-        assert bucket.allow(1) is False  # 然后被限流
+        assert await bucket.allow(5000) is True  # 突发通过
+        assert await bucket.allow(1) is False  # 然后被限流
 
-    def test_reset(self) -> None:
+    async def test_reset(self) -> None:
         bucket = TokenBucket(capacity=100, rate=10)
-        bucket.allow(80)
+        await bucket.allow(80)
         bucket.reset()
         assert bucket.available == 100.0
 
@@ -162,33 +162,33 @@ class TestDegradationPath:
 class TestResourceGuard:
     """ResourceGuard 主入口——组合判断/状态转换/审计。"""
 
-    def test_guard_request_allow(self) -> None:
+    async def test_guard_request_allow(self) -> None:
         guard = ResourceGuard()
         guard.set_budget("t1", 50000)
-        r = guard.guard_request("t1", 500)
+        r = await guard.guard_request("t1", 500)
         assert r.decision == GuardDecision.ALLOW
 
-    def test_guard_token_bucket_empty(self) -> None:
+    async def test_guard_token_bucket_empty(self) -> None:
         bucket = TokenBucket(capacity=10, rate=1)
         bucket._tokens = 0
         guard = ResourceGuard(token_bucket=bucket)
-        r = guard.guard_request("t1", 50)
+        r = await guard.guard_request("t1", 50)
         assert r.decision == GuardDecision.DENY
         assert "TOKEN_BUCKET" in r.reason
 
-    def test_guard_task_over_budget(self) -> None:
+    async def test_guard_task_over_budget(self) -> None:
         guard = ResourceGuard()
         guard.set_budget("t1", 100)
         guard._budget.record_usage("t1", 999)
-        r = guard.guard_request("t1", 10)
+        r = await guard.guard_request("t1", 10)
         assert r.decision == GuardDecision.DENY
         assert "TOKEN_EXCEEDED" in r.reason
 
-    def test_circuit_opens_after_5_failures(self) -> None:
+    async def test_circuit_opens_after_5_failures(self) -> None:
         guard = ResourceGuard()
         for _ in range(5):
             guard.record_result("tx", success=False)
-        r = guard.guard_request("tx", 10)
+        r = await guard.guard_request("tx", 10)
         assert r.decision == GuardDecision.DENY
         # P0 消重: _state→_circuit (GatewayCircuitState)
         assert guard._circuit.opened_at is not None
@@ -261,13 +261,13 @@ class TestResourceGuard:
 class TestResourceGuardPerf:
     """SC1: allow_request() P99 <12ms。"""
 
-    def test_allow_request_p99_under_12ms(self) -> None:
+    async def test_allow_request_p99_under_12ms(self) -> None:
         guard = ResourceGuard()
         guard.set_budget("perf-test", 1000000)
         latencies: list[float] = []
         for _ in range(5000):
             start = time.perf_counter()
-            guard.guard_request("perf-test", estimated_tokens=100)
+            await guard.guard_request("perf-test", estimated_tokens=100)
             latencies.append((time.perf_counter() - start) * 1000)
         latencies.sort()
         p99_index = int(len(latencies) * 0.99)
@@ -275,13 +275,13 @@ class TestResourceGuardPerf:
         assert p99 < 12, f"P99 latency {p99:.3f}ms exceeds 12ms"
 
     @pytest.mark.slow
-    def test_allow_request_10000(self) -> None:
+    async def test_allow_request_10000(self) -> None:
         """10000 次调用 benchmark。"""
         guard = ResourceGuard()
         guard.set_budget("bench", 1000000)
         start = time.perf_counter()
         for i in range(10000):
-            guard.guard_request("bench", estimated_tokens=100)
+            await guard.guard_request("bench", estimated_tokens=100)
             guard.record_result("bench", success=i % 10 != 0, tokens_used=50)
         total = time.perf_counter() - start
         # 10000 次应在 12ms * 10000 = 120s 内完成, 实际目标 <<1s

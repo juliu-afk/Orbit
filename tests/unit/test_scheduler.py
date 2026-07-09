@@ -265,7 +265,7 @@ async def test_resume_mid_state_continues():
     AgentFactory.register(AgentRole.REVIEWER, MockAgent)
 
     sched = Scheduler(
-        agent_llms={},
+        agent_llms={"fallback": MagicMock()},
         checkpoint_manager=FakeCheckpoint("CODING", {"prd": "x"}),
         agent_factory=AgentFactory,
     )

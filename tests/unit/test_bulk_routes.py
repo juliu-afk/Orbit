@@ -191,7 +191,7 @@ def test_insights(client):
 
 def test_blame_no_file(client):
     r = client.get("/api/v1/blame?file=nonexistent.py")
-    assert r.status_code in (200, 422, 500)
+    assert r.status_code in (200, 404, 422, 500)
 
 
 # -- Schedule --

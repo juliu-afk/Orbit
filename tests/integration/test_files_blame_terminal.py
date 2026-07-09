@@ -20,20 +20,20 @@ from httpx import ASGITransport, AsyncClient
 class MockFileService:
     """Mock FileService for files routes."""
 
-    async def list_files(self):
+    async def list_files(self, directory: str | None = None):
         from orbit.files.service import FileInfo
 
         from orbit.files.service import FileStatus
 
         return [FileInfo(path="src/main.py", size=100, status=FileStatus.UNCHANGED)]
 
-    async def read_file(self, path: str):
+    async def read_file(self, path: str, directory: str | None = None):
         return f"# Content of {path}"
 
     def detect_language(self, path: str) -> str:
         return "python"
 
-    async def diff(self, path: str, rev_a: str, rev_b: str | None) -> dict:
+    async def diff(self, path: str, rev_a: str, rev_b: str | None, directory: str | None = None) -> dict:
         return {"path": path, "diff": f"diff between {rev_a} and {rev_b or 'HEAD'}"}
 
 

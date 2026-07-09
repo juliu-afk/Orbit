@@ -52,17 +52,17 @@ def _transition(current: TaskState, fast_lane: bool = False) -> TaskState:
 
 
 def _state_to_progress(state: TaskState) -> float:
-    """状态→进度百分比."""
+    """状态→进度比例（0.0-1.0，匹配 CheckpointData.progress 约束）。"""
     progress_map = {
         TaskState.IDLE: 0.0,
-        TaskState.PARSING: 10.0,
-        TaskState.SCOPING: 20.0,
-        TaskState.PLANNING: 30.0,
-        TaskState.CODING: 60.0,
-        TaskState.VERIFYING: 85.0,
-        TaskState.DONE: 100.0,
-        TaskState.FAILED: 100.0,
-        TaskState.CANCELLED: 100.0,
+        TaskState.PARSING: 0.10,
+        TaskState.SCOPING: 0.20,
+        TaskState.PLANNING: 0.30,
+        TaskState.CODING: 0.60,
+        TaskState.VERIFYING: 0.85,
+        TaskState.DONE: 1.0,
+        TaskState.FAILED: 1.0,
+        TaskState.CANCELLED: 1.0,
     }
     return progress_map.get(state, 0.0)
 

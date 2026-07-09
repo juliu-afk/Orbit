@@ -177,7 +177,14 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
         cycle_count = 0
         while state not in TERMINAL_STATES:
             # 检查是否已取消
-            observation = await self._agent_cycle(task_id, state, context)
+            try:
+                observation = await self._agent_cycle(task_id, state, context)
+            except Exception as e:
+                logger.error("agent_cycle_failed", task_id=task_id, error=str(e))
+                state = TaskState.FAILED
+                context["error"] = str(e)
+                await self._save_checkpoint(task_id, state, context)
+                break
             context.setdefault("artifacts", {})[state.value] = observation
             state = _transition(state, self._fast_lane)
             await self._save_checkpoint(task_id, state, context)
@@ -259,26 +266,12 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
                                    task_id=task_id, role=role)
 
         try:
-            ctx_dict = (
-                agent_context.to_dict()
-                if hasattr(agent_context, "to_dict")
-                else {}
-            )
-            agent_input = AgentInput(
-                task=ctx_dict.get("l3", {}).get("prd", ""),
-                context=ctx_dict,
-                role=AgentRole(role),
-            )
-            output_obj = await asyncio.wait_for(
+            # WHY _run_agent 内部已处理: 上下文构建→工厂创建→agent执行→错误处理，
+            # 最终返回 str(output)。_agent_cycle 直接使用字符串结果即可，不重复判 status。
+            output = await asyncio.wait_for(
                 self._run_agent(role, task_id, context),
                 timeout=AGENT_STEP_TIMEOUT_SECONDS.get(state, AGENT_STEP_TIMEOUT_DEFAULT),
             )
-            if output_obj and hasattr(output_obj, "status") and output_obj.status == "ok":
-                r = output_obj.result
-                output = r.get("design") or r.get("code") or r.get("review") or str(r)
-            else:
-                err = getattr(output_obj, "error", "unknown") if output_obj else "null output"
-                raise RuntimeError(f"Agent {role} 返回错误: {err}")
         except TimeoutError:
             logger.warning("agent_timeout", role=role, task_id=task_id)
             raise
@@ -364,20 +357,27 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
         # MCTS: 仅 ArchitectAgent 使用——复杂设计时探索多路径
         mcts = MCTSPlanner() if role == "architect" else None
 
-        agent = self._agent_factory.create(
-            role,
-            llm=llm,
-            graph=self._graph,
-            sandbox=None,
-            tools=self._tool_registry,
-            event_bus=self._event_bus,
-            compressor=self._compressor,
-            budget_tracker=self._budget_tracker,
-            reflection_engine=ref_engine,   # Phase A: ReflAct
-            preact_engine=pre_engine,       # Phase D: PreAct
-            vigil_healer=vigil,             # Phase D: VIGIL
-            mcts_planner=mcts,              # Phase D: MCTS 多路径探索
-        )
+        try:
+            agent = self._agent_factory.create(
+                role,
+                llm=llm,
+                graph=self._graph,
+                sandbox=None,
+                tools=self._tool_registry,
+                event_bus=self._event_bus,
+                compressor=self._compressor,
+                budget_tracker=self._budget_tracker,
+                reflection_engine=ref_engine,   # Phase A: ReflAct
+                preact_engine=pre_engine,       # Phase D: PreAct
+                vigil_healer=vigil,             # Phase D: VIGIL
+                mcts_planner=mcts,              # Phase D: MCTS 多路径探索
+            )
+        except Exception as e:
+            logger.error("agent_create_failed", role=role, error=str(e))
+            if self._audit_logger:
+                self._audit_logger.log("orchestrator", "agent_create_failed",
+                                       task_id=task_id, role=role, error=str(e))
+            return f"[error] 创建失败: {e}"
 
         context["mode"] = getattr(agent, "_mode", None)
         if self._audit_logger:

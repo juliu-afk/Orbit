@@ -113,6 +113,9 @@ async def get_coverage(limit: int = Query(50, ge=1, le=200)):
         summary = info.get("summary", {})
         total = summary.get("num_statements", 0)
         missing = summary.get("missing_lines", [])
+        # WHY: coverage.json 可能把 missing_lines 存成 int(0) 而非 list，Pydantic 拒绝 int
+        if not isinstance(missing, list):
+            missing = []
         pct = round((total - len(missing)) / total * 100, 1) if total > 0 else 100.0
         rel = os.path.relpath(fp, ws).replace("\\", "/")
         files.append(CoverageFile(path=rel, pct=pct, missing_lines=missing))

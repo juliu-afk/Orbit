@@ -326,7 +326,7 @@ class ToolRegistry:
         if name in self._tools:
             return str(self.invoke(name, args, agent_name=agent_name))
 
-        raise ToolNotFoundError(f"工具不存在: {name}")
+        return f"error: 工具不存在: {name}"
 
     async def _dispatch_entry(self, entry: ToolEntry, args: dict[str, Any]) -> str:
         """执行 ToolEntry——截断 + 错误处理."""

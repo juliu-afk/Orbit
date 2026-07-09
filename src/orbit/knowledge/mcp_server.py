@@ -3,11 +3,11 @@
 WHY 手写而非 mcp SDK：MVP 阶段零额外依赖。
 MCP 协议足够简单（JSON-RPC 2.0 + tools/list + tools/call）。
 
-19 个 MCP 工具：query_knowledge + find_symbol + find_referencing_symbols +
+20 个 MCP 工具：query_knowledge + find_symbol + find_referencing_symbols +
 get_symbols_overview + trace_path + get_architecture + search_code + dead_code +
 find_implementations + replace_symbol_body + insert_after/before_symbol +
 safe_delete_symbol + rename_symbol + type_hierarchy +
-query_graph + detect_changes + export_graph_artifact + okf_import
+query_graph + detect_changes + export_graph_artifact + okf_import + okf_export
 
 协议规范：https://spec.modelcontextprotocol.io/
 """
@@ -322,6 +322,16 @@ class McpServer:
                 "required": ["bundle_dir"],
             },
             handler=self._handle_okf_import,
+        )
+        self.register_tool(
+            name="okf_export",
+            description="导出知识图谱为 OKF bundle——人类可用 Obsidian/VS Code 编辑。",
+            inputSchema={
+                "type": "object",
+                "properties": {"output_dir": {"type": "string", "default": ".orbit/knowledge"}},
+                "required": [],
+            },
+            handler=self._handle_okf_export,
         )
         # ── Phase 2 新增：重命名 + 类型层次 ──────────────────
         self.register_tool(
@@ -992,6 +1002,18 @@ class McpServer:
             importer = OkfImporter(self._engine)
             count = importer.import_bundle(bundle_dir)
             return {"success": True, "imported": count, "bundle_dir": bundle_dir}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def _handle_okf_export(self, output_dir: str = ".orbit/knowledge", **_: Any) -> dict[str, Any]:
+        """导出知识图谱为 OKF bundle。"""
+        try:
+            from orbit.knowledge.okf_exporter import OkfExporter
+            exporter = OkfExporter(self._engine)
+            count = exporter.export(output_dir)
+            exporter.generate_index(output_dir)
+            exporter.generate_log(output_dir)
+            return {"success": True, "exported": count, "output_dir": output_dir}
         except Exception as e:
             return {"success": False, "error": str(e)}
 

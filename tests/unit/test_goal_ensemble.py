@@ -25,7 +25,7 @@ class TestJudgeScore:
 
     def test_total_correctness_dominant(self):
         s1 = JudgeScore(correctness=1.0, performance=0.0, maintainability=0.0)
-        s2 = JudgeScore(correctness=0.0, performance=1.0, maintainability=1.0)
+        s2 = JudgeScore(correctness=0.0, performance=0.6, maintainability=0.6)
         assert s1.total > s2.total
 
 

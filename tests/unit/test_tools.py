@@ -135,8 +135,8 @@ class TestToolRegistryNew:
     @pytest.mark.asyncio
     async def test_dispatch_not_found(self, registry):
         """dispatch——工具不存在."""
-        with pytest.raises(ToolNotFoundError):
-            await registry.dispatch("nonexistent", {})
+        result = await registry.dispatch("nonexistent", {})
+        assert "error: 工具不存在" in result
 
     def test_discover(self, tmp_path):
         """AST 自发现——扫描目录找 register_tool 调用."""

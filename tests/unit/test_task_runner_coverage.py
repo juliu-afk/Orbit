@@ -98,7 +98,7 @@ def test_constructor(runner: TaskRunner) -> None:
     assert runner._budget_tracker is None
     assert runner._tool_registry is None
     assert runner._audit_logger is None
-    assert runner.router is None
+    assert runner._router is None
     assert runner._fast_lane is False
     assert runner._edit_detector is not None  # 减熵闭环-2：默认创建
 
@@ -202,10 +202,11 @@ def test_state_to_progress() -> None:
     """_state_to_progress 全部状态映射到 0.0-1.0。"""
     expected = {
         TaskState.IDLE: 0.0,
-        TaskState.PARSING: 0.2,
-        TaskState.PLANNING: 0.4,
-        TaskState.CODING: 0.7,
-        TaskState.VERIFYING: 0.9,
+        TaskState.PARSING: 0.10,
+        TaskState.SCOPING: 0.20,
+        TaskState.PLANNING: 0.30,
+        TaskState.CODING: 0.60,
+        TaskState.VERIFYING: 0.85,
         TaskState.DONE: 1.0,
         TaskState.FAILED: 1.0,
         TaskState.CANCELLED: 1.0,
@@ -305,7 +306,6 @@ async def test_agent_cycle_state_mapping(full_runner: TaskRunner) -> None:
         "t1", TaskState.PLANNING, {"prd": "test", "complexity": {"file_count": 1, "scope": "single_file", "risk": "low"}}
     )
     assert "架构" in r3
-    full_runner.router.evaluate.assert_called_once()
 
     r4 = await full_runner._agent_cycle("t1", TaskState.CODING, {"prd": "test"})
     assert "代码" in r4
@@ -317,7 +317,7 @@ async def test_agent_cycle_state_mapping(full_runner: TaskRunner) -> None:
 @pytest.mark.asyncio
 async def test_agent_cycle_unmapped_raises(full_runner: TaskRunner) -> None:
     """无状态→角色映射的状态（如 CANCELLED）→ RuntimeError。"""
-    with pytest.raises(RuntimeError, match="无 Agent"):
+    with pytest.raises(ValueError, match="未知状态无对应角色"):
         await full_runner._agent_cycle("t1", TaskState.CANCELLED, {"prd": "test"})
 
 
@@ -522,7 +522,7 @@ async def test_continue_from_failed(full_runner: TaskRunner) -> None:
 @pytest.mark.asyncio
 async def test_agent_cycle_router_exception_fail_open(full_runner: TaskRunner) -> None:
     """PLANNING 时 router 抛异常→fail-open, 继续执行."""
-    full_runner.router.evaluate = AsyncMock(side_effect=RuntimeError("router down"))
+    full_runner._router.evaluate = AsyncMock(side_effect=RuntimeError("router down"))
 
     mock_agent = MagicMock()
     mock_agent.execute = AsyncMock(

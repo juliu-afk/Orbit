@@ -320,7 +320,7 @@ class TestGatewayStreaming:
     @pytest.mark.asyncio
     async def test_generate_stream_with_tools_text_only(self):
         """流式调用——纯文本输出，无工具调用。"""
-        from unittest.mock import patch
+        from unittest.mock import AsyncMock, patch
 
         from orbit.gateway.client import LLMClient
         from orbit.gateway.schemas import LLMRequest
@@ -332,7 +332,7 @@ class TestGatewayStreaming:
         async def mock_stream(model, req):
             yield (StreamEventType.TEXT_DELTA, {"delta": "hello"})
 
-        with patch.object(client, "_stream_completion_with_tools", new=mock_stream):
+        with patch.object(client, "_stream_completion_with_tools", new=mock_stream), patch.object(client.cb, "before_call", new_callable=AsyncMock, return_value=None):
             events = []
             async for event_type, data in client.generate_stream_with_tools(
                 LLMRequest(prompt="test"), task_id="t1"
@@ -346,7 +346,7 @@ class TestGatewayStreaming:
     @pytest.mark.asyncio
     async def test_generate_stream_with_tools_error(self):
         """流式调用——primary 失败后 fallback 成功。"""
-        from unittest.mock import patch
+        from unittest.mock import AsyncMock, patch
 
         from orbit.gateway.client import LLMClient
         from orbit.gateway.schemas import LLMRequest
@@ -363,7 +363,7 @@ class TestGatewayStreaming:
                 raise RuntimeError("primary failed")
             yield (StreamEventType.TEXT_DELTA, {"delta": "fallback ok"})
 
-        with patch.object(client, "_stream_completion_with_tools", new=mock_stream_primary):
+        with patch.object(client, "_stream_completion_with_tools", new=mock_stream_primary), patch.object(client.cb, "before_call", new_callable=AsyncMock, return_value=None):
             events = []
             async for event_type, data in client.generate_stream_with_tools(
                 LLMRequest(prompt="test"), task_id="t2"

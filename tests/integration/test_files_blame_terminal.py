@@ -20,20 +20,20 @@ from httpx import ASGITransport, AsyncClient
 class MockFileService:
     """Mock FileService for files routes."""
 
-    async def list_files(self):
+    async def list_files(self, directory: str | None = None):
         from orbit.files.service import FileInfo
 
         from orbit.files.service import FileStatus
 
         return [FileInfo(path="src/main.py", size=100, status=FileStatus.UNCHANGED)]
 
-    async def read_file(self, path: str):
+    async def read_file(self, path: str, directory: str | None = None):
         return f"# Content of {path}"
 
     def detect_language(self, path: str) -> str:
         return "python"
 
-    async def diff(self, path: str, rev_a: str, rev_b: str | None) -> dict:
+    async def diff(self, path: str, rev_a: str, rev_b: str | None, directory: str | None = None) -> dict:
         return {"path": path, "diff": f"diff between {rev_a} and {rev_b or 'HEAD'}"}
 
 
@@ -94,7 +94,8 @@ async def test_files_tree(client):
     """GET /api/v1/files/tree → 200。"""
     resp = await client.get("/api/v1/files/tree")
     assert resp.status_code == 200
-    data = resp.json()
+    body = resp.json()
+    data = body["data"]  # API 统一封装: {code, data, message}
     assert "files" in data
     assert len(data["files"]) > 0
 
@@ -104,7 +105,8 @@ async def test_files_read(client):
     """GET /api/v1/files/read?path=src/main.py → 200。"""
     resp = await client.get("/api/v1/files/read?path=src/main.py")
     assert resp.status_code == 200
-    data = resp.json()
+    body = resp.json()
+    data = body["data"]  # API 统一封装: {code, data, message}
     assert "content" in data
     assert "language" in data
 
@@ -114,7 +116,8 @@ async def test_files_diff(client):
     """GET /api/v1/files/diff?path=src/main.py → 200。"""
     resp = await client.get("/api/v1/files/diff?path=src/main.py")
     assert resp.status_code == 200
-    data = resp.json()
+    body = resp.json()
+    data = body["data"]  # API 统一封装: {code, data, message}
     assert "diff" in data
 
 

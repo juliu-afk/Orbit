@@ -12,10 +12,11 @@ from orbit.scheduler.task_runner.checkpoint import (
     _state_to_progress,
     _transition,
 )
-from orbit.scheduler.task_runner.runner import TaskRunner
+from orbit.scheduler.task_runner.runner import TaskRunner, _TASK_TYPE_MAP
 
 __all__ = [
     "TaskRunner",
+    "_TASK_TYPE_MAP",
     "STATE_TRANSITIONS",
     "FAST_LANE_TRANSITIONS",
     "InvalidStateTransitionError",

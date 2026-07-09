@@ -94,7 +94,7 @@ class ClaudeMdGenerator:
         try:
             code = self._graphs.code
             tree = code.get_directory_tree() if code else {}
-            parts.append(tree.get("text", "（从代码图谱提取）"))
+            parts.append(str(tree.get("text", "（从代码图谱提取）")))
         except Exception as e:
             logger.warning("claude_md_structure_failed", error=str(e))
             parts.append("（从代码图谱自动提取）")

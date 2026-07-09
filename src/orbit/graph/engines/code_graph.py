@@ -138,7 +138,50 @@ class CodeGraphEngine(GraphEngineBase):
 
         await self._extract_calls(tree, str(path))
         await self._extract_imports(tree, str(path))
+        # Phase 3: DATA_FLOWS——变量赋值→使用链
+        await self._extract_data_flows(tree, str(path))
         return True
+
+    async def _extract_data_flows(self, tree: ast.AST, file_path: str) -> None:
+        """提取函数内变量赋值→使用关系为 DATA_FLOWS 边。
+
+        WHY: Agent 追溯"这个变量在哪定义的→在哪使用的"。
+        借鉴 CBM DATA_FLOWS——Python 实现分析每个函数体内 Name 节点。
+        """
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            func_name = node.name
+            assigned: dict[str, int] = {}
+            used: list[tuple[str, int]] = []
+            for child in ast.walk(node):
+                if isinstance(child, ast.Name):
+                    if isinstance(child.ctx, ast.Store):
+                        assigned[child.id] = child.lineno
+                    elif isinstance(child.ctx, ast.Load):
+                        used.append((child.id, child.lineno))
+            for var_name, use_line in used:
+                if var_name in assigned:
+                    # Phase 3: DATA_FLOWS——变量名直接用作节点名（与 _parse_python_ast 中 Assign 一致）
+                    await self._record_data_flow(var_name, func_name, var_name, file_path, use_line)
+
+    async def _record_data_flow(
+        self, source: str, target: str, variable: str, file_path: str, line: int,
+    ) -> None:
+        src_node = await self.find_node_by_name(CodeNode, source)
+        if src_node is None:
+            nid = uuid.uuid4().hex
+            await self.upsert_node(CodeNode, nid, name=source, type="variable",
+                                   file_path=file_path, start_line=line, end_line=line,
+                                   meta={"data_flow_var": variable})
+            src_node = await self.find_node_by_name(CodeNode, source)
+        if src_node is None:
+            return
+        tgt_node = await self.find_node_by_name(CodeNode, target)
+        if tgt_node is None:
+            return
+        await self.add_edge(source_id=src_node.id, source_type="code",
+                            target_id=tgt_node.id, target_type="code", edge_type="data_flows")
 
     async def _parse_with_tree_sitter(self, path: Path, lang: str) -> bool:
         """tree-sitter 解析 TypeScript/SQL 文件——提取函数/类/方法。"""

@@ -780,6 +780,8 @@ class McpServer:
         return {"success": True, "symbol": symbol, "file": file_path, "deleted_lines": f"{start}-{end}"}
 
     # ── JSON-RPC 请求处理 ──────────────────────────────────
+
+    def _handle_request(self, request: dict[str, Any]) -> str | None:
         """处理单个 JSON-RPC 请求，返回响应字符串或 None（通知）。"""
         method = request.get("method", "")
         req_id = request.get("id")

@@ -88,7 +88,7 @@ class ScreenshotCapture:
         # 1. 帧去重
         try:
             thumb = frame.resize(DEDUP_THUMB_SIZE).convert("L")
-            pixels = list(thumb.getdata())
+            pixels = list(thumb.get_flattened_data())  # Pillow 14+: getdata()→get_flattened_data()
         except Exception as e:
             logger.warning("screenshot_resize_failed", error=str(e))
             return None

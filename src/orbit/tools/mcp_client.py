@@ -33,7 +33,7 @@ class MCPClientConnection:
 
     用法::
 
-        conn = MCPClientConnection("serena", "serena", ["start-mcp-server"])
+        conn = MCPClientConnection("my_server", "my-command", ["arg1"])
         conn.connect()
         tools = conn.list_tools()
         result = conn.call_tool("find_symbol", {"name_path": "MyClass"})
@@ -54,7 +54,7 @@ class MCPClientConnection:
 
         Args:
             name: 服务器标识名（用于日志和工具前缀）
-            command: 可执行文件路径（如 "serena"）
+            command: 可执行文件路径
             args: 命令行参数
             env: 额外环境变量（合并到父进程环境，而非替换）
         """

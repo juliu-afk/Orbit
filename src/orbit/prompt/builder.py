@@ -190,7 +190,7 @@ class PromptBuilder:
         """当存在 MCP 语义工具时注入使用指南。
 
         WHY: Agent 默认不知道 MCP 工具的存在和用法——需要显式教会。
-        WHY 动态提取前缀: 不硬编码 "serena"，未来支持其他 MCP 服务器。
+        WHY 动态提取前缀: 统一处理所有 MCP 服务器，通过配置发现。
         """
         if not tools_schema:
             return ""

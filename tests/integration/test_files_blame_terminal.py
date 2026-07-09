@@ -94,7 +94,8 @@ async def test_files_tree(client):
     """GET /api/v1/files/tree → 200。"""
     resp = await client.get("/api/v1/files/tree")
     assert resp.status_code == 200
-    data = resp.json()
+    body = resp.json()
+    data = body["data"]  # API 统一封装: {code, data, message}
     assert "files" in data
     assert len(data["files"]) > 0
 
@@ -104,7 +105,8 @@ async def test_files_read(client):
     """GET /api/v1/files/read?path=src/main.py → 200。"""
     resp = await client.get("/api/v1/files/read?path=src/main.py")
     assert resp.status_code == 200
-    data = resp.json()
+    body = resp.json()
+    data = body["data"]  # API 统一封装: {code, data, message}
     assert "content" in data
     assert "language" in data
 
@@ -114,7 +116,8 @@ async def test_files_diff(client):
     """GET /api/v1/files/diff?path=src/main.py → 200。"""
     resp = await client.get("/api/v1/files/diff?path=src/main.py")
     assert resp.status_code == 200
-    data = resp.json()
+    body = resp.json()
+    data = body["data"]  # API 统一封装: {code, data, message}
     assert "diff" in data
 
 

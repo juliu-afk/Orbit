@@ -59,17 +59,18 @@ class ChangeDetector:
         if not changed_files:
             return []
 
+        # P0-1 fix: 用 get_all_nodes() 过滤而非 find_definitions_with_positions("")
+        # 后者生成 SQL WHERE name='' → 恒返回 [] → 整个检测功能无效
+        try:
+            all_nodes = await self._cg.get_all_nodes()
+        except Exception:
+            return []
+
         impacts: list[ChangeImpact] = []
         for fpath in changed_files:
-            # WHY 按文件路径查 CodeNode：变更文件中的符号均需重新评估
-            try:
-                defs = await self._cg.find_definitions_with_positions("")
-                file_defs = [d for d in defs if d.get("file_path") == fpath]
-            except Exception:
-                file_defs = []
+            file_defs = [n for n in all_nodes if n.get("file_path") == fpath]
 
             if not file_defs:
-                # 文件有变更但无已索引符号（如新文件 / 非代码文件）
                 continue
 
             for d in file_defs:

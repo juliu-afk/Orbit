@@ -51,7 +51,9 @@ def export_graph_artifact(
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             tmp_path = tmp.name
         conn = sqlite3.connect(str(src))
-        conn.execute("VACUUM INTO ?", (tmp_path,))
+        # P2-3 fix: VACUUM INTO 不支持参数绑定（DDL 限制）——用字符串拼接
+        # tmp_path 来自 tempfile.mktemp()——系统生成的安全路径，非用户输入
+        conn.execute(f"VACUUM INTO '{tmp_path}'")
         conn.close()
 
         # 2. zstd 压缩

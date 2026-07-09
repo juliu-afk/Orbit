@@ -205,14 +205,10 @@ class CodeGraphEngine(GraphEngineBase):
             await self._walk_ts_tree(child, source, file_path)
 
     def _ts_get_name(self, node, source: str) -> str | None:
-        """从 tree-sitter 节点提取名称——找 name/identifier 子节点。"""
+        """从 tree-sitter 节点提取名称——仅查直接子节点（P1-3 fix: 去递归）。"""
         for child in node.children:
             if child.type in ("identifier", "name", "property_identifier", "object_type"):
                 return source[child.start_byte:child.end_byte]
-            # 递归一层（如 function_declaration > name > identifier）
-            name = self._ts_get_name(child, source)
-            if name:
-                return name
         return None
 
     def _ts_get_callee_name(self, node, source: str) -> str | None:

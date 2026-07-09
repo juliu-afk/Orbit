@@ -620,7 +620,7 @@ class McpServer:
         # 通过 edges 找所有指向 base_id 的继承边
         sub_ids: set[str] = set()
         for e in edges:
-            if e.get("edge_type") in ("inherits", "calls") and e.get("target_id") == base_id:
+            if e.get("edge_type") == "inherits" and e.get("target_id") == base_id:
                 sub_ids.add(e.get("source_id", ""))
 
         implementations: list[dict] = []
@@ -834,20 +834,15 @@ class McpServer:
                     content = f.read()
             except Exception:
                 continue
-            new_content = content.replace(symbol, new_name)
+            # P2-1 fix: word-boundary regex 防子串误改（order→handleOrder 不误改 border）
+            import re as _re
+            new_content = _re.sub(r'\b' + _re.escape(symbol) + r'\b', new_name, content)
             if new_content != content:
                 with open(full_path, "w", encoding="utf-8") as f:
                     f.write(new_content)
                 updated += 1
                 self._run_async(self._code_graph.incremental_update(fpath))
-        # 更新 CodeNode.name（不影响 id）
-        try:
-            from orbit.graph.models.nodes import CodeNode
-            node = self._run_async(self._code_graph.find_node_by_name(CodeNode, symbol))
-            if node:
-                node.name = new_name
-        except Exception:
-            pass
+        # P1-2 fix: incremental_update 已删除旧节点+重建——无需手动改 name
         return {"success": True, "symbol": symbol, "new_name": new_name, "files_updated": updated}
 
     def _handle_type_hierarchy(
@@ -869,36 +864,40 @@ class McpServer:
                 break
         if target_id is None:
             return {"found": False, "class_name": class_name}
-        # BFS 上行（supertypes）——沿 inherits 边的 target→source
+        # P2-2 fix: 预建邻接索引——O(V+E) 替代 O(V×E)
+        node_by_id = {n.get("id"): n for n in nodes}
+        inherits_to: dict[str, list[str]] = {}   # target_id → [source_ids] (子类)
+        inherits_from: dict[str, list[str]] = {} # source_id → [target_ids] (超类)
+        for e in edges:
+            if e.get("edge_type") == "inherits":
+                tid = e.get("target_id", "")
+                sid = e.get("source_id", "")
+                inherits_to.setdefault(tid, []).append(sid)
+                inherits_from.setdefault(sid, []).append(tid)
+        # BFS 上行（supertypes）
         supertypes: list[dict] = []
         visited: set[str] = {target_id}
         queue = [target_id]
-        while queue:
-            cur = queue.pop(0)
-            for e in edges:
-                if e.get("edge_type") == "inherits" and e.get("source_id") == cur:
-                    sup_id = e.get("target_id", "")
-                    if sup_id not in visited:
-                        visited.add(sup_id)
-                        sup_node = next((n for n in nodes if n.get("id") == sup_id), None)
-                        if sup_node:
-                            supertypes.append({"name": sup_node["name"], "file": sup_node.get("file_path", "")})
-                            queue.append(sup_id)
-        # BFS 下行（subtypes）——沿 inherits 边的 source→target
+        for cur in queue:
+            for sup_id in inherits_from.get(cur, []):
+                if sup_id not in visited:
+                    visited.add(sup_id)
+                    sn = node_by_id.get(sup_id)
+                    if sn:
+                        supertypes.append({"name": sn["name"], "file": sn.get("file_path", "")})
+                    queue.append(sup_id)
+        # BFS 下行（subtypes）
         subtypes: list[dict] = []
         visited2: set[str] = {target_id}
         queue2 = [target_id]
-        while queue2:
-            cur = queue2.pop(0)
-            for e in edges:
-                if e.get("edge_type") == "inherits" and e.get("target_id") == cur:
-                    sub_id = e.get("source_id", "")
-                    if sub_id not in visited2:
-                        visited2.add(sub_id)
-                        sub_node = next((n for n in nodes if n.get("id") == sub_id), None)
-                        if sub_node:
-                            subtypes.append({"name": sub_node["name"], "file": sub_node.get("file_path", "")})
-                            queue2.append(sub_id)
+        for cur in queue2:
+            for sub_id in inherits_to.get(cur, []):
+                if sub_id not in visited2:
+                    visited2.add(sub_id)
+                    sn = node_by_id.get(sub_id)
+                    if sn:
+                        subtypes.append({"name": sn["name"], "file": sn.get("file_path", "")})
+                    queue2.append(sub_id)
         return {"found": True, "class_name": class_name,
                 "supertypes": supertypes, "subtypes": subtypes}
 

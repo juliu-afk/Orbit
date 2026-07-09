@@ -15,7 +15,8 @@ from enum import IntEnum
 
 
 class Tier(IntEnum):
-    """三梯度——从轻到重。"""
+    """多模态梯度——从本地到云端。"""
+    PRIVATE = 0     # V15.1 P2: 本地 MiniCPM-V，数据不出域
     LIGHT = 1       # 免费，单图/短视频
     STANDARD = 2    # 免费+thinking，多图/中等视频/Bug诊断
     HEAVY = 3       # 付费，长视频/设计稿→代码/批量文档
@@ -50,6 +51,16 @@ class TierConfig:
 # P1 多 provider 时迁移到 YAML/JSON 配置。
 
 TIERS: dict[Tier, TierConfig] = {
+    Tier.PRIVATE: TierConfig(
+        model="openbmb/MiniCPM-V-4.6",
+        endpoint="http://localhost:8000/v1",
+        max_tokens=4096,
+        thinking=None,
+        input_cost_per_million=0.0,    # 本地=免费
+        output_cost_per_million=0.0,
+        context_window=262_000,
+        description="P0 私有化：MiniCPM-V 4.6，数据不出域，6GB VRAM",
+    ),
     Tier.LIGHT: TierConfig(
         model="glm-4.1v-thinking-flash",
         endpoint="https://open.bigmodel.cn/api/paas/v4",
@@ -85,15 +96,19 @@ TIERS: dict[Tier, TierConfig] = {
 # ── 梯度降级链 ──
 # T3 失败时降级到的目标梯度（None=不降级，直接抛异常）
 DOWNGRADE_CHAIN: dict[Tier, Tier | None] = {
-    Tier.HEAVY: Tier.STANDARD,   # T3 失败 → T2（保留视觉，免费兜底）
-    Tier.STANDARD: None,          # T2 失败 → 抛异常（不降级到纯文本）
-    Tier.LIGHT: None,             # T1 失败 → 抛异常
+    Tier.HEAVY: Tier.STANDARD,
+    Tier.STANDARD: None,
+    Tier.LIGHT: None,
+    Tier.PRIVATE: Tier.LIGHT,     # V15.1 P2: 本地失败→云端免费（可配置） WHY 可用性优先
 }
 
 # ── 梯度自动判定 ──
 
 # 触发 T2 的关键词——出现即需要深度推理
 THINKING_KEYWORDS = ["分析", "诊断", "定位", "找问题", "bug", "根因", "为什么"]
+
+# V15.1 P2: 隐私关键词——出现即路由到本地模型，数据不出域
+PRIVATE_KEYWORDS = ["财务", "内部", "密钥", "密码", "工资", "对账单", "报税", "审计"]
 
 # 触发 T3 的视频时长阈值（秒）
 HEAVY_VIDEO_THRESHOLD_SEC = 600  # 10 分钟
@@ -125,8 +140,8 @@ class TierRouter:
         """
         # 手动指定优先
         if tier is not None:
-            if tier not in (1, 2, 3):
-                raise ValueError(f"tier 必须在 1-3 范围内，当前值: {tier}")
+            if tier not in (0, 1, 2, 3):
+                raise ValueError(f"tier 必须在 0-3 范围内，当前值: {tier}")
             return Tier(tier)
 
         # content 为 None 或纯文本 → 不应走多模态路径（调用方应走纯文本）
@@ -170,6 +185,11 @@ class TierRouter:
             if kw in all_text.lower():
                 has_thinking_keyword = True
                 break
+
+        # ── V15.1 P2: 隐私优先——敏感关键词 → 本地模型 ──
+        for kw in PRIVATE_KEYWORDS:
+            if kw in all_text:
+                return Tier.PRIVATE
 
         # 判定逻辑（顺序敏感——先检查 T3，再 T2，最后 T1）
         if has_long_video or image_count >= HEAVY_IMAGE_COUNT:

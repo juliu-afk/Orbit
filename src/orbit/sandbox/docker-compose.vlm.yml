@@ -1,0 +1,32 @@
+# V15.1 多模态 P2：MiniCPM-V 4.6 私有化视觉 LLM
+#
+# WHY 私有化：财务截图/内部文档/敏感UI→数据不出域
+# MiniCPM-V 4.6: 1.3B 参数, Apache 2.0, 仅 6GB VRAM
+#
+# 启动: docker compose -f sandbox/docker-compose.vlm.yml up -d
+# 验证: curl http://localhost:8000/health
+# 停止: docker compose -f sandbox/docker-compose.vlm.yml down
+
+services:
+  minicpm-v:
+    image: vllm/vllm-openai:latest
+    container_name: orbit-minicpm-v
+    ports:
+      - "8000:8000"
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    command:
+      - --model
+      - openbmb/MiniCPM-V-4.6
+      - --max-model-len
+      - "4096"
+      - --gpu-memory-utilization
+      - "0.85"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped

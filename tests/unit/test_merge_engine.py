@@ -63,7 +63,8 @@ class TestDeterministicCheck:
 
     def test_error_handling_detected(self):
         e = MergeEngine(None)
-        result = e._deterministic_check({}, "try:\n  foo()\nexcept:\n  pass")
+        # 错误处理检查仅看 output 内容，task 不参与此检查
+        result = e._deterministic_check({"code": "try:\n  foo()\nexcept:\n  pass"}, "")
         assert result["has_error_handling"] == 10.0
 
 
@@ -105,10 +106,10 @@ class TestParseScores:
 class TestFallbackMerge:
     def test_fallback(self):
         e = MergeEngine(None)
-        from dataclasses import dataclass
+        from dataclasses import dataclass, field
         @dataclass
         class FakeAttempt:
             tier_label: str = "Tier 1"
-            output: dict | None = {"code": "ok"}
+            output: dict | None = field(default_factory=lambda: {"code": "ok"})
         result = e._fallback_merge([FakeAttempt()])
         assert "fallback" in result.scorer

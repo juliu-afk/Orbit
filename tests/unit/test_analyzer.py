@@ -20,15 +20,17 @@ class TestAnalyzeDirectory:
     def test_python_project(self):
         with tempfile.TemporaryDirectory() as d:
             Path(d, "pyproject.toml").write_text("[project]\nname='test'")
+            Path(d, "src").mkdir()
             Path(d, "src/main.py").write_text("print('hello')")
             result = analyze_directory(d)
             assert result.file_count >= 2
-            assert "python" in result.languages
+            assert result.language == "python"
 
     def test_typescript_project(self):
         with tempfile.TemporaryDirectory() as d:
             Path(d, "package.json").write_text('{"name":"test"}')
             Path(d, "tsconfig.json").write_text("{}")
+            Path(d, "src").mkdir()
             Path(d, "src/index.ts").write_text("export {}")
             result = analyze_directory(d)
             assert result.file_count >= 3
@@ -46,7 +48,8 @@ class TestDetectFrameworks:
 
     def test_python_unknown(self):
         result = _detect_python_framework(["some-random-lib==1.0"])
-        assert len(result) > 0  # returns "Python" at minimum
+        # 未知依赖 → 返回空字符串，无匹配框架
+        assert result == ""
 
     def test_js_react(self):
         assert "React" in _detect_js_framework(["react"], {"react": "^18.0"})
@@ -56,4 +59,5 @@ class TestDetectFrameworks:
 
     def test_js_unknown(self):
         result = _detect_js_framework(["some-lib"], {})
-        assert len(result) > 0
+        # 未知依赖 → 返回空字符串，无匹配框架
+        assert result == ""

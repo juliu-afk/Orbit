@@ -55,7 +55,7 @@ class ResourceGuard:
 
     用法:
         guard = ResourceGuard()
-        result = guard.guard_request(task_id="t1", estimated_tokens=500)
+        result = await guard.guard_request(task_id="t1", estimated_tokens=500)
         if result.decision == GuardDecision.ALLOW:
             ...  # 正常调用 LLM
         else:

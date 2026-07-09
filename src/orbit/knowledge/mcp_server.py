@@ -130,7 +130,7 @@ class McpServer:
         """注册代码导航工具——基于 CodeGraph AST 索引。
 
         WHY: 让外部 Agent（Claude Code/Codex）能通过 Orbit MCP 做代码导航，
-        不再仅限领域知识查询。50 行实现，偷师 Serena 的 MCP 开放思路。
+        不再仅限领域知识查询。
         """
         self.register_tool(
             name="find_symbol",
@@ -219,7 +219,7 @@ class McpServer:
         )
         self.register_tool(
             name="find_implementations",
-            description="查找指定类的所有子类实现——通过继承边（INHERITS）查询。替代 Serena find_implementations。",
+            description="查找指定类的所有子类实现——通过继承边（INHERITS）查询。",
             inputSchema={
                 "type": "object",
                 "properties": {"class_name": {"type": "string", "description": "基类/接口名"}},
@@ -227,7 +227,7 @@ class McpServer:
             },
             handler=self._handle_find_implementations,
         )
-        # ── Phase 1 新增：语义编辑工具（替代 Serena 编辑能力）────────
+        # ── Phase 1 新增：语义编辑工具 ────────────────────────────
         self.register_tool(
             name="replace_symbol_body",
             description="精确替换函数/方法的函数体。通过符号名定位 start_line..end_line，替换内容后触增增量索引。",

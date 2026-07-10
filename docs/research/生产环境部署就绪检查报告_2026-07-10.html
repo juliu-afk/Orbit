@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit 生产环境部署就绪检查报告 — 2026-07-10</title>
+<style>
+  :root {
+    --bg: #0d1117; --fg: #c9d1d9; --border: #30363d;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --blue: #58a6ff; --muted: #8b949e; --card: #161b22;
+    --tag-bg: #1c2129;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+    background: var(--bg); color: var(--fg); line-height: 1.6; padding: 2rem;
+    max-width: 1100px; margin: 0 auto;
+  }
+  h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: .5rem; margin-bottom: .25rem; }
+  h2 { font-size: 1.35rem; margin: 2rem 0 .75rem; padding-bottom: .25rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.1rem; margin: 1.25rem 0 .5rem; color: var(--blue); }
+  h4 { font-size: .95rem; margin: .75rem 0 .25rem; color: var(--muted); }
+  .meta { color: var(--muted); font-size: .85rem; margin-bottom: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; margin: .75rem 0 1.25rem; font-size: .9rem; }
+  th, td { padding: .5rem .75rem; text-align: left; border: 1px solid var(--border); }
+  th { background: var(--card); font-weight: 600; }
+  tr:nth-child(even) { background: var(--card); }
+  .badge { display: inline-block; padding: .15rem .55rem; border-radius: 999px; font-size: .78rem; font-weight: 600; }
+  .badge-pass { background: #1b3a1b; color: var(--green); }
+  .badge-fail { background: #3a1b1b; color: var(--red); }
+  .badge-warn { background: #3a3020; color: var(--yellow); }
+  .badge-info { background: #1b2d3a; color: var(--blue); }
+  .verdict { font-size: 1.05rem; padding: .6rem 1rem; border-radius: 6px; margin: .75rem 0; }
+  .verdict-pass { background: #1b3a1b; border-left: 4px solid var(--green); }
+  .verdict-warn { background: #3a3020; border-left: 4px solid var(--yellow); }
+  .verdict-fail { background: #3a1b1b; border-left: 4px solid var(--red); }
+  ul, ol { margin: .4rem 0 .4rem 1.5rem; }
+  li { margin: .15rem 0; }
+  code { background: var(--card); padding: .1rem .35rem; border-radius: 3px; font-size: .88em; }
+  pre { background: var(--card); padding: .75rem; border-radius: 6px; overflow-x: auto; font-size: .85rem; margin: .5rem 0; border: 1px solid var(--border); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: .75rem; margin: .75rem 0; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .card-title { font-weight: 700; font-size: .95rem; margin-bottom: .4rem; }
+  .stat-row { display: flex; justify-content: space-between; padding: .2rem 0; font-size: .88rem; }
+  .stat-val { font-weight: 600; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+  .toc { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+  .toc a { color: var(--blue); text-decoration: none; }
+  .toc ol { margin-left: 1.2rem; }
+  .blocker { border-left: 4px solid var(--red); padding-left: 1rem; margin: .75rem 0; }
+  .recommend { border-left: 4px solid var(--yellow); padding-left: 1rem; margin: .75rem 0; }
+  .checklist { list-style: none; margin-left: 0; }
+  .checklist li { padding: .15rem 0; }
+  .checklist li::before { content: '☐ '; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>🔭 Orbit 生产环境部署就绪检查报告</h1>
+<p class="meta">
+  生成日期：2026-07-10 &nbsp;|&nbsp; 版本基线：v0.47.0 (commit <code>746845a</code>) &nbsp;|&nbsp; 分支：master
+</p>
+
+<!-- ──────────────────── TOC ──────────────────── -->
+<div class="toc">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#s1">总体结论</a></li>
+    <li><a href="#s2">阻断项（发布前必须解决）</a></li>
+    <li><a href="#s3">建议项（推荐完成）</a></li>
+    <li><a href="#s4">分维度详细评估</a>
+      <ol>
+        <li><a href="#s4-1">代码质量</a></li>
+        <li><a href="#s4-2">安全</a></li>
+        <li><a href="#s4-3">桌面 exe 交付（Tauri）</a></li>
+        <li><a href="#s4-4">Docker / k8s 服务端交付</a></li>
+        <li><a href="#s4-5">可观测性</a></li>
+        <li><a href="#s4-6">数据库</a></li>
+        <li><a href="#s4-7">CI/CD 流水线</a></li>
+        <li><a href="#s4-8">文档追溯</a></li>
+      </ol>
+    </li>
+    <li><a href="#s5">行动清单</a></li>
+    <li><a href="#s6">风险矩阵</a></li>
+    <li><a href="#s7">签核</a></li>
+  </ol>
+</div>
+
+<!-- ──────────────────── 1. 总体结论 ──────────────────── -->
+<h2 id="s1">1. 总体结论</h2>
+
+<table>
+  <tr><th>维度</th><th>结果</th><th>说明</th></tr>
+  <tr>
+    <td>代码质量</td>
+    <td><span class="badge badge-warn">⚠ 有条件通过</span></td>
+    <td>lint/typecheck 通过；1 个单元测试失败</td>
+  </tr>
+  <tr>
+    <td>测试覆盖率</td>
+    <td><span class="badge badge-fail">❌ 不达标</span></td>
+    <td>69.93% vs 目标 80%（CI 门禁 69% 勉强撑住）</td>
+  </tr>
+  <tr>
+    <td>安全</td>
+    <td><span class="badge badge-pass">✅ 通过</span></td>
+    <td>5 层权限引擎，零硬编码密钥，三重 CI 扫描</td>
+  </tr>
+  <tr>
+    <td>桌面 exe 交付</td>
+    <td><span class="badge badge-pass">✅ 就绪</span></td>
+    <td>168MB Orbit.exe 可构建，auto-discover 模块，冒烟验证</td>
+  </tr>
+  <tr>
+    <td>Docker/k8s 交付</td>
+    <td><span class="badge badge-warn">⚠ 略有不足</span></td>
+    <td>Dockerfile 单阶段（非多阶段）、Helm chart 基础可用</td>
+  </tr>
+  <tr>
+    <td>可观测性</td>
+    <td><span class="badge badge-pass">✅ 就绪</span></td>
+    <td>OTEL + Grafana + Alertmanager + Logstash 配置齐全</td>
+  </tr>
+  <tr>
+    <td>数据库迁移</td>
+    <td><span class="badge badge-pass">✅ 就绪</span></td>
+    <td>4 个迁移文件，Alembic 配置到位</td>
+  </tr>
+  <tr>
+    <td>文档追溯</td>
+    <td><span class="badge badge-pass">✅ 就绪</span></td>
+    <td>功能清单+路线图+ADR 文档链完整</td>
+  </tr>
+  <tr>
+    <td>CI/CD</td>
+    <td><span class="badge badge-warn">⚠ CI 已知红灯</span></td>
+    <td>poetry.lock 不同步（历史遗留），非本次引入</td>
+  </tr>
+</table>
+
+<div class="verdict verdict-warn">
+  <strong>最终判定：有条件通过</strong> — 3 个阻断项必须在生产发布前解决，5 个建议项推荐完成。
+</div>
+
+<!-- ──────────────────── 项目快照 ──────────────────── -->
+<div class="grid2">
+  <div class="card">
+    <div class="card-title">📦 源码规模</div>
+    <div class="stat-row"><span>Python 模块</span><span class="stat-val">339</span></div>
+    <div class="stat-row"><span>源码 LOC</span><span class="stat-val">59,404</span></div>
+    <div class="stat-row"><span>测试 LOC</span><span class="stat-val">43,692</span></div>
+    <div class="stat-row"><span>测试/源码比</span><span class="stat-val">0.74</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🧪 测试概览</div>
+    <div class="stat-row"><span>覆盖率</span><span class="stat-val" style="color:var(--yellow)">69.93%</span></div>
+    <div class="stat-row"><span>行覆盖</span><span class="stat-val">~75%</span></div>
+    <div class="stat-row"><span>分支覆盖</span><span class="stat-val">~60%</span></div>
+    <div class="stat-row"><span>未覆盖分支</span><span class="stat-val" style="color:var(--red)">≈2,100</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🚀 CI/CD</div>
+    <div class="stat-row"><span>工作流</span><span class="stat-val">7</span></div>
+    <div class="stat-row"><span>Pre-commit hooks</span><span class="stat-val">11</span></div>
+    <div class="stat-row"><span>迁移文件</span><span class="stat-val">4</span></div>
+    <div class="stat-row"><span>模块完成度</span><span class="stat-val">95.1%</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🖥️ 交付物</div>
+    <div class="stat-row"><span>Orbit.exe</span><span class="stat-val">168 MB</span></div>
+    <div class="stat-row"><span>Helm Chart</span><span class="stat-val">v0.11.0</span></div>
+    <div class="stat-row"><span>Tauri 壳</span><span class="stat-val">v0.10.0</span></div>
+    <div class="stat-row"><span>K8s 副本数</span><span class="stat-val">3</span></div>
+  </div>
+</div>
+
+<!-- ──────────────────── 2. 阻断项 ──────────────────── -->
+<h2 id="s2">2. 阻断项 <span style="font-size:.85rem;color:var(--muted)">（必须在生产发布前解决）</span></h2>
+
+<div class="blocker">
+  <h3>B1. 测试覆盖率不达标（69.93% → ≥80%）</h3>
+  <table>
+    <tr><th>指标</th><th>当前</th><th>目标</th><th>差距</th></tr>
+    <tr><td>综合覆盖率</td><td style="color:var(--red)">69.93%</td><td>≥80%</td><td>−10.07%</td></tr>
+    <tr><td>行覆盖率</td><td>~75%</td><td>—</td><td>—</td></tr>
+    <tr><td>分支覆盖率</td><td style="color:var(--yellow)">~60%</td><td>—</td><td>≈2,100 未覆盖分支</td></tr>
+    <tr><td>CI 门禁</td><td>69%</td><td>80%</td><td>当前 69% 门槛过低</td></tr>
+  </table>
+  <p><strong>影响</strong>：生产运行时存在未验证路径，调度器/防幻觉层错误可能导致 Agent 行为异常。</p>
+  <p><strong>5 个零覆盖模块</strong>（V15.1 多模态新增）：</p>
+  <pre>src/orbit/tools/file_parser.py       84 行  0%
+src/orbit/tools/gui_tools.py         70 行  0%
+src/orbit/tools/mcp_server.py        95 行  0%
+src/orbit/tools/ocr_tools.py         61 行  0%
+src/orbit/tools/office_tools.py      68 行  0%</pre>
+</div>
+
+<div class="blocker">
+  <h3>B2. 单元测试失败（1 条）</h3>
+  <pre>FAILED tests/unit/test_llm_client.py::test_error_rate_below_min_calls_no_trip</pre>
+  <p><strong>模块</strong>：<code>gateway/llm_client</code> —— LLM 调用入口。</p>
+  <p><strong>影响</strong>：网关错误率统计逻辑可能已在变更中损坏。</p>
+  <p><strong>修复方向</strong>：先复现确认是否为本次基线问题，再定位根因。</p>
+</div>
+
+<div class="blocker">
+  <h3>B3. <code>.env</code> 文件可能已被 Git 追踪</h3>
+  <p><code>.gitignore</code> 声明忽略 <code>.env</code>，但 <code>.env</code> 文件（907 字节）存在于工作树。</p>
+  <p><strong>风险</strong>：若已提交，任何克隆仓库的人都能看到 API key 占位符或真实密钥。</p>
+  <p><strong>验证</strong>：<code>git ls-files .env</code></p>
+  <p><strong>修复</strong>：<code>git rm --cached .env</code> + 轮换已暴露的密钥。</p>
+</div>
+
+<!-- ──────────────────── 3. 建议项 ──────────────────── -->
+<h2 id="s3">3. 建议项 <span style="font-size:.85rem;color:var(--muted)">（推荐完成，不阻塞发布）</span></h2>
+
+<div class="recommend">
+  <h3>S1. CI poetry.lock 不同步（历史遗留）</h3>
+  <p>CI lint/typecheck job 报全红，根因 <code>poetry.lock</code> 与 <code>pyproject.toml</code> 版本不一致。</p>
+  <p><strong>修复</strong>：<code>poetry lock --no-update</code> → commit new lock file。</p>
+</div>
+
+<div class="recommend">
+  <h3>S2. gitignore 遗漏（5 项）</h3>
+  <p>缺失：<code>.mypy_cache/</code>、<code>.ruff_cache/</code>、<code>.semgrep/</code>、<code>*.log</code>、<code>coverage.xml</code>。</p>
+</div>
+
+<div class="recommend">
+  <h3>S3. Helm chart 缺失生产必要配置</h3>
+  <ul>
+    <li>无 <code>secrets</code> 模板（LiteLLM key、DB 密码需通过 K8s Secret 注入）</li>
+    <li>无 <code>ConfigMap</code> 模板（环境变量直接写在 values.yaml）</li>
+    <li>Ingress 默认禁用，生产需启用并配置 TLS</li>
+    <li><code>limits.memory: 2Gi</code> 可能不够（168MB exe + LLM 调用叠加）</li>
+  </ul>
+</div>
+
+<div class="recommend">
+  <h3>S4. Dockerfile 改为多阶段构建</h3>
+  <p>当前单阶段 <code>python:3.11-slim</code>。建议 build stage 安装 poetry，run stage 仅复制 <code>.venv</code>。</p>
+</div>
+
+<div class="recommend">
+  <h3>S5. 前端 CI 接入</h3>
+  <p>JS/TS lint、vitest、TypeScript 类型检查均不在 CI（前端仅作为 exe 构建步骤出现）。</p>
+</div>
+
+<!-- ──────────────────── 4. 分维度详细评估 ──────────────────── -->
+<h2 id="s4">4. 分维度详细评估</h2>
+
+<!-- 4.1 -->
+<h3 id="s4-1">4.1 代码质量</h3>
+<table>
+  <tr><th>检查项</th><th>状态</th><th>详情</th></tr>
+  <tr><td>Lint (ruff)</td><td><span class="badge badge-pass">✅</span></td><td>Makefile <code>lint</code> 目标，CI 矩阵 3.11/3.12</td></tr>
+  <tr><td>Format (black/isort)</td><td><span class="badge badge-pass">✅</span></td><td>CI 强制执行</td></tr>
+  <tr><td>Type check (mypy)</td><td><span class="badge badge-pass">✅</span></td><td>27 处 <code>type: ignore</code></td></tr>
+  <tr><td>单元测试</td><td><span class="badge badge-warn">⚠</span></td><td>1 失败，65 条跳过</td></tr>
+  <tr><td>集成测试</td><td><span class="badge badge-pass">✅</span></td><td>10 个文件，PostgreSQL+Redis 真实容器</td></tr>
+  <tr><td>冒烟测试</td><td><span class="badge badge-pass">✅</span></td><td>5 核心场景，≤2 分钟</td></tr>
+</table>
+
+<!-- 4.2 -->
+<h3 id="s4-2">4.2 安全</h3>
+
+<h4>安全扫描覆盖</h4>
+<table>
+  <tr><th>工具</th><th>触发</th><th>状态</th></tr>
+  <tr><td>gitleaks</td><td>PR + push + 每周定时</td><td><span class="badge badge-pass">✅</span> 零发现</td></tr>
+  <tr><td>bandit</td><td>PR + push（非阻塞）</td><td><span class="badge badge-pass">✅</span> 低风险放行</td></tr>
+  <tr><td>pip-audit</td><td>PR + push（非阻塞）</td><td><span class="badge badge-pass">✅</span> 已知 CVE 仅影响 CI 工具</td></tr>
+  <tr><td>ECC AgentShield</td><td>阶段 4a 手动</td><td><span class="badge badge-pass">✅</span> 1,282 条规则</td></tr>
+  <tr><td>Semgrep 自定义</td><td>.semgrep/orbit-security-rules.yaml</td><td><span class="badge badge-pass">✅</span> 3 条专用规则</td></tr>
+</table>
+
+<h4>运行时安全：5 层 deny-wins 权限引擎</h4>
+<pre>L5 Global Deny → L4 Sandbox → L3 Path Scope → L2 Tool Category → L1 Agent Role</pre>
+<ul>
+  <li><strong>拒绝列表</strong>：<code>.env</code>/<code>*.pem</code>/<code>*.key</code>/<code>credentials</code>/<code>secrets</code> 禁止访问</li>
+  <li><strong>沙箱</strong>：所有 <code>exec_command</code> 必须经 <code>ProcessSandbox</code>（Docker 隔离）</li>
+  <li><strong>路径防护</strong>：<code>WorkspaceGuard.validate()</code> 检测路径穿越</li>
+  <li><strong>角色</strong>：7 个内置角色，architect/clarifier 只读</li>
+  <li><strong>Bash 验证</strong>：25 个安全命令白名单，11 种危险模式检测</li>
+</ul>
+
+<h4>凭证管理</h4>
+<ul>
+  <li><span class="badge badge-pass">✅</span> 零硬编码密钥（grep 扫描 Python 源码无发现）</li>
+  <li><span class="badge badge-pass">✅</span> <code>.env.example</code> 使用 <code>sk-dummy</code> 占位符</li>
+  <li><span class="badge badge-pass">✅</span> 所有密钥走环境变量 → LiteLLM 网关，无直连 provider</li>
+</ul>
+
+<h4>待确认</h4>
+<ul class="checklist">
+  <li>生产 API key 是否已生成并安全存储（非本仓库可查范围）</li>
+  <li>Docker Compose 中的 <code>ZAI_API_KEY</code> / <code>DEEPSEEK_API_KEY</code> 来源是否安全</li>
+</ul>
+
+<!-- 4.3 -->
+<h3 id="s4-3">4.3 桌面 exe 交付（Tauri）</h3>
+
+<h4>构建流水线</h4>
+<pre>Frontend (Vite) → backend/static/ → PyInstaller → orbit-backend.exe → Tauri Rust Shell → Orbit.exe</pre>
+
+<table>
+  <tr><th>阶段</th><th>说明</th></tr>
+  <tr><td>构建脚本</td><td><code>scripts/build-exe.sh</code>（4 步）/ <code>scripts/build-desktop.sh</code>（7 步，含门禁）</td></tr>
+  <tr><td>产物</td><td><code>Deliverables/Orbit.exe</code> — 168 MB（最后构建 2026-07-09）</td></tr>
+  <tr><td>PyInstaller spec</td><td><code>backend/orbit.spec</code>，自动发现模块——无需手动维护 hiddenimports</td></tr>
+  <tr><td>Tauri 版本</td><td>v2，Cargo.toml 0.10.0</td></tr>
+  <tr><td>发布配置</td><td>LTO + strip + <code>opt-level=s</code> + <code>panic=abort</code></td></tr>
+</table>
+
+<h4>Tauri 壳启动流程</h4>
+<ol>
+  <li>杀端口 18888 旧进程</li>
+  <li>提取内嵌 exe 到 <code>%TEMP%/orbit/</code></li>
+  <li>后台启动 orbit-backend.exe（CREATE_NO_WINDOW）</li>
+  <li>Boot 页面轮询 <code>/api/v1/observability/startup-probe</code></li>
+  <li>后端就绪 → 加载 SPA</li>
+  <li>退出时清理临时 exe + 杀后端进程</li>
+</ol>
+
+<h4>门禁</h4>
+<ul>
+  <li><code>check_spec.py</code>：验证 spec hiddenimports 完整性</li>
+  <li><code>smoke_test.py</code>：启动后 API 冒烟（5 核心端点）</li>
+</ul>
+
+<h4>待确认</h4>
+<ul class="checklist">
+  <li>目标 Windows 版本（Win10/Win11）均已实际启动测试</li>
+  <li>WebView2 Runtime 离线包版本兼容性</li>
+  <li>168MB exe 是否过大</li>
+</ul>
+
+<!-- 4.4 -->
+<h3 id="s4-4">4.4 Docker / k8s 服务端交付</h3>
+
+<h4>Dockerfile</h4>
+<pre>FROM python:3.11-slim → poetry install --only main → USER orbit → EXPOSE 18888 → uvicorn</pre>
+<table>
+  <tr><th>项目</th><th>评价</th></tr>
+  <tr><td>基础镜像</td><td><span class="badge badge-pass">✅</span> python:3.11-slim</td></tr>
+  <tr><td>非 root</td><td><span class="badge badge-pass">✅</span> USER orbit</td></tr>
+  <tr><td>多阶段构建</td><td><span class="badge badge-fail">❌</span> 单阶段</td></tr>
+  <tr><td>HEALTHCHECK</td><td><span class="badge badge-warn">⚠</span> 无（k8s 探针弥补）</td></tr>
+</table>
+
+<h4>Docker Compose 服务</h4>
+<table>
+  <tr><th>服务</th><th>镜像</th><th>端口</th><th>健康检查</th></tr>
+  <tr><td>postgres</td><td>postgres:15</td><td>5432</td><td><span class="badge badge-pass">✅</span> pg_isready</td></tr>
+  <tr><td>redis</td><td>redis:7.2</td><td>6379</td><td><span class="badge badge-pass">✅</span> redis-cli ping</td></tr>
+  <tr><td>litellm</td><td>ghcr.io/berriai/litellm:main-v1.40.0</td><td>4000</td><td><span class="badge badge-warn">⚠</span> 无</td></tr>
+</table>
+
+<h4>Helm Chart（v0.11.0）</h4>
+<table>
+  <tr><th>配置</th><th>值</th><th>评估</th></tr>
+  <tr><td>副本数</td><td>3</td><td><span class="badge badge-pass">✅</span></td></tr>
+  <tr><td>资源 requests</td><td>512Mi / 500m</td><td><span class="badge badge-pass">✅</span></td></tr>
+  <tr><td>资源 limits</td><td>2Gi / 2000m</td><td><span class="badge badge-warn">⚠</span> 可能偏紧</td></tr>
+  <tr><td>健康检查</td><td>/health :18888</td><td><span class="badge badge-pass">✅</span></td></tr>
+  <tr><td>Ingress</td><td>默认禁用</td><td><span class="badge badge-warn">⚠</span> 生产需启用</td></tr>
+  <tr><td>Secrets 模板</td><td>无</td><td><span class="badge badge-fail">❌</span></td></tr>
+  <tr><td>ConfigMap 模板</td><td>无</td><td><span class="badge badge-fail">❌</span></td></tr>
+</table>
+
+<h4>K8s 高级部署</h4>
+<ul>
+  <li><span class="badge badge-pass">✅</span> Argo Rollouts 蓝绿/金丝雀（<code>argo-rollout.yaml</code>）</li>
+  <li><span class="badge badge-pass">✅</span> 蓝绿命名空间（<code>blue-green-namespaces.yaml</code>）</li>
+  <li><span class="badge badge-pass">✅</span> 金丝雀分析模板（<code>analysis-template.yaml</code>）</li>
+</ul>
+
+<!-- 4.5 -->
+<h3 id="s4-5">4.5 可观测性</h3>
+<table>
+  <tr><th>组件</th><th>配置路径</th><th>状态</th></tr>
+  <tr><td>OpenTelemetry</td><td><code>configs/otel/otel-collector-config.yml</code></td><td><span class="badge badge-pass">✅</span> Collector 管道就绪</td></tr>
+  <tr><td>Grafana</td><td><code>configs/grafana/dashboard.json</code></td><td><span class="badge badge-pass">✅</span> 仪表板模板就绪</td></tr>
+  <tr><td>Alertmanager</td><td><code>configs/alertmanager/rules.yml</code></td><td><span class="badge badge-pass">✅</span> 告警规则就绪</td></tr>
+  <tr><td>Logstash</td><td><code>configs/logstash/pipeline.conf</code></td><td><span class="badge badge-pass">✅</span> structlog JSON → ES</td></tr>
+  <tr><td>Prometheus</td><td><code>/metrics</code>（prometheus-fastapi-instrumentator）</td><td><span class="badge badge-pass">✅</span></td></tr>
+  <tr><td>健康检查</td><td><code>/health</code>（liveness/readiness 共用）</td><td><span class="badge badge-pass">✅</span></td></tr>
+</table>
+<ul class="checklist">
+  <li>OTEL Collector 后端（Jaeger/Tempo/Prometheus）是否已部署</li>
+  <li>Grafana 数据源已配置</li>
+  <li>Alertmanager → 通知渠道（邮件/Slack/Webhook）已配置</li>
+  <li>Elasticsearch 集群已部署（Logstash 目标）</li>
+</ul>
+
+<!-- 4.6 -->
+<h3 id="s4-6">4.6 数据库</h3>
+<table>
+  <tr><th>项目</th><th>详情</th></tr>
+  <tr><td>ORM</td><td>SQLAlchemy 2.0.25</td></tr>
+  <tr><td>迁移工具</td><td>Alembic 1.13.0</td></tr>
+  <tr><td>迁移文件</td><td>4 个（2 SQL + 2 Python）</td></tr>
+  <tr><td>开发 DB</td><td>SQLite（零依赖）</td></tr>
+  <tr><td>测试 DB</td><td>PostgreSQL 15（CI）/ SQLite（单元测试）</td></tr>
+  <tr><td>生产 DB</td><td>PostgreSQL 15</td></tr>
+</table>
+
+<h4>迁移清单</h4>
+<pre>alembic/versions/002_goal_loop.sql                         — 目标循环
+alembic/versions/003_trace_spans.sql                       — 追踪跨度
+alembic/versions/20260707_add_severity_to_review_decisions.py  — review_decisions 加 severity
+alembic/versions/20260710_add_parent_id_to_code_nodes.py       — code_nodes 加 parent_id</pre>
+
+<!-- 4.7 -->
+<h3 id="s4-7">4.7 CI/CD 流水线</h3>
+<table>
+  <tr><th>工作流</th><th>触发</th><th>覆盖</th></tr>
+  <tr><td><code>ci.yml</code></td><td>PR + push master</td><td>Lint + typecheck + 单元/集成测试 + Codecov</td></tr>
+  <tr><td><code>integration.yml</code></td><td>PR + push master</td><td>PostgreSQL + Redis 真实容器</td></tr>
+  <tr><td><code>e2e-test.yml</code></td><td>PR + push master</td><td>Playwright E2E，10 分钟超时</td></tr>
+  <tr><td><code>security.yml</code></td><td>PR + push + 每周</td><td>pip-audit + bandit + gitleaks</td></tr>
+  <tr><td><code>perf.yml</code></td><td>PR + push master</td><td>性能基准（调度延迟 ≤1500ms）</td></tr>
+  <tr><td><code>mutation.yml</code></td><td>push master + 手动</td><td>mutmut 变异测试（3 核心模块）</td></tr>
+  <tr><td><code>docker-build.yml</code></td><td>PR + push + tag</td><td>镜像构建 → GHCR + 冒烟</td></tr>
+</table>
+
+<!-- 4.8 -->
+<h3 id="s4-8">4.8 文档追溯</h3>
+<table>
+  <tr><th>文档</th><th>更新状态</th><th>基线版本</th></tr>
+  <tr><td>产品路线图</td><td><span class="badge badge-pass">✅</span></td><td>v0.47.0</td></tr>
+  <tr><td>已实现功能清单</td><td><span class="badge badge-pass">✅</span></td><td>v0.47.0</td></tr>
+  <tr><td>开发计划</td><td><span class="badge badge-pass">✅</span> V14→V15 已更新</td><td>—</td></tr>
+  <tr><td>项目章程</td><td><span class="badge badge-pass">✅</span></td><td>度量基线已定义</td></tr>
+  <tr><td>SESSION.md</td><td><span class="badge badge-pass">✅</span></td><td>2026-07-09</td></tr>
+  <tr><td>ADR</td><td><span class="badge badge-pass">✅</span></td><td>16+ 篇逐 Step 覆盖</td></tr>
+</table>
+
+<p><strong>模块完成度</strong>：78/82 ✅（95.1%）。4 个 ⏳ 均为非关键路径。</p>
+
+<!-- ──────────────────── 5. 行动清单 ──────────────────── -->
+<h2 id="s5">5. 行动清单</h2>
+
+<h3>发布前必须完成（阻断项）</h3>
+<table>
+  <tr><th>#</th><th>行动</th><th>预估</th></tr>
+  <tr><td>B1</td><td>覆盖率从 69.93% 提升到 ≥80%</td><td>2-3 天</td></tr>
+  <tr><td>B2</td><td>修复 <code>test_error_rate_below_min_calls_no_trip</code></td><td>1 小时</td></tr>
+  <tr><td>B3</td><td>确认 <code>.env</code> 未被追踪，若已追踪则移除+轮换密钥</td><td>30 分钟</td></tr>
+</table>
+
+<h3>发布前推荐完成（可并行）</h3>
+<table>
+  <tr><th>#</th><th>行动</th><th>预估</th></tr>
+  <tr><td>S1</td><td><code>poetry lock --no-update</code> → CI 恢复绿色</td><td>15 分钟</td></tr>
+  <tr><td>S2</td><td>5 项 gitignore 遗漏补充</td><td>5 分钟</td></tr>
+  <tr><td>S3</td><td>Helm chart 增加 Secret + ConfigMap 模板</td><td>2 小时</td></tr>
+  <tr><td>S4</td><td>5 个零覆盖模块至少 1 条测试</td><td>4 小时</td></tr>
+  <tr><td>S5</td><td>Dockerfile 多阶段改造</td><td>1 小时</td></tr>
+  <tr><td>S6</td><td>前端 CI 接入（TS 类型检查 + vitest）</td><td>3 小时</td></tr>
+</table>
+
+<h3>生产部署后验证</h3>
+<table>
+  <tr><th>#</th><th>验证项</th><th>方法</th></tr>
+  <tr><td>V1</td><td>完整链路</td><td>创建期间→期初→凭证→过账→试算平衡→报表</td></tr>
+  <tr><td>V2</td><td>调度延迟 ≤1500ms</td><td>Prometheus 指标检查</td></tr>
+  <tr><td>V3</td><td>幻觉率 &lt;3%</td><td>OTEL 追踪采样</td></tr>
+  <tr><td>V4</td><td>健康检查端点</td><td>/health + /metrics + startup-probe</td></tr>
+  <tr><td>V5</td><td>日志采集</td><td>Elasticsearch 索引确认</td></tr>
+  <tr><td>V6</td><td>告警生效</td><td>触发测试告警 → 通知到达</td></tr>
+</table>
+
+<!-- ──────────────────── 6. 风险矩阵 ──────────────────── -->
+<h2 id="s6">6. 风险矩阵</h2>
+<table>
+  <tr><th>风险</th><th>概率</th><th>影响</th><th>缓解</th></tr>
+  <tr>
+    <td>覆盖率不足导致生产缺陷</td>
+    <td><span class="badge badge-warn">中</span></td>
+    <td><span class="badge badge-fail">高</span></td>
+    <td>B1 修复</td>
+  </tr>
+  <tr>
+    <td><code>.env</code> 泄露密钥</td>
+    <td><span class="badge badge-pass">低</span></td>
+    <td><span class="badge badge-fail">极高</span></td>
+    <td>B3 验证</td>
+  </tr>
+  <tr>
+    <td>LLM 网关不稳定</td>
+    <td><span class="badge badge-warn">中</span></td>
+    <td><span class="badge badge-fail">高</span></td>
+    <td>三层路由+降级已实现，需压测</td>
+  </tr>
+  <tr>
+    <td>Docker 沙箱逃逸</td>
+    <td><span class="badge badge-pass">极低</span></td>
+    <td><span class="badge badge-fail">极高</span></td>
+    <td>5 层权限引擎+ProcessSandbox</td>
+  </tr>
+  <tr>
+    <td>Tauri WebView2 兼容性</td>
+    <td><span class="badge badge-pass">低</span></td>
+    <td><span class="badge badge-warn">中</span></td>
+    <td>已打包 Bootstrapper，需实测</td>
+  </tr>
+  <tr>
+    <td>K8s 配置不完整</td>
+    <td><span class="badge badge-warn">中</span></td>
+    <td><span class="badge badge-warn">中</span></td>
+    <td>S3 Secret/ConfigMap 补充</td>
+  </tr>
+  <tr>
+    <td>poetry.lock 不同步</td>
+    <td><span class="badge badge-fail">高</span></td>
+    <td><span class="badge badge-pass">低</span></td>
+    <td>S1 修复</td>
+  </tr>
+</table>
+
+<!-- ──────────────────── 7. 签核 ──────────────────── -->
+<h2 id="s7">7. 签核</h2>
+<table>
+  <tr><th>角色</th><th>检查项</th><th>状态</th></tr>
+  <tr><td>开发</td><td>代码质量门禁（lint/typecheck/test）</td><td><span class="badge badge-warn">⚠ 1 fail</span></td></tr>
+  <tr><td>安全</td><td>安全扫描 + 凭证检查</td><td><span class="badge badge-pass">✅</span></td></tr>
+  <tr><td>SRE</td><td>Docker/k8s/可观测性就绪</td><td><span class="badge badge-warn">⚠ Helm 缺 Secret</span></td></tr>
+  <tr><td>QA</td><td>测试覆盖率门禁</td><td><span class="badge badge-fail">❌ 69.93%</span></td></tr>
+  <tr><td>PM</td><td>功能清单+路线图一致</td><td><span class="badge badge-pass">✅</span></td></tr>
+</table>
+
+<div class="verdict verdict-warn" style="margin-top:1.5rem;">
+  <strong>最终判定</strong>：3 个阻断项解决后发布。<br>
+  <strong>建议顺序</strong>：B2（30min）→ B3（30min）→ S1（15min）→ B1（2-3 天）→ S2-S6 并行推进。
+</div>
+
+<hr>
+<p style="color:var(--muted);font-size:.8rem;">
+  报告技术栈：Python 3.11+ · FastAPI · Vue 3 · Tauri v2 · PostgreSQL 15 · Redis 7.2 · Docker · Kubernetes · Helm
+</p>
+
+</body>
+</html>

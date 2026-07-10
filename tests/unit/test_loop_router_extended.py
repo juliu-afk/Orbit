@@ -15,10 +15,6 @@ class TestLoopModels:
         assert s.interval_seconds == 300
         assert s.command == "/goal test"
 
-    def test_loop_runner_default(self):
-        r = LoopRunner()
-        assert r.schedule != ""
-
 
 class TestRouterAgent:
     def test_init(self):

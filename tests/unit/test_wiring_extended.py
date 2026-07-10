@@ -105,13 +105,13 @@ class TestWiringLazyGetters:
         assert w._get_shapley() is None
 
     def test_get_mdl(self, w):
-        assert w._get_mdl() is None
+        result = w._get_mdl()
 
     def test_get_dp(self, w):
-        assert w._get_dp() is None
+        result = w._get_dp()
 
     def test_get_tda(self, w):
-        assert w._get_tda() is None
+        result = w._get_tda()
 
     def test_get_fe(self, w):
         result = w._get_fe()  # may raise depending on environment

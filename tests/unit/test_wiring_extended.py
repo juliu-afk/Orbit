@@ -1,127 +1,69 @@
-"""integration/wiring.py extended — lazy getter coverage.
-Each _get_* method follows same pattern: check None → try import → cache.
-Testing them all gives ~200+ statements.
-"""
-from __future__ import annotations
-
+import sys
+from unittest.mock import MagicMock
 import pytest
-from unittest.mock import MagicMock, patch
-
 from orbit.integration.wiring import OrbitWiring
 
+_MODULES = ["orbit.observability.trajectory","orbit.memory.episodic","orbit.memory.profile",
+"orbit.memory.agentic","orbit.evolution.distill","orbit.evolution.anchor","orbit.evolution.grpo",
+"orbit.evolution.inject","orbit.evolution.llm_distill","orbit.metacognition.monitor",
+"orbit.agents.mcts","orbit.router.bandit","orbit.observability.drift_detector",
+"orbit.metacognition.pid_controller","orbit.testing.conformal","orbit.graph.spectral",
+"orbit.compression.ib_compressor","orbit.context.ot_matcher","orbit.agents.mdp",
+"orbit.hallucination.abstract_interp","orbit.compose.mechanism","orbit.evolution.pac_bounds",
+"orbit.graph.engines.slicer","orbit.hallucination.l9_temporal","orbit.hallucination.l10_separation",
+"orbit.agents.bisim","orbit.goal.bft","orbit.observability.attribution","orbit.review.mdl_scorer",
+"orbit.observability.dp","orbit.graph.tda","orbit.metacognition.free_energy",
+"orbit.evolution.info_geom","orbit.hallucination.effect_tracker","orbit.gateway.client"]
 
-class TestWiringLazyGetters:
-    """Test all lazy getters — each returns None when imports fail."""
+@pytest.fixture(autouse=True)
+def _mock():
+    saved = {}
+    for m in _MODULES:
+        mock = MagicMock()
+        cls_name = "".join(w.capitalize() for w in m.split(".")[-1].split("_"))
+        setattr(mock, cls_name, MagicMock())
+        saved[m] = sys.modules.get(m)
+        sys.modules[m] = mock
+    yield
+    for m, o in saved.items():
+        if o is None: sys.modules.pop(m, None)
+        else: sys.modules[m] = o
 
+class TestWiringExtended:
     @pytest.fixture
-    def w(self):
-        return OrbitWiring(db_path=":memory:")
-
-    # Core getters (sprint 1-3 modules)
-    def test_get_trajectory(self, w):
-        assert w._get_trajectory() is None
-
-    def test_get_episodic(self, w):
-        assert w._get_episodic() is None
-
-    def test_get_profile(self, w):
-        assert w._get_profile() is None
-
-    def test_get_agentic(self, w):
-        assert w._get_agentic() is None
-
-    def test_get_distill(self, w):
-        assert w._get_distill() is None
-
-    def test_get_anchor(self, w):
-        assert w._get_anchor() is None
-
-    def test_get_grpo(self, w):
-        assert w._get_grpo() is None
-
-    def test_get_injector(self, w):
-        assert w._get_injector() is None
-
-    def test_get_llm_distill(self, w):
-        assert w._get_llm_distill() is None
-
-    def test_get_monitor(self, w):
-        assert w._get_monitor() is None
-
-    def test_get_mcts(self, w):
-        assert w._get_mcts() is None
-
-    # V14.2+Theory getters
-    def test_get_bandit(self, w):
-        assert w._get_bandit() is None
-
-    def test_get_drift(self, w):
-        assert w._get_drift() is None
-
-    def test_get_pid(self, w):
-        assert w._get_pid() is None
-
-    def test_get_conformal(self, w):
-        assert w._get_conformal() is None
-
-    # P1+P2 getters
-    def test_get_spectral(self, w):
-        assert w._get_spectral() is None
-
-    def test_get_ib(self, w):
-        assert w._get_ib() is None
-
-    def test_get_ot(self, w):
-        assert w._get_ot() is None
-
-    def test_get_mdp(self, w):
-        assert w._get_mdp() is None
-
-    def test_get_abs_pipe(self, w):
-        assert w._get_abs_pipe() is None
-
-    def test_get_vcg(self, w):
-        assert w._get_vcg() is None
-
-    def test_get_pac(self, w):
-        assert w._get_pac() is None
-
-    def test_get_slicer(self, w):
-        assert w._get_slicer() is None
-
-    def test_get_temporal(self, w):
-        assert w._get_temporal() is None
-
-    def test_get_sep(self, w):
-        assert w._get_sep() is None
-
-    def test_get_bisim(self, w):
-        result = w._get_bisim()
-
-    def test_get_bft(self, w):
-        result = w._get_bft()
-
-    def test_get_shapley(self, w):
-        result = w._get_shapley()
-
-    def test_get_mdl(self, w):
-        result = w._get_mdl()
-
-    def test_get_dp(self, w):
-        result = w._get_dp()
-
-    def test_get_tda(self, w):
-        result = w._get_tda()
-
-    def test_get_fe(self, w):
-        result = w._get_fe()  # may raise depending on environment
-
-    def test_get_ig(self, w):
-        result = w._get_ig()
-        # May raise or return None depending on deps
-
-    def test_get_effect(self, w):
-        result = w._get_effect()
-
-    def test_get_llm_client(self, w):
-        result = w._get_llm_client()
+    def w(self): return OrbitWiring(db_path=":memory:")
+    def test_traj(self,w): assert w._get_trajectory() is not None
+    def test_epi(self,w): assert w._get_episodic() is not None
+    def test_prof(self,w): assert w._get_profile() is not None
+    def test_ag(self,w): assert w._get_agentic() is not None
+    def test_dis(self,w): assert w._get_distill() is not None
+    def test_anc(self,w): assert w._get_anchor() is not None
+    def test_grpo(self,w): assert w._get_grpo() is not None
+    def test_inj(self,w): assert w._get_injector() is not None
+    def test_lld(self,w): assert w._get_llm_distill() is not None
+    def test_mon(self,w): assert w._get_monitor() is not None
+    def test_mcts(self,w): assert w._get_mcts() is not None
+    def test_band(self,w): assert w._get_bandit() is not None
+    def test_drift(self,w): assert w._get_drift() is not None
+    def test_pid(self,w): assert w._get_pid() is not None
+    def test_conf(self,w): assert w._get_conformal() is not None
+    def test_spec(self,w): assert w._get_spectral() is not None
+    def test_ib(self,w): assert w._get_ib() is not None
+    def test_ot(self,w): assert w._get_ot() is not None
+    def test_mdp(self,w): assert w._get_mdp() is not None
+    def test_abs(self,w): assert w._get_abs_pipe() is not None
+    def test_vcg(self,w): assert w._get_vcg() is not None
+    def test_pac(self,w): assert w._get_pac() is not None
+    def test_slice(self,w): assert w._get_slicer() is not None
+    def test_temp(self,w): assert w._get_temporal() is not None
+    def test_sep(self,w): assert w._get_sep() is not None
+    def test_bisim(self,w): assert w._get_bisim() is not None
+    def test_bft(self,w): assert w._get_bft() is not None
+    def test_shap(self,w): assert w._get_shapley() is not None
+    def test_mdl(self,w): assert w._get_mdl() is not None
+    def test_dp(self,w): assert w._get_dp() is not None
+    def test_tda(self,w): assert w._get_tda() is not None
+    def test_fe(self,w): assert w._get_fe() is not None
+    def test_ig(self,w): assert w._get_ig() is not None
+    def test_eff(self,w): assert w._get_effect() is not None
+    def test_llm(self,w): assert w._get_llm_client() is not None

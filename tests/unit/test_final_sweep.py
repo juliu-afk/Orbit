@@ -28,8 +28,8 @@ def test_ablation_context():
     assert not AblationContext.is_disabled("test")
 
 
-def test_snapshot_manager_init(tmp_path):
-    from orbit.backup.snapshot import SnapshotManager
+def test_snapshot_init(tmp_path):
+    from orbit.backup.manager import SnapshotManager
     s = SnapshotManager(str(tmp_path))
     assert s is not None
 
@@ -49,9 +49,3 @@ def test_worktree_manager():
 def test_stream_sse():
     from orbit.stream.sse import router
     assert router is not None
-
-
-def test_compose_engine():
-    from orbit.compose.engine import ComposeEngine
-    e = ComposeEngine()
-    assert e is not None

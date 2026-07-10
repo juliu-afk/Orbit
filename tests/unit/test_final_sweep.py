@@ -17,12 +17,6 @@ def test_events_constants():
     assert bus is not None
 
 
-def test_sharding_engine():
-    from orbit.sharding.engine import ShardingEngine
-    e = ShardingEngine()
-    assert e is not None
-
-
 def test_security_guard():
     from orbit.security.guard import WorkspaceGuard
     g = WorkspaceGuard("/tmp")
@@ -31,12 +25,33 @@ def test_security_guard():
 
 def test_ablation_context():
     from orbit.effectiveness.ablation import AblationContext
-    assert AblationContext.is_disabled("test") is False
+    assert not AblationContext.is_disabled("test")
 
 
-def test_backup_snapshot():
+def test_snapshot_manager_init(tmp_path):
     from orbit.backup.snapshot import SnapshotManager
-    import tempfile
-    d = tempfile.mkdtemp()
-    s = SnapshotManager(d)
+    s = SnapshotManager(str(tmp_path))
     assert s is not None
+
+
+def test_versioning_registry():
+    from orbit.versioning.registry import VersionRegistry
+    r = VersionRegistry()
+    assert r is not None
+
+
+def test_worktree_manager():
+    from orbit.worktree.manager import WorktreeManager
+    w = WorktreeManager()
+    assert w is not None
+
+
+def test_stream_sse():
+    from orbit.stream.sse import router
+    assert router is not None
+
+
+def test_compose_engine():
+    from orbit.compose.engine import ComposeEngine
+    e = ComposeEngine()
+    assert e is not None

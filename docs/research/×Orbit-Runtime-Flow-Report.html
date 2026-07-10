@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orbit 完整运行流程报告</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --border: #30363d;
+  --text: #c9d1d9; --muted: #8b949e; --accent: #58a6ff;
+  --green: #3fb950; --red: #f85149; --yellow: #d2991d;
+  --orange: #db6d28; --purple: #a371f7; --pink: #f778ba;
+  --cyan: #39d2c0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--text); line-height: 1.6;
+}
+body { max-width: 1400px; margin: 0 auto; padding: 20px; }
+h1 { font-size: 2em; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+h2 { font-size: 1.5em; color: var(--accent); margin-top: 40px; border-left: 4px solid var(--accent); padding-left: 12px; }
+h3 { color: var(--purple); margin-top: 28px; }
+.section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; }
+.mermaid { background: #fff; border-radius: 6px; padding: 16px; margin: 16px 0; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+th { background: #21262d; font-weight: 600; }
+tr:nth-child(even) { background: #161b22; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 600; }
+.badge-green { background: #1b3a1b; color: var(--green); }
+.badge-red { background: #3a1b1b; color: var(--red); }
+.badge-yellow { background: #3a351b; color: var(--yellow); }
+.badge-purple { background: #2a1b3a; color: var(--purple); }
+.badge-cyan { background: #1b3a3a; color: var(--cyan); }
+.badge-orange { background: #3a2a1b; color: var(--orange); }
+.failure-card { border-left: 3px solid var(--red); background: #1a1015; padding: 10px 14px; margin: 8px 0; border-radius: 0 6px 6px 0; }
+.recovery-card { border-left: 3px solid var(--green); background: #101a15; padding: 10px 14px; margin: 8px 0; border-radius: 0 6px 6px 0; }
+.loop-card { border-left: 3px solid var(--orange); background: #1a1510; padding: 10px 14px; margin: 8px 0; border-radius: 0 6px 6px 0; }
+.mod-flow { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.mod-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+.mod-card h4 { margin: 0 0 6px; color: var(--accent); }
+.mod-card p { margin: 4px 0; font-size: 0.9em; color: var(--muted); }
+.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.toc ul { columns: 2; }
+code { background: #21262d; padding: 1px 6px; border-radius: 3px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h1>🛸 Orbit 完整运行时流程报告</h1>
+<p style="color:var(--muted)">
+  生成时间: 2026-07-07 | 覆盖范围: 启动→调度→Agent执行→防幻觉→沙箱→检查点→熔断→审计→UI反馈 全链路<br>
+  45个源码模块 | 269个测试文件 | ~48K Python LOC | 28个API路由模块
+</p>
+
+<div class="toc">
+<h3>📑 目录</h3>
+<ul>
+<li><a href="#overview">1. 系统总览</a></li>
+<li><a href="#entry">2. 启动入口</a></li>
+<li><a href="#api">3. API / 前端交互层</a></li>
+<li><a href="#goal-flow">4. Goal 编排主流程 (MetaOrchestrator)</a></li>
+<li><a href="#intake">5. Intake Router 输入判定</a></li>
+<li><a href="#subtask">6. SubTaskSession 流水线</a></li>
+<li><a href="#process-guard">7. ProcessGuard 流程守卫</a></li>
+<li><a href="#agent-exec">8. Agent 执行引擎</a></li>
+<li><a href="#gateway">9. LLM 网关 & 熔断器</a></li>
+<li><a href="#hallucination">10. 9层防幻觉管道</a></li>
+<li><a href="#sandbox">11. Docker 沙箱执行</a></li>
+<li><a href="#checkpoint">12. 检查点持久化</a></li>
+<li><a href="#resource-guard">13. 资源熔断 (ResourceGuard)</a></li>
+<li><a href="#context">14. 上下文系统</a></li>
+<li><a href="#compose">15. Compose 多Agent编排</a></li>
+<li><a href="#failure-cycles">16. 失败循环 & 条件汇总</a></li>
+<li><a href="#ui-feedback">17. UI 反馈映射</a></li>
+<li><a href="#full-flow">18. 全链路主流程图</a></li>
+</ul>
+</div>
+
+<!-- ============== 1. 系统总览 ============== -->
+<h2 id="overview">1. 系统总览</h2>
+<div class="section">
+<p><strong>Orbit</strong> = 轻量级多Agent软件开发自循环系统。定位在<strong>编排层</strong>——不是单Agent执行工具，而是让一群AI协作完成软件开发全流程的治理系统。</p>
+<p>核心价值: <span class="badge badge-purple">编排</span> <span class="badge badge-cyan">治理</span> <span class="badge badge-green">验证</span> <span class="badge badge-yellow">追溯</span></p>
+
+<h3>五图谱体系</h3>
+<div class="mod-flow">
+  <div class="mod-card"><h4>代码图谱</h4><p>Tree-sitter AST解析，符号级代码理解</p></div>
+  <div class="mod-card"><h4>数据库图谱</h4><p>DDL解析 + MVCC版本追踪</p></div>
+  <div class="mod-card"><h4>配置图谱</h4><p>.env / Nginx / docker-compose 解析</p></div>
+  <div class="mod-card"><h4>知识图谱</h4><p>外挂领域知识 + BGE语义搜索 + TF-IDF降级</p></div>
+  <div class="mod-card"><h4>元图谱</h4><p>12种跨图谱关系 (READS_FROM/WRITES_TO/DEPENDS_ON...)</p></div>
+</div>
+
+<h3>模型体系 (Tier 换位 2026-06-26)</h3>
+<table>
+<tr><th>Tier</th><th>模型</th><th>用途</th><th>角色</th></tr>
+<tr><td>T3 最强推理</td><td>GLM-5.2</td><td>复杂架构设计</td><td><span class="badge badge-purple">architect</span></td></tr>
+<tr><td>T2 中档推理</td><td>DeepSeek V4 Pro</td><td>编码/审查/测试</td><td><span class="badge badge-cyan">developer</span> <span class="badge badge-green">reviewer</span> <span class="badge badge-yellow">qa</span></td></tr>
+<tr><td>T1 轻量任务</td><td>DeepSeek V4 Flash</td><td>配置/澄清</td><td><span class="badge badge-orange">config_manager</span> <span class="badge badge-purple">clarifier</span></td></tr>
+<tr><td>降级兜底</td><td>GLM-4.7 Flash</td><td>免费降级</td><td>所有角色降级</td></tr>
+</table>
+</div>
+
+<!-- ============== 2. 启动入口 ============== -->
+<h2 id="entry">2. 启动入口——从双击exe到服务就绪</h2>
+<div class="section">
+<div class="mermaid">
+flowchart TD
+    A["🖱️ 双击 Orbit.exe<br/>(Tauri 桌面壳, ~20MB)"] --> B["Tauri Rust Shell 启动"]
+    B --> C["内嵌 Python 后端启动<br/>launcher.py → uvicorn.run(app)"]
+    C --> D["FastAPI 应用组装<br/>create_app()"]
+    D --> E1["注册 28 个路由模块<br/>(懒加载 _ROUTE_SPEC)"]
+    D --> E2["注册中间件<br/>(CORS + Auth + BodyLimit)"]
+    D --> E3["初始化 Scheduler<br/>+ LLMClient + EventBus"]
+    D --> E4["初始化 CheckpointManager<br/>(Redis→PG→内存→磁盘)"]
+    D --> E5["挂载前端静态文件<br/>(Vue3 dist)"]
+    E1 & E2 & E3 & E4 & E5 --> F["✅ Uvicorn 监听<br/>0.0.0.0:18888"]
+    F --> G["Tauri WebView<br/>加载 http://127.0.0.1:18888"]
+    G --> H["Vue3 驾驶舱渲染<br/>BootView → DashboardView"]
+
+    style A fill:#1b3a1b,stroke:#3fb950
+    style H fill:#1b2a3a,stroke:#58a6ff
+</div>
+
+<h3>启动方式对比</h3>
+<table>
+<tr><th>方式</th><th>命令</th><th>前端</th><th>数据库</th><th>适用</th></tr>
+<tr><td>双击exe (推荐)</td><td>双击 Orbit.exe</td><td>内置静态文件</td><td>SQLite</td><td>终端用户</td></tr>
+<tr><td>源码启动</td><td><code>poetry run python src/orbit/launcher.py</code></td><td>内置静态文件</td><td>SQLite</td><td>开发</td></tr>
+<tr><td>源码+前端热重载</td><td>后端 + <code>cd frontend && pnpm dev</code></td><td>Vite :5173</td><td>SQLite</td><td>前端开发</td></tr>
+<tr><td>Docker 全栈</td><td><code>make init</code></td><td>内置静态文件</td><td>PostgreSQL + Redis</td><td>生产模拟</td></tr>
+</table>
+</div>
+
+<!-- ============== 3. API/前端交互层 ============== -->
+<h2 id="api">3. API / 前端交互层</h2>
+<div class="section">
+<div class="mermaid">
+flowchart LR
+    subgraph Frontend["Vue3 驾驶舱 (Pinia + AG-UI)"]
+        DV[DashboardView<br/>主工作台]
+        TS[TerminalShell<br/>终端]
+        CP[ChatPanel<br/>聊天面板]
+        RP[右侧监控面板<br/>状态/Token/告警]
+    end
+
+    subgraph Transport["传输层"]
+        WS[WebSocket<br/>实时诊断+状态推送]
+        SSE[SSE 流式<br/>Agent输出逐Token推送]
+        HTTP[REST API<br/>CRUD + 任务调度]
+    end
+
+    subgraph API["FastAPI 路由 (28模块)"]
+        R1[chat/router<br/>对话交互]
+        R2[goal/router<br/>Goal生命周期]
+        R3[compose/router<br/>多Agent编排]
+        R4[tasks/router<br/>任务管理]
+        R5[observability<br/>可观测性]
+        R6[loop/router<br/>定时调度]
+        R7[dream/router<br/>后台异步]
+        R8[其他21个路由...]
+    end
+
+    DV --> WS & SSE & HTTP
+    CP --> SSE & HTTP
+    TS --> WS & HTTP
+    RP --> WS
+    WS & SSE & HTTP --> R1 & R2 & R3 & R4 & R5 & R6 & R7
+
+    style Frontend fill:#1b2a3a,stroke:#58a6ff
+    style API fill:#2a1b3a,stroke:#a371f7
+</div>
+
+<h3>API 响应格式 (统一)</h3>
+<pre><code>// 成功: { code: 0, data: {...}, message: "ok" }
+// 错误: { code: 错误码, data: null, message: "具体原因" }</code></pre>
+
+<h3>WebSocket 事件类型 (实时推送)</h3>
+<table>
+<tr><th>事件</th><th>Payload</th><th>触发时机</th></tr>
+<tr><td><code>task:update</code></td><td>task_id, state, progress, dag[], output</td><td>状态转换后</td></tr>
+<tr><td><code>token:update</code></td><td>prompt_tokens, completion_tokens, total_tokens</td><td>每次LLM调用后</td></tr>
+<tr><td><code>dashboard:health</code></td><td>healthy/degraded/unhealthy, alerts[]</td><td>健康检查周期</td></tr>
+<tr><td><code>dashboard:metrics</code></td><td>active_tasks, circuit_breaker_state, latency</td><td>指标推送周期</td></tr>
+</table>
+
+<h3>SSE 流式事件 (Agent 实时输出)</h3>
+<table>
+<tr><th>事件</th><th>数据格式</th><th>说明</th></tr>
+<tr><td><code>TEXT_DELTA</code></td><td><code>{"delta": "文本片段"}</code></td><td>逐Token增量推送</td></tr>
+<tr><td><code>TOOL_CALL</code></td><td><code>{"tool_calls": [{id, type, function}]}</code></td><td>工具调用聚合完成</td></tr>
+<tr><td><code>ERROR</code></td><td><code>{"message": "...", "code": "..."}</code></td><td>流式错误</td></tr>
+</table>
+</div>
+
+<!-- ============== 4. Goal 编排主流程 ============== -->
+<h2 id="goal-flow">4. Goal 编排主流程 (MetaOrchestrator)</h2>
+<div class="section">
+<p><strong>入口</strong>: 用户在前端聊天面板输入需求 → <code>POST /api/v1/goal</code> → <code>MetaOrchestrator.run(goal)</code></p>
+
+<div class="mermaid">
+flowchart TD
+    START(["📝 用户输入 Goal<br/>(模糊需求/PRD/复数文档)"]) --> GEN["自动生成 CLAUDE.md<br/>(fail-open: 失败不阻塞)"]
+    GEN --> ROUTE["🔀 IntakeRouter.route()<br/>判定输入形态"]
+
+    ROUTE -->|"is_batch=true<br/>复数文档"| BATCH["_run_batch()<br/>依赖分析 + 队列执行"]
+    ROUTE -->|"needs_clarify=true<br/>清晰度 &lt; 0.7"| CLARIFY["_clarify()<br/>ClarifierAgent 多轮澄清"]
+    ROUTE -->|"needs_decompose=true<br/>拆解度 &lt; 0.7"| DECOMPOSE["ComposeBridge.generate_spec()<br/>拆解为 TaskDAG"]
+
+    BATCH --> BATCH_DETAIL["DependencyAnalyzer.analyze()<br/>→ 检测环形依赖 → 失败退出<br/>→ 逐层 Semaphore 并发执行"]
+    CLARIFY --> DECOMPOSE
+    DECOMPOSE --> SPEC{"有 Spec?"}
+
+    SPEC -->|"有 ComposeOrchestrator"| DELEGATE["委托给 ComposeOrchestrator<br/>run_spec()"]
+    SPEC -->|"有 TaskDAG"| LAYERS["拓扑分层<br/>_topological_layers()"]
+    SPEC -->|"无 Spec (单任务)"| SINGLE["_run_single_task()<br/>可选 TaskShardingEngine 分片"]
+
+    LAYERS --> LAYER_LOOP["🔄 逐层循环 (for layer in layers)"]
+
+    LAYER_LOOP --> BUDGET_ALLOC["BudgetAllocator.allocate()<br/>按层分配 Token 预算"]
+    BUDGET_ALLOC --> PARALLEL["层内并行: asyncio.gather()<br/>每个 Task → _run_subtask()"]
+    PARALLEL --> SUBTASK["SubTaskSession<br/>.run_full_pipeline()"]
+
+    SUBTASK --> RESULT_CHECK{"子任务结果?"}
+    RESULT_CHECK -->|"ok"| REGRESSION["RegressionGuard.check()<br/>回归测试"]
+    RESULT_CHECK -->|"critique_loop"| PAUSE_CRITIQUE["⏸️ GoalResult status=paused<br/>批判退回超上限"]
+    RESULT_CHECK -->|"failed"| FAIL_COUNT{"consecutive_failures ≥ 3?"}
+    FAIL_COUNT -->|"是"| FAIL_GOAL["❌ GoalResult status=failed"]
+    FAIL_COUNT -->|"否"| CONTINUE["继续下一子任务"]
+
+    REGRESSION --> PAUSE_CHECK["⏸️ _pause_event.wait()<br/>检查暂停信号"]
+    PAUSE_CHECK --> PROGRESS["ProgressTracker.update()"]
+    PROGRESS --> ALIGN{"completed % 5 == 0?"}
+    ALIGN -->|"是"| ALIGN_CHECK["AlignmentCheck.check()<br/>对齐检查"]
+    ALIGN_CHECK --> ALIGN_RESULT{"连续2次对齐失败?"}
+    ALIGN_RESULT -->|"是"| PAUSE_ALIGN["⏸️ GoalResult status=paused"]
+    ALIGN_RESULT -->|"否"| BUDGET_CHECK
+    ALIGN -->|"否"| BUDGET_CHECK
+
+    BUDGET_CHECK{"预算耗尽?<br/>Token 或 时间"} -->|"是"| BUDGET_DONE["⚠️ GoalResult status=done<br/>reason=预算耗尽"]
+    BUDGET_CHECK -->|"否"| LAYER_LOOP
+
+    LAYER_LOOP -->|"所有层完成"| DONE["✅ GoalResult status=done"]
+
+    style START fill:#1b3a1b,stroke:#3fb950
+    style FAIL_GOAL fill:#3a1b1b,stroke:#f85149
+    style DONE fill:#1b3a1b,stroke:#3fb950
+    style PAUSE_CRITIQUE fill:#3a351b,stroke:#d2991d
+    style PAUSE_ALIGN fill:#3a351b,stroke:#d2991d
+    style BUDGET_DONE fill:#3a351b,stroke:#d2991d
+</div>
+
+<h3>GoalResult 状态码</h3>
+<table>
+<tr><th>状态</th><th>含义</th><th>触发条件</th></tr>
+<tr><td><code>done</code></td><td><span class="badge badge-green">成功</span></td><td>所有子任务完成 / 预算耗尽但部分完成</td></tr>
+<tr><td><code>partial</code></td><td><span class="badge badge-yellow">部分完成</span></td><td>部分子任务失败但有成功的 / 分片部分成功</td></tr>
+<tr><td><code>failed</code></td><td><span class="badge badge-red">失败</span></td><td>连续3个子任务失败 / 环形依赖 / 异常抛出</td></tr>
+<tr><td><code>paused</code></td><td><span class="badge badge-orange">暂停</span></td><td>批判退回超上限 / 连续2次对齐失败</td></tr>
+<tr><td><code>cancelled</code></td><td><span class="badge badge-red">取消</span></td><td>用户取消 / asyncio.CancelledError</td></tr>
+</table>
+</div>
+
+<!-- ============== 5. Intake Router ============== -->
+<h2 id="intake">5. Intake Router 输入判定</h2>
+<div class="section">
+<p><strong>功能</strong>: 启发式评分判定输入形态——决定哪些阶段可跳过 (fail-open: 不确定→走完整流程)</p>
+
+<div class="mermaid">
+flowchart TD
+    INPUT["GoalSession.description"] --> DETECT["_detect_form()<br/>检测输入形态"]
+
+    DETECT -->|"--from 或 batch_goals"| B["batch<br/>复数文档<br/>clarity跳过, decomp跳过"]
+    DETECT -->|"路径结尾.md + 文件存在"| F["single_file<br/>按普通字符串评分"]
+    DETECT -->|"含 TaskDAG 关键词"| T["task_only<br/>已有任务列表"]
+    DETECT -->|"默认"| V["vague_string<br/>模糊需求"]
+
+    B & F & T & V --> SCORE_C["_score_clarity()<br/>清晰度评分 0-1"]
+    SCORE_C --> SCORE_D["_score_decomposition()<br/>拆解度评分 0-1"]
+
+    SCORE_C --> |"说明"| C_DETAIL["评分依据:<br/>• 文本长度(>500→+0.20)<br/>• 验收标准关键词(+0.18)<br/>• 验证命令(+0.12)<br/>• 约束/Non-Goals(+0.10)<br/>• YAML frontmatter(+0.15)"]
+    SCORE_D --> |"说明"| D_DETAIL["评分依据:<br/>• 子任务/ Tasks 标题(+0.20)<br/>• depends_on(+0.20)<br/>• 任务列表(+0.15)<br/>• agent_role(+0.10)<br/>• Markdown表格+任务表头(+0.15)"]
+
+    SCORE_C --> DECISION{"判定"}
+    DECISION -->|"clarity ≥ 0.7"| SKIP_C["跳过澄清"]
+    DECISION -->|"0.4 ≤ clarity &lt; 0.7"| NEED_C["需要补齐澄清"]
+    DECISION -->|"clarity &lt; 0.4"| FULL_C["需要全量澄清"]
+</div>
+</div>
+
+<!-- ============== 6. SubTaskSession ============== -->
+<h2 id="subtask">6. SubTaskSession 流水线 (单子任务完整生命周期)</h2>
+<div class="section">
+<p><strong>核心设计</strong>: 每个子任务 = 独立 128K 上下文窗口 + 独立 Git 分支 + 独立 Worktree 隔离。子任务间通过 git merge commit 传递状态 (0 Token 开销)。</p>
+
+<div class="mermaid">
+flowchart TD
+    START_S(["SubTaskSession.run_full_pipeline()"]) --> WT["创建隔离 Worktree<br/>branch: goal/{goal_id}/{task_id}"]
+    WT --> LOOP_START{"状态循环<br/>while state ∉ TERMINAL_STATES"}
+
+    LOOP_START --> GUARD["🔒 ProcessGuard.check()<br/>代码级流程检查<br/>(LLM不可绕过)"]
+    GUARD --> EXEC["_execute_state(state)<br/>按角色创建Agent→执行"]
+
+    EXEC --> IDLE_D["IDLE: 初始状态<br/>→ 直接转换到 PARSING"]
+    EXEC --> PARSING["PARSING: ClarifierAgent<br/>解析需求→结构化输出"]
+    EXEC --> SCOPING["SCOPING: 确定性规则引擎<br/>(不调LLM,纯规则计算)"]
+    EXEC --> PLANNING["PLANNING: ArchitectAgent<br/>生成技术方案/架构设计"]
+    EXEC --> CODING["CODING: DeveloperAgent<br/>编写代码/修改文件"]
+
+    CODING --> CRITIQUE{"🔍 批判门禁<br/>_critique_gate()"}
+    CRITIQUE -->|"APPROVED"| VERIFY
+    CRITIQUE -->|"REJECTED"| RETRY{"critique_attempts<br/>&gt; MAX_RETRIES(2)?"}
+    RETRY -->|"否 ≤2"| FEEDBACK["注入 critique_feedback<br/>→ 重新 CODING"]
+    FEEDBACK --> CODING
+    RETRY -->|"是 >2"| CRITIQUE_LOOP(["❌ SubTaskResult<br/>status=critique_loop"])
+
+    VERIFY["VERIFYING: ReviewerAgent<br/>代码审查+验证"]
+    VERIFY --> DONE_STATE["DONE: 终态"]
+
+    EXEC --> CKPT["💾 _save_checkpoint()<br/>每次状态转换后保存"]
+
+    LOOP_START -->|"终态"| CLEANUP["清理 Worktree"]
+    CLEANUP --> RESULT(["✅ SubTaskResult<br/>status=ok + tokens_used"])
+
+    style GUARD fill:#2a1b3a,stroke:#a371f7
+    style CRITIQUE fill:#3a351b,stroke:#d2991d
+    style CRITIQUE_LOOP fill:#3a1b1b,stroke:#f85149
+    style RESULT fill:#1b3a1b,stroke:#3fb950
+</div>
+
+<h3>状态→角色映射</h3>
+<table>
+<tr><th>TaskState</th><th>Agent角色</th><th>task_type (模型路由)</th><th>超时(s)</th></tr>
+<tr><td>IDLE</td><td>chatter</td><td>summarization</td><td>120</td></tr>
+<tr><td>PARSING</td><td>clarifier</td><td>structured_output</td><td>120</td></tr>
+<tr><td>SCOPING</td><td>(规则引擎, 不调LLM)</td><td>summarization</td><td>30</td></tr>
+<tr><td>PLANNING</td><td>architect</td><td>reasoning</td><td>120</td></tr>
+<tr><td>CODING</td><td>developer</td><td>reasoning</td><td>180</td></tr>
+<tr><td>VERIFYING</td><td>reviewer</td><td>structured_output</td><td>120</td></tr>
+</table>
+
+<h3>CritiqueAgent 门禁 (5维度审查)</h3>
+<table>
+<tr><th>维度</th><th>检查内容</th><th>max_severity</th></tr>
+<tr><td>1. 安全性</td><td>SQL注入 / XSS / 命令注入 / 硬编码密钥</td><td>critical</td></tr>
+<tr><td>2. 调度器完整性</td><td>状态转换 / 检查点策略 / 回滚路径</td><td>critical</td></tr>
+<tr><td>3. 防幻觉影响</td><td>L1-L8链路 / 误报漏报风险</td><td>critical</td></tr>
+<tr><td>4. 方案一致性</td><td>是否偏离Spec</td><td>high</td></tr>
+<tr><td>5. 测试覆盖</td><td>正向+异常用例</td><td>high</td></tr>
+</table>
+</div>
+
+<!-- ============== 7. ProcessGuard ============== -->
+<h2 id="process-guard">7. ProcessGuard 流程守卫</h2>
+<div class="section">
+<p><strong>对标 MetaGPT SOP Enforcement</strong>: LLM 不可绕过的代码级流程检查。prompt-only 约束可被 LLM 通过 prompt 注入绕过→代码级守卫不可绕过。</p>
+
+<div class="mermaid">
+flowchart LR
+    subgraph Full["完整流水线 (FULL_PIPELINE_TRANSITIONS)"]
+        F1["IDLE"] --> F2["PARSING<br/>(强制)"]
+        F2 --> F3["PLANNING"]
+        F3 --> F4["CODING<br/>(强制)"]
+        F4 --> F5["VERIFYING"]
+        F5 --> F6["DONE"]
+    end
+
+    subgraph Fast["快车道路径 (FAST_LANE_TRANSITIONS)<br/>⚠️ 仅 ComplexityScorer 可授权"]
+        FF1["IDLE"] --> FF2["PARSING<br/>(强制)"]
+        FF2 --> FF3["CODING<br/>(强制,跳过PLANNING)"]
+        FF3 --> FF4["DONE<br/>(跳过VERIFYING)"]
+    end
+
+    style F2 fill:#3a1b1b,stroke:#f85149
+    style F4 fill:#3a1b1b,stroke:#f85149
+    style FF2 fill:#3a1b1b,stroke:#f85149
+    style FF3 fill:#3a1b1b,stroke:#f85149
+</div>
+
+<h3>ProcessGuard 4项检查 (每次状态转换前执行)</h3>
+<div class="failure-card">
+<strong>检查1: 强制状态不可跳过</strong><br>
+PARSING 和 CODING 是硬性强制状态。LLM 试图跳过→ <code>ProcessViolationError</code> 阻断。<br>
+判定方式: 比较 _STATE_ORDER，若已越过强制状态但未 visited→违规。
+</div>
+<div class="failure-card">
+<strong>检查2: PLANNING 跳过权限</strong><br>
+CODING 前 PLANNING 未 visited 且未授权快车道→违规。必须 ComplexityScorer 授权。
+</div>
+<div class="failure-card">
+<strong>检查3: VERIFYING 跳过权限</strong><br>
+DONE 前 VERIFYING 未 visited 且未授权快车道→违规。
+</div>
+<div class="failure-card">
+<strong>检查4: 前一状态产物完整性</strong><br>
+前驱状态的 artifact 必须存在（如 PARSING→PLANNING 时 PARSING 必须有产物）。
+</div>
+</div>
+
+<!-- ============== 8. Agent 执行引擎 ============== -->
+<h2 id="agent-exec">8. Agent 执行引擎</h2>
+<div class="section">
+<div class="mermaid">
+flowchart TD
+    CYCLE["_agent_cycle(task_id, state, context)"] --> ROLE{"角色映射<br/>ROLE_MAP[state]"}
+    ROLE -->|"SCOPING"| SCOPING_R["_run_scoping()<br/>确定性规则引擎<br/>(不调LLM)"]
+    ROLE -->|"其他"| CTX["_build_context()<br/>3级上下文构建"]
+
+    CTX --> RUN["_run_agent()<br/>asyncio.wait_for(timeout)"]
+    RUN --> FACTORY["AgentFactory.create(role)<br/>注入依赖:"]
+
+    FACTORY --> DEPS["• LLMClient (含路由策略)<br/>• CodeGraphEngine (G2)<br/>• Sandbox (可选)<br/>• ToolRegistry<br/>• EventBus<br/>• ContextCompressor<br/>• TokenBudgetTracker"]
+    FACTORY --> ENGINES["五大能力引擎:"]
+    ENGINES --> E1["ReflectionEngine<br/>(ReflAct自省)"]
+    ENGINES --> E2["PreActEngine<br/>(预测-行动)"]
+    ENGINES --> E3["VIGIL SelfHealer<br/>(故障自愈)"]
+    ENGINES --> E4["MCTSPlanner<br/>(仅architect,多路径探索)"]
+    ENGINES --> E5["ReActAgent<br/>(思考-行动循环)"]
+
+    DEPS & ENGINES --> EXEC_AGENT["agent.execute(AgentInput)"]
+    EXEC_AGENT --> LLM_CALL["LLMClient.generate()<br/>或 generate_stream_with_tools()"]
+
+    LLM_CALL --> FAIL{"失败?"}
+    FAIL -->|"TimeoutError"| TIMEOUT_HANDLE["记录+raise → 上层处理"]
+    FAIL -->|"非超时异常"| AUTO_UPGRADE{"auto_upgrade_context<br/>已启用?"}
+    AUTO_UPGRADE -->|"是"| UPGRADE["load_stage(STAGE2)<br/>加载更完整的上下文→重试"]
+    AUTO_UPGRADE -->|"否"| RAISE_ERR["记录审计+raise"]
+
+    LLM_CALL -->|"成功"| OUTPUT["解析 output.result<br/>提取 design/code/review"]
+    OUTPUT --> DETECT["EditStabilityDetector<br/>记录文件编辑"]
+    DETECT --> METRICS["record_scheduling_latency()<br/>记录调度延迟"]
+
+    style EXEC_AGENT fill:#1b2a3a,stroke:#58a6ff
+    style LLM_CALL fill:#2a1b3a,stroke:#a371f7
+</div>
+
+<h3>10 种 Agent 角色</h3>
+<table>
+<tr><th>角色</th><th>文件</th><th>职责</th></tr>
+<tr><td>base</td><td>agents/base.py</td><td>Agent基类, 定义 execute() 接口</td></tr>
+<tr><td>chatter</td><td>agents/chatter.py</td><td>闲聊对话, 意图标记(_intent: xxx)</td></tr>
+<tr><td>clarifier</td><td>agents/clarifier/</td><td>需求澄清, 多轮对话提取约束</td></tr>
+<tr><td>context</td><td>agents/context.py</td><td>上下文Agent, 收集项目信息</td></tr>
+<tr><td>dream</td><td>agents/dream_agent.py</td><td>异步后台Dream任务Agent</td></tr>
+<tr><td>factory</td><td>agents/factory.py</td><td>Agent工厂, 统一创建入口(14KB)</td></tr>
+<tr><td>mcts</td><td>agents/mcts.py</td><td>MCTS蒙特卡洛树搜索规划器</td></tr>
+<tr><td>preact</td><td>agents/preact.py</td><td>PreAct预测-行动引擎</td></tr>
+<tr><td>react_agent</td><td>agents/react_agent/</td><td>ReAct思考-行动循环Agent</td></tr>
+<tr><td>reflection</td><td>agents/reflection.py</td><td>ReflAct自省反思引擎</td></tr>
+</table>
+</div>
+
+<!-- ============== 9. LLM 网关 & 熔断 ============== -->
+<h2 id="gateway">9. LLM 网关 & 熔断器</h2>
+<div class="section">
+<div class="mermaid">
+flowchart TD
+    REQ["LLMRequest 到达<br/>generate(req, task_id, agent_name)"] --> ROUTE{"模型路由决策<br/>(优先级从高到低)"}
+
+    ROUTE -->|"1. RoutingStrategy ≠ AGENT_DEFAULT"| STRATEGY["select_model(strategy)<br/>Phase 3 显式路由"]
+    ROUTE -->|"2. task_type 存在"| TASK_TYPE["TaskModelRouter.select()<br/>Inkeep借鉴:按任务类型路由"]
+    ROUTE -->|"3. AgentModelResolver"| RESOLVER["resolver.resolve(agent_name)<br/>Step 2.3: 按Agent名称路由"]
+    ROUTE -->|"4. 默认"| DEFAULT["使用 default_model<br/>(DeepSeek V4 Pro)"]
+
+    STRATEGY & TASK_TYPE & RESOLVER & DEFAULT --> MODEL["选定 model + model_source"]
+
+    MODEL --> CB_CHECK["🔌 CircuitBreaker.before_call(model)"]
+    CB_CHECK --> CB_STATE{"熔断器状态?"}
+    CB_STATE -->|"CLOSED"| CALL["_do_completion(model, req)"]
+    CB_STATE -->|"HALF_OPEN + 探测可用"| CALL
+    CB_STATE -->|"OPEN (冷却中)"| CB_OPEN(["CircuitOpenError<br/>→ 降级到 GLM-4.7 Flash"])
+    CB_STATE -->|"HALF_OPEN + 探测已满"| CB_FULL(["CircuitOpenError<br/>→ 同上降级"])
+
+    CALL --> RES{"成功?"}
+    RES -->|"成功"| SUCCESS["cb.record_success(model)<br/>→ CLOSED (重置失败计数)"]
+    RES -->|"失败"| FAILURE["cb.record_failure(model)<br/>→ failure_count++"]
+
+    FAILURE --> CB_TRIGGER{"触发熔断?"}
+    CB_TRIGGER -->|"连续失败≥5"| OPEN["→ OPEN (冷却60s)"]
+    CB_TRIGGER -->|"窗口内错误率>30%"| OPEN
+    CB_TRIGGER -->|"未触发"| RETRY["抛异常 → 上层降级处理"]
+
+    SUCCESS --> LOG["记录usage + cost<br/>_log_usage(task_id, usage)"]
+    LOG --> RESP(["返回 LLMResponse<br/>(content, model, usage, tool_calls)"])
+
+    CB_OPEN --> FALLBACK["降级到 fallback_model<br/>(GLM-4.7 Flash 免费)"]
+    CB_FULL --> FALLBACK
+    FALLBACK --> FB_RES{"降级成功?"}
+    FB_RES -->|"成功"| RESP
+    FB_RES -->|"失败"| FATAL(["❌ 抛出异常<br/>上层人工介入"])
+
+    style CB_CHECK fill:#2a1b3a,stroke:#a371f7
+    style OPEN fill:#3a1b1b,stroke:#f85149
+    style FATAL fill:#3a1b1b,stroke:#f85149
+    style RESP fill:#1b3a1b,stroke:#3fb950
+</div>
+
+<h3>熔断器状态机</h3>
+<div class="mermaid">
+stateDiagram-v2
+    [*] --> CLOSED
+    CLOSED --> OPEN: 5次连续失败 或<br/>60s内错误率>30%
+    OPEN --> HALF_OPEN: 冷却60s到期
+    HALF_OPEN --> CLOSED: 探测调用成功
+    HALF_OPEN --> OPEN: 探测调用失败
+</div>
+
+<h3>熔断器存储层次</h3>
+<ol>
+<li><strong>SQLite 持久化</strong>: <code>~/.orbit/cache/circuit_breaker.db</code> → 进程重启不丢失</li>
+<li><strong>内存降级</strong>: SQLite不可用时 → dict in-memory</li>
+<li><strong>半开RMW保护</strong>: <code>asyncio.Lock</code> 确保 probe_in_flight 读写原子</li>
+</ol>
+
+<h3>模型价格</h3>
+<table>
+<tr><th>模型</th><th>Prompt ($/1K tokens)</th><th>Completion ($/1K tokens)</th></tr>
+<tr><td>DeepSeek V4 Pro</td><td>$0.000435</td><td>$0.00087</td></tr>
+<tr><td>DeepSeek V4 Flash</td><td>$0.00014</td><td>$0.00028</td></tr>
+<tr><td>GLM-5.2</td><td colspan="2">免费 (Coding Plan订阅)</td></tr>
+<tr><td>GLM-4.7 Flash</td><td colspan="2">免费 (Coding Plan订阅)</td></tr>
+</table>
+</div>
+
+<!-- ============== 10. 防幻觉管道 ============== -->
+<h2 id="hallucination">10. 9层防幻觉管道</h2>
+<div class="section">
+<div class="mermaid">
+flowchart LR
+    CODE["LLM 生成的 code"] --> L1["L1 图谱验证 ⚡最快<br/>(需要CodeGraphEngine)"]
+    L1 --> L4["L4 类型检查<br/>(mypy/pyright 风格)"]
+    L4 --> L3["L3 熵监控<br/>(token分布异常检测)"]
+    L3 --> L2["L2 动态追踪<br/>(需要Sandbox)"]
+    L2 --> L6["L6 合约验证<br/>(pre/post-condition)"]
+    L6 --> L8["L8 配置漂移检测<br/>(.env/docker-compose一致性)"]
+    L8 --> L7["L7 沙箱运行时 🐢最慢<br/>(需要Sandbox)"]
+    L7 --> L5["L5 Z3 形式化验证 ���最重<br/>(SMT solver)"]
+
+    L1 -.->|"❌ 失败→立即停止<br/>(FATAL)"| STOP1(["PIPELINE STOP"])
+    L7 -.->|"❌ 失败→立即停止<br/>(FATAL)"| STOP2(["PIPELINE STOP"])
+
+    style L1 fill:#3a1b1b,stroke:#f85149
+    style L7 fill:#3a1b1b,stroke:#f85149
+    style L5 fill:#1b2a3a,stroke:#58a6ff
+</div>
+
+<h3>详细层级说明</h3>
+<table>
+<tr><th>层</th><th>验证器</th><th>依赖</th><th>致命?</th><th>原理</th></tr>
+<tr><td>L1</td><td>L1GraphValidator</td><td>CodeGraphEngine</td><td><span class="badge badge-red">致命</span></td><td>检查生成的代码引用的符号是否在代码图谱中存在——引用不存在的函数/类→必然跑不起来</td></tr>
+<tr><td>L2</td><td>L2DynamicTracer</td><td>Sandbox</td><td>否</td><td>动态追踪代码执行路径，验证实际行为</td></tr>
+<tr><td>L3</td><td>L3EntropyMonitor</td><td>无</td><td>否</td><td>监控LLM输出token分布熵值——高熵=模型不确定=可能幻觉</td></tr>
+<tr><td>L4</td><td>L4TypeValidator</td><td>无</td><td>否</td><td>静态类型检查——类似mypy，验证类型一致性</td></tr>
+<tr><td>L5</td><td>L5Z3Validator</td><td>无 (Z3自包含)</td><td>否</td><td>Z3 SMT求解器做形式化验证——将约束编码为Z3公式，验证可满足性</td></tr>
+<tr><td>L6</td><td>L6ContractValidator</td><td>无</td><td>否</td><td>Design by Contract: 检查前置/后置条件/不变量是否满足</td></tr>
+<tr><td>L7</td><td>L7RuntimeValidator</td><td>Sandbox</td><td><span class="badge badge-red">致命</span></td><td>Docker沙箱内实际运行代码，捕获运行时错误</td></tr>
+<tr><td>L8</td><td>L8ConfigValidator</td><td>无</td><td>否</td><td>检测代码修改是否导致配置漂移(.env不一致等)</td></tr>
+<tr><td>L9</td><td>动态合规验证</td><td>compliance/模块</td><td>否</td><td>规则引擎 + 知识时效性检查，独立于L1-L8管道</td></tr>
+</table>
+
+<h3>管道执行策略</h3>
+<div class="mod-flow">
+  <div class="mod-card">
+    <h4>validate_quick()</h4>
+    <p>快速验证 L1+L4+L3<br/>用于每次代码生成后即时检查<br/>不需要 Sandbox 的层同步运行</p>
+  </div>
+  <div class="mod-card">
+    <h4>validate_full()</h4>
+    <p>全量验证 L1-L8<br/>用于 CODING 阶段完成后的完整验证<br/>依赖缺失的层自动跳过</p>
+  </div>
+  <div class="mod-card">
+    <h4>fail-open 原则</h4>
+    <p>单个验证器崩溃不阻塞管道<br/>记录 warning → 继续下一层<br/>仅 L1/L7 失败立即停止</p>
+  </div>
+</div>
+</div>
+
+<!-- ============== 11. Sandbox ============== -->
+<h2 id="sandbox">11. Docker 沙箱执行</h2>
+<div class="section">
+<div class="mermaid">
+flowchart TD
+    REQ_S["代码片段 + language"] --> CHECK{"Docker 可用?"}
+    CHECK -->|"是"| DOCKER["Docker Sandbox<br/>python:3.12-slim"]
+    CHECK -->|"否"| PROCESS["ProcessSandbox<br/>进程级降级"]
+
+    DOCKER --> VOL["卷挂载:<br/>• /workspace:rw (项目路径)<br/>• /readonly/{name}:ro (最多5个)"]
+    VOL --> EXEC_D["docker run --rm<br/>--timeout=N<br/>捕获 stdout/stderr"]
+    EXEC_D --> RES_D{"结果?"}
+    RES_D -->|"成功 (exit 0)"| OUT["返回 stdout"]
+    RES_D -->|"超时"| TIMEOUT(["SandboxTimeoutError"])
+    RES_D -->|"非零退出"| EXEC_ERR(["SandboxExecutionError"])
+
+    PROCESS --> PROC_EXEC["subprocess.run()<br/>timeout + 工作目录限制"]
+    PROC_EXEC --> PROC_RES{"结果?"}
+    PROC_RES -->|"成功"| OUT
+    PROC_RES -->|"超时/失败"| PROC_ERR(["SandboxError"])
+
+    style DOCKER fill:#1b2a3a,stroke:#58a6ff
+    style PROCESS fill:#3a351b,stroke:#d2991d
+</div>
+
+<h3>调用方</h3>
+<ul>
+<li><strong>Agent CODING 阶段</strong>: 执行Agent生成的代码</li>
+<li><strong>L5 Z3 验证</strong>: 形式化验证需要沙箱环境</li>
+<li><strong>L7 运行时验证</strong>: 防幻觉层沙箱运行时检查</li>
+<li><strong>ExecutorVerifier</strong>: 验证命令(pytest/lint/tsc)在沙箱中执行</li>
+</ul>
+</div>
+
+<!-- ============== 12. Checkpoint ============== -->
+<h2 id="checkpoint">12. 检查点持久化——4层降级</h2>
+<div class="section">
+<div class="mermaid">
+flowchart TD
+    SAVE["检查点保存请求<br/>CheckpointManager.save(task_id, data)"] --> REDIS_W["写 Redis<br/>(热数据, TTL 1h)"]
+    REDIS_W --> REDIS_R{"Redis 写成功?"}
+    REDIS_R -->|"成功"| PG["异步写 PG<br/>(冷备份, fire-and-forget)"]
+    REDIS_R -->|"失败"| REDIS_RETRY["重试1次"]
+    REDIS_RETRY --> REDIS_R2{"重试成功?"}
+    REDIS_R2 -->|"成功"| PG
+    REDIS_R2 -->|"失败"| MEM_DISK["降级: 内存 + 磁盘兜底<br/>_save_to_disk_fallback()"]
+
+    LOAD["检查点加载请求<br/>CheckpointManager.load(task_id)"] --> RL["1. 读 Redis"]
+    RL --> RL_HIT{"命中?"}
+    RL_HIT -->|"是"| RETURN(["返回 CheckpointData"])
+    RL_HIT -->|"否"| PGL["2. 读 PostgreSQL"]
+    PGL --> PG_HIT{"命中?"}
+    PG_HIT -->|"是"| BACKFILL["回填 Redis → 返回"]
+    PG_HIT -->|"否"| MEML["3. 读内存 dict"]
+    MEML --> MEM_HIT{"命中?"}
+    MEM_HIT -->|"是"| RETURN
+    MEM_HIT -->|"否"| DISK["4. 读磁盘文件<br/>%TEMP%/orbit_checkpoints/"]
+    DISK --> DISK_HIT{"命中?"}
+    DISK_HIT -->|"是"| RETURN
+    DISK_HIT -->|"否"| NONE(["返回 None<br/>(无检查点)"])
+</div>
+</div>
+
+<!-- ============== 13. ResourceGuard ============== -->
+<h2 id="resource-guard">13. 资源熔断 (ResourceGuard)</h2>
+<div class="section">
+<div class="mermaid">
+flowchart TD
+    REQ_RG["allow_request(task_id, estimated_tokens)"] --> TB["1. TokenBucket.allow(tokens)<br/>全局令牌桶 (100K容量, 5K/s)"]
+    TB --> TB_RES{"令牌充足?"}
+    TB_RES -->|"否"| RL_ERR(["限流 → GuardDecision.RATE_LIMITED"])
+    TB_RES -->|"是"| BG["2. BudgetGuard.is_over_budget(task_id)<br/>单任务预算检查 (1.5x multiplier)"]
+    BG --> BG_RES{"超预算?"}
+    BG_RES -->|"是"| BUDGET_ERR(["局部熔断 → GuardDecision.OVER_BUDGET"])
+    BG_RES -->|"否"| DG["3. DependencyGuard.check()<br/>外部依赖健康检查"]
+    DG --> DG_RES{"依赖异常?"}
+    DG_RES -->|"是"| DEP_ERR(["→ GuardDecision.DEPENDENCY_UNAVAILABLE"])
+    DG_RES -->|"否"| ALLOW(["✅ GuardDecision.ALLOW"])
+
+    RL_ERR & BUDGET_ERR & DEP_ERR --> DEGRADE["DegradationPath.execute(level)<br/>3级降级策略"]
+</div>
+
+<h3>3级降级策略</h3>
+<table>
+<tr><th>级别</th><th>触发条件</th><th>降级动作</th></tr>
+<tr><td>L1 轻度</td><td>TokenBucket 限流</td><td>等待重试 (指数退避)</td></tr>
+<tr><td>L2 中度</td><td>单任务预算超限</td><td>切换更小/更便宜的模型</td></tr>
+<tr><td>L3 重度</td><td>全局资源耗尽 / 依赖不可用</td><td>暂停所有非关键任务, 通知用户</td></tr>
+</table>
+
+<h3>P99 延迟目标: &lt;12ms (纯内存, 无IO)</h3>
+</div>
+
+<!-- ============== 14. 上下文系统 ============== -->
+<h2 id="context">14. 上下文预构建体系</h2>
+<div class="section">
+<div class="mod-flow">
+  <div class="mod-card">
+    <h4>5 Prebuilders</h4>
+    <p>预计算型上下文<br/>• ProjectStructurePrebuilder<br/>• DependencyGraphPrebuilder<br/>• GitHistoryPrebuilder<br/>• ConfigSnapshotPrebuilder<br/>• TestCoveragePrebuilder</p>
+  </div>
+  <div class="mod-card">
+    <h4>7 Builders</h4>
+    <p>按需构建型上下文<br/>• TaskContextBuilder<br/>• FileContextBuilder<br/>• DiffContextBuilder<br/>• ErrorContextBuilder<br/>• ReviewContextBuilder<br/>• KnowledgeContextBuilder<br/>• ModeContextBuilder</p>
+  </div>
+  <div class="mod-card">
+    <h4>5 Scanners</h4>
+    <p>文件发现扫描器<br/>• ImportScanner<br/>• ReferenceScanner<br/>• ConfigScanner<br/>• TestScanner<br/>• DocsScanner</p>
+  </div>
+</div>
+
+<h3>3级上下文加载</h3>
+<table>
+<tr><th>级别</th><th>内容</th><th>Token估算</th><th>使用场景</th></tr>
+<tr><td>Stage1 (轻量)</td><td>项目结构 + 关键文件列表</td><td>~500-1000</td><td>PARSING阶段</td></tr>
+<tr><td>Stage2 (标准)</td><td>+ 文件内容 + 导入图</td><td>~3000-8000</td><td>PLANNING/CODING阶段</td></tr>
+<tr><td>Stage3 (完整)</td><td>+ 完整依赖图 + Git历史 + 测试</td><td>~12000-50000</td><td>复杂重构/架构变更</td></tr>
+</table>
+
+<h3>上下文压缩</h3>
+<ul>
+<li><strong>TokenBudgetTracker</strong>: 实时追踪token消耗, 超预算时警告</li>
+<li><strong>ContextCompressor</strong>: 超限时压缩上下文 (摘要/截断/优先级排序)</li>
+<li><strong>CascadeCompressor</strong>: 多级级联压缩, 从轻到重逐级压缩</li>
+<li><strong>CompressionPipeline</strong>: 编排压缩步骤的管道</li>
+</ul>
+</div>
+
+<!-- ============== 15. Compose ============== -->
+<h2 id="compose">15. Compose 多Agent编排</h2>
+<div class="section">
+<div class="mermaid">
+flowchart TD
+    SPEC["📋 Spec 文本<br/>(结构化任务描述)"] --> PARSE["ComposeParser.parse_spec()<br/>提取 title + tasks[]"]
+    PARSE --> WT_C["创建 Worktree 隔离区<br/>(WorktreeStrategy.DELEGATE)"]
+    WT_C --> BRIEF["brief 就绪检查<br/>项目说明书缺失→自动生成"]
+    BRIEF --> SPEC_REVIEW["🔍 方案审查门禁<br/>(spec review)"]
+    SPEC_REVIEW --> DEP_ORDER["按依赖顺序排序 tasks"]
+    DEP_ORDER --> TASK_LOOP["🔄 逐 Task 循环"]
+
+    TASK_LOOP --> SPAWN["ActorSpawn.dispatch()<br/>每个 Task 分发 implementer subagent"]
+    SPAWN --> AGENT_EXEC["SubAgent 执行<br/>(独立上下文+Worktree)"]
+    AGENT_EXEC --> CODE_REVIEW["🔍 代码审查门禁<br/>(code quality review)"]
+    CODE_REVIEW --> PONYTAIL["S3: PonytailReviewer<br/>过度工程检测"]
+
+    PONYTAIL --> TASK_RES{"Task 结果?"}
+    TASK_RES -->|"成功"| NEXT{"还有 Task?"}
+    TASK_RES -->|"失败 ≤MAX_RETRIES"| SPAWN
+    TASK_RES -->|"失败 >MAX_RETRIES"| FAIL_CC(["❌ 返回 error"])
+
+    NEXT -->|"是"| TASK_LOOP
+    NEXT -->|"否"| FINAL["最终审查 → Merge"]
+    FINAL --> CC_DONE(["✅ { status: 'ok' }"])
+
+    style SPEC_REVIEW fill:#2a1b3a,stroke:#a371f7
+    style CODE_REVIEW fill:#2a1b3a,stroke:#a371f7
+</div>
+</div>
+
+<!-- ============== 16. 失败循环 & 条件汇总 ============== -->
+<h2 id="failure-cycles">16. 失败循环 & 条件汇总</h2>
+<div class="section">
+
+<h3>16.1 失败条件→处理→循环 完整矩阵</h3>
+<table>
+<tr><th>#</th><th>层级</th><th>失败条件</th><th>检测点</th><th>循环行为</th><th>最大重试</th><th>最终出口</th></tr>
+
+<tr>
+<td>F1</td><td>LLM 调用</td><td>API 调用失败 (RateLimit/Timeout/APIError)</td>
+<td>LLMClient.generate()</td>
+<td>自动降级 GLM-4.7 Flash</td><td>1次(降级)</td>
+<td>降级也失败→抛出异常→上层处理</td>
+</tr>
+
+<tr>
+<td>F2</td><td>熔断器</td><td>单模型连续5次失败 或 60s窗口错误率>30%</td>
+<td>CircuitBreaker.before_call()</td>
+<td>进入 OPEN→60s冷却→HALF_OPEN→探测</td><td>无限(HALF_OPEN探测)</td>
+<td>探测成功→CLOSED; 探测失败→重回OPEN</td>
+</tr>
+
+<tr>
+<td>F3</td><td>Agent 执行</td><td>Agent 执行超时</td>
+<td>asyncio.wait_for(timeout=120~180s)</td>
+<td>TimeoutError→记录审计→抛出</td><td>0</td>
+<td>抛出异常→上层 TaskRunner 处理</td>
+</tr>
+
+<tr>
+<td>F4</td><td>Agent 执行</td><td>Agent 返回非 ok 状态</td>
+<td>agent.execute() 返回值检查</td>
+<td>RuntimeError→触发上下文自动升级→重试</td><td>1次(上下文升级后)</td>
+<td>仍失败→抛出异常</td>
+</tr>
+
+<tr>
+<td>F5</td><td>批判门禁</td><td>CritiqueAgent 审查未通过</td>
+<td>SubTaskSession._critique_gate()</td>
+<td>注入反馈→重新 CODING→再次审查</td><td>2次 (MAX_CRITIQUE_RETRIES)</td>
+<td>超限→SubTaskResult status=critique_loop→Goal 暂停</td>
+</tr>
+
+<tr>
+<td>F6</td><td>子任务</td><td>单个子任务失败 (status!=ok)</td>
+<td>MetaOrchestrator._run_subtask() 返回</td>
+<td>consecutive_failures++→继续下一子任务</td><td>取决于层内任务数</td>
+<td>consecutive_failures≥3→GoalResult status=failed</td>
+</tr>
+
+<tr>
+<td>F7</td><td>对齐检查</td><td>AlignmentCheck 未对齐 (每5个Task)</td>
+<td>completed_count % 5 == 0</td>
+<td>consecutive_misalignments++→继续</td><td>不限</td>
+<td>连续2次→GoalResult status=paused</td>
+</tr>
+
+<tr>
+<td>F8</td><td>预算</td><td>Token 预算耗尽 或 时间预算耗尽</td>
+<td>MetaOrchestrator._budget_exhausted()</td>
+<td>立即终止→返回已完成结果</td><td>0</td>
+<td>GoalResult status=done, reason=预算耗尽</td>
+</tr>
+
+<tr>
+<td>F9</td><td>循环上限</td><td>Agent 循环超过 50 次</td>
+<td>TaskRunner.run_task() cycle_count ≥ MAX_AGENT_CYCLES</td>
+<td>强制设置 state=FAILED</td><td>0</td>
+<td>TaskState.FAILED, 保存检查点</td>
+</tr>
+
+<tr>
+<td>F10</td><td>防幻觉</td><td>L1 图谱验证失败 (引用不存在符号)</td>
+<td>HallucinationPipeline L1 FATAL</td><td>立即停止管道→返回 errors[]</td><td>0</td>
+<td>ValidationResult.passed=false→上层决定如何处理</td>
+</tr>
+
+<tr>
+<td>F11</td><td>防幻觉</td><td>L7 运行时验证失败 (代码跑不起来)</td>
+<td>HallucinationPipeline L7 FATAL</td><td>立即停止管道→返回 errors[]</td><td>0</td>
+<td>ValidationResult.passed=false→上层决定</td>
+</tr>
+
+<tr>
+<td>F12</td><td>防幻觉</td><td>L2-L6/L8 非致命层失败</td>
+<td>HallucinationPipeline 各层</td><td>记录 errors→继续下一层</td><td>-</td><td>所有层跑完汇总结果</td>
+</tr>
+
+<tr>
+<td>F13</td><td>防幻觉</td><td>验证器自身崩溃</td>
+<td>HallucinationPipeline._run_levels() except</td><td>fail-open: 记录 warning→跳过该层→继续</td><td>-</td><td>该层跳过,不阻塞管道</td>
+</tr>
+
+<tr>
+<td>F14</td><td>沙箱</td><td>Docker 不可用</td>
+<td>Sandbox.run() 入口</td><td>降级 ProcessSandbox (subprocess)</td><td>0</td><td>ProcessSandbox 执行 / 抛出 SandboxError</td>
+</tr>
+
+<tr>
+<td>F15</td><td>沙箱</td><td>代码执行超时</td>
+<td>Sandbox.run() timeout</td><td>强杀容器→SandboxTimeoutError</td><td>0</td><td>抛出异常</td>
+</tr>
+
+<tr>
+<td>F16</td><td>检查点</td><td>Redis 写失败</td>
+<td>CheckpointManager._save_to_redis()</td><td>重试1次→降级内存→写磁盘兜底</td><td>1次</td><td>内存+磁盘降级成功</td>
+</tr>
+
+<tr>
+<td>F17</td><td>检查点</td><td>PG 写失败</td>
+<td>CheckpointManager._save_to_pg()</td><td>fire-and-forget→仅记 Critical 日志</td><td>0</td><td>不阻塞主流程</td>
+</tr>
+
+<tr>
+<td>F18</td><td>检查点</td><td>数据损坏 (反序列化失败)</td>
+<td>CheckpointManager._deserialize()</td><td>CheckpointCorruptedError</td><td>0</td><td>上层捕获→可能丢失该检查点</td>
+</tr>
+
+<tr>
+<td>F19</td><td>资源</td><td>TokenBucket 令牌不足</td>
+<td>ResourceGuard.guard_request()</td><td>限流→DegradationPath L1 (指数退避重试)</td><td>按退避策略</td><td>超时或放弃</td>
+</tr>
+
+<tr>
+<td>F20</td><td>资源</td><td>单任务 Token 预算超限</td>
+<td>BudgetGuard.is_over_budget()</td><td>局部熔断→切换更便宜模型</td><td>0</td><td>降级模型或暂停</td>
+</tr>
+
+<tr>
+<td>F21</td><td>批量</td><td>环形依赖检测</td>
+<td>DependencyAnalyzer.analyze() conflicts[]</td><td>立即返回失败</td><td>0</td><td>GoalResult status=failed</td>
+</tr>
+
+<tr>
+<td>F22</td><td>编排</td><td>Spec 解析失败</td>
+<td>ComposeParser.parse_spec()</td><td>返回 error</td><td>0</td><td>{ status: 'error', error: '...' }</td>
+</tr>
+
+<tr>
+<td>F23</td><td>编排</td><td>Worktree 创建失败</td>
+<td>ComposeOrchestrator.run_spec()</td><td>降级: 不使用隔离→直接执行</td><td>0</td><td>无隔离继续执行(fail-open)</td>
+</tr>
+
+<tr>
+<td>F24</td><td>分片</td><td>PRD > 8000字符 需要分片</td>
+<td>TaskShardingEngine.should_shard()</td><td>按段落边界切分→并发执行子任务</td><td>按分片数</td><td>部分成功→partial; 全失败→failed</td>
+</tr>
+
+<tr>
+<td>F25</td><td>流程</td><td>LLM 试图跳过强制状态</td>
+<td>ProcessGuard.check()</td><td>ProcessViolationError→阻断执行</td><td>0</td><td>代码级阻断, LLM不可恢复</td>
+</tr>
+</table>
+
+<h3>16.2 关键循环图示</h3>
+<div class="mermaid">
+flowchart TD
+    subgraph LLM_LOOP["🔄 LLM 调用循环"]
+        L1["LLM API 调用"] -->|"成功"| L2["返回结果"]
+        L1 -->|"API错误"| L3["切换降级模型 GLM-4.7 Flash"]
+        L3 -->|"成功"| L2
+        L3 -->|"失败"| L4["❌ 抛出异常"]
+    end
+
+    subgraph CB_LOOP["🔄 熔断器循环"]
+        C1["CLOSED"] -->|"5次失败"| C2["OPEN (60s)"]
+        C2 -->|"冷却到期"| C3["HALF_OPEN"]
+        C3 -->|"探测成功"| C1
+        C3 -->|"探测失败"| C2
+    end
+
+    subgraph CRITIQUE_LOOP["🔄 批判回路 (max 2次)"]
+        K1["CODING 完成"] --> K2["CritiqueAgent 审查"]
+        K2 -->|"APPROVED"| K3["→ VERIFYING"]
+        K2 -->|"REJECTED"| K4{"attempts ≤ 2?"}
+        K4 -->|"是"| K5["注入反馈 → 重新 CODING"]
+        K5 --> K1
+        K4 -->|"否 >2"| K6["⏸️ critique_loop → Goal暂停"]
+    end
+
+    subgraph SUBTASK_LOOP["🔄 子任务层循环"]
+        S1["Layer[i] 子任务"] --> S2["_run_subtask()"]
+        S2 -->|"ok"| S3["下一个"]
+        S2 -->|"failed"| S4{"consecutive_failures ≥ 3?"}
+        S4 -->|"否"| S5["继续同层下一个"]
+        S5 --> S1
+        S4 -->|"是"| S6["❌ Goal failed"]
+    end
+
+    subgraph CKPT_LOOP["🔄 检查点降级链"]
+        P1["Redis"] -->|"miss"| P2["PostgreSQL"]
+        P2 -->|"miss"| P3["内存 dict"]
+        P3 -->|"miss"| P4["磁盘文件"]
+        P4 -->|"miss"| P5["None"]
+    end
+
+    style L4 fill:#3a1b1b,stroke:#f85149
+    style K6 fill:#3a351b,stroke:#d2991d
+    style S6 fill:#3a1b1b,stroke:#f85149
+</div>
+</div>
+
+<!-- ============== 17. UI 反馈 ============== -->
+<h2 id="ui-feedback">17. UI 反馈映射——每个节点→前端呈现</h2>
+<div class="section">
+
+<h3>17.1 实时状态推送到 UI</h3>
+<table>
+<tr><th>后端事件</th><th>传输方式</th><th>前端 Store</th><th>UI 组件</th><th>展示内容</th></tr>
+
+<tr>
+<td>状态转换 (IDLE→PARSING→...→DONE)</td>
+<td>WebSocket <code>task:update</code></td>
+<td>taskStore.ts</td>
+<td>ChatPanel 进度条<br/>DAG 可视化</td>
+<td>状态名 + 进度百分比 + DAG节点着色</td>
+</tr>
+
+<tr>
+<td>Token 消耗更新</td>
+<td>WebSocket <code>token:update</code></td>
+<td>agentops.ts</td>
+<td>Dashboard 右侧面板<br/>"Token 消耗" 行</td>
+<td><code>total_tokens</code> 数字</td>
+</tr>
+
+<tr>
+<td>防幻觉拦截</td>
+<td>WebSocket <code>dashboard:metrics</code></td>
+<td>agentops.ts</td>
+<td>Dashboard "防幻觉拦截" 行</td>
+<td>拦截次数累计</td>
+</tr>
+
+<tr>
+<td>熔断器状态变化</td>
+<td>WebSocket <code>dashboard:metrics</code></td>
+<td>agentops.ts</td>
+<td>CircuitBreakerLight 组件<br/>(RG/Z3/SB 三指示灯)</td>
+<td>0=CLOSED(绿) / 1=HALF_OPEN(黄) / 2=OPEN(红)</td>
+</tr>
+
+<tr>
+<td>LLM 调用失败/降级</td>
+<td>WebSocket <code>dashboard:health</code></td>
+<td>health.ts</td>
+<td>告警列表</td>
+<td>告警条数 + 等级</td>
+</tr>
+
+<tr>
+<td>系统健康 (healthy/degraded/unhealthy)</td>
+<td>WebSocket <code>dashboard:health</code></td>
+<td>health.ts<br/>agentops.ts</td>
+<td>Dashboard "系统健康" 行</td>
+<td>"正常" / "降级" / "异常" + 颜色</td>
+</tr>
+
+<tr>
+<td>Agent 实时输出</td>
+<td>SSE <code>TEXT_DELTA</code></td>
+<td>chat.ts</td>
+<td>ChatPanel 消息气泡</td>
+<td>逐 Token 追加文本 (打字机效果)</td>
+</tr>
+
+<tr>
+<td>Agent 工具调用</td>
+<td>SSE <code>TOOL_CALL</code></td>
+<td>chat.ts</td>
+<td>ChatPanel 工具调用卡片</td>
+<td>工具名 + 参数摘要</td>
+</tr>
+
+<tr>
+<td>Goal 生命周期</td>
+<td>HTTP <code>POST/GET /api/v1/goal</code></td>
+<td>taskStore.ts</td>
+<td>ChatPanel Goal 卡片<br/>Spec Compose 面板</td>
+<td>Goal 状态 + 进度 + 子任务列表</td>
+</tr>
+
+<tr>
+<td>审计记录</td>
+<td>HTTP <code>GET /api/v1/observability</code></td>
+<td>audit.ts</td>
+<td>AuditPanel 审计面板</td>
+<td>时间线 + Agent动作 + 状态转换 + 验证结果</td>
+</tr>
+
+<tr>
+<td>资源使用</td>
+<td>WebSocket <code>dashboard:metrics</code></td>
+<td>resources.ts</td>
+<td>ResourcesPanel</td>
+<td>CPU/内存/Token桶使用率</td>
+</tr>
+
+<tr>
+<td>告警列表</td>
+<td>WebSocket <code>dashboard:health</code></td>
+<td>alert.ts</td>
+<td>AlertsList 告警列表</td>
+<td>告警类型 + 时间 + 严重程度</td>
+</tr>
+</table>
+
+<h3>17.2 前端组件树 & 数据流</h3>
+<div class="mermaid">
+flowchart TD
+    subgraph App["Vue3 App"]
+        BOOT["BootView<br/>启动画面"] --> DASH["DashboardView<br/>主工作台"]
+
+        DASH --> TOPBAR["SessionBar<br/>Session管理"]
+        DASH --> CHAT["ChatPanel<br/>聊天交互区"]
+        DASH --> ASIDE["右侧面板"]
+
+        CHAT --> SPEC_COMPOSE["SpecCompose<br/>多Agent编排UI"]
+        CHAT --> GOAL_CARD["GoalCard<br/>Goal状态展示"]
+        CHAT --> AGENT_MSG["AgentMessage<br/>Agent输出气泡"]
+
+        ASIDE --> STATUS["运行状态区"]
+        ASIDE --> TOOLS["工具箱"]
+        ASIDE --> MONITOR["监控区"]
+
+        STATUS --> ACTIVE_TASKS["活跃任务数"]
+        STATUS --> TOKEN_USAGE["Token 消耗"]
+        STATUS --> HALLUCINATION["防幻觉拦截数"]
+        STATUS --> CB_LIGHTS["CircuitBreakerLight x3"]
+        STATUS --> ALERTS["告警数"]
+        STATUS --> HEALTH["系统健康"]
+
+        TOOLS --> SPEC_BTN["Spec Compose 按钮"]
+        TOOLS --> SEARCH_BTN["Search 按钮"]
+
+        MONITOR --> DAG_VIZ["DAG 可视化"]
+        MONITOR --> AUDIT["审计面板"]
+        MONITOR --> METRICS["指标图表"]
+    end
+
+    subgraph Stores["Pinia Stores (22个)"]
+        S1["chat.ts (8KB)"]
+        S2["session.ts (5KB)"]
+        S3["agentops.ts"]
+        S4["health.ts"]
+        S5["audit.ts"]
+        S6["task.ts"]
+        S7["resources.ts"]
+        S8["settings.ts"]
+        S9["knowledge.ts"]
+        S10["codegraph.ts"]
+        S11["review.ts"]
+        S12["mcp.ts"]
+        S13["shell.ts"]
+        S14["ops.ts"]
+        S15["editor.ts"]
+        S16["preflight.ts"]
+        S17["peak.ts"]
+        S18["diagnostics.ts"]
+        S19["gitStore.ts"]
+        S20["dashboard.ts"]
+        S21["alert.ts"]
+        S22["settings.ts"]
+    end
+
+    subgraph Composables["组合式函数"]
+        C1["useAgentStream.ts<br/>(SSE流式消费)"]
+        C2["useWebSocket.ts<br/>(WS连接管理)"]
+        C3["useEventSource.ts<br/>(通用事件源)"]
+        C4["useConnectionManager.ts<br/>(重连逻辑)"]
+    end
+
+    DASH --> Stores
+    Stores --> Composables
+    Composables --> API["FastAPI Backend"]
+
+    style App fill:#1b2a3a,stroke:#58a6ff
+    style Stores fill:#2a1b3a,stroke:#a371f7
+    style Composables fill:#1b3a3a,stroke:#39d2c0
+</div>
+</div>
+
+<!-- ============== 18. 全链路主流程图 ============== -->
+<h2 id="full-flow">18. 全链路主流程图——从输入到输出</h2>
+<div class="section">
+<p>以下是一张完整的端到端流程图，覆盖用户输入→Goal编排→Task执行→Agent运行→LLM网关→防幻觉→沙箱→检查点→审计→UI反馈 的完整链路。</p>
+
+<div class="mermaid" style="font-size:12px">
+flowchart TD
+    U["🖱️ 用户在驾驶舱输入需求"] --> API_IN["POST /api/v1/goal<br/>{ description, constraints, ... }"]
+    API_IN --> APP["FastAPI create_app()<br/>路由→中间件→Goal路由"]
+
+    APP --> META["MetaOrchestrator.run(goal)"]
+
+    subgraph GOAL["🎯 Goal 编排层"]
+        META --> GEN_MD["自动生成 CLAUDE.md<br/>(fail-open)"]
+        GEN_MD --> INTAKE["IntakeRouter.route()<br/>清晰度/拆解度 评分"]
+        INTAKE --> CLARIFY["按需 ClarifierAgent 澄清"]
+        CLARIFY --> DECOMP["按需 ComposeBridge 拆解"]
+        DECOMP --> LAYERS["拓扑分层 → 逐层并行"]
+    end
+
+    subgraph TASK["📋 Task 执行层"]
+        LAYERS --> SUB["SubTaskSession<br/>独立 Worktree + 独立上下文"]
+        SUB --> GUARD["ProcessGuard.check()<br/>代码级流程检查(LLM不可绕过)"]
+        GUARD --> CYCLE["状态机循环<br/>IDLE→PARSING→PLANNING→CODING→VERIFYING→DONE"]
+    end
+
+    subgraph AGENT["🤖 Agent 执行层"]
+        CYCLE --> FACTORY["AgentFactory.create(role)"]
+        FACTORY --> DEPS_INJ["注入: LLMClient + CodeGraph + Sandbox<br/>+ ReflectionEngine + PreActEngine<br/>+ VIGIL Healer + MCTSPlanner"]
+        DEPS_INJ --> EXEC["agent.execute(AgentInput)"]
+    end
+
+    subgraph GATEWAY["🌐 LLM 网关层"]
+        EXEC --> ROUTE["模型路由: RoutingStrategy → TaskType → Resolver → Default"]
+        ROUTE --> CB["CircuitBreaker.before_call()<br/>CLOSED/OPEN/HALF_OPEN"]
+        CB --> LITELLM["litellm.acompletion()<br/>或 litellm.acompletion(stream=True)"]
+        LITELLM --> CB_POST["cb.record_success/failure()"]
+    end
+
+    subgraph HALLU["🛡️ 防幻觉层 (并行管道)"]
+        LITELLM -.-> H_PIPE["HallucinationPipeline<br/>L1→L4→L3→L2→L6→L8→L7→L5"]
+        H_PIPE -.-> H_RESULT["ValidationResult<br/>{ passed, errors[], warnings[] }"]
+    end
+
+    subgraph SANDBOX["📦 沙箱执行"]
+        LITELLM -.-> SB["Sandbox.run(code)<br/>Docker隔离或ProcessSandbox降级"]
+        SB -.-> SB_RESULT["stdout / SandboxError"]
+    end
+
+    subgraph CKPT["💾 检查点层"]
+        CYCLE -.-> CKPT_SAVE["每次状态转换后保存<br/>Redis→PG→内存→磁盘"]
+    end
+
+    subgraph AUDIT["📊 审计 & 可观测性"]
+        EXEC -.-> AUDIT_LOG["AuditLogger.log()<br/>记录每个动作"]
+        LITELLM -.-> METRICS["record_scheduling_latency()<br/>Token计数 + 成本计算"]
+        CYCLE -.-> EVENT["EventBus.publish()<br/>task:update / token:update"]
+    end
+
+    subgraph UI["🖥️ 前端反馈"]
+        EVENT --> WS["WebSocket 实时推送"]
+        EVENT --> SSE["SSE 流式推送"]
+        WS --> DASH["DashboardView 状态更新"]
+        SSE --> CHAT_PANEL["ChatPanel 逐Token渲染"]
+
+        DASH --> TASK_DISP["活跃任务数"]
+        DASH --> TOKEN_DISP["Token消耗数"]
+        DASH --> HALLU_DISP["防幻觉拦截数"]
+        DASH --> CB_DISP["CircuitBreakerLight x3<br/>(RG绿/Z3绿/SB绿)"]
+        DASH --> HEALTH_DISP["系统健康: 正常/降级/异常"]
+    end
+
+    CB_POST --> RESP["LLMResponse<br/>{ content, model, usage, tool_calls }"]
+    RESP --> EXEC
+    EXEC --> CYCLE
+    CYCLE --> CRITIQUE["CritiqueAgent 门禁<br/>(APPROVED/REJECTED)"]
+    CRITIQUE -->|"REJECTED ≤2次"| CYCLE
+    CRITIQUE -->|"APPROVED 或 >2次"| SUB
+    SUB --> LAYERS
+    LAYERS --> GOAL_RESULT(["GoalResult<br/>done / partial / failed / paused"])
+
+    style U fill:#1b3a1b,stroke:#3fb950
+    style GOAL_RESULT fill:#1b3a1b,stroke:#3fb950
+    style GOAL fill:#1b2a3a,stroke:#58a6ff
+    style TASK fill:#2a1b3a,stroke:#a371f7
+    style AGENT fill:#1b3a3a,stroke:#39d2c0
+    style GATEWAY fill:#3a2a1b,stroke:#db6d28
+    style HALLU fill:#3a1b1b,stroke:#f85149
+    style SANDBOX fill:#2a2a1b,stroke:#d2991d
+    style CKPT fill:#1b1b3a,stroke:#58a6ff
+    style AUDIT fill:#1b1b3a,stroke:#a371f7
+    style UI fill:#1b3a1b,stroke:#3fb950
+</div>
+</div>
+
+<!-- ============== 附录 ============== -->
+<h2>附录 A: 45个模块完整清单</h2>
+<div class="section">
+<div class="mod-flow">
+  <div class="mod-card"><h4>scheduler/</h4><p>调度器状态机 + DAG + 离线调度 + TaskRunner + DagRunner + Orchestrator + 编辑稳定性检测 + 复杂度评分 + 模板选择 + 资源调度 + 图调度 + 暂存引擎 + 问题升级 + Clarifier + offpeak调度</p></div>
+  <div class="mod-card"><h4>graph/</h4><p>图谱引擎 (代码/数据库/配置 + 元图谱 12 种跨图谱关系)</p></div>
+  <div class="mod-card"><h4>hallucination/</h4><p>L1-L8 防幻觉: 图谱/动态/熵/类型/Z3/合约/运行时/配置 + 管道 + schemas</p></div>
+  <div class="mod-card"><h4>compliance/</h4><p>L9 动态合规验证: 规则引擎 + 知识时效性检查</p></div>
+  <div class="mod-card"><h4>sandbox/</h4><p>Docker 执行器 + ProcessSandbox 降级 + 工厂</p></div>
+  <div class="mod-card"><h4>checkpoint/</h4><p>Redis+PG+内存+磁盘 4层检查点 + 边界管理</p></div>
+  <div class="mod-card"><h4>agents/</h4><p>10角色: base/chatter/clarifier/context/dream/factory/mcts/preact/react_agent/reflection</p></div>
+  <div class="mod-card"><h4>gateway/</h4><p>LLMClient + CircuitBreaker + RoutingStrategy + TaskModelRouter + Adapters(Anthropic/OpenAI)</p></div>
+  <div class="mod-card"><h4>knowledge/</h4><p>知识图谱 SQLite + BGE向量搜索 + TF-IDF降级 + MCP + CLAUDE.md生成器</p></div>
+  <div class="mod-card"><h4>modes/</h4><p>交互协议层: architect/clarify/review + 三维度评分 + 模式可见性</p></div>
+  <div class="mod-card"><h4>memory/</h4><p>分层记忆: 情节/画像/决策日志 + SCOPE双流 + MemoryStore</p></div>
+  <div class="mod-card"><h4>evolution/</h4><p>自我进化: GEPA Prompt进化 + SCOPE + 自蒸馏 + ANCHOR对齐</p></div>
+  <div class="mod-card"><h4>context/</h4><p>5 prebuilder + 7 builder + 5 scanner + matcher + relevance</p></div>
+  <div class="mod-card"><h4>compression/</h4><p>TokenBudgetTracker + ContextCompressor + CascadeCompressor + Pipeline</p></div>
+  <div class="mod-card"><h4>communication/</h4><p>AgentMessageBus (4模式 + 幂等 + 熔断传播) + Protocol</p></div>
+  <div class="mod-card"><h4>observability/</h4><p>OpenTelemetry + AuditLogger + FeedbackEngine + Metrics + TrajectoryCollector</p></div>
+  <div class="mod-card"><h4>metacognition/</h4><p>VIGIL SelfHealer + MonitorAgent</p></div>
+  <div class="mod-card"><h4>api/</h4><p>FastAPI: 28路由模块 + Pydantic schemas + 中间件</p></div>
+  <div class="mod-card"><h4>compose/</h4><p>ComposeOrchestrator + Parser + Models + 6×SKILL.md</p></div>
+  <div class="mod-card"><h4>goal/</h4><p>MetaOrchestrator + IntakeRouter + DependencyAnalyzer + SubTaskSession + ProcessGuard + Critique + Verifier + 11个模块</p></div>
+  <div class="mod-card"><h4>loop/</h4><p>LoopScheduler + LoopRunner + CronParser</p></div>
+  <div class="mod-card"><h4>dream/</h4><p>异步后台Dream任务: DreamScheduler</p></div>
+  <div class="mod-card"><h4>tools/</h4><p>ToolRegistry + MCP Server</p></div>
+  <div class="mod-card"><h4>resource_guard/</h4><p>TokenBucket + BudgetGuard + DegradationPath + DependencyGuard + ResourceGuard</p></div>
+  <div class="mod-card"><h4>router/</h4><p>智能路由: RouterAgent + CC_SWITCH + AgentModelResolver</p></div>
+  <div class="mod-card"><h4>review/</h4><p>代码审查引擎 + Ponytail过度工程检测</p></div>
+  <div class="mod-card"><h4>security/</h4><p>安全扫描 + security_constants</p></div>
+  <div class="mod-card"><h4>backup/</h4><p>快照 + SHA256校验 + 恢复</p></div>
+  <div class="mod-card"><h4>versioning/</h4><p>版本注册表 + Schema迁移</p></div>
+  <div class="mod-card"><h4>worktree/</h4><p>Git Worktree 隔离管理</p></div>
+  <div class="mod-card"><h4>prompt/</h4><p>Prompt 构建器 + Ponytail规则</p></div>
+  <div class="mod-card"><h4>stream/</h4><p>SSE 流式事件 + StreamEventType</p></div>
+  <div class="mod-card"><h4>events/</h4><p>EventBus + DashboardEvent schemas</p></div>
+  <div class="mod-card"><h4>actors/</h4><p>Actor生命周期 + Spawn + Watchdog + Registry</p></div>
+  <div class="mod-card"><h4>files/</h4><p>文件操作 service</p></div>
+  <div class="mod-card"><h4>lsp/</h4><p>LSP 协议支持 service</p></div>
+  <div class="mod-card"><h4>sharding/</h4><p>TaskShardingEngine: 大PRD任务分片</p></div>
+  <div class="mod-card"><h4>projects/</h4><p>项目注册表</p></div>
+  <div class="mod-card"><h4>sessions/</h4><p>会话管理</p></div>
+  <div class="mod-card"><h4>brief/</h4><p>简洁规则引擎</p></div>
+  <div class="mod-card"><h4>integration/</h4><p>外部集成: WeChat + Wiring</p></div>
+  <div class="mod-card"><h4>ws/</h4><p>WebSocket 管理</p></div>
+  <div class="mod-card"><h4>core/</h4><p>配置 + 日志 + 安全常量 + 公共工具</p></div>
+  <div class="mod-card"><h4>infrastructure/</h4><p>DB 引擎 + Session 管理</p></div>
+  <div class="mod-card"><h4>cli/</h4><p>CLI 入口</p></div>
+</div>
+</div>
+
+<h2>附录 B: 数据流向总图</h2>
+<div class="section">
+<div class="mermaid">
+flowchart LR
+    subgraph INPUT["输入"]
+        I1["自然语言需求"]
+        I2["Markdown PRD"]
+        I3["复数文档"]
+        I4["Spec 任务描述"]
+    end
+
+    subgraph PROCESS["处理管道"]
+        P1["Intake Router<br/>判定形态"]
+        P2["MetaOrchestrator<br/>Goal编排"]
+        P3["SubTaskSession<br/>流水线"]
+        P4["AgentFactory<br/>角色创建"]
+        P5["LLM Gateway<br/>模型路由+熔断"]
+        P6["HallucinationPipeline<br/>L1-L9验证"]
+        P7["Sandbox<br/>代码执行"]
+        P8["CritiqueAgent<br/>门禁审查"]
+        P9["Checkpoint<br/>状态持久化"]
+    end
+
+    subgraph STORAGE["存储"]
+        S1[("CodeGraph SQLite<br/>代码图谱")]
+        S2[("PostgreSQL<br/>审计+检查点")]
+        S3[("Redis<br/>热缓存+熔断状态")]
+        S4[("knowledge.db<br/>知识图谱")]
+    end
+
+    subgraph OUTPUT["输出"]
+        O1["✅ 代码变更<br/>(git commit)"]
+        O2["📊 审计日志"]
+        O3["📈 指标数据"]
+        O4["🔔 告警通知"]
+        O5["💬 实时对话"]
+    end
+
+    I1 & I2 & I3 & I4 --> P1
+    P1 --> P2 --> P3 --> P4 --> P5
+    P5 --> P6
+    P5 --> P7
+    P3 --> P8
+    P3 --> P9
+    P5 --> S3
+    P6 --> S1
+    P9 --> S2 & S3
+    P2 --> S4
+
+    P3 --> O1
+    P2 --> O2 & O3 & O4
+    P4 --> O5
+
+    style INPUT fill:#1b3a1b,stroke:#3fb950
+    style PROCESS fill:#1b2a3a,stroke:#58a6ff
+    style STORAGE fill:#2a1b3a,stroke:#a371f7
+    style OUTPUT fill:#1b3a1b,stroke:#3fb950
+</div>
+</div>
+
+<footer style="text-align:center;color:var(--muted);margin-top:60px;padding:20px;border-top:1px solid var(--border)">
+  <p>Orbit Runtime Flow Report · Generated 2026-07-07 · Source: <code>src/orbit/</code> 45 modules analysis</p>
+  <p>覆盖: 启动 · 调度 · Agent · 网关 · 防幻觉 · 沙箱 · 检查点 · 熔断 · 上下文 · 审计 · UI反馈 · 失败循环</p>
+</footer>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'default',
+  securityLevel: 'loose',
+  flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+});
+</script>
+</body>
+</html>

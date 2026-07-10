@@ -58,9 +58,24 @@ class TestMcpServerHandlers:
         result = server._handle_find_referencing_symbols(symbol="MyClass")
         assert isinstance(result, dict)
 
-    def test_get_symbols_overview(self, server_with_cg):
-        result = server_with_cg._handle_get_symbols_overview(file_path="src/a.py")
+    def test_get_symbols_overview_no_cg(self, server):
+        result = server._handle_get_symbols_overview(file_path="src/a.py")
         assert isinstance(result, dict)
+
+    def test_get_symbols_overview_real_file(self, server, tmp_path):
+        """AST extraction from real Python file."""
+        f = tmp_path / "test.py"
+        f.write_text("""
+class MyClass:
+    def method1(self):
+        pass
+
+def top_level_func():
+    pass
+""")
+        server._workspace_dir = str(tmp_path)
+        result = server._handle_get_symbols_overview(file_path="test.py")
+        assert len(result["symbols"]) >= 2  # class + function
 
     def test_search_code(self, server):
         result = server._handle_search_code(query="def test")

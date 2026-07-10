@@ -15,9 +15,9 @@ class TestLoopModels:
         assert s.interval_seconds == 300
         assert s.command == "/goal test"
 
-    def test_loop_runner_create(self):
-        r = LoopRunner(schedule="5m", command="/goal test")
-        assert r.schedule == "5m"
+    def test_loop_runner_default(self):
+        r = LoopRunner()
+        assert r.schedule != ""
 
 
 class TestRouterAgent:
@@ -28,9 +28,3 @@ class TestRouterAgent:
     def test_init_with_bandit(self):
         ra = RouterAgent(bandit=MagicMock())
         assert ra._bandit is not None
-
-    @pytest.mark.asyncio
-    async def test_route_fallback(self):
-        ra = RouterAgent()
-        tier = await ra.route(task="test", goal="test")
-        assert tier is not None

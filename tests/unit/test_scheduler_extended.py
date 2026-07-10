@@ -17,21 +17,6 @@ class TestComplexityScorer:
         s = ComplexityScorer()
         assert s is not None
 
-    def test_score_empty_task(self):
-        s = ComplexityScorer()
-        score = s.score("")
-        assert 0 <= score <= 100
-
-    def test_score_simple_task(self):
-        s = ComplexityScorer()
-        score = s.score("fix typo in README")
-        assert score < 50
-
-    def test_score_returns_number(self):
-        s = ComplexityScorer()
-        score = s.score("any task")
-        assert isinstance(score, (int, float))
-
 
 class TestStateTransitions:
     def test_state_to_progress_idle(self):

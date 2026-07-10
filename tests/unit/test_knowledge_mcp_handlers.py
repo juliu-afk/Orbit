@@ -88,3 +88,27 @@ def top_level_func():
     def test_query_graph(self, server):
         result = server._handle_query_graph(type="code", symbol="test")
         assert isinstance(result, dict)
+
+    def test_detect_changes(self, server):
+        result = server._handle_detect_changes()
+        assert isinstance(result, dict)
+
+    def test_export_graph_artifact(self, server):
+        result = server._handle_export_graph_artifact(format="json")
+        assert isinstance(result, dict)
+
+    def test_dead_code(self, server):
+        result = server._handle_dead_code()
+        assert isinstance(result, dict)
+
+    def test_type_hierarchy(self, server):
+        result = server._handle_type_hierarchy(symbol="MyClass")
+        assert isinstance(result, dict)
+
+    def test_okf_import(self, server):
+        result = server._handle_okf_import(bundle_dir=".")
+        assert isinstance(result, dict)
+
+    def test_okf_export(self, server):
+        result = server._handle_okf_export(domain="test")
+        assert isinstance(result, dict)

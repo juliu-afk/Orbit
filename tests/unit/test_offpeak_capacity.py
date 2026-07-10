@@ -11,6 +11,7 @@ def _make_task(name="t", duration=10, priority="NORMAL"):
     return DeferredTask(
         goal_id=f"g-{name}", goal_text=f"task {name}",
         estimated_duration_seconds=duration, priority=priority,
+        enqueued_at=datetime.now(UTC),
     )
 
 

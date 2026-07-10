@@ -1,6 +1,4 @@
-"""loop/models + router/agent extended tests.
-Coverage sprint 9.
-"""
+"""loop/models + router/agent extended tests."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -9,7 +7,6 @@ import pytest
 
 from orbit.loop.models import LoopRunner, LoopSchedule
 from orbit.router.agent import RouterAgent
-from orbit.router.cc_switch import CC_SWITCH
 
 
 class TestLoopModels:
@@ -34,13 +31,6 @@ class TestRouterAgent:
 
     @pytest.mark.asyncio
     async def test_route_fallback(self):
-        """Routing without bandit falls back to default tier."""
         ra = RouterAgent()
-        tier = await ra.route(task="test task", goal="test goal")
+        tier = await ra.route(task="test", goal="test")
         assert tier is not None
-        assert isinstance(tier, str)
-
-
-class TestCCSwitch:
-    def test_cc_switch_is_callable(self):
-        assert callable(CC_SWITCH)

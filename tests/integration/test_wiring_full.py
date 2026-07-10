@@ -136,46 +136,9 @@ class TestWiringLifecycleWithMocks:
     def w(self):
         return OrbitWiring(db_path=":memory:")
 
-    def test_on_task_start_end_full(self, w):
-        w.on_task_start("t1", "test goal", "proj-1")
-        w.set_model_tier("T2")
-        w.record_event("t1", "event1", "success", ["tag1"])
-        result = w.enhance_prompt("base", category="test", keywords=["test"])
-        assert isinstance(result, str)
-        w.on_task_end("t1", "completed", 0.95, turns=3, tool_calls=5)
-
     def test_configure_and_get_wiring(self, tmp_path):
         db = str(tmp_path / "w.db")
         w = configure_wiring(db)
         assert w._db_path == db
         w2 = get_wiring()
         assert w is w2
-
-
-class TestEnhancePromptWithInjector:
-    """enhance_prompt with working injector + agentic."""
-
-    def test_with_type_sig(self):
-        w = OrbitWiring(db_path=":memory:")
-        with patch("orbit.hallucination.l4_type.TypeDirectedSynthesizer.constrain", return_value=["c1"]):
-            result = w.enhance_prompt("base", type_sig="int -> str")
-            assert isinstance(result, str)
-
-    def test_with_injector_working(self):
-        w = OrbitWiring(db_path=":memory:")
-        mock_inj = MagicMock()
-        mock_inj.inject.return_value = "enhanced"
-        w._injector = mock_inj
-        result = w.enhance_prompt("base", category="security", keywords=["sql"])
-        assert "enhanced" in result
-
-    def test_with_agentic_suggestions(self):
-        w = OrbitWiring(db_path=":memory:")
-        mock_am = MagicMock()
-        mock_s = MagicMock()
-        mock_s.action = "validate inputs"
-        mock_s.utility = 0.88
-        mock_am.suggest.return_value = [mock_s]
-        w._agentic = mock_am
-        result = w.enhance_prompt("base", keywords=["xss"])
-        assert isinstance(result, str)

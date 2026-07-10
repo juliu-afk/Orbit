@@ -17,13 +17,35 @@ class TestComplexityScorer:
         s = ComplexityScorer()
         assert s is not None
 
+    def test_score_empty_task(self):
+        s = ComplexityScorer()
+        score = s.score("")
+        assert 0 <= score <= 100
+
+    def test_score_simple_task(self):
+        s = ComplexityScorer()
+        score = s.score("fix typo in README")
+        assert score < 50
+
+    def test_score_complex_task(self):
+        s = ComplexityScorer()
+        score = s.score("Implement distributed transaction with 2PC across microservices with PostgreSQL and Redis")
+        assert score > 50
+
 
 class TestStateTransitions:
-    def test_state_to_progress_idle(self):
-        assert _state_to_progress(TaskState.IDLE) >= 0
+    def test_state_to_progress(self):
+        for state in TaskState:
+            pct = _state_to_progress(state)
+            assert 0 <= pct <= 100
 
-    def test_state_to_progress_coding(self):
-        assert _state_to_progress(TaskState.CODING) > 0
+    def test_transition_valid(self):
+        t = _transition(TaskState.PLANNING, TaskState.CODING)
+        assert t is True
+
+    def test_transition_invalid(self):
+        t = _transition(TaskState.IDLE, TaskState.VERIFYING)
+        assert t is False
 
     def test_all_states_have_progress(self):
         """All states have progress values."""

@@ -21,6 +21,7 @@ import SearchDrawer from '@/components/editor/SearchDrawer.vue'
 import TraceDrawer from '@/components/observability/TraceDrawer.vue'
 import ConfigDrawer from '@/components/config/ConfigDrawer.vue'
 import CodeGraphDrawer from '@/components/codegraph/CodeGraphDrawer.vue'
+import LoopDrawer from '@/components/loop/LoopDrawer.vue'
 import WechatBindingPanel from '@/components/settings/WechatBindingPanel.vue'
 import ShortcutPanel from '@/components/layout/ShortcutPanel.vue'
 import CommandPalette from '@/components/layout/CommandPalette.vue'  // UX-11
@@ -117,6 +118,7 @@ function onCmdExecute(action: string) {
     case 'toggle:charts': shell.showChart = !shell.showChart; break
     case 'toggle:trace': shell.showTrace = !shell.showTrace; break
     case 'toggle:config': shell.showConfig = !shell.showConfig; break
+    case 'toggle:loop': shell.showLoop = !shell.showLoop; break
     case 'open:settings': showShortcuts.value = true; break
     case 'open:newsession': showNewDialog.value = true; break
     case 'open:shortcuts': showShortcuts.value = true; break
@@ -154,6 +156,7 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
   <DAGDrawer v-model:show="shell.showDAG" /><TokenChartDrawer v-model:show="shell.showChart" /><SearchDrawer v-model:show="shell.showSearch" @open-file="shell.openFileReview" />
   <TraceDrawer v-model:show="shell.showTrace" /><ConfigDrawer v-model:show="shell.showConfig" />
   <CodeGraphDrawer v-model:show="shell.showCodeGraph" />
+  <LoopDrawer v-model:show="shell.showLoop" />
   <WechatBindingPanel v-model:show="shell.showWeChat" />
   <ShortcutPanel v-model:show="showShortcuts" />
     <!-- UX-11: 命令面板 Cmd+K -->

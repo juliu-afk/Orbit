@@ -31,6 +31,7 @@ const CMDS: Cmd[] = [
   { id: 'charts', icon: '📊', label: 'Toggle Charts', shortcut: '', action: 'toggle:charts' },
   { id: 'trace', icon: '🔎', label: 'Toggle Trace View', shortcut: '', action: 'toggle:trace' },
   { id: 'config', icon: '⚙️', label: 'Toggle Config', shortcut: '', action: 'toggle:config' },
+  { id: 'loop', icon: '⏰', label: 'Toggle Loop Tasks', shortcut: '', action: 'toggle:loop' },
   { id: 'settings', icon: '🎛️', label: 'Open Settings', shortcut: 'Ctrl+,', action: 'open:settings' },
   { id: 'theme', icon: '🌓', label: 'Toggle Theme', shortcut: '', action: 'toggle:theme' },
   { id: 'newsession', icon: '🆕', label: 'New Session', shortcut: 'Ctrl+N', action: 'open:newsession' },

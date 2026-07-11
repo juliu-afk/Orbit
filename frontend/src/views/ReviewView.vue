@@ -91,8 +91,9 @@ async function approveAll() {
   ElMessage.success('已批准')
 }
 async function rejectAll() {
-  await review.transitionStatus('rejected')
-  ElMessage.warning('已拒绝')
+  // 后端状态机: in_review → changes_requested（'rejected' 非法状态值）
+  await review.transitionStatus('changes_requested')
+  ElMessage.warning('已要求修改')
 }
 
 async function doCommit() {

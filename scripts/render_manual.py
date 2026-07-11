@@ -279,6 +279,7 @@ def main() -> int:
         # 标题取首个 # 行
         m = re.search(r"^#\s+(.*)", text, re.MULTILINE)
         title = re.sub(r"<[^>]+>", "", m.group(1)) if m else md_path.stem
+        title = title.replace(" || ", " · ").replace("||", " · ")
         body = md_to_html_body(text)
         page = _PAGE.format(title=html.escape(title), css=_CSS, body=body)
         (out / f"{md_path.stem}.html").write_text(page, encoding="utf-8")

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit 说明书 · Orbit Manual</title>
+<style>
+:root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
+        --accent:#0969da; --code-bg:#f6f8fa; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg:#e6edf3; --bg:#0d1117; --muted:#8b949e; --border:#30363d;
+          --accent:#4493f8; --code-bg:#161b22; } }
+* { box-sizing: border-box; }
+body { margin:0; color:var(--fg); background:var(--bg);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC",
+       "Microsoft YaHei",Helvetica,Arial,sans-serif; line-height:1.6; }
+main { max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+h1,h2,h3,h4 { line-height:1.25; margin-top:1.6em; }
+h1 { border-bottom:2px solid var(--border); padding-bottom:.3em; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:.25em; }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+code { background:var(--code-bg); padding:.15em .35em; border-radius:6px;
+       font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size:.9em; }
+pre { background:var(--code-bg); padding:1rem; border-radius:8px; overflow-x:auto;
+      border:1px solid var(--border); }
+pre code { background:none; padding:0; }
+blockquote { margin:1em 0; padding:.4em 1em; color:var(--muted);
+             border-left:4px solid var(--border); }
+table { border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto; }
+th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
+th { background:var(--code-bg); }
+hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
+ul { padding-left:1.5em; }
+</style>
+</head>
+<body><main>
+<h1 id="orbit-说明书-orbit-manual">Orbit 说明书 · Orbit Manual</h1>
+<blockquote>轻量级多 Agent 软件开发自循环系统 —— 完整说明书。 A lightweight multi-agent self-looping software development system — complete manual.</blockquote>
+<p>本说明书面向三类读者，用一套带目录的文档覆盖 Orbit 的<strong>设计哲学、整体架构、技术方案、使用说明、再开发说明</strong>。</p>
+<p>This manual serves three audiences and covers Orbit's <strong>design philosophy, architecture, technical design, usage, and re-development</strong> in one indexed set of documents.</p>
+<table>
+<thead><tr>
+<th>读者 Reader</th>
+<th>你想知道 You want</th>
+<th>建议阅读顺序 Suggested path</th>
+</tr></thead><tbody>
+<tr><td>使用者 <strong>User</strong></td><td>怎么装、怎么跑、怎么用</td><td>00 → 05 → 06</td></tr>
+<tr><td>开发者 <strong>Developer</strong></td><td>怎么改、怎么加功能、怎么构建</td><td>00 → 02 → 07 → 06</td></tr>
+<tr><td>研究者 <strong>Researcher</strong></td><td>为什么这么设计、理论依据</td><td>01 → 02 → 03 → 08</td></tr>
+</tbody></table>
+<hr>
+<h2 id="目录-table-of-contents">目录 · Table of Contents</h2>
+<table>
+<thead><tr>
+<th>#</th>
+<th>文档 Document</th>
+<th>内容 Content</th>
+</tr></thead><tbody>
+<tr><td>00</td><td><a href="00-overview.html">总览 · Overview</a></td><td>项目定位、核心指标、技术栈全景、读者导航</td></tr>
+<tr><td>01</td><td><a href="01-design-philosophy.html">设计哲学 · Design Philosophy</a></td><td>为何存在、为何锚定编排层、为何自研调度器、六项哲学、不可妥协项</td></tr>
+<tr><td>02</td><td><a href="02-architecture.html">整体架构 · Architecture</a></td><td>三层架构规范、数据流全链路、48 模块地图、五图谱体系、熔断/检查点/审计链</td></tr>
+<tr><td>03</td><td><a href="03-hallucination-defense.html">九层防幻觉 · Hallucination Defense</a></td><td>L1–L9 逐层原理、执行管道顺序、四类幻觉打击策略、效果数据</td></tr>
+<tr><td>04</td><td><a href="04-technical-stack.html">技术方案 · Technical Design</a></td><td>技术栈矩阵、LiteLLM 网关与三层路由、沙箱、存储、可观测性</td></tr>
+<tr><td>05</td><td><a href="05-usage-guide.html">使用说明 · Usage Guide</a></td><td>三种启动方式、配置项、CLI、前端页面、主用户工作流</td></tr>
+<tr><td>06</td><td><a href="06-api-reference.html">API 参考 · API Reference</a></td><td>全部路由组、代表端点、WebSocket/SSE 通道</td></tr>
+<tr><td>07</td><td><a href="07-development-guide.html">再开发说明 · Development Guide</a></td><td>四阶段工作流、模块职责表、测试体系、exe 构建链路、数据库迁移、贡献约定</td></tr>
+<tr><td>08</td><td><a href="08-appendix.html">附录 · Appendix</a></td><td>术语表、核心指标基线、路线图、原始设计文档索引</td></tr>
+</tbody></table>
+<hr>
+<h2 id="一句话理解-orbit-orbit-in-one-sentence">一句话理解 Orbit · Orbit in One Sentence</h2>
+<p><strong>中文</strong>：Orbit 不是"再造一个 Claude Code"，而是<strong>站在 Claude Code / Codex 之上的治理层</strong>——让一群 AI Agent 协作完成软件开发全流程，并对每一步做<strong>编排、验证、追溯</strong>。</p>
+<p><strong>English</strong>: Orbit is not "another Claude Code" — it is the <strong>governance layer above</strong> single-agent coders. It lets a fleet of AI agents collaborate through the full software-development lifecycle, while <strong>orchestrating, validating, and tracing</strong> every step.</p>
+<p>四个动词是全书主线 · Four verbs run through this whole manual:</p>
+<table>
+<thead><tr>
+<th>编排 Orchestrate</th>
+<th>治理 Govern</th>
+<th>验证 Validate</th>
+<th>追溯 Trace</th>
+</tr></thead><tbody>
+<tr><td>自研 asyncio 状态机调度器</td><td>五图谱 + 权限 + 资源熔断</td><td>9 层防幻觉纵深防御</td><td><code>task_audit_trail</code> 审计链</td></tr>
+</tbody></table>
+<hr>
+<h2 id="文档约定-conventions">文档约定 · Conventions</h2>
+<ul>
+<li>标题、关键术语中英对照；正文以中文为主，关键概念附英文摘要。</li>
+</ul>
+<p>Headings and key terms are bilingual; body text is Chinese-first with English summaries for core concepts.</p>
+<ul>
+<li>凡涉及具体实现，均标注源文件路径（<code>src/orbit/...</code>）或设计文档，便于回溯核对。</li>
+</ul>
+<p>Every concrete claim cites a source file (<code>src/orbit/...</code>) or design doc for verification.</p>
+<ul>
+<li>数据/指标以撰写时仓库状态为准，随版本演进；以 <a href="../产品路线图.html"><code>docs/产品路线图.md</code></a> 与 <a href="../已实现功能清单.html"><code>docs/已实现功能清单.md</code></a> 为权威更新源。</li>
+</ul>
+<p>Metrics reflect repo state at writing time; the roadmap and feature-list docs are the authoritative live sources.</p>
+<h2 id="相关文档-related-docs">相关文档 · Related Docs</h2>
+<ul>
+<li><a href="../../README.html"><code>README.md</code></a> — 项目根 README（快速开始）</li>
+<li><a href="../../AGENTS.html"><code>AGENTS.md</code></a> — 开发哲学与实现约束全集</li>
+<li><a href="../charter.html"><code>docs/charter.md</code></a> — 项目章程（度量基线、范围、风险 — 本项目"宪法"）</li>
+<li><a href="../开发计划_V14.1.html"><code>docs/开发计划_V14.1.md</code></a> — 总体设计（26 章，指向 <code>docs/开发计划/</code> 子文档）</li>
+<li><a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a> — 四阶段开发流程细则</li>
+<li><a href="../三层架构规范.html"><code>docs/三层架构规范.md</code></a> — 三层边界与静态检查规则</li>
+</ul>
+<p>&lt;/content&gt;</p>
+<p>&lt;/invoke&gt;</p>
+</main></body>
+</html>

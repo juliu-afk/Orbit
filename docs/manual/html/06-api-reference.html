@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 · API 参考 · API Reference</title>
+<style>
+:root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
+        --accent:#0969da; --code-bg:#f6f8fa; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg:#e6edf3; --bg:#0d1117; --muted:#8b949e; --border:#30363d;
+          --accent:#4493f8; --code-bg:#161b22; } }
+* { box-sizing: border-box; }
+body { margin:0; color:var(--fg); background:var(--bg);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC",
+       "Microsoft YaHei",Helvetica,Arial,sans-serif; line-height:1.6; }
+main { max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+h1,h2,h3,h4 { line-height:1.25; margin-top:1.6em; }
+h1 { border-bottom:2px solid var(--border); padding-bottom:.3em; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:.25em; }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+code { background:var(--code-bg); padding:.15em .35em; border-radius:6px;
+       font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size:.9em; }
+pre { background:var(--code-bg); padding:1rem; border-radius:8px; overflow-x:auto;
+      border:1px solid var(--border); }
+pre code { background:none; padding:0; }
+blockquote { margin:1em 0; padding:.4em 1em; color:var(--muted);
+             border-left:4px solid var(--border); }
+table { border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto; }
+th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
+th { background:var(--code-bg); }
+hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
+ul { padding-left:1.5em; }
+</style>
+</head>
+<body><main>
+<h1 id="06-api-参考-api-reference">06 · API 参考 · API Reference</h1>
+<p><a href="README.html">← 返回目录 Back to index</a> · <a href="05-usage-guide.html">← 上一章 使用说明</a></p>
+<blockquote>路由注册见 <a href="../../src/orbit/api/main.py"><code>src/orbit/api/main.py</code></a>（<code>_ROUTE_MODULES</code> / <code>_ROUTE_SPEC</code>）。交互式文档：运行后访问 <code>/docs</code>（Swagger）或 <code>/redoc</code>。</blockquote>
+<hr>
+<h2 id="6-1-统一约定-conventions">6.1 统一约定 · Conventions</h2>
+<ul>
+<li>版本前缀：<code>/api/v1</code>（<code>API_V1_STR</code>）。</li>
+<li>鉴权：设置 <code>ORBIT_AUTH_TOKEN</code> 后启用 AuthMiddleware；请求带 <code>Authorization: Bearer &amp;lt;token&amp;gt;</code>。</li>
+<li>自动文档：<code>/docs</code>（Swagger UI）、<code>/redoc</code>（ReDoc）。</li>
+<li>指标：<code>/metrics</code>（Prometheus）。</li>
+</ul>
+<h2 id="6-2-任务与目标-tasks-goals">6.2 任务与目标 · Tasks &amp; Goals</h2>
+<table>
+<thead><tr>
+<th>前缀</th>
+<th>路由文件</th>
+<th>代表端点</th>
+</tr></thead><tbody>
+<tr><td><code>/health</code></td><td><code>health.py</code></td><td><code>GET /health</code>（含 Redis 探针）</td></tr>
+<tr><td><code>/api/v1/tasks</code></td><td><code>tasks.py</code></td><td><code>POST /tasks</code> 创建 · <code>GET /tasks/{id}</code> · <code>POST /tasks/{id}/cancel</code></td></tr>
+<tr><td><code>/api/v1/goal</code></td><td><code>goal.py</code></td><td><code>POST /goal</code>（PRD/模糊需求/批量目录）· <code>POST /goal/{id}/cancel · pause · resume</code></td></tr>
+<tr><td><code>/api/v1/loop</code></td><td><code>loop.py</code></td><td><code>POST /loop</code> 定时循环 · <code>GET /loop</code> · <code>DELETE /loop/{id}</code></td></tr>
+<tr><td><code>/api/v1/compose</code></td><td><code>compose.py</code></td><td><code>POST /compose/run</code> 执行 spec 编排（限流 5 req/60s）</td></tr>
+<tr><td><code>/api/v1/dream</code></td><td><code>dream.py</code></td><td><code>POST /dream/run</code> 触发记忆合并 · <code>GET /dream/status</code></td></tr>
+<tr><td><code>/api/v1/schedule</code></td><td><code>schedule.py</code></td><td><code>GET /peak-status</code> · <code>GET /queue</code> · <code>POST /queue/{id}/urgent</code> · <code>GET /savings-report</code> · <code>POST /reload-config</code></td></tr>
+</tbody></table>
+<h2 id="6-3-会话与项目-sessions-projects">6.3 会话与项目 · Sessions &amp; Projects</h2>
+<table>
+<thead><tr>
+<th>前缀</th>
+<th>路由文件</th>
+<th>代表端点</th>
+</tr></thead><tbody>
+<tr><td><code>/api/v1/sessions</code></td><td><code>sessions.py</code></td><td><code>POST /sessions</code> · <code>GET /sessions</code> · <code>GET/PATCH /sessions/{id}</code> · <code>POST /sessions/{id}/fork</code> · <code>GET /sessions/{id}/forks</code></td></tr>
+<tr><td><code>/api/v1/projects</code></td><td><code>projects.py</code></td><td><code>POST /projects</code> 注册 · <code>GET /projects</code> · <code>GET /projects/{name}</code> · <code>GET /projects/{name}/brief</code> · <code>POST /projects/{name}/brief/refresh</code></td></tr>
+<tr><td><code>/api/v1/chat</code></td><td><code>chat.py</code></td><td><code>WebSocket /chat</code> 自然语言入口（ChatterAgent→意图路由→Chatter/Clarifier）</td></tr>
+<tr><td><code>/api/v1/agents</code></td><td><code>agent_llm.py</code></td><td><code>GET /agents/{name}/llm</code> 查询配置 · <code>POST /agents/{name}/llm/switch</code> 强制切换模型</td></tr>
+</tbody></table>
+<h2 id="6-4-验证与知识-validation-knowledge">6.4 验证与知识 · Validation &amp; Knowledge</h2>
+<table>
+<thead><tr>
+<th>前缀</th>
+<th>路由文件</th>
+<th>代表端点</th>
+</tr></thead><tbody>
+<tr><td><code>/api/v1/review</code></td><td><code>review.py</code></td><td><code>POST /review</code> 创建审查 · <code>GET /review/{id}</code></td></tr>
+<tr><td><code>/api/v1/knowledge</code></td><td><code>knowledge.py</code></td><td><code>GET /knowledge?domain=...&amp;amp;concept=...</code> 领域知识查询（会计/金融/法律）</td></tr>
+<tr><td><code>/api/v1/compliance</code></td><td><code>compliance.py</code></td><td><code>GET /compliance/validate</code> · <code>/validate-all</code> · <code>/rules</code></td></tr>
+<tr><td><code>/api/v1/compliance_check</code></td><td><code>compliance_routes.py</code></td><td>Diff 合规标注 + 审查清单自动生成</td></tr>
+<tr><td><code>/api/v1/causal</code></td><td><code>causal_routes.py</code></td><td><code>POST /learn</code> 学习因果图 · <code>POST /root-cause</code> 根因分析 · <code>GET /graph</code> · <code>POST /recommend</code></td></tr>
+</tbody></table>
+<h2 id="6-5-可观测与运维-observability-ops">6.5 可观测与运维 · Observability &amp; Ops</h2>
+<table>
+<thead><tr>
+<th>前缀</th>
+<th>路由文件</th>
+<th>代表端点</th>
+</tr></thead><tbody>
+<tr><td><code>/api/v1/observability</code></td><td><code>observability.py</code></td><td><code>GET /health</code> · <code>/health/{component}</code> · <code>/metrics</code> · <code>/alerts</code> · <code>/alerts/history</code> · <code>/audit</code> · <code>POST/GET /lessons</code> · <code>/feedback</code> · <code>/grafana/dashboard</code></td></tr>
+<tr><td><code>/api/v1/backup</code></td><td><code>backup.py</code></td><td><code>GET /snapshots</code> · <code>POST /snapshots</code> 创建快照 · <code>POST /restore</code> 恢复</td></tr>
+<tr><td><code>/api/v1/versioning</code></td><td><code>versioning.py</code></td><td><code>GET /current</code> · <code>GET /versions</code> · <code>POST /install</code></td></tr>
+<tr><td><code>/projects</code></td><td><code>ponytail_debt.py</code></td><td>Ponytail 技术债务台账扫描</td></tr>
+</tbody></table>
+<h2 id="6-6-代码与文件-code-files">6.6 代码与文件 · Code &amp; Files</h2>
+<table>
+<thead><tr>
+<th>前缀</th>
+<th>路由文件</th>
+<th>代表端点</th>
+</tr></thead><tbody>
+<tr><td><code>/api/v1/files</code></td><td><code>files_routes.py</code></td><td><code>GET /tree</code> 文件树 · <code>GET /read?path=...</code></td></tr>
+<tr><td><code>/api/v1/git</code></td><td><code>git_routes.py</code></td><td>Git 操作（commit/branch/diff/log）</td></tr>
+<tr><td><code>/api/v1/search</code></td><td><code>search_routes.py</code></td><td><code>GET /search?q=...</code> 文件名 + 内容搜索（ripgrep）</td></tr>
+<tr><td><code>/api/v1/codegraph</code></td><td><code>codegraph_routes.py</code></td><td><code>GET /definition</code> Go-to-Def · <code>/references</code> · <code>/outline</code> · <code>/hover</code> · 图谱可视化 · <code>POST /build</code></td></tr>
+<tr><td><code>/api/v1/tests</code></td><td><code>tests_routes.py</code></td><td>测试结果 + 覆盖率 API</td></tr>
+<tr><td><code>/api/v1/insights</code></td><td><code>insights_routes.py</code></td><td>风险评分、影响分析、模块健康</td></tr>
+<tr><td><code>/api/v1/terminal</code></td><td><code>terminal_routes.py</code></td><td>集成终端命令执行 + 输出流（命令白名单）</td></tr>
+<tr><td><code>/api/v1/config</code></td><td><code>config_routes.py</code></td><td>配置管理（YAML 编辑 + Git 历史 + 分支 + 冲突解决）</td></tr>
+</tbody></table>
+<h2 id="6-7-集成与窗口-integration-window">6.7 集成与窗口 · Integration &amp; Window</h2>
+<table>
+<thead><tr>
+<th>前缀</th>
+<th>路由文件</th>
+<th>代表端点</th>
+</tr></thead><tbody>
+<tr><td><code>/api/v1/wechat</code></td><td><code>wechat_routes.py</code></td><td>微信集成——绑定 + 配置 + iLink Bot API 双向对话</td></tr>
+<tr><td><code>/app</code></td><td><code>app_routes.py</code></td><td>窗口控制（最小化/最大化/关闭）</td></tr>
+</tbody></table>
+<h2 id="6-8-实时通道-real-time-channels">6.8 实时通道 · Real-time Channels</h2>
+<table>
+<thead><tr>
+<th>通道</th>
+<th>路由</th>
+<th>用途</th>
+</tr></thead><tbody>
+<tr><td>WebSocket</td><td><code>/ws</code></td><td>驾驶舱实时监控（DAG/Token/告警推送）</td></tr>
+<tr><td>WebSocket</td><td><code>/ws/diagnostics/{task_id}</code></td><td>实时诊断推送（mypy 结果）</td></tr>
+<tr><td>WebSocket</td><td><code>/api/v1/chat</code></td><td>自然语言对话</td></tr>
+<tr><td>SSE</td><td><code>stream/</code> 模块</td><td>Agent 输出流式响应</td></tr>
+</tbody></table>
+<hr>
+<p><a href="README.html">← 返回目录</a> · <a href="07-development-guide.html">下一章：再开发说明 →</a></p>
+<p>&lt;/content&gt;</p>
+</main></body>
+</html>

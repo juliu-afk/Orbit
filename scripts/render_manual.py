@@ -24,6 +24,15 @@ _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
 
 def _render_inline(text: str) -> str:
+    # 双语约定：任一块级文本用 " || " 分隔中英——中文在前、英文在后。
+    # WHY：统一到行内渲染入口，标题/段落/列表项/表格单元格自动获得"中文上、英文小号在下"。
+    if " || " in text:
+        zh, en = text.split(" || ", 1)
+        return f'{_render_inline_one(zh)}<span class="en">{_render_inline_one(en)}</span>'
+    return _render_inline_one(text)
+
+
+def _render_inline_one(text: str) -> str:
     # 1) 转义 HTML 特殊字符（先做，防止注入与显示错乱）
     text = html.escape(text, quote=False)
     # 2) 行内代码抽出为占位符
@@ -60,18 +69,28 @@ def _slugify(text: str) -> str:
     return text.strip("-")
 
 
+# 单元格分隔：只按"单个 |"切分，不切分双语分隔符 `||`（否则 `中文 || English` 被误拆成空列）
+_CELL_SPLIT = re.compile(r"(?<!\|)\|(?!\|)")
+
+
+def _split_cells(line: str) -> list[str]:
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|"):
+        s = s[:-1]
+    return [c.strip() for c in _CELL_SPLIT.split(s)]
+
+
 def _is_table_sep(line: str) -> bool:
     # 表格分隔行形如 |---|:--:|---| 或 --- | ---
-    cells = [c.strip() for c in line.strip().strip("|").split("|")]
+    cells = _split_cells(line)
     return bool(cells) and all(re.fullmatch(r":?-{2,}:?", c) for c in cells)
 
 
 def _render_table(rows: list[str]) -> str:
-    def cells(line: str) -> list[str]:
-        return [c.strip() for c in line.strip().strip("|").split("|")]
-
-    header = cells(rows[0])
-    body = [cells(r) for r in rows[2:]]
+    header = _split_cells(rows[0])
+    body = [_split_cells(r) for r in rows[2:]]
     out = ["<table>", "<thead><tr>"]
     out += [f"<th>{_render_inline(c)}</th>" for c in header]
     out.append("</tr></thead><tbody>")
@@ -215,6 +234,10 @@ th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
 th { background:var(--code-bg); }
 hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
 ul { padding-left:1.5em; }
+.en { display:block; font-size:.82em; font-weight:400; color:var(--muted);
+      line-height:1.45; margin-top:.15em; }
+h1 .en, h2 .en, h3 .en, h4 .en { font-size:.6em; margin-top:.2em; }
+th .en, td .en { font-size:.8em; }
 """
 
 _PAGE = """<!DOCTYPE html>

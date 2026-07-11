@@ -32,6 +32,10 @@ th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
 th { background:var(--code-bg); }
 hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
 ul { padding-left:1.5em; }
+.en { display:block; font-size:.82em; font-weight:400; color:var(--muted);
+      line-height:1.45; margin-top:.15em; }
+h1 .en, h2 .en, h3 .en, h4 .en { font-size:.6em; margin-top:.2em; }
+th .en, td .en { font-size:.8em; }
 </style>
 </head>
 <body><main>
@@ -41,118 +45,117 @@ ul { padding-left:1.5em; }
 <h2 id="8-1-术语表-glossary">8.1 术语表 · Glossary</h2>
 <table>
 <thead><tr>
-<th>术语 Term</th>
-<th>含义 Meaning</th>
+<th>术语<span class="en">Term</span></th>
+<th>含义<span class="en">Meaning</span></th>
 </tr></thead><tbody>
-<tr><td><strong>编排层</strong> Orchestration layer</td><td>Orbit 的定位——协调多 Agent，而非单次代码生成</td></tr>
-<tr><td><strong>五图谱</strong> Five-graph system</td><td>代码/数据库/配置/知识/元图谱，Agent 的全局记忆</td></tr>
-<tr><td><strong>元图谱</strong> Meta-graph</td><td>记录五图谱间 12 种跨图谱关系，做影响面分析</td></tr>
-<tr><td><strong>9 层防幻觉</strong> 9-layer defense</td><td>L1–L9 纵深验证管道，把错误率压到 &lt;3%</td></tr>
-<tr><td><strong>CEGIS</strong></td><td>L5 Z3 形式化的反例引导归纳合成循环（生成→验证→修复→重生成）</td></tr>
-<tr><td><strong>检查点</strong> Checkpoint</td><td>状态机关键转换点的快照，用于回滚（Redis 热 + PG 冷）</td></tr>
-<tr><td><strong>审计链</strong> Audit trail</td><td><code>task_audit_trail</code>，链式记录每步推理，可追溯</td></tr>
-<tr><td><strong>熔断</strong> Circuit breaker</td><td>Token/延迟超限即回滚，三态 CLOSED/OPEN/HALF_OPEN</td></tr>
-<tr><td><strong>Goal 模式</strong></td><td>多独立会话编排 + 自主 PR 合入</td></tr>
-<tr><td><strong>Loop 模式</strong></td><td>定时重复执行 Goal/命令（cron / 自然语言间隔）</td></tr>
-<tr><td><strong>三层架构</strong> 3-layer model</td><td>L1 系统→Agent / L2 Agent→工具(MCP) / L3 Agent→Agent(A2A)</td></tr>
-<tr><td><strong>T1/T2/T3 路由</strong></td><td>三层模型路由，按任务复杂度选模型（成本/质量平衡）</td></tr>
-<tr><td><strong>SCOPE</strong></td><td>evolution 模块的双流记忆机制</td></tr>
-<tr><td><strong>GEPA</strong></td><td>evolution 模块的 Prompt 进化算法</td></tr>
-<tr><td><strong>HITL</strong> Human-in-the-loop</td><td>元认知监控触发的人工干预移交</td></tr>
-<tr><td><strong>Ponytail</strong></td><td>技术债务台账扫描</td></tr>
-<tr><td><strong>grill-me</strong></td><td>modes 模块的交互协议层（YAML 定义 Agent 行为）</td></tr>
+<tr><td><strong>编排层</strong><span class="en"><strong>Orchestration layer</strong></span></td><td>Orbit 的定位——协调多 Agent，而非单次代码生成<span class="en">Orbit's positioning — coordinating multiple agents, not single-shot code generation</span></td></tr>
+<tr><td><strong>五图谱</strong><span class="en"><strong>Five-graph system</strong></span></td><td>代码/数据库/配置/知识/元图谱，Agent 的全局记忆<span class="en">Code/DB/Config/Knowledge/Meta graphs, the agent's global memory</span></td></tr>
+<tr><td><strong>元图谱</strong><span class="en"><strong>Meta-graph</strong></span></td><td>记录五图谱间 12 种跨图谱关系，做影响面分析<span class="en">Records 12 cross-graph relations among the five graphs for impact analysis</span></td></tr>
+<tr><td><strong>9 层防幻觉</strong><span class="en"><strong>9-layer defense</strong></span></td><td>L1–L9 纵深验证管道，把错误率压到 &lt;3%<span class="en">L1–L9 deep validation pipeline, driving error rate below 3%</span></td></tr>
+<tr><td><strong>CEGIS</strong></td><td>L5 Z3 形式化的反例引导归纳合成循环（生成→验证→修复→重生成）<span class="en">L5 Z3-formalized counterexample-guided inductive synthesis loop (generate → verify → fix → regenerate)</span></td></tr>
+<tr><td><strong>检查点</strong><span class="en"><strong>Checkpoint</strong></span></td><td>状态机关键转换点的快照，用于回滚（Redis 热 + PG 冷）<span class="en">Snapshot at key state-machine transitions for rollback (Redis hot + PG cold)</span></td></tr>
+<tr><td><strong>审计链</strong><span class="en"><strong>Audit trail</strong></span></td><td><code>task_audit_trail</code>，链式记录每步推理，可追溯<span class="en"><code>task_audit_trail</code>, chains every reasoning step for full traceability</span></td></tr>
+<tr><td><strong>熔断</strong><span class="en"><strong>Circuit breaker</strong></span></td><td>Token/延迟超限即回滚，三态 CLOSED/OPEN/HALF_OPEN<span class="en">Rolls back on token/latency threshold breach, three states CLOSED/OPEN/HALF_OPEN</span></td></tr>
+<tr><td><strong>Goal 模式</strong><span class="en"><strong>Goal mode</strong></span></td><td>多独立会话编排 + 自主 PR 合入<span class="en">Multi-independent session orchestration + autonomous PR merge</span></td></tr>
+<tr><td><strong>Loop 模式</strong><span class="en"><strong>Loop mode</strong></span></td><td>定时重复执行 Goal/命令（cron / 自然语言间隔）<span class="en">Periodically repeats Goal/commands (cron or natural-language interval)</span></td></tr>
+<tr><td><strong>三层架构</strong><span class="en"><strong>3-layer model</strong></span></td><td>L1 系统→Agent / L2 Agent→工具(MCP) / L3 Agent→Agent(A2A)<span class="en">L1 System→Agent / L2 Agent→Tool(MCP) / L3 Agent→Agent(A2A)</span></td></tr>
+<tr><td><strong>T1/T2/T3 路由</strong><span class="en"><strong>T1/T2/T3 routing</strong></span></td><td>三层模型路由，按任务复杂度选模型（成本/质量平衡）<span class="en">Three-tier model routing, selects model by task complexity (cost/quality balance)</span></td></tr>
+<tr><td><strong>SCOPE</strong></td><td>evolution 模块的双流记忆机制<span class="en">The dual-stream memory mechanism of the evolution module</span></td></tr>
+<tr><td><strong>GEPA</strong></td><td>evolution 模块的 Prompt 进化算法<span class="en">The prompt evolution algorithm of the evolution module</span></td></tr>
+<tr><td><strong>HITL</strong><span class="en"><strong>Human-in-the-loop</strong></span></td><td>元认知监控触发的人工干预移交<span class="en">Human intervention handoff triggered by metacognitive monitoring</span></td></tr>
+<tr><td><strong>Ponytail</strong></td><td>技术债务台账扫描<span class="en">Technical debt ledger scan</span></td></tr>
+<tr><td><strong>grill-me</strong></td><td>modes 模块的交互协议层（YAML 定义 Agent 行为）<span class="en">The interaction protocol layer of the modes module (YAML-defined Agent behavior)</span></td></tr>
 </tbody></table>
 <h2 id="8-2-核心指标基线-metric-baselines">8.2 核心指标基线 · Metric Baselines</h2>
 <table>
 <thead><tr>
-<th>指标</th>
-<th>目标</th>
-<th>来源</th>
+<th>指标<span class="en">Metric</span></th>
+<th>目标<span class="en">Target</span></th>
+<th>来源<span class="en">Source</span></th>
 </tr></thead><tbody>
-<tr><td>调度层延迟</td><td>≤1500ms（预警 1200ms）</td><td><code>charter.md:64</code></td></tr>
-<tr><td>幻觉率</td><td>&lt;3%</td><td><code>charter.md:65</code></td></tr>
-<tr><td>幻觉拦截率</td><td>≥98%</td><td>架构总览:723</td></tr>
-<tr><td>CI 覆盖率门禁</td><td>≥80%</td><td><code>charter.md:66</code></td></tr>
-<tr><td>单任务 Token（设计目标）</td><td>≤35</td><td><code>charter.md:67</code></td></tr>
-<tr><td>熔断决策延迟</td><td>≤12ms</td><td>架构总览:688</td></tr>
-<tr><td>图谱查询延迟</td><td>&lt;50ms</td><td>架构总览:621</td></tr>
-<tr><td>L9 合规验证延迟</td><td>P99 &lt;200ms</td><td>L9 PRD:12</td></tr>
-<tr><td>L9 时效性判断</td><td>≥95%</td><td>L9 PRD:12</td></tr>
-<tr><td>L9 告警误报率</td><td>≤5%</td><td>L9 PRD:12</td></tr>
-<tr><td>Z3 验证端到端</td><td>1.87–3.73s（超时 5s）</td><td>架构总览:328</td></tr>
-<tr><td>检查点 RTO</td><td>≤30s</td><td><code>checkpoint/manager.py</code></td></tr>
-<tr><td>12 任务项目成本</td><td>0.012–0.025 元（非高峰）</td><td>架构总览:719</td></tr>
-<tr><td>Token 节省 vs V3.1</td><td>99.4%</td><td>架构总览:733</td></tr>
+<tr><td>调度层延迟<span class="en">Scheduler latency</span></td><td>≤1500ms（预警 1200ms）</td><td><code>charter.md:64</code></td></tr>
+<tr><td>幻觉率<span class="en">Hallucination rate</span></td><td>&lt;3%</td><td><code>charter.md:65</code></td></tr>
+<tr><td>幻觉拦截率<span class="en">Hallucination interception rate</span></td><td>≥98%</td><td>架构总览:723</td></tr>
+<tr><td>CI 覆盖率门禁<span class="en">CI coverage gate</span></td><td>≥80%</td><td><code>charter.md:66</code></td></tr>
+<tr><td>单任务 Token（设计目标）<span class="en">Tokens per task (design target)</span></td><td>≤35</td><td><code>charter.md:67</code></td></tr>
+<tr><td>熔断决策延迟<span class="en">Circuit-breaker decision latency</span></td><td>≤12ms</td><td>架构总览:688</td></tr>
+<tr><td>图谱查询延迟<span class="en">Graph query latency</span></td><td>&lt;50ms</td><td>架构总览:621</td></tr>
+<tr><td>L9 合规验证延迟<span class="en">L9 compliance verification latency</span></td><td>P99 &lt;200ms</td><td>L9 PRD:12</td></tr>
+<tr><td>L9 时效性判断<span class="en">L9 timeliness judgment</span></td><td>≥95%</td><td>L9 PRD:12</td></tr>
+<tr><td>L9 告警误报率<span class="en">L9 alarm false-positive rate</span></td><td>≤5%</td><td>L9 PRD:12</td></tr>
+<tr><td>Z3 验证端到端<span class="en">Z3 end-to-end verification</span></td><td>1.87–3.73s（超时 5s）</td><td>架构总览:328</td></tr>
+<tr><td>检查点 RTO<span class="en">Checkpoint RTO</span></td><td>≤30s</td><td><code>checkpoint/manager.py</code></td></tr>
+<tr><td>12 任务项目成本<span class="en">Cost for a 12-task project</span></td><td>0.012–0.025 元（非高峰）</td><td>架构总览:719</td></tr>
+<tr><td>Token 节省 vs V3.1<span class="en">Token savings vs V3.1</span></td><td>99.4%</td><td>架构总览:733</td></tr>
 </tbody></table>
 <h2 id="8-3-防幻觉层效果速查-defense-layer-effectiveness">8.3 防幻觉层效果速查 · Defense Layer Effectiveness</h2>
 <table>
 <thead><tr>
-<th>层</th>
-<th>效果</th>
+<th>层<span class="en">Layer</span></th>
+<th>效果<span class="en">Effectiveness</span></th>
 </tr></thead><tbody>
-<tr><td>L1 图谱</td><td>99%</td></tr>
-<tr><td>L2 追踪</td><td>检测 100%，召回 87.6%（F1=0.934），修复 77%</td></tr>
-<tr><td>L3 熵</td><td>AUROC=0.76，阈值 2.5 bits</td></tr>
-<tr><td>L5 Z3</td><td>99%（可证明）</td></tr>
-<tr><td>L7 沙箱</td><td>错误率 65%→2%（最优 0%）</td></tr>
-<tr><td>L9 合规</td><td>时效性 ≥95%，误报 ≤5%</td></tr>
+<tr><td>L1 图谱<span class="en">L1 Graph</span></td><td>99%</td></tr>
+<tr><td>L2 追踪<span class="en">L2 Tracing</span></td><td>检测 100%，召回 87.6%（F1=0.934），修复 77%<span class="en">Detection 100%, recall 87.6% (F1=0.934), auto-fix 77%</span></td></tr>
+<tr><td>L3 熵<span class="en">L3 Entropy</span></td><td>AUROC=0.76，阈值 2.5 bits<span class="en">AUROC=0.76, threshold 2.5 bits</span></td></tr>
+<tr><td>L5 Z3</td><td>99%（可证明）<span class="en">99% (provable)</span></td></tr>
+<tr><td>L7 沙箱<span class="en">L7 Sandbox</span></td><td>错误率 65%→2%（最优 0%）<span class="en">Error rate 65%→2% (best 0%)</span></td></tr>
+<tr><td>L9 合规<span class="en">L9 Compliance</span></td><td>时效性 ≥95%，误报 ≤5%<span class="en">Timeliness ≥95%, false positives ≤5%</span></td></tr>
 </tbody></table>
 <h2 id="8-4-路线图-roadmap">8.4 路线图 · Roadmap</h2>
 <table>
 <thead><tr>
-<th>阶段</th>
+<th>阶段<span class="en">Phase</span></th>
 <th>Step</th>
-<th>内容</th>
-<th>状态</th>
+<th>内容<span class="en">Content</span></th>
+<th>状态<span class="en">Status</span></th>
 </tr></thead><tbody>
-<tr><td>W1–W2</td><td>0.1–1.2</td><td>章程/环境/API 契约/图谱 Schema</td><td>✅</td></tr>
-<tr><td>W3–W4</td><td>2.1–2.2</td><td>LiteLLM 网关/检查点</td><td>✅</td></tr>
-<tr><td>W5–W6</td><td>3.1–3.4</td><td>图谱引擎 + 知识图谱</td><td>✅</td></tr>
-<tr><td>W7–W8</td><td>4.1–4.3</td><td>9 层防幻觉 L1–L9</td><td>✅</td></tr>
-<tr><td>W9–W10</td><td>5.1–5.7</td><td>调度器状态机 + Agent 角色 + DAG</td><td>✅</td></tr>
-<tr><td>W11–W12</td><td>6.1–6.3</td><td>驾驶舱/E2E</td><td>✅</td></tr>
-<tr><td>W13</td><td>7.1–7.5</td><td>灰度发布 + 可观测性 + DR</td><td>✅</td></tr>
-<tr><td>W14+</td><td>8–10</td><td>元图谱 + IDE 追赶 + 驾驶舱翻新</td><td>✅</td></tr>
-<tr><td>当前</td><td>—</td><td>覆盖率冲刺 + 交互协议层 + 自我进化</td><td>🔄</td></tr>
+<tr><td>W1–W2</td><td>0.1–1.2</td><td>章程/环境/API 契约/图谱 Schema<span class="en">Charter/env/API contract/graph schema</span></td><td>✅</td></tr>
+<tr><td>W3–W4</td><td>2.1–2.2</td><td>LiteLLM 网关/检查点<span class="en">LiteLLM gateway/checkpoint</span></td><td>✅</td></tr>
+<tr><td>W5–W6</td><td>3.1–3.4</td><td>图谱引擎 + 知识图谱<span class="en">Graph engine + knowledge graph</span></td><td>✅</td></tr>
+<tr><td>W7–W8</td><td>4.1–4.3</td><td>9 层防幻觉 L1–L9<span class="en">9-layer hallucination defense L1–L9</span></td><td>✅</td></tr>
+<tr><td>W9–W10</td><td>5.1–5.7</td><td>调度器状态机 + Agent 角色 + DAG<span class="en">Scheduler state machine + Agent roles + DAG</span></td><td>✅</td></tr>
+<tr><td>W11–W12</td><td>6.1–6.3</td><td>驾驶舱/E2E<span class="en">Cockpit/E2E</span></td><td>✅</td></tr>
+<tr><td>W13</td><td>7.1–7.5</td><td>灰度发布 + 可观测性 + DR<span class="en">Canary release + observability + DR</span></td><td>✅</td></tr>
+<tr><td>W14+</td><td>8–10</td><td>元图谱 + IDE 追赶 + 驾驶舱翻新<span class="en">Meta-graph + IDE catch-up + cockpit refresh</span></td><td>✅</td></tr>
+<tr><td>当前<span class="en">Current</span></td><td>—</td><td>覆盖率冲刺 + 交互协议层 + 自我进化<span class="en">Coverage sprint + interaction protocol layer + self-evolution</span></td><td>🔄</td></tr>
 </tbody></table>
-<p>权威更新源：<a href="../产品路线图.html"><code>docs/产品路线图.md</code></a> · <a href="../已实现功能清单.html"><code>docs/已实现功能清单.md</code></a>。</p>
+<p>权威更新源：<a href="../产品路线图.html"><code>docs/产品路线图.md</code></a> · <a href="../已实现功能清单.html"><code>docs/已实现功能清单.md</code></a>。<span class="en">Authoritative live sources: <a href="../产品路线图.html"><code>docs/产品路线图.md</code></a> · <a href="../已实现功能清单.html"><code>docs/已实现功能清单.md</code></a>。</span></p>
 <h2 id="8-5-原始设计文档索引-source-design-docs">8.5 原始设计文档索引 · Source Design Docs</h2>
-<p>本说明书是提炼；研究细节请查原始文档：</p>
+<p>本说明书是提炼；研究细节请查原始文档：<span class="en">This manual is a distillation; for research details refer to the original docs:</span></p>
 <table>
 <thead><tr>
-<th>文档</th>
-<th>内容</th>
+<th>文档<span class="en">Document</span></th>
+<th>内容<span class="en">Content</span></th>
 </tr></thead><tbody>
-<tr><td><a href="../charter.html"><code>docs/charter.md</code></a></td><td>项目章程（度量基线/范围/风险，"宪法"）</td></tr>
-<tr><td><a href="../开发计划_V14.1.html"><code>docs/开发计划_V14.1.md</code></a></td><td>总体设计索引（26 章，指向 <code>docs/开发计划/</code> 子文档）</td></tr>
-<tr><td><a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md</code></a></td><td>架构总览（哲学/防幻觉/图谱/成本）</td></tr>
-<tr><td><a href="../三层架构规范.html"><code>docs/三层架构规范.md</code></a></td><td>三层边界 + 静态检查规则</td></tr>
-<tr><td><a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a></td><td>四阶段开发流程细则</td></tr>
-<tr><td><a href="../PRD+ADR_元图谱.html"><code>docs/PRD+ADR_元图谱.md</code></a></td><td>元图谱设计</td></tr>
-<tr><td><a href="../PRD+ADR_Step4.3_L9动态合规验证.html"><code>docs/PRD+ADR_Step4.3_L9动态合规验证.md</code></a></td><td>L9 合规</td></tr>
-<tr><td><a href="../"><code>docs/PRD+ADR_*阶段.md</code></a></td><td>各 Step 逐字段契约（0+1/2/3/4/5/6/7/MVP 阶段）</td></tr>
-<tr><td><a href="../SOP-灾难恢复手册.html"><code>docs/SOP-灾难恢复手册.md</code></a></td><td>灾难恢复 SOP</td></tr>
-<tr><td><a href="../SOP-代码签名.html"><code>docs/SOP-代码签名.md</code></a></td><td>代码签名 SOP</td></tr>
-<tr><td><a href="../../AGENTS.html"><code>AGENTS.md</code></a></td><td>开发哲学 + 实现约束全集</td></tr>
+<tr><td><a href="../charter.html"><code>docs/charter.md</code></a></td><td>项目章程（度量基线/范围/风险，"宪法"）<span class="en">Project charter (metric baselines, scope, risks, the "constitution")</span></td></tr>
+<tr><td><a href="../开发计划_V14.1.html"><code>docs/开发计划_V14.1.md</code></a></td><td>总体设计索引（26 章，指向 <code>docs/开发计划/</code> 子文档）<span class="en">Overall design index (26 chapters, pointing to <code>docs/开发计划/</code> subdocs)</span></td></tr>
+<tr><td><a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md</code></a></td><td>架构总览（哲学/防幻觉/图谱/成本）<span class="en">Architecture overview (philosophy/hallucination defense/graphs/cost)</span></td></tr>
+<tr><td><a href="../三层架构规范.html"><code>docs/三层架构规范.md</code></a></td><td>三层边界 + 静态检查规则<span class="en">Three-layer boundaries + static-check rules</span></td></tr>
+<tr><td><a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a></td><td>四阶段开发流程细则<span class="en">Four-stage development workflow details</span></td></tr>
+<tr><td><a href="../PRD+ADR_元图谱.html"><code>docs/PRD+ADR_元图谱.md</code></a></td><td>元图谱设计<span class="en">Meta-graph design</span></td></tr>
+<tr><td><a href="../PRD+ADR_Step4.3_L9动态合规验证.html"><code>docs/PRD+ADR_Step4.3_L9动态合规验证.md</code></a></td><td>L9 合规<span class="en">L9 compliance</span></td></tr>
+<tr><td><a href="../"><code>docs/PRD+ADR_*阶段.md</code></a></td><td>各 Step 逐字段契约（0+1/2/3/4/5/6/7/MVP 阶段）<span class="en">Field-level contracts for each Step (phases 0+1/2/3/4/5/6/7/MVP)</span></td></tr>
+<tr><td><a href="../SOP-灾难恢复手册.html"><code>docs/SOP-灾难恢复手册.md</code></a></td><td>灾难恢复 SOP<span class="en">Disaster recovery SOP</span></td></tr>
+<tr><td><a href="../SOP-代码签名.html"><code>docs/SOP-代码签名.md</code></a></td><td>代码签名 SOP<span class="en">Code signing SOP</span></td></tr>
+<tr><td><a href="../../AGENTS.html"><code>AGENTS.md</code></a></td><td>开发哲学 + 实现约束全集<span class="en">Full development philosophy and implementation constraints</span></td></tr>
 </tbody></table>
 <h2 id="8-6-关键源文件锚点-key-source-anchors">8.6 关键源文件锚点 · Key Source Anchors</h2>
 <table>
 <thead><tr>
-<th>主题</th>
-<th>文件</th>
+<th>主题<span class="en">Topic</span></th>
+<th>文件<span class="en">File</span></th>
 </tr></thead><tbody>
-<tr><td>启动入口</td><td><a href="../../src/orbit/launcher.py"><code>src/orbit/launcher.py</code></a></td></tr>
-<tr><td>FastAPI 应用工厂</td><td><a href="../../src/orbit/api/main.py"><code>src/orbit/api/main.py</code></a></td></tr>
-<tr><td>元图谱 12 关系</td><td><a href="../../src/orbit/graph/meta_graph.py"><code>src/orbit/graph/meta_graph.py</code></a></td></tr>
-<tr><td>防幻觉管道</td><td><a href="../../src/orbit/hallucination/pipeline.py"><code>src/orbit/hallucination/pipeline.py</code></a></td></tr>
-<tr><td>L9 合规实现</td><td><a href="../../src/orbit/compliance/validator.py"><code>src/orbit/compliance/validator.py</code></a></td></tr>
-<tr><td>检查点四级降级</td><td><a href="../../src/orbit/checkpoint/manager.py"><code>src/orbit/checkpoint/manager.py</code></a></td></tr>
+<tr><td>启动入口<span class="en">Launch entry</span></td><td><a href="../../src/orbit/launcher.py"><code>src/orbit/launcher.py</code></a></td></tr>
+<tr><td>FastAPI 应用工厂<span class="en">FastAPI app factory</span></td><td><a href="../../src/orbit/api/main.py"><code>src/orbit/api/main.py</code></a></td></tr>
+<tr><td>元图谱 12 关系<span class="en">Meta-graph 12 relations</span></td><td><a href="../../src/orbit/graph/meta_graph.py"><code>src/orbit/graph/meta_graph.py</code></a></td></tr>
+<tr><td>防幻觉管道<span class="en">Hallucination-defense pipeline</span></td><td><a href="../../src/orbit/hallucination/pipeline.py"><code>src/orbit/hallucination/pipeline.py</code></a></td></tr>
+<tr><td>L9 合规实现<span class="en">L9 compliance implementation</span></td><td><a href="../../src/orbit/compliance/validator.py"><code>src/orbit/compliance/validator.py</code></a></td></tr>
+<tr><td>检查点四级降级<span class="en">Checkpoint 4-level degradation</span></td><td><a href="../../src/orbit/checkpoint/manager.py"><code>src/orbit/checkpoint/manager.py</code></a></td></tr>
 <tr><td>PyInstaller spec</td><td><a href="../../backend/orbit.spec"><code>backend/orbit.spec</code></a></td></tr>
-<tr><td>前端路由</td><td><a href="../../frontend/src/router/index.ts"><code>frontend/src/router/index.ts</code></a></td></tr>
+<tr><td>前端路由<span class="en">Frontend router</span></td><td><a href="../../frontend/src/router/index.ts"><code>frontend/src/router/index.ts</code></a></td></tr>
 </tbody></table>
 <hr>
-<p><a href="README.html">← 返回目录</a></p>
-<blockquote>本说明书由项目现有文档与源码提炼而成，随版本演进。发现与代码不一致时，以源码 + 章程为准，并请更新本文档对应章节。</blockquote>
-<p>&lt;/content&gt;</p>
+<p><a href="README.html">← 返回目录</a><span class="en"><a href="README.html">← Back to index</a></span></p>
+<blockquote>本说明书由项目现有文档与源码提炼而成，随版本演进。发现与代码不一致时，以源码 + 章程为准，并请更新本文档对应章节。<span class="en">This manual is distilled from the project's existing docs and source code, evolving with each release. If inconsistencies are found with the code, defer to the source code and charter, and please update this document accordingly.</span></blockquote>
 </main></body>
 </html>

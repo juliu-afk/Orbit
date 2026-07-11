@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>03 · 九层防幻觉 · Hallucination Defense</title>
+<title>03 · 九层防幻觉 || 03 · Hallucination Defense</title>
 <style>
 :root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
         --accent:#0969da; --code-bg:#f6f8fa; }
@@ -32,88 +32,90 @@ th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
 th { background:var(--code-bg); }
 hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
 ul { padding-left:1.5em; }
+.en { display:block; font-size:.82em; font-weight:400; color:var(--muted);
+      line-height:1.45; margin-top:.15em; }
+h1 .en, h2 .en, h3 .en, h4 .en { font-size:.6em; margin-top:.2em; }
+th .en, td .en { font-size:.8em; }
 </style>
 </head>
 <body><main>
-<h1 id="03-九层防幻觉-hallucination-defense">03 · 九层防幻觉 · Hallucination Defense</h1>
-<p><a href="README.html">← 返回目录 Back to index</a> · <a href="02-architecture.html">← 上一章 整体架构</a></p>
-<blockquote>Orbit 的验证内核。研究者重点章节。实现见 <a href="../../src/orbit/hallucination/"><code>src/orbit/hallucination/</code></a> 与 <a href="../../src/orbit/compliance/"><code>src/orbit/compliance/</code></a>。</blockquote>
+<h1 id="03-九层防幻觉-03-hallucination-defense">03 · 九层防幻觉<span class="en">03 · Hallucination Defense</span></h1>
+<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="02-architecture.html">← 上一章 整体架构 || Previous: Architecture</a></span></p>
+<blockquote>Orbit 的验证内核。研究者重点章节。实现见 <a href="../../src/orbit/hallucination/"><code>src/orbit/hallucination/</code></a> 与 <a href="../../src/orbit/compliance/"><code>src/orbit/compliance/</code></a>。<span class="en">Orbit's verification kernel. Essential reading for researchers. See <a href="../../src/orbit/hallucination/"><code>src/orbit/hallucination/</code></a> and <a href="../../src/orbit/compliance/"><code>src/orbit/compliance/</code></a>.</span></blockquote>
 <hr>
-<h2 id="3-1-为什么需要-9-层-why-nine-layers">3.1 为什么需要 9 层 · Why Nine Layers</h2>
-<p><strong>中文</strong>：核心认知——<strong>纯静态分析拦截幻觉的理论上限只有 48.5%–77%</strong>。要把错误率压到 &lt;3%，必须静态 + 动态结合，用"从快到慢"的分层管道：廉价层拦截大多数简单幻觉，昂贵层（沙箱执行）只处理残余高危幻觉。</p>
-<p><strong>English</strong>: Static analysis alone caps at 48.5%–77% interception. To reach &lt;3% error, Orbit combines static + dynamic checks in a "cheap-to-expensive" pipeline — cheap layers catch most simple hallucinations; expensive layers (sandbox execution) handle the residual high-risk ones.</p>
-<p>分层成本逻辑（<a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:540-544</code></a>）：</p>
+<h2 id="3-1-为什么需要-9-层-why-nine-layers">3.1 为什么需要 9 层<span class="en">Why Nine Layers</span></h2>
+<p>核心认知——<strong>纯静态分析拦截幻觉的理论上限只有 48.5%–77%</strong>。要把错误率压到 &lt;3%，必须静态 + 动态结合，用"从快到慢"的分层管道：廉价层拦截大多数简单幻觉，昂贵层（沙箱执行）只处理残余高危幻觉。<span class="en">Static analysis alone caps at 48.5%–77% interception. To reach &lt;3% error, Orbit combines static + dynamic checks in a "cheap-to-expensive" pipeline — cheap layers catch most simple hallucinations; expensive layers (sandbox execution) handle the residual high-risk ones.</span></p>
+<p>分层成本逻辑（<a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:540-544</code></a>）<span class="en">Layered cost logic (see <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:540-544</code></a>):</span></p>
 <table>
 <thead><tr>
-<th>层组</th>
-<th>拦截占比</th>
-<th>成本</th>
+<th>层组<span class="en">Layer group</span></th>
+<th>拦截占比<span class="en">Interception share</span></th>
+<th>成本<span class="en">Cost</span></th>
 </tr></thead><tbody>
-<tr><td>L1–L2 廉价层</td><td>~80% 简单幻觉（语法、命名）</td><td>接近零</td></tr>
-<tr><td>L3–L4 中等层</td><td>~15% 复杂幻觉（语义、逻辑）</td><td>Token 放大 3–5×，仅关键路径</td></tr>
-<tr><td>L5–L7 高成本层</td><td>~5% 高危幻觉</td><td>沙箱执行换效果</td></tr>
-<tr><td>L8–L9 把关层</td><td>配置一致性 + 合规时效性</td><td>零 Token / 异步</td></tr>
+<tr><td>L1–L2 廉价层<span class="en">L1–L2 Cheap</span></td><td>~80% 简单幻觉（语法、命名）<span class="en">~80% simple hallucinations (syntax, naming)</span></td><td>接近零<span class="en">Near zero</span></td></tr>
+<tr><td>L3–L4 中等层<span class="en">L3–L4 Medium</span></td><td>~15% 复杂幻觉（语义、逻辑）<span class="en">~15% complex hallucinations (semantics, logic)</span></td><td>Token 放大 3–5×，仅关键路径<span class="en">Token amplification 3–5×, critical path only</span></td></tr>
+<tr><td>L5–L7 高成本层<span class="en">L5–L7 High-cost</span></td><td>~5% 高危幻觉<span class="en">~5% high-risk hallucinations</span></td><td>沙箱执行换效果<span class="en">Sandbox execution for effectiveness</span></td></tr>
+<tr><td>L8–L9 把关层<span class="en">L8–L9 Gatekeeping</span></td><td>配置一致性 + 合规时效性<span class="en">Config consistency + compliance timeliness</span></td><td>零 Token / 异步<span class="en">Zero token / async</span></td></tr>
 </tbody></table>
-<h2 id="3-2-四类幻觉与打击策略-four-hallucination-types">3.2 四类幻觉与打击策略 · Four Hallucination Types</h2>
-<p>来源 <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:514-522</code></a>：</p>
+<h2 id="3-2-四类幻觉与打击策略-four-hallucination-types">3.2 四类幻觉与打击策略<span class="en">Four Hallucination Types</span></h2>
+<p>来源 <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:514-522</code></a><span class="en">Source: <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:514-522</code></a>:</span></p>
 <table>
 <thead><tr>
-<th>幻觉类型</th>
-<th>描述</th>
-<th>示例</th>
-<th>主打防御层</th>
+<th>幻觉类型<span class="en">Hallucination type</span></th>
+<th>描述<span class="en">Description</span></th>
+<th>示例<span class="en">Example</span></th>
+<th>主打防御层<span class="en">Primary defense layers</span></th>
 </tr></thead><tbody>
-<tr><td><strong>映射幻觉</strong> Mapping</td><td>需求映射到错误 API/结构</td><td>需求"排序"→生成 <code>array_reverse()</code></td><td>L3 + L6</td></tr>
-<tr><td><strong>命名幻觉</strong> Naming</td><td>捏造不存在的函数/参数/库</td><td><code>pd.read_exel()</code></td><td>L2</td></tr>
-<tr><td><strong>资源幻觉</strong> Resource</td><td>引用不存在的文件/路径/资源</td><td><code>include 'config/missing.php'</code></td><td>L5 + L7</td></tr>
-<tr><td><strong>逻辑幻觉</strong> Logic</td><td>算法错误/边界遗漏/并发问题</td><td>循环 <code>i &amp;lt;= count</code> 数组越界</td><td>L4 + L5</td></tr>
+<tr><td><strong>映射幻觉</strong><span class="en">Mapping</span></td><td>需求映射到错误 API/结构<span class="en">Requirement mapped to wrong API/structure</span></td><td>需求"排序"→生成 <code>array_reverse()</code><span class="en">Requirement "sort" → generates <code>array_reverse()</code></span></td><td>L3 + L6</td></tr>
+<tr><td><strong>命名幻觉</strong><span class="en">Naming</span></td><td>捏造不存在的函数/参数/库<span class="en">Fabricated non-existent functions/params/libraries</span></td><td><code>pd.read_exel()</code></td><td>L2</td></tr>
+<tr><td><strong>资源幻觉</strong><span class="en">Resource</span></td><td>引用不存在的文件/路径/资源<span class="en">References to non-existent files/paths/resources</span></td><td><code>include 'config/missing.php'</code></td><td>L5 + L7</td></tr>
+<tr><td><strong>逻辑幻觉</strong><span class="en">Logic</span></td><td>算法错误/边界遗漏/并发问题<span class="en">Algorithm errors / edge-case omissions / concurrency issues</span></td><td>循环 <code>i &amp;lt;= count</code> 数组越界<span class="en">Loop <code>i &amp;lt;= count</code> array out-of-bounds</span></td><td>L4 + L5</td></tr>
 </tbody></table>
-<h2 id="3-3-逐层详解-layer-by-layer">3.3 逐层详解 · Layer-by-Layer</h2>
+<h2 id="3-3-逐层详解-layer-by-layer">3.3 逐层详解<span class="en">Layer-by-Layer</span></h2>
 <table>
 <thead><tr>
-<th>层</th>
-<th>名称</th>
-<th>技术手段</th>
-<th>拦截目标</th>
-<th>效果数据</th>
+<th>层<span class="en">Layer</span></th>
+<th>名称<span class="en">Name</span></th>
+<th>技术手段<span class="en">Approach</span></th>
+<th>拦截目标<span class="en">Target</span></th>
+<th>效果数据<span class="en">Effectiveness</span></th>
 </tr></thead><tbody>
-<tr><td><strong>L1</strong></td><td>图谱校验 Graph</td><td>CodeGraph 符号匹配 + JSON Schema/Pydantic 约束</td><td>语法级幻觉、引用不存在符号</td><td>99%</td></tr>
-<tr><td><strong>L2</strong></td><td>动态追踪 Trace</td><td>AST 确定性匹配 + 沙箱运行时追踪（<code>__call</code>/<code>eval</code>/<code>call_user_func</code>）</td><td>命名幻觉、动态调用幻觉</td><td>检测 100%，召回 87.6%（F1=0.934），修复 77%</td></tr>
-<tr><td><strong>L3</strong></td><td>熵监控 Entropy</td><td>采样一致性（3–5 候选 + MiniLM 相似度）+ 流式 Shannon 熵实时计算</td><td>语义级幻觉、高熵"胡言乱语"</td><td>AUROC=0.76，阈值 2.5 bits</td></tr>
-<tr><td><strong>L4</strong></td><td>类型检查 Type</td><td>mypy 静态类型检查</td><td>类型错误、API 签名不匹配</td><td>—</td></tr>
-<tr><td><strong>L5</strong></td><td>Z3 形式化 Formal</td><td>rotalabs-verity CEGIS 循环（LLM 生成→Z3 验证→CE2P 修复→重生成），仅核心算法</td><td>逻辑幻觉、边界条件</td><td>99%（可证明），超时 5s，端到端 1.87–3.73s</td></tr>
-<tr><td><strong>L6</strong></td><td>合约验证 Contract</td><td>正向合约（PRD→Assertions）+ 反向分支覆盖检查</td><td>业务逻辑幻觉</td><td>零 Token</td></tr>
-<tr><td><strong>L7</strong></td><td>沙箱执行 Sandbox</td><td>Docker 隔离执行，I/O 行为聚类（MIT 方法），多候选变体执行 + 最大簇 ≥70% 采纳</td><td><strong>所有类型（最强）</strong></td><td>错误率 65%→2%（最优可至 0%）</td></tr>
-<tr><td><strong>L8</strong></td><td>配置漂移 Config drift</td><td>黄金基线 SHA256 指纹比对，自动修复</td><td>配置幻觉、环境不一致</td><td>零 Token，自动修复</td></tr>
-<tr><td><strong>L9</strong></td><td>动态合规 Compliance</td><td>外部合规库实时查询 + 本地缓存，时效性判断 + 版本比对 + DSL 规则引擎</td><td>过时知识引用、法规风险</td><td>时效性 ≥95%，误报 ≤5%，延迟 P99&lt;200ms</td></tr>
+<tr><td><strong>L1</strong></td><td>图谱校验<span class="en">Graph Validation</span></td><td>CodeGraph 符号匹配 + JSON Schema/Pydantic 约束<span class="en">CodeGraph symbol matching + JSON Schema/Pydantic constraints</span></td><td>语法级幻觉、引用不存在符号<span class="en">Syntax-level hallucinations, references to non-existent symbols</span></td><td>99%</td></tr>
+<tr><td><strong>L2</strong></td><td>动态追踪<span class="en">Dynamic Tracing</span></td><td>AST 确定性匹配 + 沙箱运行时追踪（<code>__call</code>/<code>eval</code>/<code>call_user_func</code>）<span class="en">AST deterministic matching + sandbox runtime tracing (<code>__call</code>/<code>eval</code>/<code>call_user_func</code>)</span></td><td>命名幻觉、动态调用幻觉<span class="en">Naming hallucinations, dynamic call hallucinations</span></td><td>检测 100%，召回 87.6%（F1=0.934），修复 77%<span class="en">Detection 100%, recall 87.6% (F1=0.934), fix rate 77%</span></td></tr>
+<tr><td><strong>L3</strong></td><td>熵监控<span class="en">Entropy Monitoring</span></td><td>采样一致性（3–5 候选 + MiniLM 相似度）+ 流式 Shannon 熵实时计算<span class="en">Sampling consistency (3–5 candidates + MiniLM similarity) + real-time streaming Shannon entropy</span></td><td>语义级幻觉、高熵"胡言乱语"<span class="en">Semantic hallucinations, high-entropy gibberish</span></td><td>AUROC=0.76，阈值 2.5 bits<span class="en">AUROC=0.76, threshold 2.5 bits</span></td></tr>
+<tr><td><strong>L4</strong></td><td>类型检查<span class="en">Type Checking</span></td><td>mypy 静态类型检查<span class="en">mypy static type checking</span></td><td>类型错误、API 签名不匹配<span class="en">Type errors, API signature mismatches</span></td><td>—</td></tr>
+<tr><td><strong>L5</strong></td><td>Z3 形式化<span class="en">Z3 Formal Verification</span></td><td>rotalabs-verity CEGIS 循环（LLM 生成→Z3 验证→CE2P 修复→重生成），仅核心算法<span class="en">rotalabs-verity CEGIS loop (LLM generate → Z3 verify → CE2P repair → regenerate), core algorithms only</span></td><td>逻辑幻觉、边界条件<span class="en">Logic hallucinations, edge cases</span></td><td>99%（可证明），超时 5s，端到端 1.87–3.73s<span class="en">99% (provable), timeout 5s, end-to-end 1.87–3.73s</span></td></tr>
+<tr><td><strong>L6</strong></td><td>合约验证<span class="en">Contract Validation</span></td><td>正向合约（PRD→Assertions）+ 反向分支覆盖检查<span class="en">Forward contracts (PRD → Assertions) + reverse branch-coverage check</span></td><td>业务逻辑幻觉<span class="en">Business logic hallucinations</span></td><td>零 Token<span class="en">Zero token</span></td></tr>
+<tr><td><strong>L7</strong></td><td>沙箱执行<span class="en">Sandbox Execution</span></td><td>Docker 隔离执行，I/O 行为聚类（MIT 方法），多候选变体执行 + 最大簇 ≥70% 采纳<span class="en">Docker isolated execution, I/O behavior clustering (MIT method), multi-candidate variant execution + max cluster ≥70% acceptance</span></td><td><strong>所有类型（最强）</strong><span class="en"><strong>All types (strongest)</strong></span></td><td>错误率 65%→2%（最优可至 0%）<span class="en">Error rate 65%→2% (as low as 0% optimal)</span></td></tr>
+<tr><td><strong>L8</strong></td><td>配置漂移<span class="en">Config Drift</span></td><td>黄金基线 SHA256 指纹比对，自动修复<span class="en">Golden-baseline SHA256 fingerprint comparison, auto-repair</span></td><td>配置幻觉、环境不一致<span class="en">Config hallucinations, environment inconsistency</span></td><td>零 Token，自动修复<span class="en">Zero token, auto-repair</span></td></tr>
+<tr><td><strong>L9</strong></td><td>动态合规<span class="en">Dynamic Compliance</span></td><td>外部合规库实时查询 + 本地缓存，时效性判断 + 版本比对 + DSL 规则引擎<span class="en">External compliance database real-time query + local cache, timeliness check + version comparison + DSL rule engine</span></td><td>过时知识引用、法规风险<span class="en">Outdated knowledge references, regulatory risks</span></td><td>时效性 ≥95%，误报 ≤5%，延迟 P99&lt;200ms<span class="en">Timeliness ≥95%, false positive ≤5%, latency P99&lt;200ms</span></td></tr>
 </tbody></table>
-<blockquote>L1–L8 枚举定义见 <a href="../../src/orbit/hallucination/schemas.py"><code>src/orbit/hallucination/schemas.py:15-25</code></a>；L9 为独立模块 <a href="../../src/orbit/compliance/validator.py"><code>src/orbit/compliance/validator.py</code></a>，设计见 <a href="../PRD+ADR_Step4.3_L9动态合规验证.html"><code>docs/PRD+ADR_Step4.3_L9动态合规验证.md</code></a>。</blockquote>
-<h2 id="3-4-执行管道-execution-pipeline">3.4 执行管道 · Execution Pipeline</h2>
-<p><strong>关键</strong>：管道<strong>执行顺序</strong>不等于层编号顺序。实际顺序为"从快到慢"（<a href="../../src/orbit/hallucination/pipeline.py"><code>src/orbit/hallucination/pipeline.py:43-52</code></a>）：</p>
+<blockquote>L1–L8 枚举定义见 <a href="../../src/orbit/hallucination/schemas.py"><code>src/orbit/hallucination/schemas.py:15-25</code></a>；L9 为独立模块 <a href="../../src/orbit/compliance/validator.py"><code>src/orbit/compliance/validator.py</code></a>，设计见 <a href="../PRD+ADR_Step4.3_L9动态合规验证.html"><code>docs/PRD+ADR_Step4.3_L9动态合规验证.md</code></a>。<span class="en">L1–L8 enum definitions in <a href="../../src/orbit/hallucination/schemas.py"><code>src/orbit/hallucination/schemas.py:15-25</code></a>; L9 is a standalone module at <a href="../../src/orbit/compliance/validator.py"><code>src/orbit/compliance/validator.py</code></a>, see <a href="../PRD+ADR_Step4.3_L9动态合规验证.html"><code>docs/PRD+ADR_Step4.3_L9动态合规验证.md</code></a> for design.</span></blockquote>
+<h2 id="3-4-执行管道-execution-pipeline">3.4 执行管道<span class="en">Execution Pipeline</span></h2>
+<p><strong>关键</strong>：管道<strong>执行顺序</strong>不等于层编号顺序。实际顺序为"从快到慢"（<a href="../../src/orbit/hallucination/pipeline.py"><code>src/orbit/hallucination/pipeline.py:43-52</code></a>）：<span class="en"><strong>Key</strong>: The pipeline <strong>execution order</strong> is NOT the layer number order. The actual order is "cheapest-first" (see <a href="../../src/orbit/hallucination/pipeline.py"><code>src/orbit/hallucination/pipeline.py:43-52</code></a>):</span></p>
 <pre><code>L1 图谱 → L4 类型 → L3 熵 → L2 追踪 → L6 合约 → L8 配置 → L7 沙箱 → L5 Z3
                                                             ↓
                                                        L9 合规（独立）</code></pre>
-<p>两种调用入口：</p>
+<p>两种调用入口：<span class="en">Two invocation entry points:</span></p>
 <table>
 <thead><tr>
-<th>入口</th>
-<th>层组合</th>
-<th>用途</th>
+<th>入口<span class="en">Entry</span></th>
+<th>层组合<span class="en">Layer combination</span></th>
+<th>用途<span class="en">Purpose</span></th>
 </tr></thead><tbody>
-<tr><td><code>validate_quick()</code></td><td>L1 + L4 + L3</td><td>每次代码生成后即时检查</td></tr>
-<tr><td><code>validate_full()</code></td><td>L1–L8 全量</td><td>coding 阶段完成后完整验证</td></tr>
+<tr><td><code>validate_quick()</code></td><td>L1 + L4 + L3</td><td>每次代码生成后即时检查<span class="en">Instant check after each code generation</span></td></tr>
+<tr><td><code>validate_full()</code></td><td>L1–L8 全量<span class="en">L1–L8 full</span></td><td>coding 阶段完成后完整验证<span class="en">Full validation after coding phase completes</span></td></tr>
 </tbody></table>
-<h3 id="致命层熔断-fatal_levels">致命层熔断（FATAL_LEVELS）</h3>
-<p><strong>L1 图谱</strong> 和 <strong>L7 沙箱</strong> 运行时失败时，管道<strong>立即停止</strong>，不再执行后续层——因为这两层失败意味着代码根本不可信，继续验证无意义（<a href="../../src/orbit/hallucination/pipeline.py"><code>pipeline.py:55-58</code></a>）。</p>
-<h2 id="3-5-设计原理小结-design-rationale">3.5 设计原理小结 · Design Rationale</h2>
+<h3 id="致命层熔断-fatal_levels-fatal-layer-early-termination-fatal_levels">致命层熔断（FATAL_LEVELS）<span class="en">Fatal Layer Early Termination (FATAL_LEVELS)</span></h3>
+<p><strong>L1 图谱</strong> 和 <strong>L7 沙箱</strong> 运行时失败时，管道<strong>立即停止</strong>，不再执行后续层——因为这两层失败意味着代码根本不可信，继续验证无意义（<a href="../../src/orbit/hallucination/pipeline.py"><code>pipeline.py:55-58</code></a>）。<span class="en">When <strong>L1 Graph</strong> or <strong>L7 Sandbox</strong> fails at runtime, the pipeline <strong>halts immediately</strong> and does not execute subsequent layers — failure in these two layers means the code is fundamentally untrustworthy, making further validation meaningless (see <a href="../../src/orbit/hallucination/pipeline.py"><code>pipeline.py:55-58</code></a>).</span></p>
+<h2 id="3-5-设计原理小结-design-rationale">3.5 设计原理小结<span class="en">Design Rationale</span></h2>
 <ul>
-<li><strong>顺序服务于早停</strong>：便宜且高召回的层放前面，一旦发现致命问题即提前终止，省下昂贵层的开销。</li>
-<li><strong>静动互补</strong>：L1/L4/L5/L6/L8 静态（确定性、可证明），L2/L3/L7 动态（运行时真值）。静态给出必要条件，动态给出充分验证。</li>
-<li><strong>L7 沙箱是最后防线</strong>：能拦截所有类型幻觉，把错误率从 65% 压到 2%，代价是 Docker 执行开销——因此只在 full 验证跑。</li>
-<li><strong>L9 独立于 L1–L8</strong>：合规是"知识时效"维度，与代码正确性正交，故单独成模块、异步执行、不阻塞主管道。</li>
+<li><strong>顺序服务于早停</strong>：便宜且高召回的层放前面，一旦发现致命问题即提前终止，省下昂贵层的开销。<span class="en"><strong>Order serves early termination</strong>: cheap, high-recall layers go first. Once a fatal problem is detected, the pipeline terminates early, saving the cost of expensive layers.</span></li>
+<li><strong>静动互补</strong>：L1/L4/L5/L6/L8 静态（确定性、可证明），L2/L3/L7 动态（运行时真值）。静态给出必要条件，动态给出充分验证。<span class="en"><strong>Static-dynamic complementarity</strong>: L1/L4/L5/L6/L8 are static (deterministic, provable), L2/L3/L7 are dynamic (runtime ground truth). Static provides necessary conditions, dynamic provides sufficient verification.</span></li>
+<li><strong>L7 沙箱是最后防线</strong>：能拦截所有类型幻觉，把错误率从 65% 压到 2%，代价是 Docker 执行开销——因此只在 full 验证跑。<span class="en"><strong>L7 Sandbox is the last line of defense</strong>: it catches all hallucination types, reducing error rate from 65% to 2%, at the cost of Docker execution overhead — hence it only runs in full validation.</span></li>
+<li><strong>L9 独立于 L1–L8</strong>：合规是"知识时效"维度，与代码正确性正交，故单独成模块、异步执行、不阻塞主管道。<span class="en"><strong>L9 is independent from L1–L8</strong>: compliance is a "knowledge timeliness" dimension orthogonal to code correctness, so it lives as a separate module, runs asynchronously, and does not block the main pipeline.</span></li>
 </ul>
 <hr>
-<p><a href="README.html">← 返回目录</a> · <a href="04-technical-stack.html">下一章：技术方案 →</a></p>
-<p>&lt;/content&gt;</p>
+<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="04-technical-stack.html">下一章：技术方案 → || Next: Technical Design →</a></span></p>
 </main></body>
 </html>

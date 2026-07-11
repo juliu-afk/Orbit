@@ -32,7 +32,7 @@
 | `/api/v1/sessions` | `sessions.py` | `POST /sessions` · `GET /sessions` · `GET/PATCH /sessions/{id}` · `POST /sessions/{id}/fork` · `GET /sessions/{id}/forks` |
 | `/api/v1/projects` | `projects.py` | `POST /projects` 注册 || register · `GET /projects` · `GET /projects/{name}` · `GET /projects/{name}/brief` · `POST /projects/{name}/brief/refresh` |
 | `/api/v1/chat` | `chat.py` | `WebSocket /chat` 自然语言入口（ChatterAgent→意图路由→Chatter/Clarifier）|| natural language entry point (ChatterAgent → intent routing → Chatter/Clarifier) |
-| `/api/v1/agents` | `agent_llm.py` | `GET /agents/{name}/llm` 查询配置 || query config · `POST /agents/{name}/llm/switch` 强制切换模型 || force model switch |
+| `/api/v1/agents` | `agent_llm.py` | `GET /agents/{name}/llm` 查询配置 · `POST /agents/{name}/llm/switch` 强制切换模型 || `GET /agents/{name}/llm` query config · `POST /agents/{name}/llm/switch` force model switch |
 
 ## 6.4 验证与知识 || Validation & Knowledge
 
@@ -42,14 +42,14 @@
 | `/api/v1/knowledge` | `knowledge.py` | `GET /knowledge?domain=...&concept=...` 领域知识查询（会计/金融/法律）|| domain knowledge query (accounting/finance/legal) |
 | `/api/v1/compliance` | `compliance.py` | `GET /compliance/validate` · `/validate-all` · `/rules` |
 | `/api/v1/compliance_check` | `compliance_routes.py` | Diff 合规标注 + 审查清单自动生成 || Diff compliance annotations + auto-generated review checklist |
-| `/api/v1/causal` | `causal_routes.py` | `POST /learn` 学习因果图 || learn causal graph · `POST /root-cause` 根因分析 || root cause analysis · `GET /graph` · `POST /recommend` |
+| `/api/v1/causal` | `causal_routes.py` | `POST /learn` 学习因果图 · `POST /root-cause` 根因分析 · `GET /graph` · `POST /recommend` || `POST /learn` learn causal graph · `POST /root-cause` root cause analysis · `GET /graph` · `POST /recommend` |
 
 ## 6.5 可观测与运维 || Observability & Ops
 
 | 前缀 || Prefix | 路由文件 || Route file | 代表端点 || Representative endpoints |
 |---|---|---|
 | `/api/v1/observability` | `observability.py` | `GET /health` · `/health/{component}` · `/metrics` · `/alerts` · `/alerts/history` · `/audit` · `POST/GET /lessons` · `/feedback` · `/grafana/dashboard` |
-| `/api/v1/backup` | `backup.py` | `GET /snapshots` · `POST /snapshots` 创建快照 || create snapshot · `POST /restore` 恢复 || restore |
+| `/api/v1/backup` | `backup.py` | `GET /snapshots` · `POST /snapshots` 创建快照 · `POST /restore` 恢复 || `GET /snapshots` · `POST /snapshots` create snapshot · `POST /restore` restore |
 | `/api/v1/versioning` | `versioning.py` | `GET /current` · `GET /versions` · `POST /install` |
 | `/projects` | `ponytail_debt.py` | Ponytail 技术债务台账扫描 || Ponytail technical debt ledger scan |
 

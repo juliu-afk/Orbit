@@ -75,7 +75,7 @@ th .en, td .en { font-size:.8em; }
 <tr><td><code>/api/v1/sessions</code></td><td><code>sessions.py</code></td><td><code>POST /sessions</code> · <code>GET /sessions</code> · <code>GET/PATCH /sessions/{id}</code> · <code>POST /sessions/{id}/fork</code> · <code>GET /sessions/{id}/forks</code></td></tr>
 <tr><td><code>/api/v1/projects</code></td><td><code>projects.py</code></td><td><code>POST /projects</code> 注册<span class="en">register · <code>GET /projects</code> · <code>GET /projects/{name}</code> · <code>GET /projects/{name}/brief</code> · <code>POST /projects/{name}/brief/refresh</code></span></td></tr>
 <tr><td><code>/api/v1/chat</code></td><td><code>chat.py</code></td><td><code>WebSocket /chat</code> 自然语言入口（ChatterAgent→意图路由→Chatter/Clarifier）<span class="en">natural language entry point (ChatterAgent → intent routing → Chatter/Clarifier)</span></td></tr>
-<tr><td><code>/api/v1/agents</code></td><td><code>agent_llm.py</code></td><td><code>GET /agents/{name}/llm</code> 查询配置<span class="en">query config · <code>POST /agents/{name}/llm/switch</code> 强制切换模型 || force model switch</span></td></tr>
+<tr><td><code>/api/v1/agents</code></td><td><code>agent_llm.py</code></td><td><code>GET /agents/{name}/llm</code> 查询配置 · <code>POST /agents/{name}/llm/switch</code> 强制切换模型<span class="en"><code>GET /agents/{name}/llm</code> query config · <code>POST /agents/{name}/llm/switch</code> force model switch</span></td></tr>
 </tbody></table>
 <h2 id="6-4-验证与知识-validation-knowledge">6.4 验证与知识<span class="en">Validation &amp; Knowledge</span></h2>
 <table>
@@ -88,7 +88,7 @@ th .en, td .en { font-size:.8em; }
 <tr><td><code>/api/v1/knowledge</code></td><td><code>knowledge.py</code></td><td><code>GET /knowledge?domain=...&amp;concept=...</code> 领域知识查询（会计/金融/法律）<span class="en">domain knowledge query (accounting/finance/legal)</span></td></tr>
 <tr><td><code>/api/v1/compliance</code></td><td><code>compliance.py</code></td><td><code>GET /compliance/validate</code> · <code>/validate-all</code> · <code>/rules</code></td></tr>
 <tr><td><code>/api/v1/compliance_check</code></td><td><code>compliance_routes.py</code></td><td>Diff 合规标注 + 审查清单自动生成<span class="en">Diff compliance annotations + auto-generated review checklist</span></td></tr>
-<tr><td><code>/api/v1/causal</code></td><td><code>causal_routes.py</code></td><td><code>POST /learn</code> 学习因果图<span class="en">learn causal graph · <code>POST /root-cause</code> 根因分析 || root cause analysis · <code>GET /graph</code> · <code>POST /recommend</code></span></td></tr>
+<tr><td><code>/api/v1/causal</code></td><td><code>causal_routes.py</code></td><td><code>POST /learn</code> 学习因果图 · <code>POST /root-cause</code> 根因分析 · <code>GET /graph</code> · <code>POST /recommend</code><span class="en"><code>POST /learn</code> learn causal graph · <code>POST /root-cause</code> root cause analysis · <code>GET /graph</code> · <code>POST /recommend</code></span></td></tr>
 </tbody></table>
 <h2 id="6-5-可观测与运维-observability-ops">6.5 可观测与运维<span class="en">Observability &amp; Ops</span></h2>
 <table>
@@ -98,7 +98,7 @@ th .en, td .en { font-size:.8em; }
 <th>代表端点<span class="en">Representative endpoints</span></th>
 </tr></thead><tbody>
 <tr><td><code>/api/v1/observability</code></td><td><code>observability.py</code></td><td><code>GET /health</code> · <code>/health/{component}</code> · <code>/metrics</code> · <code>/alerts</code> · <code>/alerts/history</code> · <code>/audit</code> · <code>POST/GET /lessons</code> · <code>/feedback</code> · <code>/grafana/dashboard</code></td></tr>
-<tr><td><code>/api/v1/backup</code></td><td><code>backup.py</code></td><td><code>GET /snapshots</code> · <code>POST /snapshots</code> 创建快照<span class="en">create snapshot · <code>POST /restore</code> 恢复 || restore</span></td></tr>
+<tr><td><code>/api/v1/backup</code></td><td><code>backup.py</code></td><td><code>GET /snapshots</code> · <code>POST /snapshots</code> 创建快照 · <code>POST /restore</code> 恢复<span class="en"><code>GET /snapshots</code> · <code>POST /snapshots</code> create snapshot · <code>POST /restore</code> restore</span></td></tr>
 <tr><td><code>/api/v1/versioning</code></td><td><code>versioning.py</code></td><td><code>GET /current</code> · <code>GET /versions</code> · <code>POST /install</code></td></tr>
 <tr><td><code>/projects</code></td><td><code>ponytail_debt.py</code></td><td>Ponytail 技术债务台账扫描<span class="en">Ponytail technical debt ledger scan</span></td></tr>
 </tbody></table>

@@ -9,6 +9,7 @@ import CytoscapeCanvas from './CytoscapeCanvas.vue'
 import SearchBar from './SearchBar.vue'
 import LayoutSelector from './LayoutSelector.vue'
 import NodePanel from './NodePanel.vue'
+import ImpactGraph from '@/components/insights/ImpactGraph.vue'
 
 const props = defineProps<{ show: boolean }>()
 const emit = defineEmits<{ (e: 'update:show', v: boolean): void }>()
@@ -16,6 +17,20 @@ const emit = defineEmits<{ (e: 'update:show', v: boolean): void }>()
 const session = useSessionStore()
 const store = useCodeGraphStore()
 const building = ref(false)
+
+// PR2: 选中节点 → 拉该符号的影响分析。symbol 取节点 label/name。
+// P2-2: 防抖 300ms——图中快速切换节点时只取最后一次，避免请求洪峰。
+// P2-3: String() 强转比较——节点 id 后端可能是 number，严格 === 会漏匹配。
+let _impactTimer: ReturnType<typeof setTimeout> | undefined
+watch(() => store.selectedNodeId, (id) => {
+  if (_impactTimer) clearTimeout(_impactTimer)
+  if (!id) { store.impact = []; return }
+  _impactTimer = setTimeout(() => {
+    const node = store.elements.find(e => String(e.data.id) === String(id))
+    const symbol = (node?.data.label || node?.data.name || '') as string
+    if (symbol) store.fetchImpact(symbol)
+  }, 300)
+})
 
 // 打开抽屉时加载数据
 watch(() => props.show, async (visible) => {
@@ -97,6 +112,8 @@ function onClose(): void {
           </div>
           <div class="detail-area">
             <NodePanel />
+            <!-- PR2: 选中节点的影响分析——被谁调用 -->
+            <ImpactGraph v-if="store.selectedNodeId" :symbol="store.impactSymbol" :nodes="store.impact" />
           </div>
         </template>
       </div>

@@ -90,9 +90,3 @@ async def impact_analysis(symbol: str = Query(...)):
 
         structlog.get_logger().warning("impact_analysis_failed", error=str(e))
         return []
-
-
-@router.get("/health")
-async def module_health():
-    """模块健康仪表盘——预留接口，后续接入 AgentOps 实际数据 (Phase 3.4)."""
-    return {"modules": [], "note": "Module health data will be populated from AgentOps metrics"}

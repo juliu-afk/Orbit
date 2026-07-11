@@ -1,18 +1,35 @@
 <script setup lang="ts">
 // WHY v0.22.1: MonacoPanel 底部加 5 tab——Problems/Outline/Tests/Terminal/Conflicts。
 // 替代旧 ReviewView 底部 tab 栏，将代码审查辅助功能内嵌到 Monaco 面板。
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { useEditorStore } from '@/stores/editor'
 import { useShellStore } from '@/stores/shell'
 import { useDiagnosticsStore } from '@/stores/diagnostics'
+import { useCodeGraphStore } from '@/stores/codegraph'
 import ProblemPanel from '@/components/editor/ProblemPanel.vue'
 import TestPanel from '@/components/editor/TestPanel.vue'
 import MergeConflictPanel from '@/components/editor/MergeConflictPanel.vue'
 import TestGapsPanel from '@/components/editor/TestGapsPanel.vue'
+import OutlinePanel from '@/components/editor/OutlinePanel.vue'
 
 const editor = useEditorStore()
 const shell = useShellStore()
 const diag = useDiagnosticsStore()
+const codegraph = useCodeGraphStore()
+
+// PR2: 打开文件时拉大纲；点击大纲项跳转到对应行
+const gotoLine = ref(0)
+let _revealTick = false
+watch(() => editor.currentFile, (fp) => {
+  if (fp && !fp.startsWith('[code]')) codegraph.fetchOutline(fp)
+  else codegraph.outline = []
+})
+function onOutlineSelect(line: number) {
+  // P1-1 修复：同一行连点也要重新跳转。gotoLine 在 line 与 line+0.5 间交替，
+  // 保证值真实变化触发 watch；MonacoDiffEditor 侧 Math.floor 还原整数行号。
+  _revealTick = !_revealTick
+  gotoLine.value = line + (_revealTick ? 0.5 : 0)
+}
 
 // P1-4 fix: ProblemPanel 点击 → 打开文件 + 激活 Monaco
 function onProblemClick(d: { filePath?: string; file?: string; line?: number }) {
@@ -44,7 +61,7 @@ const activeTab = ref('problems')
   <div class="flex-1 overflow-hidden">
     <Suspense>
       <template #default>
-        <MonacoDiffEditor v-if="editor.currentFile" :original="editor.original" :modified="editor.modified" :language="editor.language" height="100%" />
+        <MonacoDiffEditor v-if="editor.currentFile" :original="editor.original" :modified="editor.modified" :language="editor.language" :goto-line="gotoLine" height="100%" />
         <div v-else class="flex items-center justify-center h-full text-xs" style="color:var(--color-orbit-text-muted)">select a file</div>
       </template>
       <template #fallback><div class="flex items-center justify-center h-full text-xs" style="color:var(--color-orbit-text-muted)">loading editor...</div></template>
@@ -56,6 +73,9 @@ const activeTab = ref('problems')
     <el-tabs v-model="activeTab" class="monaco-tabs" style="height:100%">
       <el-tab-pane label="Problems" name="problems">
         <ProblemPanel :diagnostics="diag.diagnostics" @click="onProblemClick" />
+      </el-tab-pane>
+      <el-tab-pane label="Outline" name="outline">
+        <OutlinePanel :items="codegraph.outline" @select="onOutlineSelect" />
       </el-tab-pane>
       <el-tab-pane label="Tests" name="tests">
         <TestPanel @show-error="onTestError" />

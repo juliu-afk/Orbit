@@ -87,6 +87,9 @@ _ROUTE_SPEC: dict[str, tuple[str, str, str | None]] = {
     "terminal_routes":  ("orbit.api.routes.terminal_routes", "router", "API_V1_STR"),
     "config_routes":    ("orbit.api.routes.config_routes", "router", "API_V1_STR"),
     "diagnostics_ws":   ("orbit.api.routes.diagnostics_ws", "router", None),
+    "lsp_routes":       ("orbit.api.routes.lsp_routes", "router", "API_V1_STR"),
+    "mcp_routes":       ("orbit.api.routes.mcp_routes", "router", "API_V1_STR"),
+    "memory_routes":    ("orbit.api.routes.memory_routes", "router", "API_V1_STR"),
     "wechat_routes":    ("orbit.api.routes.wechat_routes", "router", "API_V1_STR"),
     "health":           ("orbit.api.routes.health", "router", None),
     "app_routes":       ("orbit.api.routes.app_routes", "router", "API_V1_STR"),
@@ -349,6 +352,10 @@ _diagnostic_service = DiagnosticService(_ws_dir)
 importlib.import_module("orbit.api.routes.blame_routes").set_workspace(_ws_dir)
 importlib.import_module("orbit.api.routes.terminal_routes").set_workspace(_ws_dir)
 importlib.import_module("orbit.api.routes.diagnostics_ws").set_diagnostic_service(_diagnostic_service)
+# 断链修复(A)：lsp HTTP GET 复用同一诊断服务；mcp/memory 需工作区路径读配置/记忆文件
+importlib.import_module("orbit.api.routes.lsp_routes").set_diagnostic_service(_diagnostic_service)
+importlib.import_module("orbit.api.routes.mcp_routes").set_workspace(_ws_dir)
+importlib.import_module("orbit.api.routes.memory_routes").set_workspace(_ws_dir)
 
 
 # ── MCP 客户端：连接外部 MCP 服务器 ──

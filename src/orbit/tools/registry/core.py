@@ -714,6 +714,21 @@ class ToolRegistry:
                 pass
         self._mcp_connections.clear()
 
+    def mcp_server_status(self) -> dict[str, dict[str, Any]]:
+        """返回已连接 MCP 服务器的运行状态——供 /api/v1/mcp/servers 展示。
+
+        WHY: 路由层不应直接触碰私有 _mcp_connections，这里封装为只读快照。
+        """
+        out: dict[str, dict[str, Any]] = {}
+        for name, conn in self._mcp_connections.items():
+            try:
+                connected = bool(getattr(conn, "connected", False))
+                tools = conn.list_tools() if connected else []
+            except Exception:
+                connected, tools = False, []
+            out[name] = {"connected": connected, "tools_count": len(tools)}
+        return out
+
     @staticmethod
     def _convert_mcp_schema(prefixed_name: str, tool: dict[str, Any]) -> dict[str, Any]:
         """MCP inputSchema → OpenAI function calling 格式。

@@ -19,6 +19,24 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 # 已知 Agent 列表（与 scheduler/orchestrator.py 中 role_map 一致）
 KNOWN_AGENTS = {"clarifier", "architect", "developer", "reviewer", "qa", "config_manager"}
 
+# 前端历史组件用 PascalCase 别名（ArchitectAgent 等），后端规范名是 snake_case。
+# WHY: 归一化避免前后端命名不一致导致 404——前端任何写法都解析到规范 Agent。
+# ConfigAgent→config_manager、QAAgent→qa 无法靠后缀剥离推导，必须显式映射。
+_AGENT_ALIASES = {
+    "architectagent": "architect",
+    "developeragent": "developer",
+    "revieweragent": "reviewer",
+    "qaagent": "qa",
+    "configagent": "config_manager",
+    "clarifieragent": "clarifier",
+}
+
+
+def _normalize_agent(name: str) -> str:
+    """把前端传入的 Agent 名归一化为后端规范名（大小写不敏感 + 别名映射）。"""
+    key = name.strip().lower()
+    return _AGENT_ALIASES.get(key, key)
+
 # ── Response Models ──────────────────────────────
 
 
@@ -73,19 +91,20 @@ async def list_agents():
 @router.get("/{agent_name}/llm", response_model=LLMConfigResponse)
 async def get_agent_llm_config(agent_name: str) -> LLMConfigResponse:
     """查询 Agent 当前实际使用的 LLM 配置。"""
-    if agent_name.lower() not in KNOWN_AGENTS:
+    canonical = _normalize_agent(agent_name)
+    if canonical not in KNOWN_AGENTS:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"未知 Agent: {agent_name}。已知: {', '.join(sorted(KNOWN_AGENTS))}",
         )
 
     resolver = AgentModelResolver()
-    resolved = await resolver.resolve(agent_name)
+    resolved = await resolver.resolve(canonical)
 
     cc_config = os.getenv("CC_SWITCH", "")
 
     return LLMConfigResponse(
-        agent=agent_name,
+        agent=canonical,
         current=LLMConfigCurrent(
             model=resolved.model or "(local rules)",
             source=resolved.source,
@@ -104,7 +123,8 @@ async def switch_agent_llm(agent_name: str, body: SwitchRequest) -> SwitchRespon
     将修改 CC_SWITCH 环境变量（进程内），优先级最高。
     expires_at 到期后需手动恢复或重新设置。
     """
-    if agent_name.lower() not in KNOWN_AGENTS:
+    canonical = _normalize_agent(agent_name)
+    if canonical not in KNOWN_AGENTS:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"未知 Agent: {agent_name}。已知: {', '.join(sorted(KNOWN_AGENTS))}",
@@ -112,11 +132,11 @@ async def switch_agent_llm(agent_name: str, body: SwitchRequest) -> SwitchRespon
 
     # 获取切换前的模型
     resolver = AgentModelResolver()
-    previous = await resolver.resolve(agent_name)
+    previous = await resolver.resolve(canonical)
     previous_model = previous.model or None
 
     # 写入 CC_SWITCH（force 模式 = 最高优先级）
-    new_entry = f"{agent_name}:{body.model},force"
+    new_entry = f"{canonical}:{body.model},force"
     existing = os.getenv("CC_SWITCH", "")
 
     # 如果已有同 Agent 的 CC_SWITCH 配置，替换之；否则追加
@@ -125,7 +145,7 @@ async def switch_agent_llm(agent_name: str, body: SwitchRequest) -> SwitchRespon
         replaced = False
         for part in existing.split(","):
             part = part.strip()
-            if ":" in part and part.split(":")[0].strip().lower() == agent_name.lower():
+            if ":" in part and part.split(":")[0].strip().lower() == canonical.lower():
                 parts.append(new_entry)
                 replaced = True
             elif part and part not in ("force", "no-force"):
@@ -156,7 +176,7 @@ async def switch_agent_llm(agent_name: str, body: SwitchRequest) -> SwitchRespon
 
     return SwitchResponse(
         status="switched",
-        agent=agent_name,
+        agent=canonical,
         model=body.model,
         previous_model=previous_model,
         source="manual",

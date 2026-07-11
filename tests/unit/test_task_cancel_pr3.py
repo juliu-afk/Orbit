@@ -1,0 +1,68 @@
+"""PR3 回归：tasks 桩变真——Scheduler 取消机制 + 真实检查点状态。"""
+
+from __future__ import annotations
+
+import asyncio
+
+import pytest
+
+from orbit.checkpoint.manager import CheckpointData, CheckpointManager
+from orbit.scheduler.orchestrator import Scheduler
+
+
+@pytest.fixture
+def scheduler():
+    # 内存模式 checkpoint（无 Redis），最小 Scheduler
+    cm = CheckpointManager(redis_client=None)
+    return Scheduler(checkpoint_manager=cm)
+
+
+@pytest.mark.asyncio
+async def test_cancel_task_writes_cancelled_and_stops(scheduler):
+    """cancel_task 取消运行中任务 + 写 CANCELLED 检查点 + 清理注册表。"""
+    cm = scheduler.checkpoint
+    await cm.save("t1", CheckpointData(task_id="t1", state="PARSING", progress=0.3))
+
+    async def _long():
+        await asyncio.sleep(100)
+
+    running = asyncio.create_task(_long())
+    scheduler._active_tasks["t1"] = running
+
+    ok = await scheduler.cancel_task("t1")
+    assert ok is True
+    # 注册表已清理
+    assert "t1" not in scheduler._active_tasks
+    # 底层 asyncio 任务被取消
+    await asyncio.sleep(0)
+    assert running.cancelled() or running.done()
+    # CANCELLED 检查点已写，且 version 递增（乐观锁）
+    ckpt = await cm.load("t1")
+    assert ckpt.state == "CANCELLED"
+    assert ckpt.progress == 0.3  # 保留原进度
+    assert ckpt.version == 2  # 原 version 1 + 1
+
+
+@pytest.mark.asyncio
+async def test_cancel_task_no_prior_checkpoint(scheduler):
+    """无前置检查点时取消——仍写 CANCELLED（version=1）。"""
+    ok = await scheduler.cancel_task("ghost")
+    assert ok is True
+    ckpt = await scheduler.checkpoint.load("ghost")
+    assert ckpt.state == "CANCELLED"
+    assert ckpt.version == 1
+
+
+@pytest.mark.asyncio
+async def test_spawn_task_registers_and_cleans_up(scheduler):
+    """spawn_task 登记到注册表，完成后自动清理。"""
+    # 用 monkeypatch 替换 run_task 为快速完成的假任务
+    async def _fast(task_id, prd):
+        return None
+
+    scheduler.run_task = _fast  # type: ignore[method-assign]
+    task = scheduler.spawn_task("s1", "prd text")
+    assert "s1" in scheduler._active_tasks
+    await task
+    await asyncio.sleep(0)  # 让 done_callback 执行
+    assert "s1" not in scheduler._active_tasks

@@ -401,24 +401,17 @@ async def _handle_confirm(
         return
 
     try:
-        from orbit.api.routes.tasks import create_task as _create_task
-        from orbit.api.schemas.task import TaskCreateRequest
+        from orbit.api.main import _scheduler
+        from orbit.api.routes.tasks import create_task_record
 
-        # 内部调用：构造 TaskCreateRequest，复用现有任务创建逻辑
-        task_req = TaskCreateRequest(
-            prd=prd_text[:5000],  # 截断到上限
-            session_id=session_id or None,
+        # PR3: 建任务记录 + IDLE 检查点，再 spawn_task 真实后台调度（可 cancel）
+        task_id = await create_task_record(
+            _scheduler, prd_text[:5000], session_id=session_id or "", project_name=project_name or ""
         )
-        task_resp = await _create_task(task_req)
-        task_id = task_resp.task_id
-
-        import asyncio as _asyncio
 
         try:
-            from orbit.api.main import _scheduler
-
             if _scheduler is not None:
-                _asyncio.create_task(_scheduler.run_task(task_id, prd_text[:5000]))
+                _scheduler.spawn_task(task_id, prd_text[:5000])
         except Exception as e:
             import structlog as _sl
 

@@ -18,6 +18,22 @@ export interface GraphDataResponse {
   stats: GraphStats
 }
 
+// 大纲项（对应后端 /codegraph/outline，OutlinePanel props）
+export interface OutlineItem {
+  name: string
+  kind: string
+  line: number
+  children?: OutlineItem[]
+}
+
+// 影响节点（对应后端 /insights/impact，ImpactGraph props）
+export interface ImpactNode {
+  name: string
+  file: string
+  level: string
+  callers: string[]
+}
+
 export const useCodeGraphStore = defineStore('codegraph', () => {
   // ── 状态 ──
   const elements = ref<GraphElement[]>([])
@@ -30,6 +46,11 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
   const searchQuery = ref('')
   const activeLayout = ref('cose')            // cose | breadthfirst | concentric
   const visibleEdgeTypes = ref<string[]>([])  // 空 = 全部显示
+
+  // 大纲 / 影响分析（PR2 接线）
+  const outline = ref<OutlineItem[]>([])
+  const impact = ref<ImpactNode[]>([])
+  const impactSymbol = ref('')
 
   // ── 计算 ──
   const nodes = computed(() => elements.value.filter(e => !e.data.id?.toString().startsWith('e:')))
@@ -56,6 +77,27 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
     selectedNodeId.value = nodeId
   }
 
+  // WHY 用原生 fetch 而非 apiGet：outline/impact 端点返回裸数组（非 {code,data} 包装），
+  // apiGet 会因 json.code!==0 抛错。这两个端点契约就是裸 list，直接解析。
+  async function fetchOutline(file: string): Promise<void> {
+    try {
+      const r = await fetch(`/api/v1/codegraph/outline?file=${encodeURIComponent(file)}`)
+      outline.value = r.ok ? await r.json() : []
+    } catch {
+      outline.value = []
+    }
+  }
+
+  async function fetchImpact(symbol: string): Promise<void> {
+    impactSymbol.value = symbol
+    try {
+      const r = await fetch(`/api/v1/insights/impact?symbol=${encodeURIComponent(symbol)}`)
+      impact.value = r.ok ? await r.json() : []
+    } catch {
+      impact.value = []
+    }
+  }
+
   function setSearchQuery(query: string): void {
     searchQuery.value = query
   }
@@ -80,12 +122,17 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
     error.value = null
     selectedNodeId.value = null
     searchQuery.value = ''
+    outline.value = []
+    impact.value = []
+    impactSymbol.value = ''
   }
 
   return {
     elements, stats, loading, error,
     selectedNodeId, searchQuery, activeLayout, visibleEdgeTypes,
+    outline, impact, impactSymbol,
     nodes, edges,
     fetchGraphData, selectNode, setSearchQuery, setLayout, toggleEdgeType, reset,
+    fetchOutline, fetchImpact,
   }
 })

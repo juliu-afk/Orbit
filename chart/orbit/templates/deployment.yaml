@@ -28,6 +28,13 @@ spec:
           ports:
             - containerPort: {{ .Values.service.port }}
               protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+            {{- if .Values.secrets.create }}
+            - secretRef:
+                name: {{ .Release.Name }}-secrets
+            {{- end }}
           env:
             - name: ORBIT_LOG_LEVEL
               value: {{ .Values.env.ORBIT_LOG_LEVEL | quote }}

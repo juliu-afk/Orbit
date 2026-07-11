@@ -20,7 +20,8 @@ def _mock():
     saved = {}
     for m in _MODULES:
         mock = MagicMock()
-        cls_name = "".join(w.capitalize() for w in m.split(".")[-1].split("_"))
+        cls_name = m.split(".")[-1]
+        cls_name = "".join(w.capitalize() for w in cls_name.split("_"))
         setattr(mock, cls_name, MagicMock())
         saved[m] = sys.modules.get(m)
         sys.modules[m] = mock
@@ -29,7 +30,7 @@ def _mock():
         if o is None: sys.modules.pop(m, None)
         else: sys.modules[m] = o
 
-class TestWiringExtended:
+class TestAllGetters:
     @pytest.fixture
     def w(self): return OrbitWiring(db_path=":memory:")
     def test_traj(self,w): assert w._get_trajectory() is not None
@@ -67,3 +68,4 @@ class TestWiringExtended:
     def test_ig(self,w): assert w._get_ig() is not None
     def test_eff(self,w): assert w._get_effect() is not None
     def test_llm(self,w): assert w._get_llm_client() is not None
+    def test_cache(self,w): a=w._get_trajectory(); b=w._get_trajectory(); assert a is b

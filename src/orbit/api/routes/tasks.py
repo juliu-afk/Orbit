@@ -78,9 +78,15 @@ def _to_response(task_id: str, ckpt: CheckpointData) -> TaskStatusResponse:
 async def create_task_record(scheduler, prd: str, session_id: str = "", project_name: str = "") -> str:
     """建任务元数据 + 写 IDLE 检查点，返回 task_id。route 与 chat.py 共用，避免重复逻辑。"""
     # P2-1: 内存 dict 加容量上限，超限按插入序淘汰最旧，防长运行泄漏
+    # P2-1: 内存 dict 加容量上限防泄漏。
+    # P2-5: 淘汰时跳过仍在运行的任务（在 _active_tasks 里），淘汰最旧的非运行记录，
+    # 避免误删运行中任务的 prd/元数据导致 /run 拿到空 PRD。
     if len(_task_records) >= _MAX_TASK_RECORDS:
-        oldest = next(iter(_task_records))
-        _task_records.pop(oldest, None)
+        active = getattr(scheduler, "_active_tasks", {})
+        for tid in list(_task_records):
+            if tid not in active:
+                _task_records.pop(tid, None)
+                break
     now = datetime.now(UTC)
     task_id = uuid.uuid4().hex
     _task_records[task_id] = {

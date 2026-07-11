@@ -81,3 +81,30 @@ async def test_spawn_task_duplicate_returns_existing(scheduler):
     assert scheduler._active_tasks["dup"] is t1
     t1.cancel()
     await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_task_records_eviction_protects_running(scheduler, monkeypatch):
+    """P2-5: 记录淘汰跳过运行中任务，保护其 prd/元数据不被误删。"""
+    import orbit.api.routes.tasks as tasks_mod
+
+    monkeypatch.setattr(tasks_mod, "_MAX_TASK_RECORDS", 2)
+    tasks_mod._task_records.clear()
+
+    # 造 1 个运行中任务(在 _active_tasks) + 记录
+    async def _long(task_id, prd):
+        await asyncio.sleep(100)
+
+    scheduler.run_task = _long  # type: ignore[method-assign]
+    running_id = await tasks_mod.create_task_record(scheduler, "running prd")
+    scheduler.spawn_task(running_id, "running prd")  # 登记到 _active_tasks
+
+    # 再建 2 个记录触发淘汰——运行中的那个必须存活
+    await tasks_mod.create_task_record(scheduler, "prd2")
+    await tasks_mod.create_task_record(scheduler, "prd3")
+
+    assert running_id in tasks_mod._task_records  # 运行中任务未被淘汰
+    assert tasks_mod._task_records[running_id]["prd"] == "running prd"
+    scheduler._active_tasks[running_id].cancel()
+    await asyncio.sleep(0)
+    tasks_mod._task_records.clear()

@@ -102,7 +102,9 @@ def md_to_html_body(md: str) -> str:
         # 代码块围栏
         if line.startswith("```"):
             if in_code:
-                out.append("<pre><code>" + html.escape("\n".join(code_buf), quote=False) + "</code></pre>")
+                out.append(
+                    "<pre><code>" + html.escape("\n".join(code_buf), quote=False) + "</code></pre>"
+                )
                 code_buf = []
                 in_code = False
             else:

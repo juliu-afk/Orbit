@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>07 · 再开发说明 · Development Guide</title>
+<title>10 · 再开发说明 · Development Guide</title>
 <style>
 :root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
         --accent:#0969da; --code-bg:#f6f8fa; }
@@ -39,11 +39,11 @@ th .en, td .en { font-size:.8em; }
 </style>
 </head>
 <body><main>
-<h1 id="07-再开发说明-development-guide">07 · 再开发说明<span class="en">Development Guide</span></h1>
-<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="06-api-reference.html">← 上一章：API 参考<span class="en">Prev: API Reference</span></a></p>
+<h1 id="10-再开发说明-development-guide">10 · 再开发说明<span class="en">Development Guide</span></h1>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="09-api-reference.html">← 上一章：API 参考<span class="en">Prev: API Reference</span></a></p>
 <blockquote>面向开发者：怎么改、怎么加功能、怎么测、怎么构建交付。完整流程见 <a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a> 与 <a href="../../CONTRIBUTING.html"><code>CONTRIBUTING.md</code></a>。<span class="en">For developers: how to modify, add features, test, and build for delivery. See <a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a> and <a href="../../CONTRIBUTING.html"><code>CONTRIBUTING.md</code></a> for the complete workflow.</span></blockquote>
 <hr>
-<h2 id="7-1-四阶段开发流程-the-four-stage-workflow">7.1 四阶段开发流程<span class="en">The Four-Stage Workflow</span></h2>
+<h2 id="10-1-四阶段开发流程-the-four-stage-workflow">10.1 四阶段开发流程<span class="en">The Four-Stage Workflow</span></h2>
 <p><strong>核心规则</strong>：每阶段结束<strong>必须等用户显式确认</strong>后方可进入下一阶段。"慢就是快"——阶段 1–2 对齐需求优先，写完再改不被允许。<span class="en"><strong>Core rule</strong>: Each stage <strong>must wait for explicit user confirmation</strong> before proceeding to the next. "Slow is fast" — aligning requirements in stages 1–2 takes priority; writing first and revising later is not allowed.</span></p>
 <pre><code>阶段1 需求澄清 → 阶段2 技术方案 → 阶段3 编码实现 → 阶段3b 代码审查 → 阶段4 验证交付</code></pre>
 <h3 id="阶段-1-需求澄清-阶段1-prd-xxx-md-stage-1-requirement-clarification-阶段1-prd-xxx-md">阶段 1：需求澄清 → <code>阶段1-PRD-xxx.md</code><span class="en">Stage 1: Requirement Clarification → <code>阶段1-PRD-xxx.md</code></span></h3>
@@ -84,9 +84,9 @@ th .en, td .en { font-size:.8em; }
 </tbody></table>
 <p>审查方式：核心模块强制 <code>/ce-code-review</code>（12 Agent 并行）；非核心可选 <code>/code-review</code>（轻量）。<span class="en">Review method: core modules mandatory <code>/ce-code-review</code> (12 parallel Agents); non-core optional <code>/code-review</code> (lightweight).</span></p>
 <h3 id="阶段-4-验证交付-阶段4-测试报告-xxx-md-stage-4-validation-delivery-阶段4-测试报告-xxx-md">阶段 4：验证交付 → <code>阶段4-测试报告-xxx.md</code><span class="en">Stage 4: Validation &amp; Delivery → <code>阶段4-测试报告-xxx.md</code></span></h3>
-<p>测试决策树 + 9 项门禁（见 §7.3）。全绿方可 PR 合入。<span class="en">Test decision tree + 9 gates (see §7.3). All green before PR merge.</span></p>
-<h2 id="7-2-模块地图速查-module-map">7.2 模块地图速查<span class="en">Module Map</span></h2>
-<p>完整职责表见 <a href="02-architecture.html#23-模块地图--module-map">02 整体架构 §2.3</a>。核心模块改动触发强制回归：<span class="en">See <a href="02-architecture.html#23-模块地图--module-map">Architecture §2.3</a> for the full responsibility table. Core module changes trigger mandatory regression:</span></p>
+<p>测试决策树 + 9 项门禁（见 §10.3）。全绿方可 PR 合入。<span class="en">Test decision tree + 9 gates (see §10.3). All green before PR merge.</span></p>
+<h2 id="10-2-模块地图速查-module-map">10.2 模块地图速查<span class="en">Module Map</span></h2>
+<p>完整职责表见 <a href="03-architecture.html#23-模块地图--module-map">03 整体架构 §3.3</a>。核心模块改动触发强制回归：<span class="en">See <a href="03-architecture.html#23-模块地图--module-map">Architecture §3.3</a> for the full responsibility table. Core module changes trigger mandatory regression:</span></p>
 <table>
 <thead><tr>
 <th>核心模块<span class="en">Core Module</span></th>
@@ -97,7 +97,7 @@ th .en, td .en { font-size:.8em; }
 <tr><td><code>graph/</code></td><td>跨图谱协作查询回归<span class="en">Cross-graph collaboration query regression</span></td></tr>
 <tr><td><code>gateway/</code></td><td>LLM 路由 + 降级回归<span class="en">LLM routing + fallback regression</span></td></tr>
 </tbody></table>
-<h2 id="7-3-测试体系-testing">7.3 测试体系<span class="en">Testing</span></h2>
+<h2 id="10-3-测试体系-testing">10.3 测试体系<span class="en">Testing</span></h2>
 <table>
 <thead><tr>
 <th>层级<span class="en">Level</span></th>
@@ -123,7 +123,7 @@ th .en, td .en { font-size:.8em; }
 <li>新增防幻觉层规则 → 正向 + 异常（误报/漏报各一）<span class="en">New anti-hallucination layer rule → positive + error (one false-positive, one false-negative)</span></li>
 <li>Bug 修复 → 1 条 <code>test_regression_</code> 用例（先复现→失败→修→通过）<span class="en">Bug fix → 1 <code>test_regression_</code> case (reproduce → fail → fix → pass)</span></li>
 </ul>
-<h2 id="7-4-exe-构建链路-desktop-build">7.4 exe 构建链路<span class="en">Desktop Build</span></h2>
+<h2 id="10-4-exe-构建链路-desktop-build">10.4 exe 构建链路<span class="en">Desktop Build</span></h2>
 <p><strong>两段式：PyInstaller（后端）+ Tauri（桌面壳）</strong>。命令：<code>bash scripts/build-desktop.sh</code> 或 <code>make exe</code>。<span class="en"><strong>Two-stage: PyInstaller (backend) + Tauri (desktop shell)</strong>. Command: <code>bash scripts/build-desktop.sh</code> or <code>make exe</code>.</span></p>
 <pre><code>[1] 前端构建          frontend/ → pnpm build → frontend/dist/
 [2] 复制静态文件       frontend/dist/* → backend/static/
@@ -156,7 +156,7 @@ th .en, td .en { font-size:.8em; }
 </ul>
 <h3 id="其他脚本-scripts-other-scripts-scripts">其他脚本 <code>scripts/</code><span class="en">Other Scripts <code>scripts/</code></span></h3>
 <p><code>build_codex_context.py</code>（合并 CLAUDE/WORKFLOW→AGENTS.md）· <code>check_spec.py</code> · <code>smoke_test.py</code> · <code>check_effectiveness_ci.py</code> · <code>check_perf_thresholds.py</code> · <code>generate_benchmark.py</code> · <code>run_orbitbench.py</code> · <code>dr/recover.py</code>。<span class="en"><code>build_codex_context.py</code> (merges CLAUDE/WORKFLOW→AGENTS.md) · <code>check_spec.py</code> · <code>smoke_test.py</code> · <code>check_effectiveness_ci.py</code> · <code>check_perf_thresholds.py</code> · <code>generate_benchmark.py</code> · <code>run_orbitbench.py</code> · <code>dr/recover.py</code>.</span></p>
-<h2 id="7-5-数据库迁移-migrations">7.5 数据库迁移<span class="en">Migrations</span></h2>
+<h2 id="10-5-数据库迁移-migrations">10.5 数据库迁移<span class="en">Migrations</span></h2>
 <ul>
 <li><strong>双轨制</strong>：SQL 原生脚本（<code>.sql</code>，数字编号 <code>NNN_desc.sql</code>）+ Alembic Python（<code>YYYYMMDD_desc.py</code>）。<span class="en"><strong>Dual-track</strong>: raw SQL scripts (<code>.sql</code>, numbered <code>NNN_desc.sql</code>) + Alembic Python (<code>YYYYMMDD_desc.py</code>).</span></li>
 <li>自动生成：<code>alembic revision --autogenerate -m "..."</code>。<span class="en">Auto-generate: <code>alembic revision --autogenerate -m "..."</code>.</span></li>
@@ -164,7 +164,7 @@ th .en, td .en { font-size:.8em; }
 <li><code>down_revision</code> 链条串联，禁止直接改数据库文件不写迁移脚本。<span class="en"><code>down_revision</code> chain linked; direct database file modifications without migration scripts are prohibited.</span></li>
 </ul>
 <p>现有迁移：<code>002_goal_loop.sql</code>（Goal+Loop 表）· <code>003_trace_spans.sql</code>（Trace 表）· <code>20260707_add_severity_to_review_decisions.py</code> · <code>20260710_add_parent_id_to_code_nodes.py</code>。<span class="en">Existing migrations: <code>002_goal_loop.sql</code> (Goal+Loop tables) · <code>003_trace_spans.sql</code> (Trace table) · <code>20260707_add_severity_to_review_decisions.py</code> · <code>20260710_add_parent_id_to_code_nodes.py</code>.</span></p>
-<h2 id="7-6-贡献约定-conventions">7.6 贡献约定<span class="en">Conventions</span></h2>
+<h2 id="10-6-贡献约定-conventions">10.6 贡献约定<span class="en">Conventions</span></h2>
 <h3 id="git">Git</h3>
 <table>
 <thead><tr>
@@ -193,6 +193,6 @@ th .en, td .en { font-size:.8em; }
 <li>[ ] CHANGELOG 已更新（用户可见变更时）<span class="en">CHANGELOG updated (for user-visible changes)</span></li>
 </ul>
 <hr>
-<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="08-appendix.html">下一章：附录 →<span class="en">Next: Appendix →</span></a></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="11-appendix.html">下一章：附录 →<span class="en">Next: Appendix →</span></a></p>
 </main></body>
 </html>

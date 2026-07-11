@@ -18,13 +18,13 @@
 |---|---|---|
 | 00 | [总览 || Overview](00-overview.md) | 项目定位、核心指标、技术栈全景、读者导航 || Positioning, key metrics, tech-stack overview, reader navigation |
 | 01 | [设计哲学 || Design Philosophy](01-design-philosophy.md) | 为何存在、为何锚定编排层、为何自研调度器、六项哲学、不可妥协项 || Why it exists, why the orchestration layer, why a self-built scheduler, six principles, non-negotiables |
-| 02 | [整体架构 || Architecture](02-architecture.md) | 三层架构、数据流全链路、48 模块地图、五图谱体系、熔断/检查点/审计链 || Three-layer model, end-to-end data flow, 48-module map, five-graph system, breaker/checkpoint/audit |
-| 03 | [九层防幻觉 || Hallucination Defense](03-hallucination-defense.md) | L1–L9 逐层原理、执行管道、四类幻觉打击策略、效果数据 || Layer-by-layer L1–L9, execution pipeline, four hallucination types, effectiveness data |
-| 04 | [技术方案 || Technical Design](04-technical-stack.md) | 技术栈矩阵、LiteLLM 网关与三层路由、沙箱、存储、可观测性 || Stack matrix, LiteLLM gateway and 3-tier routing, sandbox, storage, observability |
-| 05 | [使用说明 || Usage Guide](05-usage-guide.md) | 三种启动方式、配置项、CLI、前端页面、主用户工作流 || Three launch modes, configuration, CLI, frontend screens, primary workflow |
-| 06 | [API 参考 || API Reference](06-api-reference.md) | 全部路由组、代表端点、WebSocket/SSE 通道 || All route groups, representative endpoints, WebSocket/SSE channels |
-| 07 | [再开发说明 || Development Guide](07-development-guide.md) | 四阶段工作流、模块职责表、测试体系、exe 构建链路、数据库迁移、贡献约定 || Four-stage workflow, module map, testing, exe build chain, migrations, conventions |
-| 08 | [附录 || Appendix](08-appendix.md) | 术语表、核心指标基线、路线图、原始设计文档索引 || Glossary, metric baselines, roadmap, source-doc index |
+| 02 | [整体架构 || Architecture](03-architecture.md) | 三层架构、数据流全链路、48 模块地图、五图谱体系、熔断/检查点/审计链 || Three-layer model, end-to-end data flow, 48-module map, five-graph system, breaker/checkpoint/audit |
+| 03 | [九层防幻觉 || Hallucination Defense](06-hallucination-defense.md) | L1–L9 逐层原理、执行管道、四类幻觉打击策略、效果数据 || Layer-by-layer L1–L9, execution pipeline, four hallucination types, effectiveness data |
+| 04 | [技术方案 || Technical Design](07-technical-stack.md) | 技术栈矩阵、LiteLLM 网关与三层路由、沙箱、存储、可观测性 || Stack matrix, LiteLLM gateway and 3-tier routing, sandbox, storage, observability |
+| 05 | [使用说明 || Usage Guide](08-usage-guide.md) | 三种启动方式、配置项、CLI、前端页面、主用户工作流 || Three launch modes, configuration, CLI, frontend screens, primary workflow |
+| 06 | [API 参考 || API Reference](09-api-reference.md) | 全部路由组、代表端点、WebSocket/SSE 通道 || All route groups, representative endpoints, WebSocket/SSE channels |
+| 07 | [再开发说明 || Development Guide](10-development-guide.md) | 四阶段工作流、模块职责表、测试体系、exe 构建链路、数据库迁移、贡献约定 || Four-stage workflow, module map, testing, exe build chain, migrations, conventions |
+| 08 | [附录 || Appendix](11-appendix.md) | 术语表、核心指标基线、路线图、原始设计文档索引 || Glossary, metric baselines, roadmap, source-doc index |
 
 ---
 

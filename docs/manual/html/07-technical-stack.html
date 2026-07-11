@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>04 · 技术方案 · Technical Design</title>
+<title>07 · 技术方案 · Technical Design</title>
 <style>
 :root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
         --accent:#0969da; --code-bg:#f6f8fa; }
@@ -39,11 +39,11 @@ th .en, td .en { font-size:.8em; }
 </style>
 </head>
 <body><main>
-<h1 id="04-技术方案-technical-design">04 · 技术方案<span class="en">Technical Design</span></h1>
-<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="03-hallucination-defense.html">← 上一章：九层防幻觉<span class="en">Prev: Hallucination Defense</span></a></p>
+<h1 id="07-技术方案-technical-design">07 · 技术方案<span class="en">Technical Design</span></h1>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="06-hallucination-defense.html">← 上一章：九层防幻觉<span class="en">Prev: Hallucination Defense</span></a></p>
 <blockquote>本章覆盖技术选型的"怎么实现"：技术栈、LLM 网关与三层路由、沙箱、存储、可观测性。开发者主读。<span class="en">This chapter covers the "how" of the technical design: stack matrix, LLM gateway with three-tier routing, sandbox, storage, and observability. Primarily for developers.</span></blockquote>
 <hr>
-<h2 id="4-1-技术栈矩阵-stack-matrix">4.1 技术栈矩阵<span class="en">Stack Matrix</span></h2>
+<h2 id="7-1-技术栈矩阵-stack-matrix">7.1 技术栈矩阵<span class="en">Stack Matrix</span></h2>
 <table>
 <thead><tr>
 <th>层级<span class="en">Layer</span></th>
@@ -63,11 +63,11 @@ th .en, td .en { font-size:.8em; }
 <tr><td>桌面壳<span class="en">Desktop Shell</span></td><td>Tauri (Rust WebView2)</td><td>latest</td><td>20MB 级 exe，无 Electron 臃肿<span class="en">20MB exe, no Electron bloat</span></td></tr>
 <tr><td>测试<span class="en">Testing</span></td><td>pytest / pytest-asyncio / mutmut / Playwright</td><td>≥8.0</td><td>单元→变异→E2E 全覆盖<span class="en">Unit → mutation → E2E full coverage</span></td></tr>
 </tbody></table>
-<h2 id="4-2-llm-网关与三层模型路由-gateway-3-tier-routing">4.2 LLM 网关与三层模型路由<span class="en">Gateway &amp; 3-Tier Routing</span></h2>
+<h2 id="7-2-llm-网关与三层模型路由-gateway-3-tier-routing">7.2 LLM 网关与三层模型路由<span class="en">Gateway &amp; 3-Tier Routing</span></h2>
 <p>所有 LLM 调用<strong>必须</strong>经 LiteLLM 网关（<code>gateway/</code>），禁止直连 provider——这是不可妥协项（统一追踪 + 降级）。网关之上是<strong>智能路由</strong>（<code>router/</code>）：RouterAgent 评估任务复杂度，推荐模型级别（T1/T2/T3），可被 <code>CC_SWITCH</code> 强制覆盖。<span class="en">Every LLM call <strong>must</strong> go through the LiteLLM gateway (<code>gateway/</code>) — direct provider calls are forbidden (unified tracing + fallback). Above it sits smart routing (<code>router/</code>): RouterAgent scores task complexity and recommends a model tier (T1/T2/T3), overridable via <code>CC_SWITCH</code>.</span></p>
 <p>配置的模型（<a href="../../docker-compose.yml"><code>docker-compose.yml</code></a>）：DeepSeek V4 Pro/Flash + GLM-5.2/4.7 Flash。三层路由的意图：简单任务走便宜快模型（Flash），复杂任务走强模型（Pro），成本与质量动态平衡。<span class="en">Configured models (<a href="../../docker-compose.yml"><code>docker-compose.yml</code></a>): DeepSeek V4 Pro/Flash + GLM-5.2/4.7 Flash. The three-tier routing strategy: simple tasks use cheap fast models (Flash), complex tasks use powerful models (Pro), dynamically balancing cost and quality.</span></p>
 <blockquote>相关：<code>sharding/</code> 动态任务分片、<code>compression/</code> 上下文压缩（CascadePruner 4 级级联裁剪）共同把单任务 Token 压到设计目标 ≤35。<span class="en">Related: <code>sharding/</code> dynamic task sharding, <code>compression/</code> context compression (CascadePruner 4-level cascade pruning) together keep per-task tokens at or below the design target of 35.</span></blockquote>
-<h2 id="4-3-沙箱执行-sandbox">4.3 沙箱执行<span class="en">Sandbox</span></h2>
+<h2 id="7-3-沙箱执行-sandbox">7.3 沙箱执行<span class="en">Sandbox</span></h2>
 <ul>
 <li>主方案 <strong>DockerSandbox</strong>：Docker 隔离容器执行 LLM 生成代码，<code>SANDBOX_TIMEOUT_SECONDS</code>（默认 30s）硬超时。<span class="en">Primary: <strong>DockerSandbox</strong> — Docker isolated container for executing LLM-generated code, with <code>SANDBOX_TIMEOUT_SECONDS</code> (default 30s) hard timeout.</span></li>
 <li>兜底 <strong>ProcessSandbox</strong>：无 Docker 环境时降级为进程隔离。<span class="en">Fallback: <strong>ProcessSandbox</strong> — degrades to process isolation when Docker is unavailable.</span></li>
@@ -75,7 +75,7 @@ th .en, td .en { font-size:.8em; }
 <li>红线：<strong>LLM 生成代码禁止在宿主机直接执行</strong>（安全基线）。<span class="en">Red line: <strong>LLM-generated code must never execute directly on the host</strong> (security baseline).</span></li>
 <li>用途：既是独立能力（<code>/api</code> 沙箱端点），也是防幻觉 L7 层的执行引擎。<span class="en">Usage: serves both as a standalone capability (<code>/api</code> sandbox endpoint) and as the execution engine for Hallucination Defense L7.</span></li>
 </ul>
-<h2 id="4-4-存储架构-storage">4.4 存储架构<span class="en">Storage</span></h2>
+<h2 id="7-4-存储架构-storage">7.4 存储架构<span class="en">Storage</span></h2>
 <table>
 <thead><tr>
 <th>存储<span class="en">Storage</span></th>
@@ -90,7 +90,7 @@ th .en, td .en { font-size:.8em; }
 <tr><td>PostgreSQL（生产）<span class="en">PostgreSQL (production)</span></td><td><code>DATABASE_URL=postgresql+asyncpg://...</code></td><td>生产<span class="en">Production</span></td></tr>
 </tbody></table>
 <p><strong>零依赖启动</strong>是刻意设计：开发态用 SQLite，双击 exe 即可跑，无需 Docker/Redis/PostgreSQL。生产态切 PostgreSQL + Redis。<span class="en"><strong>Zero-dependency startup</strong> is intentional: development uses SQLite — double-click the exe and it runs, no Docker/Redis/PostgreSQL needed. Production switches to PostgreSQL + Redis.</span></p>
-<h2 id="4-5-可观测性-observability">4.5 可观测性<span class="en">Observability</span></h2>
+<h2 id="7-5-可观测性-observability">7.5 可观测性<span class="en">Observability</span></h2>
 <p><code>observability/</code> 模块提供 AgentOps 全栈可观测：<span class="en">The <code>observability/</code> module provides full-stack AgentOps observability:</span></p>
 <ul>
 <li><strong>指标</strong>：Prometheus <code>/metrics</code>（4 核心业务指标：调度延迟、幻觉验证、熔断、成本）。<span class="en"><strong>Metrics</strong>: Prometheus <code>/metrics</code> (4 core business metrics: scheduling latency, hallucination verification, circuit breaker, cost).</span></li>
@@ -100,7 +100,7 @@ th .en, td .en { font-size:.8em; }
 <li><strong>看板</strong>：Grafana dashboard（<code>configs/grafana/dashboard.json</code>）。<span class="en"><strong>Dashboard</strong>: Grafana dashboard (<code>configs/grafana/dashboard.json</code>).</span></li>
 <li><strong>采集</strong>：OpenTelemetry collector（<code>configs/otel/</code>）+ Logstash pipeline。<span class="en"><strong>Collection</strong>: OpenTelemetry collector (<code>configs/otel/</code>) + Logstash pipeline.</span></li>
 </ul>
-<h2 id="4-6-部署形态-deployment-forms">4.6 部署形态<span class="en">Deployment Forms</span></h2>
+<h2 id="7-6-部署形态-deployment-forms">7.6 部署形态<span class="en">Deployment Forms</span></h2>
 <table>
 <thead><tr>
 <th>形态<span class="en">Form</span></th>
@@ -114,6 +114,6 @@ th .en, td .en { font-size:.8em; }
 </tbody></table>
 <p>灾难恢复见 <a href="../SOP-灾难恢复手册.html"><code>docs/SOP-灾难恢复手册.md</code></a>；DR 恢复 CLI 见 <code>scripts/dr/recover.py</code>（list/verify/recover）。<span class="en">See <a href="../SOP-灾难恢复手册.html"><code>docs/SOP-灾难恢复手册.md</code></a> for disaster recovery; DR CLI at <code>scripts/dr/recover.py</code> (list/verify/recover).</span></p>
 <hr>
-<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="05-usage-guide.html">下一章：使用说明 →<span class="en">Next: Usage Guide →</span></a></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="08-usage-guide.html">下一章：使用说明 →<span class="en">Next: Usage Guide →</span></a></p>
 </main></body>
 </html>

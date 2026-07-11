@@ -1,10 +1,10 @@
-# 08 · 附录 || Appendix
+# 11 · 附录 || Appendix
 
-[← 返回目录 || Back to index](README.md) · [← 上一章：再开发说明 || Prev: Development Guide](07-development-guide.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：再开发说明 || Prev: Development Guide](10-development-guide.md)
 
 ---
 
-## 8.1 术语表 || Glossary
+## 11.1 术语表 || Glossary
 
 | 术语 || Term | 含义 || Meaning |
 |---|---|
@@ -26,7 +26,7 @@
 | **Ponytail** | 技术债务台账扫描 || Technical debt ledger scan |
 | **grill-me** | modes 模块的交互协议层（YAML 定义 Agent 行为） || The interaction protocol layer of the modes module (YAML-defined Agent behavior) |
 
-## 8.2 核心指标基线 || Metric Baselines
+## 11.2 核心指标基线 || Metric Baselines
 
 | 指标 || Metric | 目标 || Target | 来源 || Source |
 |---|---|---|
@@ -45,7 +45,7 @@
 | 12 任务项目成本 || Cost for a 12-task project | 0.012–0.025 元（非高峰） | 架构总览:719 |
 | Token 节省 vs V3.1 || Token savings vs V3.1 | 99.4% | 架构总览:733 |
 
-## 8.3 防幻觉层效果速查 || Defense Layer Effectiveness
+## 11.3 防幻觉层效果速查 || Defense Layer Effectiveness
 
 | 层 || Layer | 效果 || Effectiveness |
 |---|---|
@@ -56,7 +56,7 @@
 | L7 沙箱 || L7 Sandbox | 错误率 65%→2%（最优 0%） || Error rate 65%→2% (best 0%) |
 | L9 合规 || L9 Compliance | 时效性 ≥95%，误报 ≤5% || Timeliness ≥95%, false positives ≤5% |
 
-## 8.4 路线图 || Roadmap
+## 11.4 路线图 || Roadmap
 
 | 阶段 || Phase | Step | 内容 || Content | 状态 || Status |
 |---|---|---|---|---|
@@ -72,7 +72,7 @@
 
 权威更新源：[`docs/产品路线图.md`](../产品路线图.md) · [`docs/已实现功能清单.md`](../已实现功能清单.md)。 || Authoritative live sources: [`docs/产品路线图.md`](../产品路线图.md) · [`docs/已实现功能清单.md`](../已实现功能清单.md)。
 
-## 8.5 原始设计文档索引 || Source Design Docs
+## 11.5 原始设计文档索引 || Source Design Docs
 
 本说明书是提炼；研究细节请查原始文档： || This manual is a distillation; for research details refer to the original docs:
 
@@ -90,7 +90,7 @@
 | [`docs/SOP-代码签名.md`](../SOP-代码签名.md) | 代码签名 SOP || Code signing SOP |
 | [`AGENTS.md`](../../AGENTS.md) | 开发哲学 + 实现约束全集 || Full development philosophy and implementation constraints |
 
-## 8.6 关键源文件锚点 || Key Source Anchors
+## 11.6 关键源文件锚点 || Key Source Anchors
 
 | 主题 || Topic | 文件 || File |
 |---|---|

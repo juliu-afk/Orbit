@@ -1,12 +1,12 @@
-# 04 · 技术方案 || Technical Design
+# 07 · 技术方案 || Technical Design
 
-[← 返回目录 || Back to index](README.md) · [← 上一章：九层防幻觉 || Prev: Hallucination Defense](03-hallucination-defense.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：九层防幻觉 || Prev: Hallucination Defense](06-hallucination-defense.md)
 
 > 本章覆盖技术选型的"怎么实现"：技术栈、LLM 网关与三层路由、沙箱、存储、可观测性。开发者主读。 || This chapter covers the "how" of the technical design: stack matrix, LLM gateway with three-tier routing, sandbox, storage, and observability. Primarily for developers.
 
 ---
 
-## 4.1 技术栈矩阵 || Stack Matrix
+## 7.1 技术栈矩阵 || Stack Matrix
 
 | 层级 || Layer | 组件 || Component | 版本 || Version | 选型理由 || Rationale |
 |---|---|---|---|
@@ -22,7 +22,7 @@
 | 桌面壳 || Desktop Shell | Tauri (Rust WebView2) | latest | 20MB 级 exe，无 Electron 臃肿 || 20MB exe, no Electron bloat |
 | 测试 || Testing | pytest / pytest-asyncio / mutmut / Playwright | ≥8.0 | 单元→变异→E2E 全覆盖 || Unit → mutation → E2E full coverage |
 
-## 4.2 LLM 网关与三层模型路由 || Gateway & 3-Tier Routing
+## 7.2 LLM 网关与三层模型路由 || Gateway & 3-Tier Routing
 
 所有 LLM 调用**必须**经 LiteLLM 网关（`gateway/`），禁止直连 provider——这是不可妥协项（统一追踪 + 降级）。网关之上是**智能路由**（`router/`）：RouterAgent 评估任务复杂度，推荐模型级别（T1/T2/T3），可被 `CC_SWITCH` 强制覆盖。 || Every LLM call **must** go through the LiteLLM gateway (`gateway/`) — direct provider calls are forbidden (unified tracing + fallback). Above it sits smart routing (`router/`): RouterAgent scores task complexity and recommends a model tier (T1/T2/T3), overridable via `CC_SWITCH`.
 
@@ -30,7 +30,7 @@
 
 > 相关：`sharding/` 动态任务分片、`compression/` 上下文压缩（CascadePruner 4 级级联裁剪）共同把单任务 Token 压到设计目标 ≤35。 || Related: `sharding/` dynamic task sharding, `compression/` context compression (CascadePruner 4-level cascade pruning) together keep per-task tokens at or below the design target of 35.
 
-## 4.3 沙箱执行 || Sandbox
+## 7.3 沙箱执行 || Sandbox
 
 - 主方案 **DockerSandbox**：Docker 隔离容器执行 LLM 生成代码，`SANDBOX_TIMEOUT_SECONDS`（默认 30s）硬超时。 || Primary: **DockerSandbox** — Docker isolated container for executing LLM-generated code, with `SANDBOX_TIMEOUT_SECONDS` (default 30s) hard timeout.
 - 兜底 **ProcessSandbox**：无 Docker 环境时降级为进程隔离。 || Fallback: **ProcessSandbox** — degrades to process isolation when Docker is unavailable.
@@ -38,7 +38,7 @@
 - 红线：**LLM 生成代码禁止在宿主机直接执行**（安全基线）。 || Red line: **LLM-generated code must never execute directly on the host** (security baseline).
 - 用途：既是独立能力（`/api` 沙箱端点），也是防幻觉 L7 层的执行引擎。 || Usage: serves both as a standalone capability (`/api` sandbox endpoint) and as the execution engine for Hallucination Defense L7.
 
-## 4.4 存储架构 || Storage
+## 7.4 存储架构 || Storage
 
 | 存储 || Storage | 用途 || Purpose | 冷热 || Hot/Cold |
 |---|---|---|
@@ -51,7 +51,7 @@
 
 **零依赖启动**是刻意设计：开发态用 SQLite，双击 exe 即可跑，无需 Docker/Redis/PostgreSQL。生产态切 PostgreSQL + Redis。 || **Zero-dependency startup** is intentional: development uses SQLite — double-click the exe and it runs, no Docker/Redis/PostgreSQL needed. Production switches to PostgreSQL + Redis.
 
-## 4.5 可观测性 || Observability
+## 7.5 可观测性 || Observability
 
 `observability/` 模块提供 AgentOps 全栈可观测： || The `observability/` module provides full-stack AgentOps observability:
 
@@ -62,7 +62,7 @@
 - **看板**：Grafana dashboard（`configs/grafana/dashboard.json`）。 || **Dashboard**: Grafana dashboard (`configs/grafana/dashboard.json`).
 - **采集**：OpenTelemetry collector（`configs/otel/`）+ Logstash pipeline。 || **Collection**: OpenTelemetry collector (`configs/otel/`) + Logstash pipeline.
 
-## 4.6 部署形态 || Deployment Forms
+## 7.6 部署形态 || Deployment Forms
 
 | 形态 || Form | 技术 || Technology | 场景 || Scenario |
 |---|---|---|
@@ -75,4 +75,4 @@
 
 ---
 
-[← 返回目录 || Back to index](README.md) · [下一章：使用说明 → || Next: Usage Guide →](05-usage-guide.md)
+[← 返回目录 || Back to index](README.md) · [下一章：使用说明 → || Next: Usage Guide →](08-usage-guide.md)

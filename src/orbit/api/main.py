@@ -534,6 +534,8 @@ app = create_app(_event_bus, lifespan=_app_lifespan)
 # Phase 4: 注入 ComposeOrchestrator 到 app state（供 API 端点访问）
 app.state.compose_orchestrator = _compose_orchestrator
 app.state.dream_engine = _dream_engine
+# PR3: 注入 Scheduler 到 app state（tasks 路由用真实调度器读状态/取消/触发）
+app.state.scheduler = _scheduler
 
 # Goal+Loop: 注入 MetaOrchestrator + LoopScheduler + CritiqueAgent + ModelEnsemble
 from orbit.goal.compose_bridge import GoalComposeBridge  # noqa: E402

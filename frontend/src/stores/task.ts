@@ -35,6 +35,7 @@ const STATUS_COLORS: Record<NodeStatus, string> = {
 export const useTaskStore = defineStore('task', () => {
   const taskState = ref<string>('IDLE')
   const progress = ref<number>(0)
+  const currentTaskId = ref<string>('')
   const dagNodes = ref<Map<string, DagNode>>(new Map())
   const dagEdges = ref<Array<{ from: string; to: string }>>([])
   const codeOutput = ref<string | null>(null)
@@ -63,6 +64,8 @@ export const useTaskStore = defineStore('task', () => {
   function handleTaskUpdate(payload: Record<string, unknown>) {
     taskState.value = (payload.state as string) || taskState.value
     progress.value = (payload.progress as number) ?? progress.value
+    // PR3: 捕获当前 task_id，供取消用
+    if (typeof payload.task_id === 'string' && payload.task_id) currentTaskId.value = payload.task_id
 
     // 提取代码产物——CODING/DONE 状态时后端推送生成的代码
     if (payload.output && typeof payload.output === 'string') {
@@ -90,15 +93,27 @@ export const useTaskStore = defineStore('task', () => {
     hasCodeOutput.value = false
   }
 
+  // PR3: 取消当前运行中任务——调真实调度器 cancel（写 CANCELLED 检查点 + 停止 asyncio 任务）。
+  // P2-3: tasks 端点返回裸 TaskStatusResponse(非 {code,data} 包装, apiPost 会抛错)，用原生 fetch；
+  // taskState 用后端响应的真实状态而非硬写 CANCELLED。
+  async function cancelCurrentTask(): Promise<void> {
+    if (!currentTaskId.value) return
+    const r = await fetch(`/api/v1/tasks/${currentTaskId.value}/cancel`, { method: 'POST' })
+    if (!r.ok) throw new Error(`取消失败 (HTTP ${r.status})`)
+    const data = await r.json()
+    taskState.value = data.state || 'CANCELLED'
+  }
+
   function reset() {
     taskState.value = 'IDLE'
     progress.value = 0
+    currentTaskId.value = ''
     dagNodes.value.clear()
     dagEdges.value = []
     codeOutput.value = null
     hasCodeOutput.value = false
   }
 
-  return { taskState, progress, dagNodes, dagEdges, visData,
-    codeOutput, hasCodeOutput, handleTaskUpdate, consumeCodeOutput, reset }
+  return { taskState, progress, currentTaskId, dagNodes, dagEdges, visData,
+    codeOutput, hasCodeOutput, handleTaskUpdate, consumeCodeOutput, cancelCurrentTask, reset }
 })

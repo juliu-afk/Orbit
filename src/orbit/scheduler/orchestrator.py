@@ -8,6 +8,7 @@ P1 重构: 697 行 Scheduler 拆为三层——
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -83,6 +84,8 @@ class Scheduler:
         self._audit_logger = audit_logger
         self.router = router
         self._fast_lane = False
+        # PR3: 运行中任务注册表——task_id → asyncio.Task，供 cancel_task 按 id 取消
+        self._active_tasks: dict[str, asyncio.Task] = {}
 
         self._task_runner = TaskRunner(
             agent_factory=agent_factory,
@@ -107,6 +110,49 @@ class Scheduler:
 
     async def run_task(self, task_id: str, prd: str) -> TaskState:
         return await self._task_runner.run_task(task_id, prd)
+
+    def spawn_task(self, task_id: str, prd: str) -> asyncio.Task:
+        """后台启动任务并登记到注册表，返回 asyncio.Task 供追踪/取消。
+
+        PR3: 替代裸 asyncio.create_task(run_task)——让运行中任务可按 task_id 取消。
+        P1-1 修复：同 task_id 已有运行中任务则直接返回它，避免重复 spawn 污染注册表；
+        done_callback 做身份校验，只清理自己那一条（防误删后来的同 id 任务）。
+        """
+        existing = self._active_tasks.get(task_id)
+        if existing is not None and not existing.done():
+            return existing
+        task = asyncio.create_task(self.run_task(task_id, prd))
+        self._active_tasks[task_id] = task
+        task.add_done_callback(
+            lambda t: self._active_tasks.pop(task_id, None) if self._active_tasks.get(task_id) is t else None
+        )
+        return task
+
+    async def cancel_task(self, task_id: str) -> bool:
+        """按 task_id 取消运行中任务并写 CANCELLED 检查点。
+
+        PR3: 若任务在注册表则 .cancel()（触发 CancelledError 停止协程）；
+        无论是否在跑，都写 CANCELLED 检查点（乐观锁 version+1 防被旧写覆盖）。
+        返回是否成功写入取消状态。
+        """
+        running = self._active_tasks.pop(task_id, None)
+        if running is not None and not running.done():
+            running.cancel()
+        if self.checkpoint is None:
+            return False
+        # WHY 读旧检查点拿 version：乐观锁递增，避免被正在收尾的协程旧状态覆盖
+        prev = await self.checkpoint.load(task_id)
+        from orbit.checkpoint.manager import CheckpointData
+
+        data = CheckpointData(
+            task_id=task_id,
+            state=TaskState.CANCELLED.value,
+            progress=prev.progress if prev else 0.0,
+            context=prev.context if prev else {},
+            version=(prev.version + 1) if prev else 1,
+        )
+        await self.checkpoint.save(task_id, data)
+        return True
 
     async def resume(self, task_id: str) -> TaskState | None:
         return await self._task_runner.resume(task_id)

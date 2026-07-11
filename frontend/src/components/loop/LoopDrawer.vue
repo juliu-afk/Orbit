@@ -1,6 +1,7 @@
 <!-- 定时任务抽屉（PR4）——Cron-like 循环任务管理：列表 + 新建 + 暂停/恢复/停止 -->
 <script setup lang="ts">
 import { watch, ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { useLoopStore } from '@/stores/loop'
 
 const props = defineProps<{ show: boolean }>()
@@ -10,6 +11,8 @@ const store = useLoopStore()
 const newInterval = ref('')
 const newCommand = ref('')
 const createError = ref('')
+// P2-2: 操作级 loading——记录正在操作的 loop id，操作期间禁用其按钮，防连击竞态
+const busyIds = ref<Set<string>>(new Set())
 
 // 打开抽屉时刷新列表
 watch(() => props.show, (visible) => {
@@ -25,12 +28,43 @@ async function submit() {
     await store.createLoop(interval, command)
     newInterval.value = ''
     newCommand.value = ''
-  } catch {
-    createError.value = '创建失败——间隔格式：30s/5m/1h/hourly/daily 或 cron 5 字段'
+  } catch (err) {
+    // P2-1: 区分错误来源——间隔格式错误(后端 message 含 interval/pattern)才提示格式，否则显示真实错误
+    const msg = err instanceof Error ? err.message : ''
+    createError.value = /interval|pattern|格式|422/i.test(msg)
+      ? '间隔格式错误：30s/5m/1h/hourly/daily 或 cron 5 字段'
+      : (msg || '创建失败，请稍后重试')
   }
 }
 
+// P2-2: 统一包裹操作——加 busy 态防连击
+async function withBusy(id: string, fn: () => Promise<void>) {
+  if (busyIds.value.has(id)) return
+  busyIds.value.add(id)
+  busyIds.value = new Set(busyIds.value)  // 触发响应式
+  try {
+    await fn()
+  } finally {
+    busyIds.value.delete(id)
+    busyIds.value = new Set(busyIds.value)
+  }
+}
+
+// P1-1: 停止是永久删除，加二次确认防误触
+async function onStop(id: string) {
+  try {
+    await ElMessageBox.confirm('停止将永久删除该定时任务，确认？', '确认停止', {
+      confirmButtonText: '停止', cancelButtonText: '取消', type: 'warning',
+    })
+  } catch {
+    return  // 用户取消
+  }
+  await withBusy(id, () => store.stopLoop(id))
+}
+
 function fmtInterval(sec: number): string {
+  // P2-3: 0 秒不显示为 "0h"
+  if (sec === 0) return '0s'
   if (sec % 3600 === 0) return `${sec / 3600}h`
   if (sec % 60 === 0) return `${sec / 60}m`
   return `${sec}s`
@@ -62,9 +96,9 @@ function fmtInterval(sec: number): string {
           <td><span class="status" :class="'st-' + l.status">{{ l.status }}</span></td>
           <td>{{ l.run_count }}</td>
           <td class="actions">
-            <el-button v-if="l.status !== 'paused'" size="small" text @click="store.pauseLoop(l.id)">暂停</el-button>
-            <el-button v-else size="small" text type="success" @click="store.resumeLoop(l.id)">恢复</el-button>
-            <el-button size="small" text type="danger" @click="store.stopLoop(l.id)">停止</el-button>
+            <el-button v-if="l.status !== 'paused'" size="small" text :loading="busyIds.has(l.id)" @click="withBusy(l.id, () => store.pauseLoop(l.id))">暂停</el-button>
+            <el-button v-else size="small" text type="success" :loading="busyIds.has(l.id)" @click="withBusy(l.id, () => store.resumeLoop(l.id))">恢复</el-button>
+            <el-button size="small" text type="danger" :loading="busyIds.has(l.id)" @click="onStop(l.id)">停止</el-button>
           </td>
         </tr>
       </tbody>

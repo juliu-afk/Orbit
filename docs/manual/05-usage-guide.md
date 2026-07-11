@@ -1,6 +1,6 @@
 # 05 · 使用说明 || 05 · Usage Guide
 
-[← 返回目录 Back to index](README.md) · [← 上一章 技术方案](04-technical-stack.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：技术方案 || Prev: Technical Design](04-technical-stack.md)
 
 > 面向使用者：怎么装、怎么配、怎么跑、怎么用。 || For users: how to install, configure, run, and use.
 
@@ -150,4 +150,4 @@ make test     # 运行测试
 
 ---
 
-[← 返回目录](README.md) · [下一章：API 参考 →](06-api-reference.md)
+[← 返回目录 || Back to index](README.md) · [下一章：API 参考 → || Next: API Reference →](06-api-reference.md)

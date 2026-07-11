@@ -1,6 +1,6 @@
 # 03 · 九层防幻觉 || 03 · Hallucination Defense
 
-[← 返回目录 || Back to index](README.md) · [← 上一章 整体架构 || Previous: Architecture](02-architecture.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：整体架构 || Prev: Architecture](02-architecture.md)
 
 > Orbit 的验证内核。研究者重点章节。实现见 [`src/orbit/hallucination/`](../../src/orbit/hallucination/) 与 [`src/orbit/compliance/`](../../src/orbit/compliance/)。 || Orbit's verification kernel. Essential reading for researchers. See [`src/orbit/hallucination/`](../../src/orbit/hallucination/) and [`src/orbit/compliance/`](../../src/orbit/compliance/).
 

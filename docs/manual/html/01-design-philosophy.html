@@ -40,7 +40,7 @@ th .en, td .en { font-size:.8em; }
 </head>
 <body><main>
 <h1 id="01-设计哲学-design-philosophy">01 · 设计哲学<span class="en">Design Philosophy</span></h1>
-<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="00-overview.html">← 上一章 总览 || Overview</a></span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="00-overview.html">← 上一章：总览<span class="en">Prev: Overview</span></a></p>
 <blockquote>本章回答"<strong>为什么这么设计</strong>"。研究者优先阅读。所有论断均可回溯至 <a href="../charter.html"><code>docs/charter.md</code></a>（项目"宪法"）与 <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md</code></a>。<span class="en">This chapter answers "<strong>why it is designed this way</strong>" — preferred reading for researchers. Every claim is traceable back to <a href="../charter.html"><code>docs/charter.md</code></a> (the project "constitution") and <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md</code></a>.</span></blockquote>
 <hr>
 <h2 id="1-1-核心命题-治理-而非生成-governance-not-generation">1.1 核心命题：治理，而非生成<span class="en">Governance, Not Generation</span></h2>
@@ -57,7 +57,7 @@ th .en, td .en { font-size:.8em; }
 <tr><td>单轮上下文塞什么<span class="en">What to fit in a single-turn context</span></td><td>五图谱全局记忆、跨 Agent 上下文传递<span class="en">Five-graph global memory, cross-agent context passing</span></td></tr>
 <tr><td>生成结果<span class="en">Generation output</span></td><td>生成过程的每一步可否被审计<span class="en">Whether every step of generation is auditable</span></td></tr>
 </tbody></table>
-<h2 id="1-3-为什么自研调度器-而非-crewai-why-a-self-built-scheduler-not-crewai">1.3 为什么自研调度器（而非 CrewAI）|| Why a Self-Built Scheduler (Not CrewAI)</h2>
+<h2 id="1-3-为什么自研调度器-而非-crewai-why-a-self-built-scheduler-not-crewai">1.3 为什么自研调度器（而非 CrewAI）<span class="en">Why a Self-Built Scheduler (Not CrewAI)</span></h2>
 <p>现成多 Agent 框架（CrewAI 等）是黑盒，调度不可审计、Token 开销大、延迟高，与 Orbit 的"极致性能 + 透明可控"哲学冲突。基准对比（<a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:83-91</code></a>）：<span class="en">Off-the-shelf multi-agent frameworks (CrewAI, etc.) are black boxes — schedule non-auditable, high token cost, high latency — conflicting with Orbit's "extreme performance + transparent controllability" philosophy. Benchmark comparison (<a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:83-91</code></a>):</span></p>
 <table>
 <thead><tr>
@@ -65,8 +65,8 @@ th .en, td .en { font-size:.8em; }
 <th>CrewAI</th>
 <th>自研调度器<span class="en">Self-built scheduler</span></th>
 </tr></thead><tbody>
-<tr><td>单任务 Token<span class="en">Tokens per task</span></td><td>~4.5K</td><td>≤35（目标，可优化至 1/128）|| ≤35 (target, optimizable to 1/128)</td></tr>
-<tr><td>单次耗时（含验证）|| Latency per task (with validation)</td><td>~32s</td><td>~1.5s（目标）|| ~1.5s (target)</td></tr>
+<tr><td>单任务 Token<span class="en">Tokens per task</span></td><td>~4.5K</td><td>≤35（目标，可优化至 1/128）<span class="en">≤35 (target, optimizable to 1/128)</span></td></tr>
+<tr><td>单次耗时（含验证）<span class="en">Latency per task (with validation)</span></td><td>~32s</td><td>~1.5s（目标）<span class="en">~1.5s (target)</span></td></tr>
 <tr><td>内存<span class="en">Memory</span></td><td>~200MB 框架开销<span class="en">~200MB framework overhead</span></td><td>~50MB</td></tr>
 <tr><td>可控性<span class="en">Controllability</span></td><td>黑盒，难审计<span class="en">Black box, hard to audit</span></td><td>完全可控、可修改<span class="en">Fully controllable and modifiable</span></td></tr>
 </tbody></table>
@@ -79,15 +79,15 @@ th .en, td .en { font-size:.8em; }
 <th>哲学<span class="en">Philosophy</span></th>
 <th>含义<span class="en">Meaning</span></th>
 </tr></thead><tbody>
-<tr><td>1</td><td><strong>极致性能</strong><span class="en"><strong>Extreme performance</strong></span></td><td>单任务 Token ≤35，调度层延迟 ≤1.5s（不含验证层）|| ≤35 tokens/task, ≤1.5s scheduler latency (excluding validation layer)</td></tr>
+<tr><td>1</td><td><strong>极致性能</strong><span class="en"><strong>Extreme performance</strong></span></td><td>单任务 Token ≤35，调度层延迟 ≤1.5s（不含验证层）<span class="en">≤35 tokens/task, ≤1.5s scheduler latency (excluding validation layer)</span></td></tr>
 <tr><td>2</td><td><strong>透明可控</strong><span class="en"><strong>Transparent &amp; controllable</strong></span></td><td>所有逻辑可审计、可修改，零黑盒依赖<span class="en">All logic auditable and modifiable, zero black-box dependency</span></td></tr>
 <tr><td>3</td><td><strong>全维度覆盖</strong><span class="en"><strong>Full-dimension memory</strong></span></td><td>代码+数据库+配置+知识+元图谱 = 五图谱完整记忆<span class="en">Code + DB + config + knowledge + meta-graph = full five-graph memory</span></td></tr>
-<tr><td>4</td><td><strong>动静结合</strong><span class="en"><strong>Static + dynamic</strong></span></td><td>确定性分析（Tree-sitter/Z3）+ 运行时反馈（追踪/熵监控）|| Deterministic analysis (Tree-sitter/Z3) + runtime feedback (tracing/entropy monitoring)</td></tr>
+<tr><td>4</td><td><strong>动静结合</strong><span class="en"><strong>Static + dynamic</strong></span></td><td>确定性分析（Tree-sitter/Z3）+ 运行时反馈（追踪/熵监控）<span class="en">Deterministic analysis (Tree-sitter/Z3) + runtime feedback (tracing/entropy monitoring)</span></td></tr>
 <tr><td>5</td><td><strong>渐进式复杂</strong><span class="en"><strong>Progressive complexity</strong></span></td><td>先跑通核心闭环，再逐步优化，不追求一次性完美<span class="en">Run the core loop first, then optimize iteratively — no pursuit of one-shot perfection</span></td></tr>
 <tr><td>6</td><td><strong>决策可追溯</strong><span class="en"><strong>Traceable decisions</strong></span></td><td>每次动作、每个状态转换、每次验证均可追溯至原始上下文<span class="en">Every action, state transition, and validation traceable to the original context</span></td></tr>
 </tbody></table>
 <h2 id="1-5-关键设计取舍-key-trade-offs">1.5 关键设计取舍<span class="en">Key Trade-offs</span></h2>
-<h3 id="1-5-1-追溯-vs-完整回滚-审计链的取舍-traceability-vs-full-rollback-audit-trail-trade-off">1.5.1 追溯 vs 完整回滚（审计链的取舍）|| Traceability vs Full Rollback (Audit Trail Trade-off)</h3>
+<h3 id="1-5-1-追溯-vs-完整回滚-审计链的取舍-traceability-vs-full-rollback-audit-trail-trade-off">1.5.1 追溯 vs 完整回滚（审计链的取舍）<span class="en">Traceability vs Full Rollback (Audit Trail Trade-off)</span></h3>
 <p>Orbit 的审计链（<code>task_audit_trail</code>）<strong>放弃了全量状态回滚</strong>（低频，&lt;1% 场景），<strong>保留了推理链追溯</strong>（高频，100% 任务需要）。代价对比：千次任务审计链约 50MB，而全量 MVCC 快照需 50GB——<strong>节约 1000 倍存储</strong>。回滚能力改由检查点（checkpoint）在关键状态点提供。<span class="en">Orbit's audit trail (<code>task_audit_trail</code>) <strong>sacrifices full-state rollback</strong> (low-frequency, &lt;1% of scenarios) and <strong>preserves inference-chain tracing</strong> (high-frequency, needed by 100% of tasks). Cost comparison: ~50MB for 1000-task audit trails vs 50GB for full MVCC snapshots — <strong>1000× storage savings</strong>. Rollback is instead provided by checkpoints at key state points.</span></p>
 <blockquote>来源 <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:430-453</code></a>。<span class="en">Source <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:430-453</code></a>.</span></blockquote>
 <h3 id="1-5-2-静态分析的理论上限-theoretical-upper-bound-of-static-analysis">1.5.2 静态分析的理论上限<span class="en">Theoretical Upper Bound of Static Analysis</span></h3>
@@ -101,7 +101,7 @@ th .en, td .en { font-size:.8em; }
 <th>红线<span class="en">Invariant</span></th>
 <th>理由<span class="en">Rationale</span></th>
 </tr></thead><tbody>
-<tr><td>1</td><td><strong>锚定编排层</strong><span class="en"><strong>Anchor orchestration layer</strong></span></td><td>Prompt 必须为协作编排服务，退化为执行层则打回（Step 0.4）|| Prompts must serve collaborative orchestration; regression to execution layer is rejected (Step 0.4)</td></tr>
+<tr><td>1</td><td><strong>锚定编排层</strong><span class="en"><strong>Anchor orchestration layer</strong></span></td><td>Prompt 必须为协作编排服务，退化为执行层则打回（Step 0.4）<span class="en">Prompts must serve collaborative orchestration; regression to execution layer is rejected (Step 0.4)</span></td></tr>
 <tr><td>2</td><td><strong>零黑盒依赖</strong><span class="en"><strong>Zero black-box dependency</strong></span></td><td>所有组件确定性可控、可审计、可修改<span class="en">All components deterministically controllable, auditable, modifiable</span></td></tr>
 <tr><td>3</td><td><strong>LiteLLM 网关唯一入口</strong><span class="en"><strong>LiteLLM gateway as sole entry</strong></span></td><td>禁止直连 provider——统一追踪 + 降级<span class="en">No direct provider connection — unified tracing + degradation</span></td></tr>
 <tr><td>4</td><td><strong>Docker 沙箱强制</strong><span class="en"><strong>Docker sandbox mandatory</strong></span></td><td>LLM 生成代码不得在宿主机直接执行——安全基线<span class="en">LLM-generated code must not execute on the host machine — security baseline</span></td></tr>
@@ -111,6 +111,6 @@ th .en, td .en { font-size:.8em; }
 <tr><td>8</td><td><strong>Charter 即宪法</strong><span class="en"><strong>Charter as constitution</strong></span></td><td>架构决策争议时以 <code>charter.md</code> 为准<span class="en"><code>charter.md</code> prevails in architectural disputes</span></td></tr>
 </tbody></table>
 <hr>
-<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="02-architecture.html">下一章：整体架构 → || Next: Architecture →</a></span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="02-architecture.html">下一章：整体架构 →<span class="en">Next: Architecture →</span></a></p>
 </main></body>
 </html>

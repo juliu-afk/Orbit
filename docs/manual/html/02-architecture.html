@@ -40,7 +40,7 @@ th .en, td .en { font-size:.8em; }
 </head>
 <body><main>
 <h1 id="02-整体架构-architecture">02 · 整体架构<span class="en">Architecture</span></h1>
-<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="01-design-philosophy.html">← 上一章 || Previous: Design Philosophy</a></span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="01-design-philosophy.html">← 上一章：设计哲学<span class="en">Prev: Design Philosophy</span></a></p>
 <blockquote>本章描述 Orbit 的骨架：三层通信边界、任务数据流、48 模块地图、五图谱体系、熔断/检查点/审计链。开发者与研究者共读。<span class="en">This chapter describes Orbit's skeleton: the three-layer communication boundaries, task data flow, a 48-module map, the five-graph system, and circuit breaker / checkpoint / audit trail. For both developers and researchers.</span></blockquote>
 <hr>
 <h2 id="2-1-三层架构规范-the-three-layer-model">2.1 三层架构规范<span class="en">The Three-Layer Model</span></h2>
@@ -211,7 +211,7 @@ Agent 5 角色协作（Architect → Developer → Reviewer → QA → ConfigMan
 <li><strong>双层冷热</strong>：Redis（热，TTL=1h）+ PostgreSQL（冷备份）。<span class="en"><strong>Dual-layer hot/cold</strong>: hot Redis (TTL=1h) + cold PostgreSQL (backup).</span></li>
 <li><strong>四级降级加载</strong>：Redis → miss → PG → 回填 Redis → miss → 内存降级 → 磁盘文件兜底。<span class="en"><strong>Four-level degradation loading</strong>: Redis → miss → PG → backfill Redis → miss → in-memory degradation → disk file fallback.</span></li>
 <li><strong>内容</strong>：<code>task_id, state, retry_count, progress, context, updated_at, version</code>。<span class="en"><strong>Content</strong>: <code>task_id, state, retry_count, progress, context, updated_at, version</code>.</span></li>
-<li><strong>版本号乐观锁</strong>：<code>WHERE version &amp;lt; EXCLUDED.version</code>，旧版本不能覆盖新版本。<span class="en"><strong>Version-based optimistic locking</strong>: <code>WHERE version &amp;lt; EXCLUDED.version</code> — older versions cannot overwrite newer ones.</span></li>
+<li><strong>版本号乐观锁</strong>：<code>WHERE version &lt; EXCLUDED.version</code>，旧版本不能覆盖新版本。<span class="en"><strong>Version-based optimistic locking</strong>: <code>WHERE version &lt; EXCLUDED.version</code> — older versions cannot overwrite newer ones.</span></li>
 <li><strong>保存时机</strong>：每个关键状态转换点（PARSING→PLANNING→CODING→VALIDATING…）。<span class="en"><strong>Save timing</strong>: at each key state transition (PARSING→PLANNING→CODING→VALIDATING…).</span></li>
 <li><strong>RTO 目标</strong>：≤30 秒。<span class="en"><strong>RTO target</strong>: ≤30 seconds.</span></li>
 </ul>
@@ -223,6 +223,6 @@ Agent 5 角色协作（Architect → Developer → Reviewer → QA → ConfigMan
 <li>取舍：放弃完整回滚（&lt;1% 场景，改由检查点提供），保留推理链追溯（100% 任务需要）。<span class="en">Trade-off: full rollback is omitted (&lt;1% of scenarios, covered by checkpoints), preserving reasoning chain traceability (needed by 100% of tasks).</span></li>
 </ul>
 <hr>
-<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="03-hallucination-defense.html">下一章：九层防幻觉 → || Next: Hallucination Defense →</a></span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="03-hallucination-defense.html">下一章：九层防幻觉 →<span class="en">Next: Hallucination Defense →</span></a></p>
 </main></body>
 </html>

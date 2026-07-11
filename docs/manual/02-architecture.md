@@ -1,6 +1,6 @@
 # 02 · 整体架构 || Architecture
 
-[← 返回目录 || Back to index](README.md) · [← 上一章 || Previous: Design Philosophy](01-design-philosophy.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：设计哲学 || Prev: Design Philosophy](01-design-philosophy.md)
 
 > 本章描述 Orbit 的骨架：三层通信边界、任务数据流、48 模块地图、五图谱体系、熔断/检查点/审计链。开发者与研究者共读。 || This chapter describes Orbit's skeleton: the three-layer communication boundaries, task data flow, a 48-module map, the five-graph system, and circuit breaker / checkpoint / audit trail. For both developers and researchers.
 

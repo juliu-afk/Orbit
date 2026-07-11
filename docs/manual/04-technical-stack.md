@@ -1,6 +1,6 @@
 # 04 · 技术方案 || Technical Design
 
-[← 返回目录 Back to index](README.md) · [← 上一章 九层防幻觉](03-hallucination-defense.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：九层防幻觉 || Prev: Hallucination Defense](03-hallucination-defense.md)
 
 > 本章覆盖技术选型的"怎么实现"：技术栈、LLM 网关与三层路由、沙箱、存储、可观测性。开发者主读。 || This chapter covers the "how" of the technical design: stack matrix, LLM gateway with three-tier routing, sandbox, storage, and observability. Primarily for developers.
 
@@ -75,4 +75,4 @@
 
 ---
 
-[← 返回目录](README.md) · [下一章：使用说明 →](05-usage-guide.md)
+[← 返回目录 || Back to index](README.md) · [下一章：使用说明 → || Next: Usage Guide →](05-usage-guide.md)

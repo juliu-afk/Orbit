@@ -40,7 +40,7 @@ th .en, td .en { font-size:.8em; }
 </head>
 <body><main>
 <h1 id="00-总览-overview">00 · 总览<span class="en">Overview</span></h1>
-<p>[← 返回目录<span class="en">Back to index](README.md)</span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a></p>
 <hr>
 <h2 id="0-1-orbit-是什么-what-orbit-is">0.1 Orbit 是什么<span class="en">What Orbit Is</span></h2>
 <p>Orbit 是一套<strong>多智能体软件开发自循环系统</strong>，锚定在<strong>编排层（orchestration layer）</strong>。它不是单智能体执行工具（如 Claude Code、Codex），而是让一群 AI Agent 协作完成软件开发全流程的<strong>治理系统</strong>。核心价值只有四个词：<strong>编排、治理、验证、追溯</strong>。<span class="en">Orbit is a <strong>multi-agent, self-looping software-development system</strong> anchored at the <strong>orchestration layer</strong>. It is not a single-agent coding tool (Claude Code, Codex); it is a <strong>governance system</strong> that coordinates a fleet of AI agents through the entire development lifecycle. Its value reduces to four words: <strong>orchestrate, govern, validate, trace</strong>.</span></p>
@@ -62,13 +62,13 @@ th .en, td .en { font-size:.8em; }
 <th>目标<span class="en">Target</span></th>
 <th>测量<span class="en">How measured</span></th>
 </tr></thead><tbody>
-<tr><td>调度层延迟<span class="en">Scheduling latency</span></td><td>≤1500ms（预警 1200ms）|| ≤1500ms (warning at 1200ms)</td><td>Prometheus <code>orbit_scheduling_latency_seconds</code></td></tr>
+<tr><td>调度层延迟<span class="en">Scheduling latency</span></td><td>≤1500ms（预警 1200ms）<span class="en">≤1500ms (warning at 1200ms)</span></td><td>Prometheus <code>orbit_scheduling_latency_seconds</code></td></tr>
 <tr><td>幻觉率<span class="en">Hallucination rate</span></td><td>&lt;3%</td><td>Prometheus <code>orbit_hallucination_validations_total</code></td></tr>
 <tr><td>幻觉拦截率<span class="en">Interception rate</span></td><td>≥98%</td><td>9 层防幻觉复合<span class="en">9-layer hallucination defense combined</span></td></tr>
 <tr><td>熔断决策延迟<span class="en">Breaker decision latency</span></td><td>≤12ms</td><td>纯内存判断<span class="en">Pure in-memory decision</span></td></tr>
 <tr><td>图谱查询延迟<span class="en">Graph query latency</span></td><td>&lt;50ms</td><td>SQLite 索引<span class="en">SQLite index</span></td></tr>
 <tr><td>CI 覆盖率门禁<span class="en">Coverage gate</span></td><td>≥80%</td><td><code>pytest --cov-fail-under=80</code></td></tr>
-<tr><td>单任务 Token（设计目标）|| Token per task (design target)</td><td>≤35</td><td>LiteLLM usage 统计<span class="en">LiteLLM usage statistics</span></td></tr>
+<tr><td>单任务 Token（设计目标）<span class="en">Token per task (design target)</span></td><td>≤35</td><td>LiteLLM usage 统计<span class="en">LiteLLM usage statistics</span></td></tr>
 <tr><td>源码模块<span class="en">Source modules</span></td><td>48</td><td><code>src/orbit/</code></td></tr>
 <tr><td>测试文件<span class="en">Test files</span></td><td>~300</td><td><code>tests/</code></td></tr>
 </tbody></table>
@@ -77,10 +77,10 @@ th .en, td .en { font-size:.8em; }
 <thead><tr>
 <th>维度<span class="en">Dimension</span></th>
 <th>自研调度器 Orbit<span class="en">Self-built Scheduler Orbit</span></th>
-<th>黑盒框架（如 CrewAI）|| Black-box framework (e.g., CrewAI)</th>
+<th>黑盒框架（如 CrewAI）<span class="en">Black-box framework (e.g., CrewAI)</span></th>
 </tr></thead><tbody>
-<tr><td>单任务 Token<span class="en">Token per task</span></td><td>≤35（目标）|| ≤35 (target)</td><td>~4.5K（基准）|| ~4.5K (baseline)</td></tr>
-<tr><td>单次运行耗时<span class="en">Latency per run</span></td><td>~1.5s（目标，不含验证）|| ~1.5s (target, without validation)</td><td>~32s（含验证）|| ~32s (with validation)</td></tr>
+<tr><td>单任务 Token<span class="en">Token per task</span></td><td>≤35（目标）<span class="en">≤35 (target)</span></td><td>~4.5K（基准）<span class="en">~4.5K (baseline)</span></td></tr>
+<tr><td>单次运行耗时<span class="en">Latency per run</span></td><td>~1.5s（目标，不含验证）<span class="en">~1.5s (target, without validation)</span></td><td>~32s（含验证）<span class="en">~32s (with validation)</span></td></tr>
 <tr><td>可控性<span class="en">Controllability</span></td><td>完全可审计、可修改<span class="en">Fully auditable, modifiable</span></td><td>黑盒调度，难审计<span class="en">Black-box scheduling, hard to audit</span></td></tr>
 <tr><td>内存占用<span class="en">Memory footprint</span></td><td>~50MB</td><td>~200MB 框架开销<span class="en">~200MB framework overhead</span></td></tr>
 </tbody></table>
@@ -104,7 +104,7 @@ th .en, td .en { font-size:.8em; }
 <tr><td>桌面壳<span class="en">Desktop shell</span></td><td>Tauri (Rust WebView2)</td><td>latest</td></tr>
 <tr><td>测试<span class="en">Testing</span></td><td>pytest / pytest-asyncio / mutmut / Playwright</td><td>≥8.0</td></tr>
 </tbody></table>
-<p>完整技术方案见 [04 技术方案<span class="en">Technical Design](04-technical-stack.md)。 || For the full technical design, see <a href="04-technical-stack.html">04 Technical Design</a>.</span></p>
+<p>完整技术方案见 <a href="04-technical-stack.html">04 技术方案<span class="en">Technical Design</span></a>。<span class="en">For the full technical design, see <a href="04-technical-stack.html">04 Technical Design</a>.</span></p>
 <h2 id="0-6-全景速览图-bird-s-eye-view">0.6 全景速览图<span class="en">Bird's-Eye View</span></h2>
 <pre><code>                     ┌─────────────────────────────────────────────┐
   用户/User ──REST──▶ │  FastAPI (api/)  ·  WebSocket 驾驶舱 (ws/)   │
@@ -134,6 +134,6 @@ th .en, td .en { font-size:.8em; }
                     │ 审计链 task_audit_trail (observability/) │
                     └─────────────────────────────┘</code></pre>
 <hr>
-<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="01-design-philosophy.html">下一章：设计哲学 → || Next: Design Philosophy →</a></span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="01-design-philosophy.html">下一章：设计哲学 →<span class="en">Next: Design Philosophy →</span></a></p>
 </main></body>
 </html>

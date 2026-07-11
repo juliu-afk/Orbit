@@ -1,6 +1,6 @@
 # 01 · 设计哲学 || Design Philosophy
 
-[← 返回目录 || Back to index](README.md) · [← 上一章 总览 || Overview](00-overview.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：总览 || Prev: Overview](00-overview.md)
 
 > 本章回答"**为什么这么设计**"。研究者优先阅读。所有论断均可回溯至 [`docs/charter.md`](../charter.md)（项目"宪法"）与 [`docs/开发计划/00-架构总览.md`](../开发计划/00-架构总览.md)。 || This chapter answers "**why it is designed this way**" — preferred reading for researchers. Every claim is traceable back to [`docs/charter.md`](../charter.md) (the project "constitution") and [`docs/开发计划/00-架构总览.md`](../开发计划/00-架构总览.md).
 

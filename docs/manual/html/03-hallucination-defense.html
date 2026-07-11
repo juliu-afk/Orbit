@@ -40,7 +40,7 @@ th .en, td .en { font-size:.8em; }
 </head>
 <body><main>
 <h1 id="03-九层防幻觉-03-hallucination-defense">03 · 九层防幻觉<span class="en">03 · Hallucination Defense</span></h1>
-<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="02-architecture.html">← 上一章 整体架构 || Previous: Architecture</a></span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="02-architecture.html">← 上一章：整体架构<span class="en">Prev: Architecture</span></a></p>
 <blockquote>Orbit 的验证内核。研究者重点章节。实现见 <a href="../../src/orbit/hallucination/"><code>src/orbit/hallucination/</code></a> 与 <a href="../../src/orbit/compliance/"><code>src/orbit/compliance/</code></a>。<span class="en">Orbit's verification kernel. Essential reading for researchers. See <a href="../../src/orbit/hallucination/"><code>src/orbit/hallucination/</code></a> and <a href="../../src/orbit/compliance/"><code>src/orbit/compliance/</code></a>.</span></blockquote>
 <hr>
 <h2 id="3-1-为什么需要-9-层-why-nine-layers">3.1 为什么需要 9 层<span class="en">Why Nine Layers</span></h2>
@@ -69,7 +69,7 @@ th .en, td .en { font-size:.8em; }
 <tr><td><strong>映射幻觉</strong><span class="en">Mapping</span></td><td>需求映射到错误 API/结构<span class="en">Requirement mapped to wrong API/structure</span></td><td>需求"排序"→生成 <code>array_reverse()</code><span class="en">Requirement "sort" → generates <code>array_reverse()</code></span></td><td>L3 + L6</td></tr>
 <tr><td><strong>命名幻觉</strong><span class="en">Naming</span></td><td>捏造不存在的函数/参数/库<span class="en">Fabricated non-existent functions/params/libraries</span></td><td><code>pd.read_exel()</code></td><td>L2</td></tr>
 <tr><td><strong>资源幻觉</strong><span class="en">Resource</span></td><td>引用不存在的文件/路径/资源<span class="en">References to non-existent files/paths/resources</span></td><td><code>include 'config/missing.php'</code></td><td>L5 + L7</td></tr>
-<tr><td><strong>逻辑幻觉</strong><span class="en">Logic</span></td><td>算法错误/边界遗漏/并发问题<span class="en">Algorithm errors / edge-case omissions / concurrency issues</span></td><td>循环 <code>i &amp;lt;= count</code> 数组越界<span class="en">Loop <code>i &amp;lt;= count</code> array out-of-bounds</span></td><td>L4 + L5</td></tr>
+<tr><td><strong>逻辑幻觉</strong><span class="en">Logic</span></td><td>算法错误/边界遗漏/并发问题<span class="en">Algorithm errors / edge-case omissions / concurrency issues</span></td><td>循环 <code>i &lt;= count</code> 数组越界<span class="en">Loop <code>i &lt;= count</code> array out-of-bounds</span></td><td>L4 + L5</td></tr>
 </tbody></table>
 <h2 id="3-3-逐层详解-layer-by-layer">3.3 逐层详解<span class="en">Layer-by-Layer</span></h2>
 <table>
@@ -116,6 +116,6 @@ th .en, td .en { font-size:.8em; }
 <li><strong>L9 独立于 L1–L8</strong>：合规是"知识时效"维度，与代码正确性正交，故单独成模块、异步执行、不阻塞主管道。<span class="en"><strong>L9 is independent from L1–L8</strong>: compliance is a "knowledge timeliness" dimension orthogonal to code correctness, so it lives as a separate module, runs asynchronously, and does not block the main pipeline.</span></li>
 </ul>
 <hr>
-<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="04-technical-stack.html">下一章：技术方案 → || Next: Technical Design →</a></span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="04-technical-stack.html">下一章：技术方案 →<span class="en">Next: Technical Design →</span></a></p>
 </main></body>
 </html>

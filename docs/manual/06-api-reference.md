@@ -1,6 +1,6 @@
 # 06 · API 参考 || API Reference
 
-[← 返回目录 || Back to index](README.md) · [← 上一章 使用说明 || Previous: Usage Guide](05-usage-guide.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：使用说明 || Prev: Usage Guide](05-usage-guide.md)
 
 > 路由注册见 [`src/orbit/api/main.py`](../../src/orbit/api/main.py)（`_ROUTE_MODULES` / `_ROUTE_SPEC`）。交互式文档：运行后访问 `/docs`（Swagger）或 `/redoc`。 || Route registration: see [`src/orbit/api/main.py`](../../src/orbit/api/main.py) (`_ROUTE_MODULES` / `_ROUTE_SPEC`). Interactive docs: visit `/docs` (Swagger) or `/redoc` after startup.
 
@@ -84,4 +84,4 @@
 
 ---
 
-[← 返回目录 || Back to index](README.md) · [下一章：再开发说明 || Next: Development Guide →](07-development-guide.md)
+[← 返回目录 || Back to index](README.md) · [下一章：再开发说明 → || Next: Development Guide →](07-development-guide.md)

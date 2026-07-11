@@ -40,7 +40,7 @@ th .en, td .en { font-size:.8em; }
 </head>
 <body><main>
 <h1 id="07-再开发说明-development-guide">07 · 再开发说明<span class="en">Development Guide</span></h1>
-<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="06-api-reference.html">← 上一章 || Prev: API 参考 || API Reference</a></span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="06-api-reference.html">← 上一章：API 参考<span class="en">Prev: API Reference</span></a></p>
 <blockquote>面向开发者：怎么改、怎么加功能、怎么测、怎么构建交付。完整流程见 <a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a> 与 <a href="../../CONTRIBUTING.html"><code>CONTRIBUTING.md</code></a>。<span class="en">For developers: how to modify, add features, test, and build for delivery. See <a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a> and <a href="../../CONTRIBUTING.html"><code>CONTRIBUTING.md</code></a> for the complete workflow.</span></blockquote>
 <hr>
 <h2 id="7-1-四阶段开发流程-the-four-stage-workflow">7.1 四阶段开发流程<span class="en">The Four-Stage Workflow</span></h2>
@@ -155,7 +155,7 @@ th .en, td .en { font-size:.8em; }
 <li><strong>Tauri 内嵌 exe 未替换</strong>（跳步骤 4）→ cargo build 用旧后端。<span class="en"><strong>Tauri embedded exe not replaced</strong> (skipped step 4) → cargo build uses old backend.</span></li>
 </ul>
 <h3 id="其他脚本-scripts-other-scripts-scripts">其他脚本 <code>scripts/</code><span class="en">Other Scripts <code>scripts/</code></span></h3>
-<p><code>build_codex_context.py</code>（合并 CLAUDE/WORKFLOW→AGENTS.md）· <code>check_spec.py</code> · <code>smoke_test.py</code> · <code>check_effectiveness_ci.py</code> · <code>check_perf_thresholds.py</code> · <code>generate_benchmark.py</code> · <code>run_orbitbench.py</code> · <code>dr/recover.py</code>。</p>
+<p><code>build_codex_context.py</code>（合并 CLAUDE/WORKFLOW→AGENTS.md）· <code>check_spec.py</code> · <code>smoke_test.py</code> · <code>check_effectiveness_ci.py</code> · <code>check_perf_thresholds.py</code> · <code>generate_benchmark.py</code> · <code>run_orbitbench.py</code> · <code>dr/recover.py</code>。<span class="en"><code>build_codex_context.py</code> (merges CLAUDE/WORKFLOW→AGENTS.md) · <code>check_spec.py</code> · <code>smoke_test.py</code> · <code>check_effectiveness_ci.py</code> · <code>check_perf_thresholds.py</code> · <code>generate_benchmark.py</code> · <code>run_orbitbench.py</code> · <code>dr/recover.py</code>.</span></p>
 <h2 id="7-5-数据库迁移-migrations">7.5 数据库迁移<span class="en">Migrations</span></h2>
 <ul>
 <li><strong>双轨制</strong>：SQL 原生脚本（<code>.sql</code>，数字编号 <code>NNN_desc.sql</code>）+ Alembic Python（<code>YYYYMMDD_desc.py</code>）。<span class="en"><strong>Dual-track</strong>: raw SQL scripts (<code>.sql</code>, numbered <code>NNN_desc.sql</code>) + Alembic Python (<code>YYYYMMDD_desc.py</code>).</span></li>
@@ -171,7 +171,7 @@ th .en, td .en { font-size:.8em; }
 <th>规则<span class="en">Rule</span></th>
 <th>内容<span class="en">Content</span></th>
 </tr></thead><tbody>
-<tr><td>分支命名<span class="en">Branch naming</span></td><td><code>feat/&amp;lt;简称&amp;gt;</code> / <code>fix/&amp;lt;简称&amp;gt;</code><span class="en"><code>feat/&amp;lt;name&amp;gt;</code> / <code>fix/&amp;lt;name&amp;gt;</code></span></td></tr>
+<tr><td>分支命名<span class="en">Branch naming</span></td><td><code>feat/&lt;简称&gt;</code> / <code>fix/&lt;简称&gt;</code><span class="en"><code>feat/&lt;name&gt;</code> / <code>fix/&lt;name&gt;</code></span></td></tr>
 <tr><td>master 保护<span class="en">master protection</span></td><td>禁止直接 push master，走 PR<span class="en">Direct push to master prohibited, use PR</span></td></tr>
 <tr><td>Commit<span class="en">Commit</span></td><td>Conventional Commits，subject ≤50 字符，作用域如 <code>feat(scheduler):</code><span class="en">Conventional Commits, subject ≤50 chars, scope e.g. <code>feat(scheduler):</code></span></td></tr>
 <tr><td>绝对禁止<span class="en">Strictly prohibited</span></td><td><code>git push --force</code> / <code>+branch</code> / <code>--delete</code> / amend 已发布 commit / 向有开放 PR 的分支推送 / <code>git add -A</code><span class="en"><code>git push --force</code> / <code>+branch</code> / <code>--delete</code> / amend published commits / push to branches with open PRs / <code>git add -A</code></span></td></tr>
@@ -182,7 +182,7 @@ th .en, td .en { font-size:.8em; }
 <h3 id="工具链-toolchain">工具链<span class="en">Toolchain</span></h3>
 <p>lint：ruff（E,F,I,UP,B,SIM，忽略 E501,B904）+ black（100）+ isort（profile=black）· typecheck：mypy <code>--strict</code> · 安全：bandit + pip-audit · pre-commit。<span class="en">lint: ruff (E,F,I,UP,B,SIM, ignores E501,B904) + black (100) + isort (profile=black) · typecheck: mypy <code>--strict</code> · security: bandit + pip-audit · pre-commit.</span></p>
 <h3 id="vue-前端-vue-frontend">Vue 前端<span class="en">Vue Frontend</span></h3>
-<p><code>&amp;lt;script setup lang="ts"&amp;gt;</code> 组合式 API · strict，禁 <code>any</code> · 状态进 Pinia · 构建 <code>CI=true pnpm build</code> · 测试 vitest + Playwright。<span class="en"><code>&amp;lt;script setup lang="ts"&amp;gt;</code> Composition API · strict, no <code>any</code> · State in Pinia · Build: <code>CI=true pnpm build</code> · Test: vitest + Playwright.</span></p>
+<p><code>&lt;script setup lang="ts"&gt;</code> 组合式 API · strict，禁 <code>any</code> · 状态进 Pinia · 构建 <code>CI=true pnpm build</code> · 测试 vitest + Playwright。<span class="en"><code>&lt;script setup lang="ts"&gt;</code> Composition API · strict, no <code>any</code> · State in Pinia · Build: <code>CI=true pnpm build</code> · Test: vitest + Playwright.</span></p>
 <h3 id="pr-检查清单-pr-checklist">PR 检查清单<span class="en">PR Checklist</span></h3>
 <ul>
 <li>[ ] 走完四阶段，文档齐全<span class="en">All four stages completed, documentation complete</span></li>
@@ -193,6 +193,6 @@ th .en, td .en { font-size:.8em; }
 <li>[ ] CHANGELOG 已更新（用户可见变更时）<span class="en">CHANGELOG updated (for user-visible changes)</span></li>
 </ul>
 <hr>
-<p>[← 返回目录<span class="en">Back to index](README.md) · <a href="08-appendix.html">下一章：附录 → || Next: Appendix →</a></span></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="08-appendix.html">下一章：附录 →<span class="en">Next: Appendix →</span></a></p>
 </main></body>
 </html>

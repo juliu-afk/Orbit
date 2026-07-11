@@ -24,40 +24,48 @@ _LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 
 
 def _render_inline(text: str) -> str:
-    # 双语约定：任一块级文本用 " || " 分隔中英——中文在前、英文在后。
-    # WHY：统一到行内渲染入口，标题/段落/列表项/表格单元格自动获得"中文上、英文小号在下"。
-    if " || " in text:
-        zh, en = text.split(" || ", 1)
-        return f'{_render_inline_one(zh)}<span class="en">{_render_inline_one(en)}</span>'
-    return _render_inline_one(text)
-
-
-def _render_inline_one(text: str) -> str:
-    # 1) 转义 HTML 特殊字符（先做，防止注入与显示错乱）
-    text = html.escape(text, quote=False)
-    # 2) 行内代码抽出为占位符
+    # 双语约定：块级文本用 `||`（前后空格可有可无）分隔中英——中文在前、英文在后。
+    # 处理顺序：先抽出行内代码与链接（保护其中的 |），再按 `||` 切分双语，最后还原。
+    # WHY：链接标签内也可能带 `||`（如导航"返回目录 || Back"），必须先把链接整体保护起来，
+    #       否则 `||` 会把 [label](href) 拦腰截断，导致 Markdown 链接失效。
     codes: list[str] = []
+    links: list[str] = []
 
-    def _stash(m: re.Match[str]) -> str:
+    def _stash_code(m: re.Match[str]) -> str:
         codes.append(m.group(1))
-        return f"\x00{len(codes) - 1}\x00"
+        return f"\x00C{len(codes) - 1}\x00"
 
-    text = _INLINE_CODE.sub(_stash, text)
-    # 3) 加粗、链接（.md 链接改指向同目录 .html，保证站内导航闭环）
-    text = _BOLD.sub(r"<strong>\1</strong>", text)
+    text = _INLINE_CODE.sub(_stash_code, text)
 
-    def _linkify(m: re.Match[str]) -> str:
+    def _stash_link(m: re.Match[str]) -> str:
         label, href = m.group(1), m.group(2)
         if href.endswith(".md"):
             href = href[:-3] + ".html"
         elif ".md#" in href:
             href = href.replace(".md#", ".html#")
-        return f'<a href="{href}">{label}</a>'
+        links.append(f'<a href="{html.escape(href, quote=True)}">{_emit(label, codes, [])}</a>')
+        return f"\x00L{len(links) - 1}\x00"
 
-    text = _LINK.sub(_linkify, text)
-    # 4) 还原行内代码
+    text = _LINK.sub(_stash_link, text)
+    return _emit(text, codes, links)
+
+
+def _emit(text: str, codes: list[str], links: list[str]) -> str:
+    # 按 `||` 切分双语；英文包进 <span class="en">（小号灰色块，紧贴中文下方）
+    if "||" in text:
+        zh, en = re.split(r"\s*\|\|\s*", text, maxsplit=1)
+        return f'{_plain(zh, codes, links)}<span class="en">{_plain(en, codes, links)}</span>'
+    return _plain(text, codes, links)
+
+
+def _plain(text: str, codes: list[str], links: list[str]) -> str:
+    # 转义 → 加粗 → 还原代码/链接占位符（还原在转义之后，避免 <a>/<code> 被二次转义）
+    text = html.escape(text, quote=False)
+    text = _BOLD.sub(r"<strong>\1</strong>", text)
     for i, code in enumerate(codes):
-        text = text.replace(f"\x00{i}\x00", f"<code>{html.escape(code, quote=False)}</code>")
+        text = text.replace(f"\x00C{i}\x00", f"<code>{html.escape(code, quote=False)}</code>")
+    for i, link in enumerate(links):
+        text = text.replace(f"\x00L{i}\x00", link)
     return text
 
 

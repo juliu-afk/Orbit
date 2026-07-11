@@ -88,11 +88,26 @@ export const useOpsStore = defineStore('ops', () => {
     loading.value = false
   }
 
+  // PR9: 从快照恢复。后端 Restorer 已内置护栏——覆盖前自动备份 .backup，校验失败自动回滚。
+  // 前端仍需显式 target + 二次确认(在组件层)。失败抛错由调用方捕获。
+  async function restoreSnapshot(snapshotId: string, targetPath: string): Promise<void> {
+    const r = await fetch('/api/v1/backup/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ snapshot_id: snapshotId, target_path: targetPath }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok || j.code !== 0) {
+      throw new Error(j.detail || j.message || `恢复失败 (HTTP ${r.status})`)
+    }
+    await fetchSnapshots()
+  }
+
   function reset() {
     snapshots.value = []
     releases.value = []
     currentVersion.value = ''
   }
 
-  return { snapshots, releases, currentVersion, sopContent, loading, fetchAll, reset }
+  return { snapshots, releases, currentVersion, sopContent, loading, fetchAll, restoreSnapshot, reset }
 })

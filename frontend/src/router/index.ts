@@ -9,6 +9,7 @@ const router = createRouter({
     // WHY 去 requiresProbe: boot.html 已独立验证后端可用，直接进 /app 避免二次预检
     { path: '/app', name: 'app', component: () => import('@/views/TerminalShell.vue') },
     { path: '/mcp', name: 'mcp', component: () => import('@/views/McpView.vue') },
+    { path: '/review/:taskId', name: 'review', component: () => import('@/views/ReviewView.vue') },
   ],
 })
 

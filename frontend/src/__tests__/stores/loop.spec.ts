@@ -6,8 +6,8 @@ import { apiGet, apiPost, apiDelete } from '@/services/api'
 import { useLoopStore } from '@/stores/loop'
 
 describe('Loop Store(PR4)', () => {
-  beforeEach(() => setActivePinia(createPinia()))
-  afterEach(() => vi.restoreAllMocks())
+  beforeEach(() => { setActivePinia(createPinia()) })
+  afterEach(() => { vi.restoreAllMocks() })
 
   it('fetchLoops 解析列表', async () => {
     vi.mocked(apiGet).mockResolvedValue({

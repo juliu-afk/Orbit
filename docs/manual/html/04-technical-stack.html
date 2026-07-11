@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 · 技术方案 · Technical Design</title>
+<style>
+:root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
+        --accent:#0969da; --code-bg:#f6f8fa; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg:#e6edf3; --bg:#0d1117; --muted:#8b949e; --border:#30363d;
+          --accent:#4493f8; --code-bg:#161b22; } }
+* { box-sizing: border-box; }
+body { margin:0; color:var(--fg); background:var(--bg);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC",
+       "Microsoft YaHei",Helvetica,Arial,sans-serif; line-height:1.6; }
+main { max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+h1,h2,h3,h4 { line-height:1.25; margin-top:1.6em; }
+h1 { border-bottom:2px solid var(--border); padding-bottom:.3em; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:.25em; }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+code { background:var(--code-bg); padding:.15em .35em; border-radius:6px;
+       font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size:.9em; }
+pre { background:var(--code-bg); padding:1rem; border-radius:8px; overflow-x:auto;
+      border:1px solid var(--border); }
+pre code { background:none; padding:0; }
+blockquote { margin:1em 0; padding:.4em 1em; color:var(--muted);
+             border-left:4px solid var(--border); }
+table { border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto; }
+th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
+th { background:var(--code-bg); }
+hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
+ul { padding-left:1.5em; }
+</style>
+</head>
+<body><main>
+<h1 id="04-技术方案-technical-design">04 · 技术方案 · Technical Design</h1>
+<p><a href="README.html">← 返回目录 Back to index</a> · <a href="03-hallucination-defense.html">← 上一章 九层防幻觉</a></p>
+<blockquote>本章覆盖技术选型的"怎么实现"：技术栈、LLM 网关与三层路由、沙箱、存储、可观测性。开发者主读。</blockquote>
+<hr>
+<h2 id="4-1-技术栈矩阵-stack-matrix">4.1 技术栈矩阵 · Stack Matrix</h2>
+<table>
+<thead><tr>
+<th>层级</th>
+<th>组件</th>
+<th>版本</th>
+<th>选型理由</th>
+</tr></thead><tbody>
+<tr><td>主语言</td><td>Python</td><td>3.11–3.13</td><td>异步生态成熟，AI/ML 库齐全</td></tr>
+<tr><td>包管理</td><td>Poetry</td><td>1.8.2</td><td>锁版本、可复现构建</td></tr>
+<tr><td>LLM 网关</td><td>LiteLLM</td><td>≥1.40</td><td>统一多 provider 接口 + 追踪 + 降级</td></tr>
+<tr><td>API</td><td>FastAPI + Pydantic v2 + Uvicorn</td><td>≥0.110</td><td>异步 + 类型契约 + 自动 OpenAPI</td></tr>
+<tr><td>ORM</td><td>SQLAlchemy 2.0.25 + Alembic 1.13</td><td>—</td><td><code>Mapped</code>/<code>mapped_column</code> 现代风格</td></tr>
+<tr><td>代码图谱</td><td>CodeGraph（Tree-sitter）</td><td>latest</td><td>多语言确定性解析</td></tr>
+<tr><td>审计存储</td><td>PostgreSQL 15 + Redis 7.2</td><td>≥15 / ≥7</td><td>冷热双层，审计 + 缓存</td></tr>
+<tr><td>沙箱</td><td>Docker Engine</td><td>≥24</td><td>强隔离执行 LLM 代码</td></tr>
+<tr><td>前端</td><td>Vue3 + Pinia + Tailwind v4</td><td>≥3.4</td><td>组合式 API + 集中状态</td></tr>
+<tr><td>桌面壳</td><td>Tauri (Rust WebView2)</td><td>latest</td><td>20MB 级 exe，无 Electron 臃肿</td></tr>
+<tr><td>测试</td><td>pytest / pytest-asyncio / mutmut / Playwright</td><td>≥8.0</td><td>单元→变异→E2E 全覆盖</td></tr>
+</tbody></table>
+<h2 id="4-2-llm-网关与三层模型路由-gateway-3-tier-routing">4.2 LLM 网关与三层模型路由 · Gateway &amp; 3-Tier Routing</h2>
+<p><strong>中文</strong>：所有 LLM 调用<strong>必须</strong>经 LiteLLM 网关（<code>gateway/</code>），禁止直连 provider——这是不可妥协项（统一追踪 + 降级）。网关之上是<strong>智能路由</strong>（<code>router/</code>）：RouterAgent 评估任务复杂度，推荐模型级别（T1/T2/T3），可被 <code>CC_SWITCH</code> 强制覆盖。</p>
+<p><strong>English</strong>: Every LLM call <strong>must</strong> go through the LiteLLM gateway (<code>gateway/</code>) — direct provider calls are forbidden (unified tracing + fallback). Above it sits smart routing (<code>router/</code>): RouterAgent scores task complexity and recommends a model tier (T1/T2/T3), overridable via <code>CC_SWITCH</code>.</p>
+<p>配置的模型（<a href="../../docker-compose.yml"><code>docker-compose.yml</code></a>）：DeepSeek V4 Pro/Flash + GLM-5.2/4.7 Flash。三层路由的意图：简单任务走便宜快模型（Flash），复杂任务走强模型（Pro），成本与质量动态平衡。</p>
+<blockquote>相关：<code>sharding/</code> 动态任务分片、<code>compression/</code> 上下文压缩（CascadePruner 4 级级联裁剪）共同把单任务 Token 压到设计目标 ≤35。</blockquote>
+<h2 id="4-3-沙箱执行-sandbox">4.3 沙箱执行 · Sandbox</h2>
+<ul>
+<li>主方案 <strong>DockerSandbox</strong>：Docker 隔离容器执行 LLM 生成代码，<code>SANDBOX_TIMEOUT_SECONDS</code>（默认 30s）硬超时。</li>
+<li>兜底 <strong>ProcessSandbox</strong>：无 Docker 环境时降级为进程隔离。</li>
+<li>自动选择：运行时探测 Docker 可用性。</li>
+<li>红线：<strong>LLM 生成代码禁止在宿主机直接执行</strong>（安全基线）。</li>
+<li>用途：既是独立能力（<code>/api</code> 沙箱端点），也是防幻觉 L7 层的执行引擎。</li>
+</ul>
+<h2 id="4-4-存储架构-storage">4.4 存储架构 · Storage</h2>
+<table>
+<thead><tr>
+<th>存储</th>
+<th>用途</th>
+<th>冷热</th>
+</tr></thead><tbody>
+<tr><td><strong>CodeGraph SQLite</strong></td><td>五图谱统一存储（代码/数据库/配置/知识）</td><td>本地、零 Token、&lt;50ms</td></tr>
+<tr><td><code>data/meta_graph.db</code></td><td>元图谱独立库（12 种跨图谱关系）</td><td>本地</td></tr>
+<tr><td><strong>Redis 7.2</strong></td><td>检查点热存储（TTL=1h）、熔断器状态、审计缓存</td><td>热</td></tr>
+<tr><td><strong>PostgreSQL 15</strong></td><td>检查点冷备份、审计链 <code>task_audit_trail</code>、成本记录</td><td>冷</td></tr>
+<tr><td>SQLite（开发）</td><td><code>DATABASE_URL=sqlite+aiosqlite:///./data/graph.db</code></td><td>零依赖启动</td></tr>
+<tr><td>PostgreSQL（生产）</td><td><code>DATABASE_URL=postgresql+asyncpg://...</code></td><td>生产</td></tr>
+</tbody></table>
+<p><strong>零依赖启动</strong>是刻意设计：开发态用 SQLite，双击 exe 即可跑，无需 Docker/Redis/PostgreSQL。生产态切 PostgreSQL + Redis。</p>
+<h2 id="4-5-可观测性-observability">4.5 可观测性 · Observability</h2>
+<p><code>observability/</code> 模块提供 AgentOps 全栈可观测：</p>
+<ul>
+<li><strong>指标</strong>：Prometheus <code>/metrics</code>（4 核心业务指标：调度延迟、幻觉验证、熔断、成本）。</li>
+<li><strong>审计</strong>：<code>task_audit_trail</code> + 反馈引擎（feedback）+ 教训库（lessons）。</li>
+<li><strong>Trace</strong>：全链路追踪，7 核心模块 40+ span，<code>trace_spans</code> 表（<code>003_trace_spans.sql</code>）。</li>
+<li><strong>告警</strong>：告警引擎 + AlertManager 规则（<code>configs/alertmanager/rules.yml</code>）。</li>
+<li><strong>看板</strong>：Grafana dashboard（<code>configs/grafana/dashboard.json</code>）。</li>
+<li><strong>采集</strong>：OpenTelemetry collector（<code>configs/otel/</code>）+ Logstash pipeline。</li>
+</ul>
+<h2 id="4-6-部署形态-deployment-forms">4.6 部署形态 · Deployment Forms</h2>
+<table>
+<thead><tr>
+<th>形态</th>
+<th>技术</th>
+<th>场景</th>
+</tr></thead><tbody>
+<tr><td>桌面 exe</td><td>Tauri + PyInstaller 内嵌后端</td><td>单机、双击即用（端口 18888）</td></tr>
+<tr><td>源码</td><td>Poetry + Uvicorn <code>--reload</code></td><td>开发（端口 8000，<code>make dev</code>）</td></tr>
+<tr><td>Docker 全栈</td><td>docker-compose（PG/Redis/LiteLLM）</td><td>生产（端口 18888，<code>make up</code>）</td></tr>
+<tr><td>Kubernetes</td><td>Helm Chart（<code>chart/orbit/</code>）+ Argo Rollouts</td><td>灰度/金丝雀 + SLO 自动回滚（<code>configs/k8s/</code>）</td></tr>
+</tbody></table>
+<p>灾难恢复见 <a href="../SOP-灾难恢复手册.html"><code>docs/SOP-灾难恢复手册.md</code></a>；DR 恢复 CLI 见 <code>scripts/dr/recover.py</code>（list/verify/recover）。</p>
+<hr>
+<p><a href="README.html">← 返回目录</a> · <a href="05-usage-guide.html">下一章：使用说明 →</a></p>
+<p>&lt;/content&gt;</p>
+</main></body>
+</html>

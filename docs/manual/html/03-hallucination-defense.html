@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 · 九层防幻觉 · Hallucination Defense</title>
+<style>
+:root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
+        --accent:#0969da; --code-bg:#f6f8fa; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg:#e6edf3; --bg:#0d1117; --muted:#8b949e; --border:#30363d;
+          --accent:#4493f8; --code-bg:#161b22; } }
+* { box-sizing: border-box; }
+body { margin:0; color:var(--fg); background:var(--bg);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC",
+       "Microsoft YaHei",Helvetica,Arial,sans-serif; line-height:1.6; }
+main { max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+h1,h2,h3,h4 { line-height:1.25; margin-top:1.6em; }
+h1 { border-bottom:2px solid var(--border); padding-bottom:.3em; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:.25em; }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+code { background:var(--code-bg); padding:.15em .35em; border-radius:6px;
+       font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size:.9em; }
+pre { background:var(--code-bg); padding:1rem; border-radius:8px; overflow-x:auto;
+      border:1px solid var(--border); }
+pre code { background:none; padding:0; }
+blockquote { margin:1em 0; padding:.4em 1em; color:var(--muted);
+             border-left:4px solid var(--border); }
+table { border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto; }
+th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
+th { background:var(--code-bg); }
+hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
+ul { padding-left:1.5em; }
+</style>
+</head>
+<body><main>
+<h1 id="03-九层防幻觉-hallucination-defense">03 · 九层防幻觉 · Hallucination Defense</h1>
+<p><a href="README.html">← 返回目录 Back to index</a> · <a href="02-architecture.html">← 上一章 整体架构</a></p>
+<blockquote>Orbit 的验证内核。研究者重点章节。实现见 <a href="../../src/orbit/hallucination/"><code>src/orbit/hallucination/</code></a> 与 <a href="../../src/orbit/compliance/"><code>src/orbit/compliance/</code></a>。</blockquote>
+<hr>
+<h2 id="3-1-为什么需要-9-层-why-nine-layers">3.1 为什么需要 9 层 · Why Nine Layers</h2>
+<p><strong>中文</strong>：核心认知——<strong>纯静态分析拦截幻觉的理论上限只有 48.5%–77%</strong>。要把错误率压到 &lt;3%，必须静态 + 动态结合，用"从快到慢"的分层管道：廉价层拦截大多数简单幻觉，昂贵层（沙箱执行）只处理残余高危幻觉。</p>
+<p><strong>English</strong>: Static analysis alone caps at 48.5%–77% interception. To reach &lt;3% error, Orbit combines static + dynamic checks in a "cheap-to-expensive" pipeline — cheap layers catch most simple hallucinations; expensive layers (sandbox execution) handle the residual high-risk ones.</p>
+<p>分层成本逻辑（<a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:540-544</code></a>）：</p>
+<table>
+<thead><tr>
+<th>层组</th>
+<th>拦截占比</th>
+<th>成本</th>
+</tr></thead><tbody>
+<tr><td>L1–L2 廉价层</td><td>~80% 简单幻觉（语法、命名）</td><td>接近零</td></tr>
+<tr><td>L3–L4 中等层</td><td>~15% 复杂幻觉（语义、逻辑）</td><td>Token 放大 3–5×，仅关键路径</td></tr>
+<tr><td>L5–L7 高成本层</td><td>~5% 高危幻觉</td><td>沙箱执行换效果</td></tr>
+<tr><td>L8–L9 把关层</td><td>配置一致性 + 合规时效性</td><td>零 Token / 异步</td></tr>
+</tbody></table>
+<h2 id="3-2-四类幻觉与打击策略-four-hallucination-types">3.2 四类幻觉与打击策略 · Four Hallucination Types</h2>
+<p>来源 <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:514-522</code></a>：</p>
+<table>
+<thead><tr>
+<th>幻觉类型</th>
+<th>描述</th>
+<th>示例</th>
+<th>主打防御层</th>
+</tr></thead><tbody>
+<tr><td><strong>映射幻觉</strong> Mapping</td><td>需求映射到错误 API/结构</td><td>需求"排序"→生成 <code>array_reverse()</code></td><td>L3 + L6</td></tr>
+<tr><td><strong>命名幻觉</strong> Naming</td><td>捏造不存在的函数/参数/库</td><td><code>pd.read_exel()</code></td><td>L2</td></tr>
+<tr><td><strong>资源幻觉</strong> Resource</td><td>引用不存在的文件/路径/资源</td><td><code>include 'config/missing.php'</code></td><td>L5 + L7</td></tr>
+<tr><td><strong>逻辑幻觉</strong> Logic</td><td>算法错误/边界遗漏/并发问题</td><td>循环 <code>i &amp;lt;= count</code> 数组越界</td><td>L4 + L5</td></tr>
+</tbody></table>
+<h2 id="3-3-逐层详解-layer-by-layer">3.3 逐层详解 · Layer-by-Layer</h2>
+<table>
+<thead><tr>
+<th>层</th>
+<th>名称</th>
+<th>技术手段</th>
+<th>拦截目标</th>
+<th>效果数据</th>
+</tr></thead><tbody>
+<tr><td><strong>L1</strong></td><td>图谱校验 Graph</td><td>CodeGraph 符号匹配 + JSON Schema/Pydantic 约束</td><td>语法级幻觉、引用不存在符号</td><td>99%</td></tr>
+<tr><td><strong>L2</strong></td><td>动态追踪 Trace</td><td>AST 确定性匹配 + 沙箱运行时追踪（<code>__call</code>/<code>eval</code>/<code>call_user_func</code>）</td><td>命名幻觉、动态调用幻觉</td><td>检测 100%，召回 87.6%（F1=0.934），修复 77%</td></tr>
+<tr><td><strong>L3</strong></td><td>熵监控 Entropy</td><td>采样一致性（3–5 候选 + MiniLM 相似度）+ 流式 Shannon 熵实时计算</td><td>语义级幻觉、高熵"胡言乱语"</td><td>AUROC=0.76，阈值 2.5 bits</td></tr>
+<tr><td><strong>L4</strong></td><td>类型检查 Type</td><td>mypy 静态类型检查</td><td>类型错误、API 签名不匹配</td><td>—</td></tr>
+<tr><td><strong>L5</strong></td><td>Z3 形式化 Formal</td><td>rotalabs-verity CEGIS 循环（LLM 生成→Z3 验证→CE2P 修复→重生成），仅核心算法</td><td>逻辑幻觉、边界条件</td><td>99%（可证明），超时 5s，端到端 1.87–3.73s</td></tr>
+<tr><td><strong>L6</strong></td><td>合约验证 Contract</td><td>正向合约（PRD→Assertions）+ 反向分支覆盖检查</td><td>业务逻辑幻觉</td><td>零 Token</td></tr>
+<tr><td><strong>L7</strong></td><td>沙箱执行 Sandbox</td><td>Docker 隔离执行，I/O 行为聚类（MIT 方法），多候选变体执行 + 最大簇 ≥70% 采纳</td><td><strong>所有类型（最强）</strong></td><td>错误率 65%→2%（最优可至 0%）</td></tr>
+<tr><td><strong>L8</strong></td><td>配置漂移 Config drift</td><td>黄金基线 SHA256 指纹比对，自动修复</td><td>配置幻觉、环境不一致</td><td>零 Token，自动修复</td></tr>
+<tr><td><strong>L9</strong></td><td>动态合规 Compliance</td><td>外部合规库实时查询 + 本地缓存，时效性判断 + 版本比对 + DSL 规则引擎</td><td>过时知识引用、法规风险</td><td>时效性 ≥95%，误报 ≤5%，延迟 P99&lt;200ms</td></tr>
+</tbody></table>
+<blockquote>L1–L8 枚举定义见 <a href="../../src/orbit/hallucination/schemas.py"><code>src/orbit/hallucination/schemas.py:15-25</code></a>；L9 为独立模块 <a href="../../src/orbit/compliance/validator.py"><code>src/orbit/compliance/validator.py</code></a>，设计见 <a href="../PRD+ADR_Step4.3_L9动态合规验证.html"><code>docs/PRD+ADR_Step4.3_L9动态合规验证.md</code></a>。</blockquote>
+<h2 id="3-4-执行管道-execution-pipeline">3.4 执行管道 · Execution Pipeline</h2>
+<p><strong>关键</strong>：管道<strong>执行顺序</strong>不等于层编号顺序。实际顺序为"从快到慢"（<a href="../../src/orbit/hallucination/pipeline.py"><code>src/orbit/hallucination/pipeline.py:43-52</code></a>）：</p>
+<pre><code>L1 图谱 → L4 类型 → L3 熵 → L2 追踪 → L6 合约 → L8 配置 → L7 沙箱 → L5 Z3
+                                                            ↓
+                                                       L9 合规（独立）</code></pre>
+<p>两种调用入口：</p>
+<table>
+<thead><tr>
+<th>入口</th>
+<th>层组合</th>
+<th>用途</th>
+</tr></thead><tbody>
+<tr><td><code>validate_quick()</code></td><td>L1 + L4 + L3</td><td>每次代码生成后即时检查</td></tr>
+<tr><td><code>validate_full()</code></td><td>L1–L8 全量</td><td>coding 阶段完成后完整验证</td></tr>
+</tbody></table>
+<h3 id="致命层熔断-fatal_levels">致命层熔断（FATAL_LEVELS）</h3>
+<p><strong>L1 图谱</strong> 和 <strong>L7 沙箱</strong> 运行时失败时，管道<strong>立即停止</strong>，不再执行后续层——因为这两层失败意味着代码根本不可信，继续验证无意义（<a href="../../src/orbit/hallucination/pipeline.py"><code>pipeline.py:55-58</code></a>）。</p>
+<h2 id="3-5-设计原理小结-design-rationale">3.5 设计原理小结 · Design Rationale</h2>
+<ul>
+<li><strong>顺序服务于早停</strong>：便宜且高召回的层放前面，一旦发现致命问题即提前终止，省下昂贵层的开销。</li>
+<li><strong>静动互补</strong>：L1/L4/L5/L6/L8 静态（确定性、可证明），L2/L3/L7 动态（运行时真值）。静态给出必要条件，动态给出充分验证。</li>
+<li><strong>L7 沙箱是最后防线</strong>：能拦截所有类型幻觉，把错误率从 65% 压到 2%，代价是 Docker 执行开销——因此只在 full 验证跑。</li>
+<li><strong>L9 独立于 L1–L8</strong>：合规是"知识时效"维度，与代码正确性正交，故单独成模块、异步执行、不阻塞主管道。</li>
+</ul>
+<hr>
+<p><a href="README.html">← 返回目录</a> · <a href="04-technical-stack.html">下一章：技术方案 →</a></p>
+<p>&lt;/content&gt;</p>
+</main></body>
+</html>

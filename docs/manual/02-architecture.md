@@ -113,7 +113,7 @@ Agent 5 角色协作（Architect → Developer → Reviewer → QA → ConfigMan
 
 | 模块 || Module | 职责 || Responsibility |
 |---|---|---|
-| **api** | FastAPI 应用——路由注册（30+ 端点文件）、中间件 || FastAPI application — route registration (30+ endpoint files), middleware |
+| **api** | FastAPI 应用——路由注册（37 个端点文件）、中间件 || FastAPI application — route registration (37 endpoint files), middleware |
 | **observability** | AgentOps 可观测性——Prometheus 指标 + 审计日志 + 告警引擎 + Trace 链路追踪 || AgentOps observability — Prometheus metrics + audit logs + alerting engine + Trace distributed tracing |
 | ws | WebSocket——RFC 6455 驾驶舱实时推送 + ConnectionManager || WebSocket — RFC 6455 real-time cockpit push + ConnectionManager |
 | stream | 流式模块——Agent 输出异步事件流 + SSE + CancellationToken || Streaming module — asynchronous Agent output event stream + SSE + CancellationToken |
@@ -131,7 +131,6 @@ Agent 5 角色协作（Architect → Developer → Reviewer → QA → ConfigMan
 | integration | 全模块集成接线——将独立模块接入 Agent 执行生命周期 || Full-module integration wiring — connects standalone modules into the Agent execution lifecycle |
 | cli | CLI 入口——`orbit init-packages` / `orbit brief check` || CLI entry — `orbit init-packages` / `orbit brief check` |
 | core | 核心配置——Settings（Pydantic Settings） || Core configuration — Settings (Pydantic Settings) |
-| infrastructure | DB 引擎、Session || DB engine, Session |
 | launcher.py | PyInstaller 启动入口——隐式 import 所有路由模块 + `uvicorn.run` || PyInstaller launcher — implicitly imports all route modules + `uvicorn.run` |
 
 ## 2.4 五图谱体系 || The Five-Graph System

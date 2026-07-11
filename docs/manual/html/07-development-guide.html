@@ -106,8 +106,8 @@ th .en, td .en { font-size:.8em; }
 <th>命令<span class="en">Command</span></th>
 <th>时长<span class="en">Duration</span></th>
 </tr></thead><tbody>
-<tr><td>单元<span class="en">Unit</span></td><td><code>tests/unit/</code></td><td>~255</td><td><code>pytest tests/unit/ -q</code></td><td>秒级<span class="en">Seconds</span></td></tr>
-<tr><td>集成<span class="en">Integration</span></td><td><code>tests/integration/</code></td><td>12</td><td><code>pytest tests/integration/ -q</code></td><td>≤1min</td></tr>
+<tr><td>单元<span class="en">Unit</span></td><td><code>tests/unit/</code></td><td>~270</td><td><code>pytest tests/unit/ -q</code></td><td>秒级<span class="en">Seconds</span></td></tr>
+<tr><td>集成<span class="en">Integration</span></td><td><code>tests/integration/</code></td><td>15</td><td><code>pytest tests/integration/ -q</code></td><td>≤1min</td></tr>
 <tr><td>冒烟<span class="en">Smoke</span></td><td><code>tests/e2e/</code></td><td>11</td><td><code>pytest tests/e2e/ -q -k "smoke"</code></td><td>≤2min</td></tr>
 <tr><td>回归<span class="en">Regression</span></td><td><code>tests/e2e/</code></td><td>11</td><td><code>pytest tests/e2e/ -q</code></td><td>≤10min</td></tr>
 <tr><td>变异<span class="en">Mutation</span></td><td>—</td><td>—</td><td><code>mutmut run</code></td><td>按需<span class="en">On demand</span></td></tr>

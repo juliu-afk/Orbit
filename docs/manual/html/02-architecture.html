@@ -153,7 +153,7 @@ Agent 5 角色协作（Architect → Developer → Reviewer → QA → ConfigMan
 <th>模块<span class="en">Module</span></th>
 <th>职责<span class="en">Responsibility</span></th>
 </tr></thead><tbody>
-<tr><td><strong>api</strong></td><td>FastAPI 应用——路由注册（30+ 端点文件）、中间件<span class="en">FastAPI application — route registration (30+ endpoint files), middleware</span></td></tr>
+<tr><td><strong>api</strong></td><td>FastAPI 应用——路由注册（37 个端点文件）、中间件<span class="en">FastAPI application — route registration (37 endpoint files), middleware</span></td></tr>
 <tr><td><strong>observability</strong></td><td>AgentOps 可观测性——Prometheus 指标 + 审计日志 + 告警引擎 + Trace 链路追踪<span class="en">AgentOps observability — Prometheus metrics + audit logs + alerting engine + Trace distributed tracing</span></td></tr>
 <tr><td>ws</td><td>WebSocket——RFC 6455 驾驶舱实时推送 + ConnectionManager<span class="en">WebSocket — RFC 6455 real-time cockpit push + ConnectionManager</span></td></tr>
 <tr><td>stream</td><td>流式模块——Agent 输出异步事件流 + SSE + CancellationToken<span class="en">Streaming module — asynchronous Agent output event stream + SSE + CancellationToken</span></td></tr>
@@ -171,7 +171,6 @@ Agent 5 角色协作（Architect → Developer → Reviewer → QA → ConfigMan
 <tr><td>integration</td><td>全模块集成接线——将独立模块接入 Agent 执行生命周期<span class="en">Full-module integration wiring — connects standalone modules into the Agent execution lifecycle</span></td></tr>
 <tr><td>cli</td><td>CLI 入口——<code>orbit init-packages</code> / <code>orbit brief check</code><span class="en">CLI entry — <code>orbit init-packages</code> / <code>orbit brief check</code></span></td></tr>
 <tr><td>core</td><td>核心配置——Settings（Pydantic Settings）<span class="en">Core configuration — Settings (Pydantic Settings)</span></td></tr>
-<tr><td>infrastructure</td><td>DB 引擎、Session<span class="en">DB engine, Session</span></td></tr>
 <tr><td>launcher.py</td><td>PyInstaller 启动入口——隐式 import 所有路由模块 + <code>uvicorn.run</code><span class="en">PyInstaller launcher — implicitly imports all route modules + <code>uvicorn.run</code></span></td></tr>
 </tbody></table>
 <h2 id="2-4-五图谱体系-the-five-graph-system">2.4 五图谱体系<span class="en">The Five-Graph System</span></h2>

@@ -41,6 +41,8 @@ def workspace_dir():
         mem.mkdir(parents=True)
         (mem / "MEMORY.md").write_text("# 记忆索引\n", encoding="utf-8")
         (mem / "notes.md").write_text("笔记内容\n", encoding="utf-8")
+        # 超大文件（>100KB）——验证 P2-1 截断
+        (mem / "big.md").write_text("x" * 200_000, encoding="utf-8")
         # MCP 配置：空服务器列表
         (ws / "configs").mkdir()
         (ws / "configs" / "mcp_clients.yaml").write_text("servers: []\n", encoding="utf-8")
@@ -127,6 +129,17 @@ async def test_memory_list(client):
     assert body["code"] == 0
     types = {item["type"] for item in body["data"]}
     assert {"MEMORY", "notes"} <= types
+
+
+@pytest.mark.asyncio
+async def test_memory_list_truncates_oversized(client):
+    """P2-1: 超过 100KB 的记忆文件被截断，并标记 truncated=True。"""
+    from orbit.api.routes.memory_routes import MAX_MEMORY_SIZE
+
+    resp = await client.get("/api/v1/memory/list")
+    big = next(item for item in resp.json()["data"] if item["type"] == "big")
+    assert big["truncated"] is True
+    assert len(big["text"]) == MAX_MEMORY_SIZE
 
 
 # ── 5. lsp/diagnostics ────────────────────────────────────────────

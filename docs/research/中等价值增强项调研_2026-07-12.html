@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit 中等价值增强项调研报告</title>
+<style>
+:root{--fg:#1f2328;--bg:#fff;--muted:#656d76;--border:#d0d7de;--accent:#0969da;--code-bg:#f6f8fa;--hi:#fff8c5;--good:#1a7f37;--warn:#9a6700;--bad:#cf222e}
+@media (prefers-color-scheme:dark){:root{--fg:#e6edf3;--bg:#0d1117;--muted:#8b949e;--border:#30363d;--accent:#4493f8;--code-bg:#161b22;--hi:#3f2e00;--good:#3fb950;--warn:#d29922;--bad:#f85149}}
+*{box-sizing:border-box}
+body{margin:0;color:var(--fg);background:var(--bg);line-height:1.65;
+ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",Helvetica,Arial,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:2.5rem 1.5rem 5rem}
+h1{font-size:1.9rem;border-bottom:2px solid var(--border);padding-bottom:.4em;margin-bottom:.3em}
+h2{margin-top:2.2em;border-bottom:1px solid var(--border);padding-bottom:.25em}
+h3{margin-top:1.8em}
+.meta{color:var(--muted);font-size:.9rem;margin-bottom:1.5em}
+code{background:var(--code-bg);padding:.12em .4em;border-radius:6px;font-family:"SFMono-Regular",Consolas,monospace;font-size:.88em}
+table{border-collapse:collapse;width:100%;margin:1em 0;display:block;overflow-x:auto}
+th,td{border:1px solid var(--border);padding:.5em .7em;text-align:left;vertical-align:top}
+th{background:var(--code-bg)}
+blockquote{margin:1em 0;padding:.5em 1em;border-left:4px solid var(--border);color:var(--muted)}
+.tag{display:inline-block;padding:.05em .5em;border-radius:10px;font-size:.8em;font-weight:600;white-space:nowrap}
+.hi{background:var(--hi);color:var(--warn)}
+.g{color:var(--good);font-weight:600}.w{color:var(--warn);font-weight:600}.b{color:var(--bad);font-weight:600}
+.card{border:1px solid var(--border);border-radius:10px;padding:1em 1.2em;margin:1.1em 0;background:var(--code-bg)}
+.card h3{margin-top:0}
+.kv{margin:.35em 0}.kv b{display:inline-block;min-width:5.5em;color:var(--muted)}
+ul{padding-left:1.4em}
+hr{border:none;border-top:1px solid var(--border);margin:2.5em 0}
+.summary{border:1px solid var(--accent);border-radius:10px;padding:1em 1.3em;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+</style>
+</head>
+<body><main>
+
+<h1>Orbit 中等价值增强项调研报告</h1>
+<div class="meta">
+日期：2026-07-12 &nbsp;·&nbsp; 范围：02 §2.2.1 十二条 Non-Goals 中价值≥「中」的 8 项 &nbsp;·&nbsp;
+方法：逐条对照 <code>origin/master</code> 实际源码（<code>git show</code> / <code>git grep</code>）核实，不依赖 requirements 文档
+</div>
+
+<div class="summary">
+<b>一句话结论</b>：真要动一条，选 <b>#3 多语言防幻觉</b>（性价比碾压）。补全体系感可评估 <b>#2 文档图谱</b>（但破「零依赖 SQLite」需取舍）。其余 6 项属锦上添花，冻结期不值得碰。
+</div>
+
+<h2>1. 背景与方法</h2>
+<p>说明书 <code>02-capabilities-boundaries.md</code> §2.2.1 列出 12 条明确 Non-Goals，源头为 charter/PRD 文档。因文档可能滞后或有误，本报告对每条逐一 <code>git show</code> / <code>git grep</code> 核实代码现状，再给「能做吗（难度+方案）」「值得做吗（价值+理由）」判断。</p>
+<p>核实结论：<b>11/12 条代码确实不存在</b>；<b>#5 部分</b>（导入边已记录，控制流/eval/exec 无 —— 详见附录）。本报告只收录价值≥「中」的 8 项。</p>
+
+<h2>2. 中等价值以上项（按优先级）</h2>
+
+<table>
+<thead><tr><th>优先</th><th>条目</th><th>价值</th><th>能做(难度)</th><th>一句话理由</th></tr></thead>
+<tbody>
+<tr><td><span class="tag hi">⭐ 高</span></td><td><b>#3 多语言防幻觉</b>（TS/JS）</td><td class="g">高</td><td>中</td><td>唯一能显著扩大适用人群</td></tr>
+<tr><td>中</td><td><b>#2 文档图谱</b></td><td class="w">中</td><td>中</td><td>补全五图谱、需求↔代码追溯</td></tr>
+<tr><td>中</td><td><b>#12 NL Issue 写操作</b></td><td class="w">中</td><td>易</td><td>闭环体验，需权限+审批</td></tr>
+<tr><td>中</td><td><b>#10 驾驶舱任务管理/历史回放</b></td><td class="w">中</td><td>易</td><td>回放结合审计链有价值</td></tr>
+<tr><td>中</td><td><b>#6 数据库图谱多主库</b></td><td class="w">中</td><td>易</td><td>真实项目常多库</td></tr>
+<tr><td>中</td><td><b>#8 DAG 跨任务依赖</b></td><td class="w">中</td><td>中</td><td>大项目有用</td></tr>
+<tr><td>中</td><td><b>#5 代码图谱 CFG 控制流分析</b></td><td class="w">中</td><td>中难</td><td>提升 L2 追踪/切片精度</td></tr>
+<tr><td>中</td><td><b>#4 L6 gRPC / L8 K8s ConfigMap 验证</b></td><td class="w">中</td><td>易</td><td>云原生项目适用</td></tr>
+</tbody>
+</table>
+
+<h2>3. 逐项详情</h2>
+
+<div class="card">
+<h3>⭐ #3 多语言防幻觉（TypeScript / JavaScript）</h3>
+<div class="kv"><b>代码现状</b>：确实仅 Python。<code>l1_graph.py</code> 无 typescript/ts 处理；<code>l4_type.py</code> 仅 <code>mypy</code>，无 <code>tsc</code>。</div>
+<div class="kv"><b>能做</b>：<span class="w">中</span>。L1 加 TS/JS 的 Tree-sitter 语法；L4 用 <code>tsc --noEmit</code> 替代 mypy；L2 沙箱换 node runtime。图谱 Schema 已语言无关，主要是解析器与类型检查器适配。</div>
+<div class="kv"><b>值得做</b>：<span class="g">高</span>。当前只服务 Python 项目——若目标用户写前端/Node，这是硬门槛。扩语言直接放大适用面，是 8 项中 ROI 最高的。</div>
+<div class="kv"><b>源文件</b>：<code>src/orbit/hallucination/l1_graph.py</code> · <code>l4_type.py</code> · <code>graph/engines/code_graph.py</code></div>
+</div>
+
+<div class="card">
+<h3>#2 文档图谱 DocGraph</h3>
+<div class="kv"><b>代码现状</b>：确实无（<code>docgraph/document_graph/pgvector/neo4j</code> 全 0 命中）。仅存在于设计文档。</div>
+<div class="kv"><b>能做</b>：<span class="w">中</span>。设计已给 pgvector + 图引用 Schema；需落地向量存储 + 文档↔符号跨图谱边。</div>
+<div class="kv"><b>值得做</b>：<span class="w">中</span>。补全「五图谱」体系，实现需求/设计文档 ↔ 代码的双向追溯，契合 Orbit「治理/追溯」定位。<b>代价</b>：引 pgvector/Neo4j 依赖，破坏「零依赖 SQLite 单机启动」的设计优势——需权衡。</div>
+<div class="kv"><b>源文件</b>：设计见 <code>docs/产品路线图.md:121</code>；无实现代码</div>
+</div>
+
+<div class="card">
+<h3>#12 自然语言交互 —— Issue 写操作</h3>
+<div class="kv"><b>代码现状</b>：确实无（无 close-issue 逻辑）。当前仅查询/关联 Issue。</div>
+<div class="kv"><b>能做</b>：<span class="g">易</span>。GitHub/GitLab REST API 加写操作端点。</div>
+<div class="kv"><b>值得做</b>：<span class="w">中</span>。闭环体验好（对话里直接闭 Issue）。<b>但</b>写操作需权限校验 + 人工审批门禁，否则风险高。做需谨慎。</div>
+<div class="kv"><b>源文件</b>：<code>src/orbit/projects/</code> · NL 交互层</div>
+</div>
+
+<div class="card">
+<h3>#10 驾驶舱 —— 任务管理 / 历史回放</h3>
+<div class="kv"><b>代码现状</b>：确实无（前端无 task-manage/replay/mobile）。</div>
+<div class="kv"><b>能做</b>：<span class="g">易</span>。纯前端功能。</div>
+<div class="kv"><b>值得做</b>：任务管理（创建/取消）<span class="w">中</span>——UX 提升；历史回放 <span class="w">中</span>——结合已有审计链 <code>task_audit_trail</code> + Trace 数据可做「时间旅行调试」，价值放大。移动端仍<span class="b">低</span>。</div>
+<div class="kv"><b>源文件</b>：<code>frontend/src/</code>；数据源已有 <code>observability/audit.py</code> · <code>trace.py</code></div>
+</div>
+
+<div class="card">
+<h3>#6 数据库图谱 —— 多主库</h3>
+<div class="kv"><b>代码现状</b>：确实无（无 mongo/nosql/multi-db）。当前仅单主库、仅关系型。</div>
+<div class="kv"><b>能做</b>：多库 <span class="g">易</span>（连接池 + 库标识）；NoSQL <span class="w">中</span>（schema-less 反射难）。</div>
+<div class="kv"><b>值得做</b>：多主库 <span class="w">中</span>——真实项目常多库（主库+只读+分片）。NoSQL <span class="b">低</span>——无 schema，图谱价值弱。</div>
+<div class="kv"><b>源文件</b>：<code>src/orbit/graph/engines/</code>（DBGraph 反射）</div>
+</div>
+
+<div class="card">
+<h3>#8 DAG —— 跨任务依赖</h3>
+<div class="kv"><b>代码现状</b>：确实无（<code>dag_runner.py</code> 无 dynamic-topology/cross-task）。当前静态图、任务内 DAG。</div>
+<div class="kv"><b>能做</b>：跨任务依赖 <span class="w">中</span>；运行时改拓扑 <span class="b">难</span>（状态一致性 + 检查点复杂度爆炸）。</div>
+<div class="kv"><b>值得做</b>：跨任务依赖 <span class="w">中</span>——大项目多 Goal 间有真实依赖。动态拓扑 <span class="b">低</span>——收益不抵复杂度。</div>
+<div class="kv"><b>源文件</b>：<code>src/orbit/scheduler/dag_runner.py</code> · <code>goal/dependency_analyzer.py</code></div>
+</div>
+
+<div class="card">
+<h3>#5 代码图谱 —— 控制流分析 (CFG)</h3>
+<div class="kv"><b>代码现状</b>：<span class="w">部分</span>。导入边已记录（<code>code_graph.py:444-448</code> <code>_record_import_edge(alias.name)</code>）；<b>CFG 控制流分析、eval/exec 确实无</b>。</div>
+<div class="kv"><b>能做</b>：CFG <span class="w">中难</span>（AST→CFG 构建，已有 <code>graph/engines/slicer.py</code> 程序切片可复用）；eval/exec <span class="b">理论不可判</span>（动态语言本质，静态分析上限）。</div>
+<div class="kv"><b>值得做</b>：CFG <span class="w">中</span>——提升 L2 动态追踪与程序切片精度。eval/exec <span class="b">低</span>——投入产出比差。</div>
+<div class="kv"><b>源文件</b>：<code>src/orbit/graph/engines/code_graph.py</code> · <code>slicer.py</code></div>
+<blockquote>⚠️ 文档 vs 代码出入：Non-Goal 写「不解析导入别名」，但代码 <code>_record_import_edge(alias.name)</code> 已记录导入别名。或为「记录≠解析」措辞差异，或文档滞后，建议复核后更新说明书。</blockquote>
+</div>
+
+<div class="card">
+<h3>#4 防幻觉 —— L6 gRPC / L8 K8s ConfigMap 验证</h3>
+<div class="kv"><b>代码现状</b>：确实无（<code>l6_contract.py</code> 无 grpc；<code>l8_config.py</code> 无 configmap/k8s）。L6 仅 OpenAPI，L8 仅文件配置。</div>
+<div class="kv"><b>能做</b>：gRPC <span class="g">易</span>（加 .proto 解析）；ConfigMap <span class="g">易</span>（加 YAML kind 识别）；L5 IO 密集 <span class="b">难</span>（形式化验证 IO 本质困难）。</div>
+<div class="kv"><b>值得做</b>：<span class="w">中</span>——云原生/微服务项目适用；否则小众，按需加。</div>
+<div class="kv"><b>源文件</b>：<code>src/orbit/hallucination/l6_contract.py</code> · <code>l8_config.py</code></div>
+</div>
+
+<h2>4. 排除项（价值低 / 属正确边界）</h2>
+<table>
+<thead><tr><th>条目</th><th>为何不做</th></tr></thead>
+<tbody>
+<tr><td>#1 时序图谱</td><td>审计链已覆盖追溯，重复投入</td></tr>
+<tr><td class="b">#7 配置加密 sops</td><td><b>正确的安全边界</b>——工具不该解密生产密钥</td></tr>
+<tr><td class="b">#9 Agent 无状态</td><td><b>有意设计</b>——可重放/可审计/检查点一致；加状态破坏治理保证</td></tr>
+<tr><td class="b">#11 知识图谱只读</td><td><b>对齐安全边界</b>——人工审核防知识污染；自动演进风险高</td></tr>
+</tbody>
+</table>
+<blockquote>#7/#9/#11 是<b>特性不是缺陷</b>——做了反而削弱 Orbit「治理而非生成」的核心保证。</blockquote>
+
+<h2>5. 建议梯队</h2>
+<ul>
+<li><b>第一梯队（若解冻做一条）</b>：#3 多语言防幻觉 —— ROI 最高。</li>
+<li><b>第二梯队（补全体系，需评估依赖代价）</b>：#2 文档图谱。</li>
+<li><b>第三梯队（锦上添花，按需）</b>：#10 回放、#12 Issue 写、#6 多库、#8 跨任务依赖、#5 CFG、#4 gRPC/ConfigMap。</li>
+<li><b>不做</b>：#1、#7、#9、#11。</li>
+</ul>
+
+<hr>
+<div class="meta">本报告基于 <code>origin/master</code>（撰写时 HEAD <code>e45554e</code>）源码核实。Orbit 内容已冻结，此为评估参考，非交付承诺。</div>
+
+</main></body>
+</html>
+</content>

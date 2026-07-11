@@ -8,6 +8,7 @@ import { useDiagnosticsStore } from '@/stores/diagnostics'
 import ProblemPanel from '@/components/editor/ProblemPanel.vue'
 import TestPanel from '@/components/editor/TestPanel.vue'
 import MergeConflictPanel from '@/components/editor/MergeConflictPanel.vue'
+import TestGapsPanel from '@/components/editor/TestGapsPanel.vue'
 
 const editor = useEditorStore()
 const shell = useShellStore()
@@ -58,6 +59,9 @@ const activeTab = ref('problems')
       </el-tab-pane>
       <el-tab-pane label="Tests" name="tests">
         <TestPanel @show-error="onTestError" />
+      </el-tab-pane>
+      <el-tab-pane label="Coverage" name="coverage">
+        <TestGapsPanel />
       </el-tab-pane>
       <el-tab-pane label="Conflicts" name="conflicts">
         <MergeConflictPanel @select-file="(path: string) => { editor.openFile(path); shell.openFileReview(path) }" />

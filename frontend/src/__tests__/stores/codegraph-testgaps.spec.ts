@@ -7,8 +7,8 @@ import { apiGet } from '@/services/api'
 import { useCodeGraphStore } from '@/stores/codegraph'
 
 describe('CodeGraph Store — test-gaps(PR6)', () => {
-  beforeEach(() => setActivePinia(createPinia()))
-  afterEach(() => vi.restoreAllMocks())
+  beforeEach(() => { setActivePinia(createPinia()) })
+  afterEach(() => { vi.restoreAllMocks() })
 
   it('fetchTestGaps 解析空洞数据', async () => {
     vi.mocked(apiGet).mockResolvedValue({

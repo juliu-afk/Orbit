@@ -32,78 +32,80 @@ th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
 th { background:var(--code-bg); }
 hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
 ul { padding-left:1.5em; }
+.en { display:block; font-size:.82em; font-weight:400; color:var(--muted);
+      line-height:1.45; margin-top:.15em; }
+h1 .en, h2 .en, h3 .en, h4 .en { font-size:.6em; margin-top:.2em; }
+th .en, td .en { font-size:.8em; }
 </style>
 </head>
 <body><main>
-<h1 id="00-总览-overview">00 · 总览 · Overview</h1>
-<p><a href="README.html">← 返回目录 Back to index</a></p>
+<h1 id="00-总览-overview">00 · 总览<span class="en">Overview</span></h1>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a></p>
 <hr>
-<h2 id="0-1-orbit-是什么-what-orbit-is">0.1 Orbit 是什么 · What Orbit Is</h2>
-<p><strong>中文</strong>：Orbit 是一套<strong>多智能体软件开发自循环系统</strong>，锚定在<strong>编排层（orchestration layer）</strong>。它不是单智能体执行工具（如 Claude Code、Codex），而是让一群 AI Agent 协作完成软件开发全流程的<strong>治理系统</strong>。核心价值只有四个词：<strong>编排、治理、验证、追溯</strong>。</p>
-<p><strong>English</strong>: Orbit is a <strong>multi-agent, self-looping software-development system</strong> anchored at the <strong>orchestration layer</strong>. It is not a single-agent coding tool (Claude Code, Codex); it is a <strong>governance system</strong> that coordinates a fleet of AI agents through the entire development lifecycle. Its value reduces to four words: <strong>orchestrate, govern, validate, trace</strong>.</p>
-<blockquote>架构锚定声明（Step 0.4，见 <a href="../charter.html"><code>docs/charter.md:87-90</code></a>）：所有 Prompt / Context 设计必须服务于<strong>协作流程的编排与治理</strong>，而非单次代码生成质量。若 Prompt 退化为"你是一个 Python 专家"这类执行层风格，评审直接打回。</blockquote>
-<h2 id="0-2-为什么需要它-why-it-exists">0.2 为什么需要它 · Why It Exists</h2>
-<p>单个编码 Agent 能写代码，但<strong>无法自我治理</strong>：无法保证不产生幻觉、无法回滚到安全状态、无法解释"这行代码为什么这么写"。Orbit 用五个能力把单 Agent 的"能写"升级为团队级的"可信交付"：</p>
-<p>A single coding agent can write code but cannot <strong>govern itself</strong> — it cannot guarantee freedom from hallucination, cannot roll back to a safe state, cannot explain why a line was written. Orbit adds five capabilities that turn "can write" into "trustworthy delivery":</p>
+<h2 id="0-1-orbit-是什么-what-orbit-is">0.1 Orbit 是什么<span class="en">What Orbit Is</span></h2>
+<p>Orbit 是一套<strong>多智能体软件开发自循环系统</strong>，锚定在<strong>编排层（orchestration layer）</strong>。它不是单智能体执行工具（如 Claude Code、Codex），而是让一群 AI Agent 协作完成软件开发全流程的<strong>治理系统</strong>。核心价值只有四个词：<strong>编排、治理、验证、追溯</strong>。<span class="en">Orbit is a <strong>multi-agent, self-looping software-development system</strong> anchored at the <strong>orchestration layer</strong>. It is not a single-agent coding tool (Claude Code, Codex); it is a <strong>governance system</strong> that coordinates a fleet of AI agents through the entire development lifecycle. Its value reduces to four words: <strong>orchestrate, govern, validate, trace</strong>.</span></p>
+<blockquote>架构锚定声明（Step 0.4，见 <a href="../charter.html"><code>docs/charter.md:87-90</code></a>）：所有 Prompt / Context 设计必须服务于<strong>协作流程的编排与治理</strong>，而非单次代码生成质量。若 Prompt 退化为"你是一个 Python 专家"这类执行层风格，评审直接打回。<span class="en">Architecture-anchor statement (Step 0.4, see <a href="../charter.html"><code>docs/charter.md:87-90</code></a>): All Prompt / Context design must serve <strong>collaboration-process orchestration and governance</strong>, not single-shot code quality. If a Prompt degenerates into execution-layer style like "You are a Python expert," the review rejects it outright.</span></blockquote>
+<h2 id="0-2-为什么需要它-why-it-exists">0.2 为什么需要它<span class="en">Why It Exists</span></h2>
+<p>单个编码 Agent 能写代码，但<strong>无法自我治理</strong>：无法保证不产生幻觉、无法回滚到安全状态、无法解释"这行代码为什么这么写"。Orbit 用五个能力把单 Agent 的"能写"升级为团队级的"可信交付"：<span class="en">A single coding agent can write code but cannot <strong>govern itself</strong> — it cannot guarantee freedom from hallucination, cannot roll back to a safe state, cannot explain why a line was written. Orbit adds five capabilities that turn "can write" into "trustworthy delivery":</span></p>
 <ul>
-<li><strong>多 Agent 协作</strong> — 5 核心角色（架构师/开发/审查/QA/配置管理）分工。</li>
-<li><strong>状态机调度</strong> — 自研 asyncio 有限状态机，每个状态转换存检查点、可回滚。</li>
-<li><strong>五图谱记忆</strong> — 代码/数据库/配置/知识/元图谱，让 Agent"知道全局"。</li>
-<li><strong>9 层防幻觉</strong> — 从静态校验到 Docker 沙箱执行的纵深防御。</li>
-<li><strong>审计链</strong> — 每个 Agent 动作、每次 LLM 调用、每条验证结果全部可追溯。</li>
+<li><strong>多 Agent 协作</strong> — 5 核心角色（架构师/开发/审查/QA/配置管理）分工。<span class="en"><strong>Multi-Agent Collaboration</strong> — 5 core roles (Architect/Developer/Reviewer/QA/ConfigManager).</span></li>
+<li><strong>状态机调度</strong> — 自研 asyncio 有限状态机，每个状态转换存检查点、可回滚。<span class="en"><strong>State-Machine Scheduler</strong> — self-built asyncio FSM, every state transition has a checkpoint, rollback-capable.</span></li>
+<li><strong>五图谱记忆</strong> — 代码/数据库/配置/知识/元图谱，让 Agent"知道全局"。<span class="en"><strong>5-Graph Memory</strong> — Code/DB/Config/Knowledge/Meta graphs, giving agents "global awareness".</span></li>
+<li><strong>9 层防幻觉</strong> — 从静态校验到 Docker 沙箱执行的纵深防御。<span class="en"><strong>9-Layer Hallucination Defense</strong> — defense-in-depth from static checks to Docker sandbox execution.</span></li>
+<li><strong>审计链</strong> — 每个 Agent 动作、每次 LLM 调用、每条验证结果全部可追溯。<span class="en"><strong>Audit Trail</strong> — every agent action, every LLM call, every validation result is traceable.</span></li>
 </ul>
-<h2 id="0-3-核心指标-key-metrics">0.3 核心指标 · Key Metrics</h2>
-<blockquote>目标值来自 <a href="../charter.html"><code>docs/charter.md</code></a>；"当前"随覆盖率冲刺演进，以路线图为准。</blockquote>
+<h2 id="0-3-核心指标-key-metrics">0.3 核心指标<span class="en">Key Metrics</span></h2>
+<blockquote>目标值来自 <a href="../charter.html"><code>docs/charter.md</code></a>；"当前"随覆盖率冲刺演进，以路线图为准。<span class="en">Targets from <a href="../charter.html"><code>docs/charter.md</code></a>; "current" values evolve with coverage sprints; see the roadmap for the latest.</span></blockquote>
 <table>
 <thead><tr>
-<th>指标 Metric</th>
-<th>目标 Target</th>
-<th>测量 How measured</th>
+<th>指标<span class="en">Metric</span></th>
+<th>目标<span class="en">Target</span></th>
+<th>测量<span class="en">How measured</span></th>
 </tr></thead><tbody>
-<tr><td>调度层延迟 Scheduling latency</td><td>≤1500ms（预警 1200ms）</td><td>Prometheus <code>orbit_scheduling_latency_seconds</code></td></tr>
-<tr><td>幻觉率 Hallucination rate</td><td>&lt;3%</td><td>Prometheus <code>orbit_hallucination_validations_total</code></td></tr>
-<tr><td>幻觉拦截率 Interception</td><td>≥98%</td><td>9 层防幻觉复合</td></tr>
-<tr><td>熔断决策延迟 Breaker decision</td><td>≤12ms</td><td>纯内存判断</td></tr>
-<tr><td>图谱查询延迟 Graph query</td><td>&lt;50ms</td><td>SQLite 索引</td></tr>
-<tr><td>CI 覆盖率门禁 Coverage gate</td><td>≥80%</td><td><code>pytest --cov-fail-under=80</code></td></tr>
-<tr><td>单任务 Token（设计目标）</td><td>≤35</td><td>LiteLLM usage 统计</td></tr>
-<tr><td>源码模块 Modules</td><td>48</td><td><code>src/orbit/</code></td></tr>
-<tr><td>测试文件 Test files</td><td>~300</td><td><code>tests/</code></td></tr>
+<tr><td>调度层延迟<span class="en">Scheduling latency</span></td><td>≤1500ms（预警 1200ms）<span class="en">≤1500ms (warning at 1200ms)</span></td><td>Prometheus <code>orbit_scheduling_latency_seconds</code></td></tr>
+<tr><td>幻觉率<span class="en">Hallucination rate</span></td><td>&lt;3%</td><td>Prometheus <code>orbit_hallucination_validations_total</code></td></tr>
+<tr><td>幻觉拦截率<span class="en">Interception rate</span></td><td>≥98%</td><td>9 层防幻觉复合<span class="en">9-layer hallucination defense combined</span></td></tr>
+<tr><td>熔断决策延迟<span class="en">Breaker decision latency</span></td><td>≤12ms</td><td>纯内存判断<span class="en">Pure in-memory decision</span></td></tr>
+<tr><td>图谱查询延迟<span class="en">Graph query latency</span></td><td>&lt;50ms</td><td>SQLite 索引<span class="en">SQLite index</span></td></tr>
+<tr><td>CI 覆盖率门禁<span class="en">Coverage gate</span></td><td>≥80%</td><td><code>pytest --cov-fail-under=80</code></td></tr>
+<tr><td>单任务 Token（设计目标）<span class="en">Token per task (design target)</span></td><td>≤35</td><td>LiteLLM usage 统计<span class="en">LiteLLM usage statistics</span></td></tr>
+<tr><td>源码模块<span class="en">Source modules</span></td><td>48</td><td><code>src/orbit/</code></td></tr>
+<tr><td>测试文件<span class="en">Test files</span></td><td>~359</td><td><code>tests/</code></td></tr>
 </tbody></table>
-<h2 id="0-4-与单-agent-工具的定位差异-positioning-vs-single-agent-tools">0.4 与单 Agent 工具的定位差异 · Positioning vs Single-Agent Tools</h2>
+<h2 id="0-4-与单-agent-工具的定位差异-positioning-vs-single-agent-tools">0.4 与单 Agent 工具的定位差异<span class="en">Positioning vs Single-Agent Tools</span></h2>
 <table>
 <thead><tr>
-<th>维度</th>
-<th>自研调度器 Orbit</th>
-<th>黑盒框架（如 CrewAI）</th>
+<th>维度<span class="en">Dimension</span></th>
+<th>自研调度器 Orbit<span class="en">Self-built Scheduler Orbit</span></th>
+<th>黑盒框架（如 CrewAI）<span class="en">Black-box framework (e.g., CrewAI)</span></th>
 </tr></thead><tbody>
-<tr><td>单任务 Token</td><td>≤35（目标）</td><td>~4.5K（基准）</td></tr>
-<tr><td>单次运行耗时</td><td>~1.5s（目标，不含验证）</td><td>~32s（含验证）</td></tr>
-<tr><td>可控性</td><td>完全可审计、可修改</td><td>黑盒调度，难审计</td></tr>
-<tr><td>内存占用</td><td>~50MB</td><td>~200MB 框架开销</td></tr>
+<tr><td>单任务 Token<span class="en">Token per task</span></td><td>≤35（目标）<span class="en">≤35 (target)</span></td><td>~4.5K（基准）<span class="en">~4.5K (baseline)</span></td></tr>
+<tr><td>单次运行耗时<span class="en">Latency per run</span></td><td>~1.5s（目标，不含验证）<span class="en">~1.5s (target, without validation)</span></td><td>~32s（含验证）<span class="en">~32s (with validation)</span></td></tr>
+<tr><td>可控性<span class="en">Controllability</span></td><td>完全可审计、可修改<span class="en">Fully auditable, modifiable</span></td><td>黑盒调度，难审计<span class="en">Black-box scheduling, hard to audit</span></td></tr>
+<tr><td>内存占用<span class="en">Memory footprint</span></td><td>~50MB</td><td>~200MB 框架开销<span class="en">~200MB framework overhead</span></td></tr>
 </tbody></table>
-<blockquote>数据来源：<a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:83-91</code></a>。选择自研而非现成框架的完整论证见 <a href="01-design-philosophy.html">01 设计哲学 §1.3</a>。</blockquote>
-<h2 id="0-5-技术栈全景-technology-stack">0.5 技术栈全景 · Technology Stack</h2>
+<blockquote>数据来源：<a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:83-91</code></a>。选择自研而非现成框架的完整论证见 <a href="01-design-philosophy.html">01 设计哲学 §1.3</a>。<span class="en">Source: <a href="../开发计划/00-架构总览.html"><code>docs/开发计划/00-架构总览.md:83-91</code></a>. Full rationale for choosing self-built over off-the-shelf frameworks is in <a href="01-design-philosophy.html">01 Design Philosophy §1.3</a>.</span></blockquote>
+<h2 id="0-5-技术栈全景-technology-stack">0.5 技术栈全景<span class="en">Technology Stack</span></h2>
 <table>
 <thead><tr>
-<th>层级 Layer</th>
-<th>组件 Component</th>
-<th>版本 Version</th>
+<th>层级<span class="en">Layer</span></th>
+<th>组件<span class="en">Component</span></th>
+<th>版本<span class="en">Version</span></th>
 </tr></thead><tbody>
-<tr><td>主语言 Language</td><td>Python</td><td>3.11–3.13</td></tr>
-<tr><td>包管理 Packaging</td><td>Poetry</td><td>1.8.2</td></tr>
-<tr><td>LLM 网关 Gateway</td><td>LiteLLM</td><td>≥1.40</td></tr>
+<tr><td>主语言<span class="en">Language</span></td><td>Python</td><td>3.11–3.13</td></tr>
+<tr><td>包管理<span class="en">Packaging</span></td><td>Poetry</td><td>1.8.2</td></tr>
+<tr><td>LLM 网关<span class="en">Gateway</span></td><td>LiteLLM</td><td>≥1.40</td></tr>
 <tr><td>API</td><td>FastAPI + Pydantic v2 + Uvicorn</td><td>≥0.110</td></tr>
 <tr><td>ORM</td><td>SQLAlchemy 2.0.25 + Alembic 1.13</td><td>—</td></tr>
-<tr><td>代码图谱 Code graph</td><td>CodeGraph（Tree-sitter）</td><td>latest</td></tr>
-<tr><td>审计存储 Audit store</td><td>PostgreSQL + Redis</td><td>≥15 / ≥7</td></tr>
-<tr><td>沙箱 Sandbox</td><td>Docker Engine</td><td>≥24</td></tr>
-<tr><td>前端 Frontend</td><td>Vue3 + Pinia + Tailwind v4</td><td>≥3.4</td></tr>
-<tr><td>桌面壳 Desktop shell</td><td>Tauri (Rust WebView2)</td><td>latest</td></tr>
-<tr><td>测试 Testing</td><td>pytest / pytest-asyncio / mutmut / Playwright</td><td>≥8.0</td></tr>
+<tr><td>代码图谱<span class="en">Code graph</span></td><td>CodeGraph（Tree-sitter）</td><td>latest</td></tr>
+<tr><td>审计存储<span class="en">Audit store</span></td><td>PostgreSQL + Redis</td><td>≥15 / ≥7</td></tr>
+<tr><td>沙箱<span class="en">Sandbox</span></td><td>Docker Engine</td><td>≥24</td></tr>
+<tr><td>前端<span class="en">Frontend</span></td><td>Vue3 + Pinia + Tailwind v4</td><td>≥3.4</td></tr>
+<tr><td>桌面壳<span class="en">Desktop shell</span></td><td>Tauri (Rust WebView2)</td><td>latest</td></tr>
+<tr><td>测试<span class="en">Testing</span></td><td>pytest / pytest-asyncio / mutmut / Playwright</td><td>≥8.0</td></tr>
 </tbody></table>
-<p>完整技术方案见 <a href="04-technical-stack.html">04 技术方案</a>。</p>
-<h2 id="0-6-全景速览图-bird-s-eye-view">0.6 全景速览图 · Bird's-Eye View</h2>
+<p>完整技术方案见 <a href="04-technical-stack.html">04 技术方案<span class="en">Technical Design</span></a>。<span class="en">For the full technical design, see <a href="04-technical-stack.html">04 Technical Design</a>.</span></p>
+<h2 id="0-6-全景速览图-bird-s-eye-view">0.6 全景速览图<span class="en">Bird's-Eye View</span></h2>
 <pre><code>                     ┌─────────────────────────────────────────────┐
   用户/User ──REST──▶ │  FastAPI (api/)  ·  WebSocket 驾驶舱 (ws/)   │
                      └───────────────┬─────────────────────────────┘
@@ -132,7 +134,6 @@ ul { padding-left:1.5em; }
                     │ 审计链 task_audit_trail (observability/) │
                     └─────────────────────────────┘</code></pre>
 <hr>
-<p><a href="README.html">← 返回目录</a> · <a href="01-design-philosophy.html">下一章：设计哲学 →</a></p>
-<p>&lt;/content&gt;</p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="01-design-philosophy.html">下一章：设计哲学 →<span class="en">Next: Design Philosophy →</span></a></p>
 </main></body>
 </html>

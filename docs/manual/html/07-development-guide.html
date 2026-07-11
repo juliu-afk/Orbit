@@ -32,95 +32,99 @@ th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
 th { background:var(--code-bg); }
 hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
 ul { padding-left:1.5em; }
+.en { display:block; font-size:.82em; font-weight:400; color:var(--muted);
+      line-height:1.45; margin-top:.15em; }
+h1 .en, h2 .en, h3 .en, h4 .en { font-size:.6em; margin-top:.2em; }
+th .en, td .en { font-size:.8em; }
 </style>
 </head>
 <body><main>
-<h1 id="07-再开发说明-development-guide">07 · 再开发说明 · Development Guide</h1>
-<p><a href="README.html">← 返回目录 Back to index</a> · <a href="06-api-reference.html">← 上一章 API 参考</a></p>
-<blockquote>面向开发者：怎么改、怎么加功能、怎么测、怎么构建交付。完整流程见 <a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a> 与 <a href="../../CONTRIBUTING.html"><code>CONTRIBUTING.md</code></a>。</blockquote>
+<h1 id="07-再开发说明-development-guide">07 · 再开发说明<span class="en">Development Guide</span></h1>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="06-api-reference.html">← 上一章：API 参考<span class="en">Prev: API Reference</span></a></p>
+<blockquote>面向开发者：怎么改、怎么加功能、怎么测、怎么构建交付。完整流程见 <a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a> 与 <a href="../../CONTRIBUTING.html"><code>CONTRIBUTING.md</code></a>。<span class="en">For developers: how to modify, add features, test, and build for delivery. See <a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a> and <a href="../../CONTRIBUTING.html"><code>CONTRIBUTING.md</code></a> for the complete workflow.</span></blockquote>
 <hr>
-<h2 id="7-1-四阶段开发流程-the-four-stage-workflow">7.1 四阶段开发流程 · The Four-Stage Workflow</h2>
-<p><strong>核心规则</strong>：每阶段结束<strong>必须等用户显式确认</strong>后方可进入下一阶段。"慢就是快"——阶段 1–2 对齐需求优先，写完再改不被允许。</p>
+<h2 id="7-1-四阶段开发流程-the-four-stage-workflow">7.1 四阶段开发流程<span class="en">The Four-Stage Workflow</span></h2>
+<p><strong>核心规则</strong>：每阶段结束<strong>必须等用户显式确认</strong>后方可进入下一阶段。"慢就是快"——阶段 1–2 对齐需求优先，写完再改不被允许。<span class="en"><strong>Core rule</strong>: Each stage <strong>must wait for explicit user confirmation</strong> before proceeding to the next. "Slow is fast" — aligning requirements in stages 1–2 takes priority; writing first and revising later is not allowed.</span></p>
 <pre><code>阶段1 需求澄清 → 阶段2 技术方案 → 阶段3 编码实现 → 阶段3b 代码审查 → 阶段4 验证交付</code></pre>
-<h3 id="阶段-1-需求澄清-阶段1-prd-xxx-md">阶段 1：需求澄清 → <code>阶段1-PRD-xxx.md</code></h3>
-<p>结构化 PRD（背景 / 用户故事 P0–P2 / 验收标准 / 待确认问题 / Non-Goals）。</p>
-<p>领域特化必须评估：调度器影响（状态转换/检查点/回滚/并发）、防幻觉影响（L1–L8 判定逻辑）、图谱影响（查询接口/存储格式/跨图谱协作）、边缘情况（LLM 超时、沙箱失败、空结果、竞态、回滚冲突）。</p>
-<p><strong>Bug 门禁</strong>：必须先复现再动代码，复现步骤记入 PRD。</p>
-<h3 id="阶段-2-技术方案-阶段2-技术方案-xxx-md">阶段 2：技术方案 → <code>阶段2-技术方案-xxx.md</code></h3>
-<p><strong>10 项必填要素，缺一不通过</strong>：</p>
+<h3 id="阶段-1-需求澄清-阶段1-prd-xxx-md-stage-1-requirement-clarification-阶段1-prd-xxx-md">阶段 1：需求澄清 → <code>阶段1-PRD-xxx.md</code><span class="en">Stage 1: Requirement Clarification → <code>阶段1-PRD-xxx.md</code></span></h3>
+<p>结构化 PRD（背景 / 用户故事 P0–P2 / 验收标准 / 待确认问题 / Non-Goals）。<span class="en">Structured PRD (background / user stories P0–P2 / acceptance criteria / open questions / Non-Goals).</span></p>
+<p>领域特化必须评估：调度器影响（状态转换/检查点/回滚/并发）、防幻觉影响（L1–L8 判定逻辑）、图谱影响（查询接口/存储格式/跨图谱协作）、边缘情况（LLM 超时、沙箱失败、空结果、竞态、回滚冲突）。<span class="en">Domain-specific assessment required: scheduler impact (state transitions/checkpoints/rollback/concurrency), anti-hallucination impact (L1–L8 judgment logic), graph impact (query interfaces/storage formats/cross-graph collaboration), edge cases (LLM timeout, sandbox failure, empty results, race conditions, rollback conflicts).</span></p>
+<p><strong>Bug 门禁</strong>：必须先复现再动代码，复现步骤记入 PRD。<span class="en"><strong>Bug gate</strong>: Must reproduce before touching code; reproduction steps recorded in the PRD.</span></p>
+<h3 id="阶段-2-技术方案-阶段2-技术方案-xxx-md-stage-2-technical-design-阶段2-技术方案-xxx-md">阶段 2：技术方案 → <code>阶段2-技术方案-xxx.md</code><span class="en">Stage 2: Technical Design → <code>阶段2-技术方案-xxx.md</code></span></h3>
+<p><strong>10 项必填要素，缺一不通过</strong>：<span class="en"><strong>10 required elements, all mandatory</strong>:</span></p>
 <ul>
-<li>PRD 对照表（逐条验收标准→方案覆盖，偏离标红）</li>
-<li>API 设计（端点、Pydantic 模型、错误码）</li>
-<li>数据模型（SQLAlchemy 2.0、Alembic 迁移方向、索引）</li>
-<li>数据流（API→调度器→Agent→图谱→防幻觉→沙箱→审计）</li>
-<li>调度器状态变更（新增/修改状态、转换条件、检查点策略、回滚路径）</li>
-<li>防幻觉层影响（哪些层受影响、判定变化、误报漏报风险）</li>
-<li>图谱 Schema 变更（CodeGraph SQLite 表结构、查询接口变化）</li>
-<li>边界 case 清单（硬性，缺失即退回）</li>
-<li>风险与缓解（至少 3 条：性能/正确性/可维护性各一）</li>
-<li>依赖链（新增/变更内外部依赖）</li>
+<li>PRD 对照表（逐条验收标准→方案覆盖，偏离标红）<span class="en">PRD cross-reference (each acceptance criterion → design coverage, deviations marked in red)</span></li>
+<li>API 设计（端点、Pydantic 模型、错误码）<span class="en">API design (endpoints, Pydantic models, error codes)</span></li>
+<li>数据模型（SQLAlchemy 2.0、Alembic 迁移方向、索引）<span class="en">Data model (SQLAlchemy 2.0, Alembic migration direction, indexes)</span></li>
+<li>数据流（API→调度器→Agent→图谱→防幻觉→沙箱→审计）<span class="en">Data flow (API → scheduler → Agent → graph → anti-hallucination → sandbox → audit)</span></li>
+<li>调度器状态变更（新增/修改状态、转换条件、检查点策略、回滚路径）<span class="en">Scheduler state changes (new/modified states, transition conditions, checkpoint strategy, rollback paths)</span></li>
+<li>防幻觉层影响（哪些层受影响、判定变化、误报漏报风险）<span class="en">Anti-hallucination layer impact (which layers affected, judgment changes, false-positive/false-negative risks)</span></li>
+<li>图谱 Schema 变更（CodeGraph SQLite 表结构、查询接口变化）<span class="en">Graph schema changes (CodeGraph SQLite table structure, query interface changes)</span></li>
+<li>边界 case 清单（硬性，缺失即退回）<span class="en">Edge-case checklist (mandatory, missing items result in rejection)</span></li>
+<li>风险与缓解（至少 3 条：性能/正确性/可维护性各一）<span class="en">Risks and mitigations (at least 3: one each for performance/correctness/maintainability)</span></li>
+<li>依赖链（新增/变更内外部依赖）<span class="en">Dependency chain (new/changed internal and external dependencies)</span></li>
 </ul>
-<h3 id="阶段-3-编码实现-阶段3-实现记录-xxx-md">阶段 3：编码实现 → <code>阶段3-实现记录-xxx.md</code></h3>
-<p>feature 分支开发，Conventional Commits，commit 注明对应 Step。按方案实现，不做方案外改动。每个文件改完展示 diff → 用户审查 → 进入 3b。</p>
-<h3 id="阶段-3b-代码审查-强制">阶段 3b：代码审查（强制）</h3>
-<p>审查维度（致命项必须修，最多 3 轮）：</p>
+<h3 id="阶段-3-编码实现-阶段3-实现记录-xxx-md-stage-3-implementation-阶段3-实现记录-xxx-md">阶段 3：编码实现 → <code>阶段3-实现记录-xxx.md</code><span class="en">Stage 3: Implementation → <code>阶段3-实现记录-xxx.md</code></span></h3>
+<p>feature 分支开发，Conventional Commits，commit 注明对应 Step。按方案实现，不做方案外改动。每个文件改完展示 diff → 用户审查 → 进入 3b。<span class="en">Develop on feature branches, Conventional Commits, each commit indicates the corresponding Step. Implement per the design, no out-of-scope changes. Show diff after each file change → user review → proceed to 3b.</span></p>
+<h3 id="阶段-3b-代码审查-强制-stage-3b-code-review-mandatory">阶段 3b：代码审查（强制）<span class="en">Stage 3b: Code Review (Mandatory)</span></h3>
+<p>审查维度（致命项必须修，最多 3 轮）：<span class="en">Review dimensions (critical items must be fixed, max 3 rounds):</span></p>
 <table>
 <thead><tr>
-<th>维度</th>
-<th>检查项</th>
-<th>严重度</th>
+<th>维度<span class="en">Dimension</span></th>
+<th>检查项<span class="en">Check Item</span></th>
+<th>严重度<span class="en">Severity</span></th>
 </tr></thead><tbody>
-<tr><td>安全</td><td>SQL 注入/XSS/命令注入/硬编码密钥</td><td>致命</td></tr>
-<tr><td>调度器</td><td>状态转换完整性/检查点策略/回滚路径</td><td>致命</td></tr>
-<tr><td>防幻觉</td><td>L1–L8 链路影响/误报漏报风险</td><td>致命</td></tr>
-<tr><td>方案偏差</td><td>是否按阶段 2 方案实现</td><td>严重</td></tr>
-<tr><td>回溯一致性</td><td>代码→方案→PRD 可追溯</td><td>严重</td></tr>
-<tr><td>测试覆盖</td><td>核心模块正 + 异常用例</td><td>严重</td></tr>
-<tr><td>代码质量</td><td>三行相似不抽象/边界条件</td><td>一般</td></tr>
+<tr><td>安全<span class="en">Security</span></td><td>SQL 注入/XSS/命令注入/硬编码密钥<span class="en">SQL injection/XSS/command injection/hardcoded keys</span></td><td>致命<span class="en">Critical</span></td></tr>
+<tr><td>调度器<span class="en">Scheduler</span></td><td>状态转换完整性/检查点策略/回滚路径<span class="en">State transition completeness/checkpoint strategy/rollback paths</span></td><td>致命<span class="en">Critical</span></td></tr>
+<tr><td>防幻觉<span class="en">Anti-hallucination</span></td><td>L1–L8 链路影响/误报漏报风险<span class="en">L1–L8 chain impact/false-positive/false-negative risks</span></td><td>致命<span class="en">Critical</span></td></tr>
+<tr><td>方案偏差<span class="en">Design deviation</span></td><td>是否按阶段 2 方案实现<span class="en">Whether implemented per stage-2 design</span></td><td>严重<span class="en">Major</span></td></tr>
+<tr><td>回溯一致性<span class="en">Traceability consistency</span></td><td>代码→方案→PRD 可追溯<span class="en">Code → design → PRD traceable</span></td><td>严重<span class="en">Major</span></td></tr>
+<tr><td>测试覆盖<span class="en">Test coverage</span></td><td>核心模块正 + 异常用例<span class="en">Core module positive + error cases</span></td><td>严重<span class="en">Major</span></td></tr>
+<tr><td>代码质量<span class="en">Code quality</span></td><td>三行相似不抽象/边界条件<span class="en">Three similar lines → refactor/boundary conditions</span></td><td>一般<span class="en">Minor</span></td></tr>
 </tbody></table>
-<p>审查方式：核心模块强制 <code>/ce-code-review</code>（12 Agent 并行）；非核心可选 <code>/code-review</code>（轻量）。</p>
-<h3 id="阶段-4-验证交付-阶段4-测试报告-xxx-md">阶段 4：验证交付 → <code>阶段4-测试报告-xxx.md</code></h3>
-<p>测试决策树 + 9 项门禁（见 §7.3）。全绿方可 PR 合入。</p>
-<h2 id="7-2-模块地图速查-module-map">7.2 模块地图速查 · Module Map</h2>
-<p>完整职责表见 <a href="02-architecture.html#23-模块地图--module-map">02 整体架构 §2.3</a>。核心模块改动触发强制回归：</p>
+<p>审查方式：核心模块强制 <code>/ce-code-review</code>（12 Agent 并行）；非核心可选 <code>/code-review</code>（轻量）。<span class="en">Review method: core modules mandatory <code>/ce-code-review</code> (12 parallel Agents); non-core optional <code>/code-review</code> (lightweight).</span></p>
+<h3 id="阶段-4-验证交付-阶段4-测试报告-xxx-md-stage-4-validation-delivery-阶段4-测试报告-xxx-md">阶段 4：验证交付 → <code>阶段4-测试报告-xxx.md</code><span class="en">Stage 4: Validation &amp; Delivery → <code>阶段4-测试报告-xxx.md</code></span></h3>
+<p>测试决策树 + 9 项门禁（见 §7.3）。全绿方可 PR 合入。<span class="en">Test decision tree + 9 gates (see §7.3). All green before PR merge.</span></p>
+<h2 id="7-2-模块地图速查-module-map">7.2 模块地图速查<span class="en">Module Map</span></h2>
+<p>完整职责表见 <a href="02-architecture.html#23-模块地图--module-map">02 整体架构 §2.3</a>。核心模块改动触发强制回归：<span class="en">See <a href="02-architecture.html#23-模块地图--module-map">Architecture §2.3</a> for the full responsibility table. Core module changes trigger mandatory regression:</span></p>
 <table>
 <thead><tr>
-<th>核心模块</th>
-<th>改动触发</th>
+<th>核心模块<span class="en">Core Module</span></th>
+<th>改动触发<span class="en">Change Trigger</span></th>
 </tr></thead><tbody>
-<tr><td><code>scheduler/</code></td><td>状态转换/检查点/回滚全路径回归</td></tr>
-<tr><td><code>hallucination/</code> + <code>compliance/</code></td><td>每层独立验证（误报/漏报各一）</td></tr>
-<tr><td><code>graph/</code></td><td>跨图谱协作查询回归</td></tr>
-<tr><td><code>gateway/</code></td><td>LLM 路由 + 降级回归</td></tr>
+<tr><td><code>scheduler/</code></td><td>状态转换/检查点/回滚全路径回归<span class="en">Full-path regression for state transitions/checkpoints/rollback</span></td></tr>
+<tr><td><code>hallucination/</code> + <code>compliance/</code></td><td>每层独立验证（误报/漏报各一）<span class="en">Each layer independently verified (one false-positive, one false-negative)</span></td></tr>
+<tr><td><code>graph/</code></td><td>跨图谱协作查询回归<span class="en">Cross-graph collaboration query regression</span></td></tr>
+<tr><td><code>gateway/</code></td><td>LLM 路由 + 降级回归<span class="en">LLM routing + fallback regression</span></td></tr>
 </tbody></table>
-<h2 id="7-3-测试体系-testing">7.3 测试体系 · Testing</h2>
+<h2 id="7-3-测试体系-testing">7.3 测试体系<span class="en">Testing</span></h2>
 <table>
 <thead><tr>
-<th>层级</th>
-<th>目录</th>
-<th>文件数</th>
-<th>命令</th>
-<th>时长</th>
+<th>层级<span class="en">Level</span></th>
+<th>目录<span class="en">Directory</span></th>
+<th>文件数<span class="en">File Count</span></th>
+<th>命令<span class="en">Command</span></th>
+<th>时长<span class="en">Duration</span></th>
 </tr></thead><tbody>
-<tr><td>单元</td><td><code>tests/unit/</code></td><td>~255</td><td><code>pytest tests/unit/ -q</code></td><td>秒级</td></tr>
-<tr><td>集成</td><td><code>tests/integration/</code></td><td>12</td><td><code>pytest tests/integration/ -q</code></td><td>≤1min</td></tr>
-<tr><td>冒烟</td><td><code>tests/e2e/</code></td><td>11</td><td><code>pytest tests/e2e/ -q -k "smoke"</code></td><td>≤2min</td></tr>
-<tr><td>回归</td><td><code>tests/e2e/</code></td><td>11</td><td><code>pytest tests/e2e/ -q</code></td><td>≤10min</td></tr>
-<tr><td>变异</td><td>—</td><td>—</td><td><code>mutmut run</code></td><td>按需</td></tr>
-<tr><td>混沌</td><td><code>tests/chaos/</code></td><td>2</td><td><code>tox -e chaos</code></td><td>按需</td></tr>
-<tr><td>其他</td><td><code>acceptance/ effectiveness/ perf/ ab/ stress/</code></td><td>—</td><td>—</td><td>按需</td></tr>
+<tr><td>单元<span class="en">Unit</span></td><td><code>tests/unit/</code></td><td>~270</td><td><code>pytest tests/unit/ -q</code></td><td>秒级<span class="en">Seconds</span></td></tr>
+<tr><td>集成<span class="en">Integration</span></td><td><code>tests/integration/</code></td><td>15</td><td><code>pytest tests/integration/ -q</code></td><td>≤1min</td></tr>
+<tr><td>冒烟<span class="en">Smoke</span></td><td><code>tests/e2e/</code></td><td>11</td><td><code>pytest tests/e2e/ -q -k "smoke"</code></td><td>≤2min</td></tr>
+<tr><td>回归<span class="en">Regression</span></td><td><code>tests/e2e/</code></td><td>11</td><td><code>pytest tests/e2e/ -q</code></td><td>≤10min</td></tr>
+<tr><td>变异<span class="en">Mutation</span></td><td>—</td><td>—</td><td><code>mutmut run</code></td><td>按需<span class="en">On demand</span></td></tr>
+<tr><td>混沌<span class="en">Chaos</span></td><td><code>tests/chaos/</code></td><td>2</td><td><code>tox -e chaos</code></td><td>按需<span class="en">On demand</span></td></tr>
+<tr><td>其他<span class="en">Other</span></td><td><code>acceptance/</code> <code>effectiveness/</code> <code>perf/</code> <code>ab/</code> <code>stress/</code></td><td>—</td><td>—</td><td>按需<span class="en">On demand</span></td></tr>
 </tbody></table>
-<p><strong>测试工具库</strong> <code>tests/lib/</code>：<code>assertions/</code>（网关/防幻觉/沙箱/任务断言）、<code>builders/</code>（chat/dag/goal/task 链）、<code>factories/</code>（agent/audit/checkpoint/…）、<code>mocks/</code>（checkpoint/circuit_breaker/code_graph/…）、<code>scenarios/</code>（6 场景：正常/熔断/检查点恢复/并发/边界/防幻觉/沙箱隔离）。</p>
-<p><strong>覆盖率门禁</strong>：≥80%（CI <code>--cov-fail-under</code>），调度器/防幻觉纯函数 100%。10 个自定义 pytest marker（<code>scenario_*</code> 系列）。</p>
-<p><strong>新功能测试强制规则</strong>：</p>
+<p><strong>测试工具库</strong> <code>tests/lib/</code>：<code>assertions/</code>（网关/防幻觉/沙箱/任务断言）、<code>builders/</code>（chat/dag/goal/task 链）、<code>factories/</code>（agent/audit/checkpoint/…）、<code>mocks/</code>（checkpoint/circuit_breaker/code_graph/…）、<code>scenarios/</code>（6 场景：正常/熔断/检查点恢复/并发/边界/防幻觉/沙箱隔离）。<span class="en"><strong>Test library</strong> <code>tests/lib/</code>: <code>assertions/</code> (gateway/anti-hallucination/sandbox/task assertions), <code>builders/</code> (chat/dag/goal/task chain), <code>factories/</code> (agent/audit/checkpoint/…), <code>mocks/</code> (checkpoint/circuit_breaker/code_graph/…), <code>scenarios/</code> (6 scenarios: normal/breaker/checkpoint-recovery/concurrency/boundary/anti-hallucination/sandbox-isolation).</span></p>
+<p><strong>覆盖率门禁</strong>：≥80%（CI <code>--cov-fail-under</code>），调度器/防幻觉纯函数 100%。10 个自定义 pytest marker（<code>scenario_*</code> 系列）。<span class="en"><strong>Coverage gate</strong>: ≥80% (CI <code>--cov-fail-under</code>), scheduler/anti-hallucination pure functions 100%. 10 custom pytest markers (<code>scenario_*</code> series).</span></p>
+<p><strong>新功能测试强制规则</strong>：<span class="en"><strong>Mandatory testing rules for new features</strong>:</span></p>
 <ul>
-<li>新增 API 端点 → 至少 1 集成测试</li>
-<li>新增调度器状态 → 覆盖所有转换路径</li>
-<li>新增防幻觉层规则 → 正向 + 异常（误报/漏报各一）</li>
-<li>Bug 修复 → 1 条 <code>test_regression_</code> 用例（先复现→失败→修→通过）</li>
+<li>新增 API 端点 → 至少 1 集成测试<span class="en">New API endpoint → at least 1 integration test</span></li>
+<li>新增调度器状态 → 覆盖所有转换路径<span class="en">New scheduler state → cover all transition paths</span></li>
+<li>新增防幻觉层规则 → 正向 + 异常（误报/漏报各一）<span class="en">New anti-hallucination layer rule → positive + error (one false-positive, one false-negative)</span></li>
+<li>Bug 修复 → 1 条 <code>test_regression_</code> 用例（先复现→失败→修→通过）<span class="en">Bug fix → 1 <code>test_regression_</code> case (reproduce → fail → fix → pass)</span></li>
 </ul>
-<h2 id="7-4-exe-构建链路-desktop-build">7.4 exe 构建链路 · Desktop Build</h2>
-<p><strong>两段式：PyInstaller（后端）+ Tauri（桌面壳）</strong>。命令：<code>bash scripts/build-desktop.sh</code> 或 <code>make exe</code>。</p>
+<h2 id="7-4-exe-构建链路-desktop-build">7.4 exe 构建链路<span class="en">Desktop Build</span></h2>
+<p><strong>两段式：PyInstaller（后端）+ Tauri（桌面壳）</strong>。命令：<code>bash scripts/build-desktop.sh</code> 或 <code>make exe</code>。<span class="en"><strong>Two-stage: PyInstaller (backend) + Tauri (desktop shell)</strong>. Command: <code>bash scripts/build-desktop.sh</code> or <code>make exe</code>.</span></p>
 <pre><code>[1] 前端构建          frontend/ → pnpm build → frontend/dist/
 [2] 复制静态文件       frontend/dist/* → backend/static/
 [3] PyInstaller 后端   orbit.launcher:main → Deliverables/Orbit-backend.exe（~39MB）
@@ -129,67 +133,66 @@ ul { padding-left:1.5em; }
 [6] API 冒烟           smoke_test.py（startup-probe + health + chat WS）
 [7] 代码签名（可选）    signtool（需 CODE_SIGN_CERT + CODE_SIGN_PASSWORD）</code></pre>
 <ul>
-<li>仅前端改动：跳步骤 3，只 1+2+5。</li>
-<li>仅后端改动：必须完整 1→2→3→4→5。</li>
-<li>构建前强制 <code>python scripts/check_spec.py</code>（5 项检查）。</li>
+<li>仅前端改动：跳步骤 3，只 1+2+5。<span class="en">Frontend-only changes: skip step 3, only 1+2+5.</span></li>
+<li>仅后端改动：必须完整 1→2→3→4→5。<span class="en">Backend-only changes: full 1→2→3→4→5 required.</span></li>
+<li>构建前强制 <code>python scripts/check_spec.py</code>（5 项检查）。<span class="en">Pre-build: <code>python scripts/check_spec.py</code> mandatory (5 checks).</span></li>
 </ul>
-<h3 id="orbit-spec-约束-backend-orbit-spec-backend-orbit-spec">orbit.spec 约束（<a href="../../backend/orbit.spec"><code>backend/orbit.spec</code></a>）</h3>
+<h3 id="orbit-spec-约束-backend-orbit-spec-orbit-spec-constraints-backend-orbit-spec">orbit.spec 约束（<code>backend/orbit.spec</code>）<span class="en">orbit.spec Constraints (<code>backend/orbit.spec</code>)</span></h3>
 <ul>
-<li>入口 <code>src/orbit/launcher.py</code>（隐式 import 所有 <code>api.routes.*</code>）。</li>
-<li><code>_discover_orbit_modules()</code> 递归扫描 <code>src/orbit/</code> 所有 <code>.py</code>，跳过 <code>__pycache__</code>/<code>.venv</code>/<code>test_</code>/<code>_</code> 前缀。</li>
-<li>手动 <code>_HIDDEN_IMPORTS</code>：基础设施 + 命名空间包（uvicorn/aiosqlite/tiktoken_ext/metacognition/evolution/agents.reflection…）。</li>
-<li>数据文件：<code>certifi/cacert.pem</code> + <code>litellm/model_prices*.json</code>。</li>
-<li>hook：<code>backend/hooks/hook-litellm.py</code>（递归收集 litellm 全部 .py + .json）。</li>
-<li><code>console=False</code>（Tauri 提供窗口）。</li>
+<li>入口 <code>src/orbit/launcher.py</code>（隐式 import 所有 <code>api.routes.*</code>）。<span class="en">Entry: <code>src/orbit/launcher.py</code> (implicitly imports all <code>api.routes.*</code>).</span></li>
+<li><code>_discover_orbit_modules()</code> 递归扫描 <code>src/orbit/</code> 所有 <code>.py</code>，跳过 <code>__pycache__</code>/<code>.venv</code>/<code>test_</code>/<code>_</code> 前缀。<span class="en"><code>_discover_orbit_modules()</code> recursively scans all <code>.py</code> files under <code>src/orbit/</code>, skipping <code>__pycache__</code>/<code>.venv</code>/<code>test_</code>/<code>_</code> prefixes.</span></li>
+<li>手动 <code>_HIDDEN_IMPORTS</code>：基础设施 + 命名空间包（uvicorn/aiosqlite/tiktoken_ext/metacognition/evolution/agents.reflection…）。<span class="en">Manual <code>_HIDDEN_IMPORTS</code>: infrastructure + namespace packages (uvicorn/aiosqlite/tiktoken_ext/metacognition/evolution/agents.reflection…).</span></li>
+<li>数据文件：<code>certifi/cacert.pem</code> + <code>litellm/model_prices*.json</code>。<span class="en">Data files: <code>certifi/cacert.pem</code> + <code>litellm/model_prices*.json</code>.</span></li>
+<li>hook：<code>backend/hooks/hook-litellm.py</code>（递归收集 litellm 全部 .py + .json）。<span class="en">Hook: <code>backend/hooks/hook-litellm.py</code> (recursively collects all litellm .py + .json).</span></li>
+<li><code>console=False</code>（Tauri 提供窗口）。<span class="en"><code>console=False</code> (Tauri provides the window).</span></li>
 </ul>
-<h3 id="常见失败模式">常见失败模式</h3>
+<h3 id="常见失败模式-common-failure-modes">常见失败模式<span class="en">Common Failure Modes</span></h3>
 <ul>
-<li><strong>新模块未加 hiddenimports</strong> → PyInstaller 漏打包（spec 自动扫描跳过懒 import）。</li>
-<li><strong><code>__pycache__</code> 残留</strong> → 运行时行为与源码不一致，构建前清理。</li>
-<li><strong>Vite 前端缓存</strong> → 产物不含最新改动，清 <code>frontend/dist/</code> + <code>.vite/</code>。</li>
-<li><strong>litellm 子模块遗漏</strong> → 1727+ 模块靠 hook 收集。</li>
-<li><strong>Tauri 内嵌 exe 未替换</strong>（跳步骤 4）→ cargo build 用旧后端。</li>
+<li><strong>新模块未加 hiddenimports</strong> → PyInstaller 漏打包（spec 自动扫描跳过懒 import）。<span class="en"><strong>New module missing from hiddenimports</strong> → PyInstaller misses it (spec auto-scan skips lazy imports).</span></li>
+<li><strong><code>__pycache__</code> 残留</strong> → 运行时行为与源码不一致，构建前清理。<span class="en"><strong><code>__pycache__</code> residue</strong> → runtime behavior diverges from source, clean before build.</span></li>
+<li><strong>Vite 前端缓存</strong> → 产物不含最新改动，清 <code>frontend/dist/</code> + <code>.vite/</code>。<span class="en"><strong>Vite frontend cache</strong> → output lacks latest changes, clear <code>frontend/dist/</code> + <code>.vite/</code>.</span></li>
+<li><strong>litellm 子模块遗漏</strong> → 1727+ 模块靠 hook 收集。<span class="en"><strong>Missing litellm submodules</strong> → 1727+ modules collected via hook.</span></li>
+<li><strong>Tauri 内嵌 exe 未替换</strong>（跳步骤 4）→ cargo build 用旧后端。<span class="en"><strong>Tauri embedded exe not replaced</strong> (skipped step 4) → cargo build uses old backend.</span></li>
 </ul>
-<h3 id="其他脚本-scripts">其他脚本 <code>scripts/</code></h3>
-<p><code>build_codex_context.py</code>（合并 CLAUDE/WORKFLOW→AGENTS.md）· <code>check_spec.py</code> · <code>smoke_test.py</code> · <code>check_effectiveness_ci.py</code> · <code>check_perf_thresholds.py</code> · <code>generate_benchmark.py</code> · <code>run_orbitbench.py</code> · <code>dr/recover.py</code>。</p>
-<h2 id="7-5-数据库迁移-migrations">7.5 数据库迁移 · Migrations</h2>
+<h3 id="其他脚本-scripts-other-scripts-scripts">其他脚本 <code>scripts/</code><span class="en">Other Scripts <code>scripts/</code></span></h3>
+<p><code>build_codex_context.py</code>（合并 CLAUDE/WORKFLOW→AGENTS.md）· <code>check_spec.py</code> · <code>smoke_test.py</code> · <code>check_effectiveness_ci.py</code> · <code>check_perf_thresholds.py</code> · <code>generate_benchmark.py</code> · <code>run_orbitbench.py</code> · <code>dr/recover.py</code>。<span class="en"><code>build_codex_context.py</code> (merges CLAUDE/WORKFLOW→AGENTS.md) · <code>check_spec.py</code> · <code>smoke_test.py</code> · <code>check_effectiveness_ci.py</code> · <code>check_perf_thresholds.py</code> · <code>generate_benchmark.py</code> · <code>run_orbitbench.py</code> · <code>dr/recover.py</code>.</span></p>
+<h2 id="7-5-数据库迁移-migrations">7.5 数据库迁移<span class="en">Migrations</span></h2>
 <ul>
-<li><strong>双轨制</strong>：SQL 原生脚本（<code>.sql</code>，数字编号 <code>NNN_desc.sql</code>）+ Alembic Python（<code>YYYYMMDD_desc.py</code>）。</li>
-<li>自动生成：<code>alembic revision --autogenerate -m "..."</code>。</li>
-<li>SQL 脚本必须 <code>IF NOT EXISTS</code>（可重复执行）；Alembic 脚本必须含可回滚 <code>downgrade()</code>。</li>
-<li><code>down_revision</code> 链条串联，禁止直接改数据库文件不写迁移脚本。</li>
+<li><strong>双轨制</strong>：SQL 原生脚本（<code>.sql</code>，数字编号 <code>NNN_desc.sql</code>）+ Alembic Python（<code>YYYYMMDD_desc.py</code>）。<span class="en"><strong>Dual-track</strong>: raw SQL scripts (<code>.sql</code>, numbered <code>NNN_desc.sql</code>) + Alembic Python (<code>YYYYMMDD_desc.py</code>).</span></li>
+<li>自动生成：<code>alembic revision --autogenerate -m "..."</code>。<span class="en">Auto-generate: <code>alembic revision --autogenerate -m "..."</code>.</span></li>
+<li>SQL 脚本必须 <code>IF NOT EXISTS</code>（可重复执行）；Alembic 脚本必须含可回滚 <code>downgrade()</code>。<span class="en">SQL scripts must use <code>IF NOT EXISTS</code> (idempotent); Alembic scripts must include a reversible <code>downgrade()</code>.</span></li>
+<li><code>down_revision</code> 链条串联，禁止直接改数据库文件不写迁移脚本。<span class="en"><code>down_revision</code> chain linked; direct database file modifications without migration scripts are prohibited.</span></li>
 </ul>
-<p>现有迁移：<code>002_goal_loop.sql</code>（Goal+Loop 表）· <code>003_trace_spans.sql</code>（Trace 表）· <code>20260707_add_severity_to_review_decisions.py</code> · <code>20260710_add_parent_id_to_code_nodes.py</code>。</p>
-<h2 id="7-6-贡献约定-conventions">7.6 贡献约定 · Conventions</h2>
+<p>现有迁移：<code>002_goal_loop.sql</code>（Goal+Loop 表）· <code>003_trace_spans.sql</code>（Trace 表）· <code>20260707_add_severity_to_review_decisions.py</code> · <code>20260710_add_parent_id_to_code_nodes.py</code>。<span class="en">Existing migrations: <code>002_goal_loop.sql</code> (Goal+Loop tables) · <code>003_trace_spans.sql</code> (Trace table) · <code>20260707_add_severity_to_review_decisions.py</code> · <code>20260710_add_parent_id_to_code_nodes.py</code>.</span></p>
+<h2 id="7-6-贡献约定-conventions">7.6 贡献约定<span class="en">Conventions</span></h2>
 <h3 id="git">Git</h3>
 <table>
 <thead><tr>
-<th>规则</th>
-<th>内容</th>
+<th>规则<span class="en">Rule</span></th>
+<th>内容<span class="en">Content</span></th>
 </tr></thead><tbody>
-<tr><td>分支命名</td><td><code>feat/&amp;lt;简称&amp;gt;</code> / <code>fix/&amp;lt;简称&amp;gt;</code></td></tr>
-<tr><td>master 保护</td><td>禁止直接 push master，走 PR</td></tr>
-<tr><td>Commit</td><td>Conventional Commits，subject ≤50 字符，作用域如 <code>feat(scheduler):</code></td></tr>
-<tr><td>绝对禁止</td><td><code>git push --force</code> / <code>+branch</code> / <code>--delete</code> / amend 已发布 commit / 向有开放 PR 的分支推送 / <code>git add -A</code></td></tr>
-<tr><td>版本号</td><td>SemVer，<code>git tag -a vX.Y.Z</code> + 更新 CHANGELOG.md</td></tr>
+<tr><td>分支命名<span class="en">Branch naming</span></td><td><code>feat/&lt;简称&gt;</code> / <code>fix/&lt;简称&gt;</code><span class="en"><code>feat/&lt;name&gt;</code> / <code>fix/&lt;name&gt;</code></span></td></tr>
+<tr><td>master 保护<span class="en">master protection</span></td><td>禁止直接 push master，走 PR<span class="en">Direct push to master prohibited, use PR</span></td></tr>
+<tr><td>Commit<span class="en">Commit</span></td><td>Conventional Commits，subject ≤50 字符，作用域如 <code>feat(scheduler):</code><span class="en">Conventional Commits, subject ≤50 chars, scope e.g. <code>feat(scheduler):</code></span></td></tr>
+<tr><td>绝对禁止<span class="en">Strictly prohibited</span></td><td><code>git push --force</code> / <code>+branch</code> / <code>--delete</code> / amend 已发布 commit / 向有开放 PR 的分支推送 / <code>git add -A</code><span class="en"><code>git push --force</code> / <code>+branch</code> / <code>--delete</code> / amend published commits / push to branches with open PRs / <code>git add -A</code></span></td></tr>
+<tr><td>版本号<span class="en">Versioning</span></td><td>SemVer，<code>git tag -a vX.Y.Z</code> + 更新 CHANGELOG.md<span class="en">SemVer, <code>git tag -a vX.Y.Z</code> + update CHANGELOG.md</span></td></tr>
 </tbody></table>
 <h3 id="python">Python</h3>
-<p>类型标注（public 函数完整签名）· 中文注释写 WHY（面向非编程审计）· 模块/类 PascalCase，函数/变量 snake_case · SQLAlchemy 2.0（<code>Mapped</code>/<code>mapped_column</code>）· 调度器/网关/沙箱一律 <code>async def</code> · 行长 100 · Python 3.11–3.13 · Poetry · <strong>新依赖必须先讨论</strong>。</p>
-<h3 id="工具链">工具链</h3>
-<p>lint：ruff（E,F,I,UP,B,SIM，忽略 E501,B904）+ black（100）+ isort（profile=black）· typecheck：mypy <code>--strict</code> · 安全：bandit + pip-audit · pre-commit。</p>
-<h3 id="vue-前端">Vue 前端</h3>
-<p><code>&amp;lt;script setup lang="ts"&amp;gt;</code> 组合式 API · strict，禁 <code>any</code> · 状态进 Pinia · 构建 <code>CI=true pnpm build</code> · 测试 vitest + Playwright。</p>
-<h3 id="pr-检查清单">PR 检查清单</h3>
+<p>类型标注（public 函数完整签名）· 中文注释写 WHY（面向非编程审计）· 模块/类 PascalCase，函数/变量 snake_case · SQLAlchemy 2.0（<code>Mapped</code>/<code>mapped_column</code>）· 调度器/网关/沙箱一律 <code>async def</code> · 行长 100 · Python 3.11–3.13 · Poetry · <strong>新依赖必须先讨论</strong>。<span class="en">Type annotations (full public function signatures) · Chinese comments explain WHY (for non-programmer auditors) · Modules/classes PascalCase, functions/variables snake_case · SQLAlchemy 2.0 (<code>Mapped</code>/<code>mapped_column</code>) · Scheduler/gateway/sandbox all <code>async def</code> · Line length 100 · Python 3.11–3.13 · Poetry · <strong>New dependencies must be discussed first</strong>.</span></p>
+<h3 id="工具链-toolchain">工具链<span class="en">Toolchain</span></h3>
+<p>lint：ruff（E,F,I,UP,B,SIM，忽略 E501,B904）+ black（100）+ isort（profile=black）· typecheck：mypy <code>--strict</code> · 安全：bandit + pip-audit · pre-commit。<span class="en">lint: ruff (E,F,I,UP,B,SIM, ignores E501,B904) + black (100) + isort (profile=black) · typecheck: mypy <code>--strict</code> · security: bandit + pip-audit · pre-commit.</span></p>
+<h3 id="vue-前端-vue-frontend">Vue 前端<span class="en">Vue Frontend</span></h3>
+<p><code>&lt;script setup lang="ts"&gt;</code> 组合式 API · strict，禁 <code>any</code> · 状态进 Pinia · 构建 <code>CI=true pnpm build</code> · 测试 vitest + Playwright。<span class="en"><code>&lt;script setup lang="ts"&gt;</code> Composition API · strict, no <code>any</code> · State in Pinia · Build: <code>CI=true pnpm build</code> · Test: vitest + Playwright.</span></p>
+<h3 id="pr-检查清单-pr-checklist">PR 检查清单<span class="en">PR Checklist</span></h3>
 <ul>
-<li>[ ] 走完四阶段，文档齐全</li>
-<li>[ ] 测试全绿，覆盖率未下降</li>
-<li>[ ] 新增依赖已讨论</li>
-<li>[ ] 无硬编码密钥/Token</li>
-<li>[ ] commit 符合 Conventional Commits</li>
-<li>[ ] CHANGELOG 已更新（用户可见变更时）</li>
+<li>[ ] 走完四阶段，文档齐全<span class="en">All four stages completed, documentation complete</span></li>
+<li>[ ] 测试全绿，覆盖率未下降<span class="en">All tests green, coverage not decreased</span></li>
+<li>[ ] 新增依赖已讨论<span class="en">New dependencies discussed</span></li>
+<li>[ ] 无硬编码密钥/Token<span class="en">No hardcoded keys/tokens</span></li>
+<li>[ ] commit 符合 Conventional Commits<span class="en">Commits follow Conventional Commits</span></li>
+<li>[ ] CHANGELOG 已更新（用户可见变更时）<span class="en">CHANGELOG updated (for user-visible changes)</span></li>
 </ul>
 <hr>
-<p><a href="README.html">← 返回目录</a> · <a href="08-appendix.html">下一章：附录 →</a></p>
-<p>&lt;/content&gt;</p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="08-appendix.html">下一章：附录 →<span class="en">Next: Appendix →</span></a></p>
 </main></body>
 </html>

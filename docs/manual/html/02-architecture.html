@@ -32,39 +32,42 @@ th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
 th { background:var(--code-bg); }
 hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
 ul { padding-left:1.5em; }
+.en { display:block; font-size:.82em; font-weight:400; color:var(--muted);
+      line-height:1.45; margin-top:.15em; }
+h1 .en, h2 .en, h3 .en, h4 .en { font-size:.6em; margin-top:.2em; }
+th .en, td .en { font-size:.8em; }
 </style>
 </head>
 <body><main>
-<h1 id="02-整体架构-architecture">02 · 整体架构 · Architecture</h1>
-<p><a href="README.html">← 返回目录 Back to index</a> · <a href="01-design-philosophy.html">← 上一章 设计哲学</a></p>
-<blockquote>本章描述 Orbit 的骨架：三层通信边界、任务数据流、48 模块地图、五图谱体系、熔断/检查点/审计链。开发者与研究者共读。</blockquote>
+<h1 id="02-整体架构-architecture">02 · 整体架构<span class="en">Architecture</span></h1>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="01-design-philosophy.html">← 上一章：设计哲学<span class="en">Prev: Design Philosophy</span></a></p>
+<blockquote>本章描述 Orbit 的骨架：三层通信边界、任务数据流、48 模块地图、五图谱体系、熔断/检查点/审计链。开发者与研究者共读。<span class="en">This chapter describes Orbit's skeleton: the three-layer communication boundaries, task data flow, a 48-module map, the five-graph system, and circuit breaker / checkpoint / audit trail. For both developers and researchers.</span></blockquote>
 <hr>
-<h2 id="2-1-三层架构规范-the-three-layer-model">2.1 三层架构规范 · The Three-Layer Model</h2>
-<p><strong>中文</strong>：Orbit 把所有交互严格分成三层，边界不可跨越。这是保证"可审计、不失控"的结构基础。</p>
-<p><strong>English</strong>: All interactions fall into three strictly separated layers with non-crossable boundaries — the structural basis for auditability.</p>
+<h2 id="2-1-三层架构规范-the-three-layer-model">2.1 三层架构规范<span class="en">The Three-Layer Model</span></h2>
+<p>Orbit 把所有交互严格分成三层，边界不可跨越。这是保证"可审计、不失控"的结构基础。<span class="en">All interactions fall into three strictly separated layers with non-crossable boundaries — the structural basis for auditability.</span></p>
 <pre><code>Layer 1  系统 → Agent      协程拉起      (asyncio)      scheduler/orchestrator.py :: _run_agent()
 Layer 2  Agent → 工具      MCP           (tool call)    agents/base.py :: act() → ToolRegistry.invoke()
 Layer 3  Agent → Agent     A2A           (message bus)  communication/message_bus.py :: request()</code></pre>
 <table>
 <thead><tr>
-<th>层</th>
-<th>协议</th>
-<th>数据</th>
-<th>关键约束</th>
+<th>层<span class="en">Layer</span></th>
+<th>协议<span class="en">Protocol</span></th>
+<th>数据<span class="en">Data</span></th>
+<th>关键约束<span class="en">Key Constraints</span></th>
 </tr></thead><tbody>
-<tr><td><strong>L1 系统→Agent</strong></td><td>Python asyncio 协程（非网络）</td><td><code>TaskContext</code>(L1–L5 五层上下文) → <code>AgentResult</code></td><td>调度器不直接调 MCP 工具或 MessageBus</td></tr>
-<tr><td><strong>L2 Agent→工具</strong></td><td>MCP (Model Context Protocol)</td><td>工具调用请求/响应</td><td>权限/限流/版本由 ToolRegistry 统一管理</td></tr>
-<tr><td><strong>L3 Agent→Agent</strong></td><td>A2A via MessageBus</td><td>4 模式：Request-Response / Notification / Streaming / Callback</td><td>Agent 间禁止直接调 <code>run()</code>，必须走 MessageBus</td></tr>
+<tr><td><strong>L1 系统→Agent</strong><span class="en"><strong>L1 System → Agent</strong></span></td><td>Python asyncio 协程（非网络）<span class="en">Python asyncio coroutines (non-network)</span></td><td><code>TaskContext</code>(L1–L5 五层上下文) → <code>AgentResult</code><span class="en"><code>TaskContext</code> (L1–L5 context) → <code>AgentResult</code></span></td><td>调度器不直接调 MCP 工具或 MessageBus<span class="en">Scheduler does not call MCP tools or MessageBus directly</span></td></tr>
+<tr><td><strong>L2 Agent→工具</strong><span class="en"><strong>L2 Agent → Tool</strong></span></td><td>MCP (Model Context Protocol)</td><td>工具调用请求/响应<span class="en">Tool call requests/responses</span></td><td>权限/限流/版本由 ToolRegistry 统一管理<span class="en">Permissions, rate limits, and versioning managed uniformly by ToolRegistry</span></td></tr>
+<tr><td><strong>L3 Agent→Agent</strong></td><td>A2A via MessageBus</td><td>4 模式：Request-Response / Notification / Streaming / Callback<span class="en">4 modes: Request-Response / Notification / Streaming / Callback</span></td><td>Agent 间禁止直接调 <code>run()</code>，必须走 MessageBus<span class="en">Agents must not call each other's <code>run()</code> directly; must go through MessageBus</span></td></tr>
 </tbody></table>
-<h3 id="静态检查-4-条硬规则-docs-三层架构规范-md-1-72-三层架构规范-md">静态检查 4 条硬规则（<a href="../三层架构规范.html"><code>docs/三层架构规范.md:1-72</code></a>）</h3>
+<h3 id="静态检查-4-条硬规则-4-hard-static-check-rules-docs-三层架构规范-md-1-72-三层架构规范-md">静态检查 4 条硬规则<span class="en">4 Hard Static-Check Rules（<a href="../三层架构规范.html"><code>docs/三层架构规范.md:1-72</code></a>）</span></h3>
 <ul>
-<li>Orchestrator 中不得出现 <code>mcp_client</code> 或 <code>ToolRegistry.invoke()</code>。</li>
-<li>Agent 基类中不得出现 <code>asyncio.create_task()</code> 拉起其他 Agent 协程。</li>
-<li>Agent 间通信必须走 <code>MessageBus</code>，禁止直接调用其他 Agent 的 <code>run()</code>。</li>
-<li>外部系统不直接与 Agent 交互，必须经 REST API → Orchestrator。</li>
+<li>Orchestrator 中不得出现 <code>mcp_client</code> 或 <code>ToolRegistry.invoke()</code>。<span class="en">Orchestrator must not contain <code>mcp_client</code> or <code>ToolRegistry.invoke()</code>.</span></li>
+<li>Agent 基类中不得出现 <code>asyncio.create_task()</code> 拉起其他 Agent 协程。<span class="en">Agent base class must not use <code>asyncio.create_task()</code> to launch other Agent coroutines.</span></li>
+<li>Agent 间通信必须走 <code>MessageBus</code>，禁止直接调用其他 Agent 的 <code>run()</code>。<span class="en">Inter-Agent communication must go through <code>MessageBus</code>; direct calls to another Agent's <code>run()</code> are prohibited.</span></li>
+<li>外部系统不直接与 Agent 交互，必须经 REST API → Orchestrator。<span class="en">External systems must not interact directly with Agents; they must go through REST API → Orchestrator.</span></li>
 </ul>
-<h2 id="2-2-任务数据流全链路-end-to-end-data-flow">2.2 任务数据流全链路 · End-to-End Data Flow</h2>
-<p>一个需求从进入到交付，经过的完整链路：</p>
+<h2 id="2-2-任务数据流全链路-end-to-end-data-flow">2.2 任务数据流全链路<span class="en">End-to-End Data Flow</span></h2>
+<p>一个需求从进入到交付，经过的完整链路：<span class="en">The complete path a requirement takes from intake to delivery:</span></p>
 <pre><code>用户需求(NL/PRD)
    │  REST POST /api/v1/goal  或  WebSocket /chat
    ▼
@@ -84,143 +87,141 @@ Agent 5 角色协作（Architect → Developer → Reviewer → QA → ConfigMan
 审计链记录（task_audit_trail：状态转换 + LLM 调用摘要 + 验证结果）
    ▼
 交付（PR 合入 / 报告 / 可观测性看板）</code></pre>
-<h2 id="2-3-模块地图-module-map">2.3 模块地图 · Module Map</h2>
-<p><code>src/orbit/</code> 下 48 个包 + <code>launcher.py</code>。粗体为核心模块。</p>
-<h3 id="治理内核-governance-core">治理内核 · Governance Core</h3>
+<h2 id="2-3-模块地图-module-map">2.3 模块地图<span class="en">Module Map</span></h2>
+<p><code>src/orbit/</code> 下 48 个包 + <code>launcher.py</code>。粗体为核心模块。<span class="en">48 packages under <code>src/orbit/</code> plus <code>launcher.py</code>. Bold items are core modules.</span></p>
+<h3 id="治理内核-governance-core">治理内核<span class="en">Governance Core</span></h3>
 <table>
 <thead><tr>
-<th>模块</th>
-<th>职责</th>
+<th>模块<span class="en">Module</span></th>
+<th>职责<span class="en">Responsibility</span></th>
 </tr></thead><tbody>
-<tr><td><strong>scheduler</strong></td><td>任务调度器——状态机、检查点、回滚、并发控制</td></tr>
-<tr><td><strong>hallucination</strong></td><td>防幻觉 L1–L8 纵深防御（图谱验证→动态追踪→熵监控→类型检查→Z3→合约→沙箱→配置漂移）</td></tr>
-<tr><td><strong>compliance</strong></td><td>L9 动态合规验证——知识时效性检查 + 规则引擎</td></tr>
-<tr><td><strong>checkpoint</strong></td><td>调度器检查点持久化（Redis 热 + PostgreSQL 冷，四级降级）</td></tr>
-<tr><td><strong>resource_guard</strong></td><td>资源熔断——令牌桶 + Token 预算 + 多级降级 + 三态机</td></tr>
-<tr><td><strong>sandbox</strong></td><td>沙箱隔离执行——DockerSandbox（主）/ ProcessSandbox（兜底）自动选择</td></tr>
-<tr><td><strong>security</strong></td><td>5 层 deny-wins 权限引擎（agent_role→tool_category→path_scope→sandbox→global_deny）</td></tr>
+<tr><td><strong>scheduler</strong></td><td>任务调度器——状态机、检查点、回滚、并发控制<span class="en">Task scheduler — state machine, checkpoint, rollback, concurrency control</span></td></tr>
+<tr><td><strong>hallucination</strong></td><td>防幻觉 L1–L8 纵深防御（图谱验证→动态追踪→熵监控→类型检查→Z3→合约→沙箱→配置漂移）<span class="en">Hallucination defense L1–L8 defense-in-depth (graph validation → dynamic tracing → entropy monitoring → type checking → Z3 → contracts → sandbox → config drift)</span></td></tr>
+<tr><td><strong>compliance</strong></td><td>L9 动态合规验证——知识时效性检查 + 规则引擎<span class="en">L9 dynamic compliance validation — knowledge freshness check + rules engine</span></td></tr>
+<tr><td><strong>checkpoint</strong></td><td>调度器检查点持久化（Redis 热 + PostgreSQL 冷，四级降级）<span class="en">Scheduler checkpoint persistence (hot Redis + cold PostgreSQL, four-level degradation)</span></td></tr>
+<tr><td><strong>resource_guard</strong></td><td>资源熔断——令牌桶 + Token 预算 + 多级降级 + 三态机<span class="en">Resource circuit breaker — token bucket + token budget + multi-level degradation + three-state machine</span></td></tr>
+<tr><td><strong>sandbox</strong></td><td>沙箱隔离执行——DockerSandbox（主）/ ProcessSandbox（兜底）自动选择<span class="en">Sandboxed execution — DockerSandbox (primary) / ProcessSandbox (fallback), auto-selected</span></td></tr>
+<tr><td><strong>security</strong></td><td>5 层 deny-wins 权限引擎（agent_role→tool_category→path_scope→sandbox→global_deny）<span class="en">5-layer deny-wins permission engine (agent_role → tool_category → path_scope → sandbox → global_deny)</span></td></tr>
 </tbody></table>
-<h3 id="图谱与知识-graphs-knowledge">图谱与知识 · Graphs &amp; Knowledge</h3>
+<h3 id="图谱与知识-graphs-knowledge">图谱与知识<span class="en">Graphs &amp; Knowledge</span></h3>
 <table>
 <thead><tr>
-<th>模块</th>
-<th>职责</th>
+<th>模块<span class="en">Module</span></th>
+<th>职责<span class="en">Responsibility</span></th>
 </tr></thead><tbody>
-<tr><td><strong>graph</strong></td><td>代码图谱——CodeGraph SQLite + Tree-sitter 多语言解析；元图谱 12 种跨图谱关系</td></tr>
-<tr><td><strong>knowledge</strong></td><td>外挂领域知识图谱——SQLite + BGE 向量搜索 + TF-IDF 降级 + MCP</td></tr>
-<tr><td><strong>causal</strong></td><td>因果推理引擎——CausalGraph、RootCauseAnalyzer、因果推荐</td></tr>
-<tr><td>memory</td><td>文件记忆系统——MEMORY.md 读写 + FTS5 全文搜索 + BM25 评分</td></tr>
+<tr><td><strong>graph</strong></td><td>代码图谱——CodeGraph SQLite + Tree-sitter 多语言解析；元图谱 12 种跨图谱关系<span class="en">Code graph — CodeGraph SQLite + Tree-sitter multi-language parsing; meta-graph with 12 cross-graph relationship types</span></td></tr>
+<tr><td><strong>knowledge</strong></td><td>外挂领域知识图谱——SQLite + BGE 向量搜索 + TF-IDF 降级 + MCP<span class="en">External domain knowledge graph — SQLite + BGE vector search + TF-IDF fallback + MCP</span></td></tr>
+<tr><td><strong>causal</strong></td><td>因果推理引擎——CausalGraph、RootCauseAnalyzer、因果推荐<span class="en">Causal inference engine — CausalGraph, RootCauseAnalyzer, causal recommendations</span></td></tr>
+<tr><td>memory</td><td>文件记忆系统——MEMORY.md 读写 + FTS5 全文搜索 + BM25 评分<span class="en">File-based memory system — MEMORY.md read/write + FTS5 full-text search + BM25 scoring</span></td></tr>
 </tbody></table>
-<h3 id="agent-与编排-agents-orchestration">Agent 与编排 · Agents &amp; Orchestration</h3>
+<h3 id="agent-与编排-agents-orchestration">Agent 与编排<span class="en">Agents &amp; Orchestration</span></h3>
 <table>
 <thead><tr>
-<th>模块</th>
-<th>职责</th>
+<th>模块<span class="en">Module</span></th>
+<th>职责<span class="en">Responsibility</span></th>
 </tr></thead><tbody>
-<tr><td><strong>agents</strong></td><td>5 核心角色（Architect/Developer/Reviewer/QA/Clarifier）+ ReActAgent 循环</td></tr>
-<tr><td><strong>gateway</strong></td><td>LLM 网关——LiteLLM 封装，三层模型路由（T1/T2/T3）+ 降级</td></tr>
-<tr><td><strong>compose</strong></td><td>Compose 流水线——spec-driven 多 Agent 编排（SKILL.md→Parser→Orchestrator）</td></tr>
-<tr><td><strong>communication</strong></td><td>Agent 通信协议——MessageBus 4 模式 + 幂等 + 熔断传播</td></tr>
-<tr><td><strong>goal</strong></td><td>Goal 模式——多独立会话编排 + 自主 PR 合入（ProcessGuard/MetaOrchestrator/CritiqueAgent/Ensemble/Verifier）</td></tr>
-<tr><td>goal_judge</td><td>目标达成判定——Verdict schema + fail-open + MAX_GOAL_REACT 硬上限</td></tr>
-<tr><td>loop</td><td>Loop 模式——定时重复执行 Goal/命令（CronParser + LoopScheduler）</td></tr>
-<tr><td>router</td><td>智能路由——RouterAgent 评估复杂度 → 模型级别推荐 → CC_SWITCH 强制覆盖</td></tr>
-<tr><td>sharding</td><td>动态任务分片——大任务自动拆分（Token 预估 + 边界识别 + 并发调度 + 结果合并）</td></tr>
-<tr><td>actors</td><td>子 Agent 生命周期——ActorRegistry(SQLite 状态机)、Spawn、Watchdog（zombie 清理）</td></tr>
-<tr><td>modes</td><td>Mode File System——grill-me 交互协议层，YAML 定义 Agent 行为</td></tr>
+<tr><td><strong>agents</strong></td><td>5 核心角色（Architect/Developer/Reviewer/QA/Clarifier）+ ReActAgent 循环<span class="en">5 core roles (Architect/Developer/Reviewer/QA/Clarifier) + ReActAgent loop</span></td></tr>
+<tr><td><strong>gateway</strong></td><td>LLM 网关——LiteLLM 封装，三层模型路由（T1/T2/T3）+ 降级<span class="en">LLM gateway — LiteLLM wrapper, three-tier model routing (T1/T2/T3) + degradation</span></td></tr>
+<tr><td><strong>compose</strong></td><td>Compose 流水线——spec-driven 多 Agent 编排（SKILL.md→Parser→Orchestrator）<span class="en">Compose pipeline — spec-driven multi-Agent orchestration (SKILL.md → Parser → Orchestrator)</span></td></tr>
+<tr><td><strong>communication</strong></td><td>Agent 通信协议——MessageBus 4 模式 + 幂等 + 熔断传播<span class="en">Agent communication protocol — MessageBus with 4 modes + idempotency + breaker propagation</span></td></tr>
+<tr><td><strong>goal</strong></td><td>Goal 模式——多独立会话编排 + 自主 PR 合入（ProcessGuard/MetaOrchestrator/CritiqueAgent/Ensemble/Verifier）<span class="en">Goal mode — multi-independent session orchestration + autonomous PR merging (ProcessGuard/MetaOrchestrator/CritiqueAgent/Ensemble/Verifier)</span></td></tr>
+<tr><td>goal_judge</td><td>目标达成判定——Verdict schema + fail-open + MAX_GOAL_REACT 硬上限<span class="en">Goal achievement judgment — Verdict schema + fail-open + MAX_GOAL_REACT hard limit</span></td></tr>
+<tr><td>loop</td><td>Loop 模式——定时重复执行 Goal/命令（CronParser + LoopScheduler）<span class="en">Loop mode — scheduled repetition of Goals/commands (CronParser + LoopScheduler)</span></td></tr>
+<tr><td>router</td><td>智能路由——RouterAgent 评估复杂度 → 模型级别推荐 → CC_SWITCH 强制覆盖<span class="en">Intelligent routing — RouterAgent evaluates complexity → model tier recommendation → CC_SWITCH override</span></td></tr>
+<tr><td>sharding</td><td>动态任务分片——大任务自动拆分（Token 预估 + 边界识别 + 并发调度 + 结果合并）<span class="en">Dynamic task sharding — automatic splitting of large tasks (token estimation + boundary identification + concurrent scheduling + result merging)</span></td></tr>
+<tr><td>actors</td><td>子 Agent 生命周期——ActorRegistry(SQLite 状态机)、Spawn、Watchdog（zombie 清理）<span class="en">Sub-Agent lifecycle — ActorRegistry (SQLite state machine), Spawn, Watchdog (zombie cleanup)</span></td></tr>
+<tr><td>modes</td><td>Mode File System——grill-me 交互协议层，YAML 定义 Agent 行为<span class="en">Mode File System — grill-me interaction protocol layer, YAML-defined Agent behavior</span></td></tr>
 </tbody></table>
-<h3 id="上下文与自进化-context-evolution">上下文与自进化 · Context &amp; Evolution</h3>
+<h3 id="上下文与自进化-context-evolution">上下文与自进化<span class="en">Context &amp; Evolution</span></h3>
 <table>
 <thead><tr>
-<th>模块</th>
-<th>职责</th>
+<th>模块<span class="en">Module</span></th>
+<th>职责<span class="en">Responsibility</span></th>
 </tr></thead><tbody>
-<tr><td>context</td><td>上下文匹配引擎——NL→关键词→项目匹配→预构建器 + 扫描器</td></tr>
-<tr><td>compression</td><td>上下文压缩——8-step 算法 + 5-layer 管线 + CascadePruner 级联裁剪 + Token 预算</td></tr>
-<tr><td>prompt</td><td>Prompt 构建器——stable/context/volatile 三层拼接</td></tr>
-<tr><td>evolution</td><td>自进化与对齐——离线自蒸馏、GRPO 评分、GEPA Prompt 进化、SCOPE 双流记忆</td></tr>
-<tr><td>dream</td><td>自进化模块——5 阶段 LLM 合并 + 去重 + 验证 + 7 天自动触发</td></tr>
-<tr><td>metacognition</td><td>元认知监控——独立 asyncio Task 消费 StreamEvent，目标漂移/重复/延迟检测 + HITL 移交</td></tr>
-<tr><td>testing</td><td>Agent 测试自循环——五层内循环（意图理解→生成→TDD→沙箱→反馈）</td></tr>
-<tr><td>effectiveness</td><td>模块效能测量——消融实验（AblationContext）+ benchmark 运行器</td></tr>
+<tr><td>context</td><td>上下文匹配引擎——NL→关键词→项目匹配→预构建器 + 扫描器<span class="en">Context matching engine — NL → keywords → project matching → prebuilder + scanner</span></td></tr>
+<tr><td>compression</td><td>上下文压缩——8-step 算法 + 5-layer 管线 + CascadePruner 级联裁剪 + Token 预算<span class="en">Context compression — 8-step algorithm + 5-layer pipeline + CascadePruner cascade pruning + Token budget</span></td></tr>
+<tr><td>prompt</td><td>Prompt 构建器——stable/context/volatile 三层拼接<span class="en">Prompt builder — stable/context/volatile three-layer assembly</span></td></tr>
+<tr><td>evolution</td><td>自进化与对齐——离线自蒸馏、GRPO 评分、GEPA Prompt 进化、SCOPE 双流记忆<span class="en">Self-evolution and alignment — offline self-distillation, GRPO scoring, GEPA Prompt evolution, SCOPE dual-stream memory</span></td></tr>
+<tr><td>dream</td><td>自进化模块——5 阶段 LLM 合并 + 去重 + 验证 + 7 天自动触发<span class="en">Self-evolution module — 5-stage LLM merging + deduplication + validation + 7-day auto-trigger</span></td></tr>
+<tr><td>metacognition</td><td>元认知监控——独立 asyncio Task 消费 StreamEvent，目标漂移/重复/延迟检测 + HITL 移交<span class="en">Metacognition monitoring — independent asyncio Task consuming StreamEvent, goal drift/duplicate/delay detection + HITL handoff</span></td></tr>
+<tr><td>testing</td><td>Agent 测试自循环——五层内循环（意图理解→生成→TDD→沙箱→反馈）<span class="en">Agent test self-loop — five-level inner loop (intent understanding → generation → TDD → sandbox → feedback)</span></td></tr>
+<tr><td>effectiveness</td><td>模块效能测量——消融实验（AblationContext）+ benchmark 运行器<span class="en">Module effectiveness measurement — ablation experiments (AblationContext) + benchmark runner</span></td></tr>
 </tbody></table>
-<h3 id="平台与接口-platform-interface">平台与接口 · Platform &amp; Interface</h3>
+<h3 id="平台与接口-platform-interface">平台与接口<span class="en">Platform &amp; Interface</span></h3>
 <table>
 <thead><tr>
-<th>模块</th>
-<th>职责</th>
+<th>模块<span class="en">Module</span></th>
+<th>职责<span class="en">Responsibility</span></th>
 </tr></thead><tbody>
-<tr><td><strong>api</strong></td><td>FastAPI 应用——路由注册（30+ 端点文件）、中间件</td></tr>
-<tr><td><strong>observability</strong></td><td>AgentOps 可观测性——Prometheus 指标 + 审计日志 + 告警引擎 + Trace 链路追踪</td></tr>
-<tr><td>ws</td><td>WebSocket——RFC 6455 驾驶舱实时推送 + ConnectionManager</td></tr>
-<tr><td>stream</td><td>流式模块——Agent 输出异步事件流 + SSE + CancellationToken</td></tr>
-<tr><td>events</td><td>事件总线——进程内发布-订阅，解耦调度器与 WebSocket 推送</td></tr>
-<tr><td>tools</td><td>工具注册中心——权限隔离 + 滑动窗口限流 + 版本管理 + MCP 客户端</td></tr>
-<tr><td>sessions</td><td>会话管理——Session + 聊天消息持久化（最小工作上下文单元）</td></tr>
-<tr><td>projects</td><td>项目注册表——项目元数据：名称/仓库/Issue 追踪器/标签</td></tr>
-<tr><td>brief</td><td>项目说明书——LLM 驱动 Brief 生成、边界执行体系（BoundaryEngine）、基础代码包库</td></tr>
-<tr><td>review</td><td>审查引擎——审查会话/决定/注释 CRUD（SQLAlchemy 2.0）</td></tr>
-<tr><td>files</td><td>文件服务——项目文件树、内容读取、diff 生成</td></tr>
-<tr><td>lsp</td><td>LSP 诊断代理——mypy/ruff 输出 → 标准化 Diagnostic</td></tr>
-<tr><td>backup</td><td>备份管理器——SQLite 快照 + SHA256 校验 + 恢复</td></tr>
-<tr><td>versioning</td><td>版本注册表——版本追踪 + Schema 迁移 + 发布审计</td></tr>
-<tr><td>worktree</td><td>Git Worktree 隔离——多工作区管理（6 策略）</td></tr>
-<tr><td>integration</td><td>全模块集成接线——将独立模块接入 Agent 执行生命周期</td></tr>
-<tr><td>cli</td><td>CLI 入口——<code>orbit init-packages</code> / <code>orbit brief check</code></td></tr>
-<tr><td>core</td><td>核心配置——Settings（Pydantic Settings）</td></tr>
-<tr><td>infrastructure</td><td>DB 引擎、Session</td></tr>
-<tr><td>launcher.py</td><td>PyInstaller 启动入口——隐式 import 所有路由模块 + <code>uvicorn.run</code></td></tr>
+<tr><td><strong>api</strong></td><td>FastAPI 应用——路由注册（37 个端点文件）、中间件<span class="en">FastAPI application — route registration (37 endpoint files), middleware</span></td></tr>
+<tr><td><strong>observability</strong></td><td>AgentOps 可观测性——Prometheus 指标 + 审计日志 + 告警引擎 + Trace 链路追踪<span class="en">AgentOps observability — Prometheus metrics + audit logs + alerting engine + Trace distributed tracing</span></td></tr>
+<tr><td>ws</td><td>WebSocket——RFC 6455 驾驶舱实时推送 + ConnectionManager<span class="en">WebSocket — RFC 6455 real-time cockpit push + ConnectionManager</span></td></tr>
+<tr><td>stream</td><td>流式模块——Agent 输出异步事件流 + SSE + CancellationToken<span class="en">Streaming module — asynchronous Agent output event stream + SSE + CancellationToken</span></td></tr>
+<tr><td>events</td><td>事件总线——进程内发布-订阅，解耦调度器与 WebSocket 推送<span class="en">Event bus — in-process pub/sub, decouples scheduler from WebSocket push</span></td></tr>
+<tr><td>tools</td><td>工具注册中心——权限隔离 + 滑动窗口限流 + 版本管理 + MCP 客户端<span class="en">Tool registry — permission isolation + sliding window rate limiting + version management + MCP client</span></td></tr>
+<tr><td>sessions</td><td>会话管理——Session + 聊天消息持久化（最小工作上下文单元）<span class="en">Session management — Session + chat message persistence (minimum working context unit)</span></td></tr>
+<tr><td>projects</td><td>项目注册表——项目元数据：名称/仓库/Issue 追踪器/标签<span class="en">Project registry — project metadata: name/repo/Issue tracker/tags</span></td></tr>
+<tr><td>brief</td><td>项目说明书——LLM 驱动 Brief 生成、边界执行体系（BoundaryEngine）、基础代码包库<span class="en">Project brief — LLM-driven Brief generation, boundary execution system (BoundaryEngine), base code package library</span></td></tr>
+<tr><td>review</td><td>审查引擎——审查会话/决定/注释 CRUD（SQLAlchemy 2.0）<span class="en">Review engine — review session/decision/comment CRUD (SQLAlchemy 2.0)</span></td></tr>
+<tr><td>files</td><td>文件服务——项目文件树、内容读取、diff 生成<span class="en">File service — project file tree, content reading, diff generation</span></td></tr>
+<tr><td>lsp</td><td>LSP 诊断代理——mypy/ruff 输出 → 标准化 Diagnostic<span class="en">LSP diagnostic proxy — mypy/ruff output → standardized Diagnostic</span></td></tr>
+<tr><td>backup</td><td>备份管理器——SQLite 快照 + SHA256 校验 + 恢复<span class="en">Backup manager — SQLite snapshot + SHA256 verification + restore</span></td></tr>
+<tr><td>versioning</td><td>版本注册表——版本追踪 + Schema 迁移 + 发布审计<span class="en">Version registry — version tracking + Schema migration + release audit</span></td></tr>
+<tr><td>worktree</td><td>Git Worktree 隔离——多工作区管理（6 策略）<span class="en">Git Worktree isolation — multi-workspace management (6 strategies)</span></td></tr>
+<tr><td>integration</td><td>全模块集成接线——将独立模块接入 Agent 执行生命周期<span class="en">Full-module integration wiring — connects standalone modules into the Agent execution lifecycle</span></td></tr>
+<tr><td>cli</td><td>CLI 入口——<code>orbit init-packages</code> / <code>orbit brief check</code><span class="en">CLI entry — <code>orbit init-packages</code> / <code>orbit brief check</code></span></td></tr>
+<tr><td>core</td><td>核心配置——Settings（Pydantic Settings）<span class="en">Core configuration — Settings (Pydantic Settings)</span></td></tr>
+<tr><td>launcher.py</td><td>PyInstaller 启动入口——隐式 import 所有路由模块 + <code>uvicorn.run</code><span class="en">PyInstaller launcher — implicitly imports all route modules + <code>uvicorn.run</code></span></td></tr>
 </tbody></table>
-<h2 id="2-4-五图谱体系-the-five-graph-system">2.4 五图谱体系 · The Five-Graph System</h2>
-<p><strong>中文</strong>：Orbit 的"全局记忆"由五张图谱构成，统一存于 CodeGraph SQLite，通过 <code>query_graph()</code> 本地查询（零 Token、&lt;50ms）。</p>
+<h2 id="2-4-五图谱体系-the-five-graph-system">2.4 五图谱体系<span class="en">The Five-Graph System</span></h2>
+<p>Orbit 的"全局记忆"由五张图谱构成，统一存于 CodeGraph SQLite，通过 <code>query_graph()</code> 本地查询（零 Token、&lt;50ms）。<span class="en">Orbit's "global memory" consists of five graphs, all stored in CodeGraph SQLite, queried locally via <code>query_graph()</code> (zero token cost, &lt;50ms).</span></p>
 <table>
 <thead><tr>
-<th>图谱</th>
-<th>数据来源</th>
-<th>核心价值</th>
+<th>图谱<span class="en">Graph</span></th>
+<th>数据来源<span class="en">Data Source</span></th>
+<th>核心价值<span class="en">Core Value</span></th>
 </tr></thead><tbody>
-<tr><td><strong>代码图谱</strong> Code</td><td>源码（Tree-sitter 解析）</td><td>符号定义、调用关系、文件依赖、数据流 Def-Use 链</td></tr>
-<tr><td><strong>数据库图谱</strong> DB</td><td>DDL + 存储过程 + 触发器 + 有条件 MVCC 快照</td><td>表结构、字段类型、主外键、索引、历史 Schema 版本</td></tr>
-<tr><td><strong>配置图谱</strong> Config</td><td>.env + Nginx/Apache + PHP.ini + docker-compose</td><td>环境变量依赖、运行时参数兼容性、容器资源限制</td></tr>
-<tr><td><strong>知识图谱</strong> Knowledge</td><td>外挂领域知识（会计/金融/法律）</td><td>双模：精确查询（图谱）+ 语义检索（BGE RAG），经 MCP 暴露</td></tr>
-<tr><td><strong>元图谱</strong> Meta</td><td>五图谱间交叉引用（独立库 <code>data/meta_graph.db</code>）</td><td>跨图谱关系、影响面分析、架构腐化检测、变更追溯</td></tr>
+<tr><td><strong>代码图谱</strong> Code<span class="en"><strong>Code Graph</strong></span></td><td>源码（Tree-sitter 解析）<span class="en">Source code (Tree-sitter parsing)</span></td><td>符号定义、调用关系、文件依赖、数据流 Def-Use 链<span class="en">Symbol definitions, call relationships, file dependencies, Def-Use data-flow chains</span></td></tr>
+<tr><td><strong>数据库图谱</strong> DB<span class="en"><strong>DB Graph</strong></span></td><td>DDL + 存储过程 + 触发器 + 有条件 MVCC 快照<span class="en">DDL + stored procedures + triggers + conditional MVCC snapshots</span></td><td>表结构、字段类型、主外键、索引、历史 Schema 版本<span class="en">Table structures, field types, primary/foreign keys, indexes, historical Schema versions</span></td></tr>
+<tr><td><strong>配置图谱</strong> Config<span class="en"><strong>Config Graph</strong></span></td><td>.env + Nginx/Apache + PHP.ini + docker-compose</td><td>环境变量依赖、运行时参数兼容性、容器资源限制<span class="en">Environment variable dependencies, runtime parameter compatibility, container resource limits</span></td></tr>
+<tr><td><strong>知识图谱</strong> Knowledge<span class="en"><strong>Knowledge Graph</strong></span></td><td>外挂领域知识（会计/金融/法律）<span class="en">External domain knowledge (accounting/finance/legal)</span></td><td>双模：精确查询（图谱）+ 语义检索（BGE RAG），经 MCP 暴露<span class="en">Dual-mode: exact query (graph) + semantic search (BGE RAG), exposed via MCP</span></td></tr>
+<tr><td><strong>元图谱</strong> Meta<span class="en"><strong>Meta Graph</strong></span></td><td>五图谱间交叉引用（独立库 <code>data/meta_graph.db</code>）<span class="en">Cross-references among the five graphs (standalone <code>data/meta_graph.db</code> database)</span></td><td>跨图谱关系、影响面分析、架构腐化检测、变更追溯<span class="en">Cross-graph relationships, impact analysis, architecture decay detection, change traceability</span></td></tr>
 </tbody></table>
-<blockquote>注：设计文档中还提到"文档图谱"，但<strong>仅存在于设计，未落地代码</strong>（<a href="../../CLAUDE.html"><code>CLAUDE.md:52</code></a>）。</blockquote>
-<h3 id="元图谱-12-种跨图谱关系-src-orbit-graph-meta_graph-py-20-34-src-orbit-graph-meta_graph-py">元图谱 12 种跨图谱关系（<a href="../../src/orbit/graph/meta_graph.py"><code>src/orbit/graph/meta_graph.py:20-34</code></a>）</h3>
-<p><code>READS_FROM</code> · <code>WRITES_TO</code> · <code>DELETES_FROM</code>（代码→数据库） · <code>DEPENDS_ON</code>（代码→配置/代码） · <code>OVERRIDES</code>（配置→配置） · <code>REFERENCES</code> · <code>COMPLIES_WITH</code>（代码→知识） · <code>PRODUCED_BY</code> · <code>MODIFIED_BY</code>（代码↔推理链） · <code>DECIDED_AT</code>（配置→推理链） · <code>CONNECTS_TO</code> · <code>USED_IN</code>（知识→代码）</p>
-<h3 id="元图谱能力">元图谱能力</h3>
+<blockquote>注：设计文档中还提到"文档图谱"，但<strong>仅存在于设计，未落地代码</strong>（<a href="../../CLAUDE.html"><code>CLAUDE.md:52</code></a>）。<span class="en">Note: The design docs also mention a "Documentation Graph," but it <strong>exists only in design, not in code</strong>（<a href="../../CLAUDE.html"><code>CLAUDE.md:52</code></a>）.</span></blockquote>
+<h3 id="元图谱-12-种跨图谱关系-meta-graph-12-cross-graph-relationship-types-src-orbit-graph-meta_graph-py-20-34-src-orbit-graph-meta_graph-py">元图谱 12 种跨图谱关系<span class="en">Meta-Graph: 12 Cross-Graph Relationship Types（<a href="../../src/orbit/graph/meta_graph.py"><code>src/orbit/graph/meta_graph.py:20-34</code></a>）</span></h3>
+<p><code>READS_FROM</code> · <code>WRITES_TO</code> · <code>DELETES_FROM</code>（代码→数据库） · <code>DEPENDS_ON</code>（代码→配置/代码） · <code>OVERRIDES</code>（配置→配置） · <code>REFERENCES</code> · <code>COMPLIES_WITH</code>（代码→知识） · <code>PRODUCED_BY</code> · <code>MODIFIED_BY</code>（代码↔推理链） · <code>DECIDED_AT</code>（配置→推理链） · <code>CONNECTS_TO</code> · <code>USED_IN</code>（知识→代码）<span class="en"><code>READS_FROM</code> · <code>WRITES_TO</code> · <code>DELETES_FROM</code> (code → database) · <code>DEPENDS_ON</code> (code → config/code) · <code>OVERRIDES</code> (config → config) · <code>REFERENCES</code> · <code>COMPLIES_WITH</code> (code → knowledge) · <code>PRODUCED_BY</code> · <code>MODIFIED_BY</code> (code ↔ reasoning chain) · <code>DECIDED_AT</code> (config → reasoning chain) · <code>CONNECTS_TO</code> · <code>USED_IN</code> (knowledge → code)</span></p>
+<h3 id="元图谱能力-meta-graph-capabilities">元图谱能力<span class="en">Meta-Graph Capabilities</span></h3>
 <ul>
-<li><strong>影响面分析</strong>：<code>impact_analysis("PaymentService.process")</code> → <code>{databases, configs, knowledge, reasoning}</code>（<a href="../../src/orbit/graph/meta_graph.py"><code>meta_graph.py:125-157</code></a>）。</li>
-<li><strong>配置变更追溯</strong>：<code>config_impact_trace("PAYMENT_TIMEOUT")</code> → 受影响代码 + 任务列表（<code>meta_graph.py:159-178</code>）。</li>
-<li><strong>架构腐化检测</strong>：<code>architecture_health_check()</code> → 检测违反约束的关系，如"代码写数据库但无合规关联"（<code>meta_graph.py:180-213</code>）。</li>
+<li><strong>影响面分析</strong>：<code>impact_analysis("PaymentService.process")</code> → <code>{databases, configs, knowledge, reasoning}</code>（<a href="../../src/orbit/graph/meta_graph.py"><code>meta_graph.py:125-157</code></a>）。<span class="en"><strong>Impact analysis</strong>: <code>impact_analysis("PaymentService.process")</code> → <code>{databases, configs, knowledge, reasoning}</code>（<a href="../../src/orbit/graph/meta_graph.py"><code>meta_graph.py:125-157</code></a>）。</span></li>
+<li><strong>配置变更追溯</strong>：<code>config_impact_trace("PAYMENT_TIMEOUT")</code> → 受影响代码 + 任务列表（<code>meta_graph.py:159-178</code>）。<span class="en"><strong>Config change tracing</strong>: <code>config_impact_trace("PAYMENT_TIMEOUT")</code> → affected code + task list（<code>meta_graph.py:159-178</code>）。</span></li>
+<li><strong>架构腐化检测</strong>：<code>architecture_health_check()</code> → 检测违反约束的关系，如"代码写数据库但无合规关联"（<code>meta_graph.py:180-213</code>）。<span class="en"><strong>Architecture decay detection</strong>: <code>architecture_health_check()</code> → detects constraint violations, e.g. "code writes to database without compliance relationship"（<code>meta_graph.py:180-213</code>）。</span></li>
 </ul>
-<h2 id="2-5-熔断-检查点-审计链-breaker-checkpoint-audit">2.5 熔断 / 检查点 / 审计链 · Breaker / Checkpoint / Audit</h2>
-<h3 id="2-5-1-熔断-circuit-breaker">2.5.1 熔断 Circuit Breaker</h3>
+<h2 id="2-5-熔断-检查点-审计链-breaker-checkpoint-audit">2.5 熔断 / 检查点 / 审计链<span class="en">Breaker / Checkpoint / Audit</span></h2>
+<h3 id="2-5-1-熔断-circuit-breaker">2.5.1 熔断<span class="en">Circuit Breaker</span></h3>
 <ul>
-<li>三态：<code>CLOSED</code> / <code>OPEN</code> / <code>HALF_OPEN</code>。</li>
-<li>触发：Token 计数器超限 <strong>或</strong> 延迟超阈值 → 熔断并回滚到上一检查点。</li>
-<li>决策延迟 ≤12ms（纯内存）。熵监控集成：流式响应实时算 Shannon 熵，&gt;2.5 bits 触发重生成或熔断。</li>
-<li>恢复：熔断后降级，拦截所有 LLM 请求；每 5 分钟放一个试探请求（半开），成功则逐步恢复。</li>
-<li>实现：<code>resource_guard/resource_guard.py</code> + <code>gateway/circuit_breaker.py</code>（减熵已合并）。</li>
+<li>三态：<code>CLOSED</code> / <code>OPEN</code> / <code>HALF_OPEN</code>。<span class="en">Three states: <code>CLOSED</code> / <code>OPEN</code> / <code>HALF_OPEN</code>.</span></li>
+<li>触发：Token 计数器超限 <strong>或</strong> 延迟超阈值 → 熔断并回滚到上一检查点。<span class="en">Trigger: Token counter exceeded <strong>or</strong> latency exceeds threshold → circuit breaks and rolls back to the last checkpoint.</span></li>
+<li>决策延迟 ≤12ms（纯内存）。熵监控集成：流式响应实时算 Shannon 熵，&gt;2.5 bits 触发重生成或熔断。<span class="en">Decision latency ≤12ms (in-memory only). Entropy monitoring integrated: real-time Shannon entropy calculation on streaming responses, &gt;2.5 bits triggers regeneration or circuit break.</span></li>
+<li>恢复：熔断后降级，拦截所有 LLM 请求；每 5 分钟放一个试探请求（半开），成功则逐步恢复。<span class="en">Recovery: degraded after break, intercepting all LLM requests; sends one probe request every 5 minutes (half-open), gradually restores on success.</span></li>
+<li>实现：<code>resource_guard/resource_guard.py</code> + <code>gateway/circuit_breaker.py</code>（减熵已合并）。<span class="en">Implementation: <code>resource_guard/resource_guard.py</code> + <code>gateway/circuit_breaker.py</code> (entropy reduction merged).</span></li>
 </ul>
-<h3 id="2-5-2-检查点-checkpoint-src-orbit-checkpoint-manager-py-src-orbit-checkpoint-manager-py">2.5.2 检查点 Checkpoint（<a href="../../src/orbit/checkpoint/manager.py"><code>src/orbit/checkpoint/manager.py</code></a>）</h3>
+<h3 id="2-5-2-检查点-checkpoint-src-orbit-checkpoint-manager-py-src-orbit-checkpoint-manager-py">2.5.2 检查点<span class="en">Checkpoint（<a href="../../src/orbit/checkpoint/manager.py"><code>src/orbit/checkpoint/manager.py</code></a>）</span></h3>
 <ul>
-<li><strong>双层冷热</strong>：Redis（热，TTL=1h）+ PostgreSQL（冷备份）。</li>
-<li><strong>四级降级加载</strong>：Redis → miss → PG → 回填 Redis → miss → 内存降级 → 磁盘文件兜底。</li>
-<li><strong>内容</strong>：<code>task_id, state, retry_count, progress, context, updated_at, version</code>。</li>
-<li><strong>版本号乐观锁</strong>：<code>WHERE version &amp;lt; EXCLUDED.version</code>，旧版本不能覆盖新版本。</li>
-<li><strong>保存时机</strong>：每个关键状态转换点（PARSING→PLANNING→CODING→VALIDATING…）。</li>
-<li><strong>RTO 目标</strong>：≤30 秒。</li>
+<li><strong>双层冷热</strong>：Redis（热，TTL=1h）+ PostgreSQL（冷备份）。<span class="en"><strong>Dual-layer hot/cold</strong>: hot Redis (TTL=1h) + cold PostgreSQL (backup).</span></li>
+<li><strong>四级降级加载</strong>：Redis → miss → PG → 回填 Redis → miss → 内存降级 → 磁盘文件兜底。<span class="en"><strong>Four-level degradation loading</strong>: Redis → miss → PG → backfill Redis → miss → in-memory degradation → disk file fallback.</span></li>
+<li><strong>内容</strong>：<code>task_id, state, retry_count, progress, context, updated_at, version</code>。<span class="en"><strong>Content</strong>: <code>task_id, state, retry_count, progress, context, updated_at, version</code>.</span></li>
+<li><strong>版本号乐观锁</strong>：<code>WHERE version &lt; EXCLUDED.version</code>，旧版本不能覆盖新版本。<span class="en"><strong>Version-based optimistic locking</strong>: <code>WHERE version &lt; EXCLUDED.version</code> — older versions cannot overwrite newer ones.</span></li>
+<li><strong>保存时机</strong>：每个关键状态转换点（PARSING→PLANNING→CODING→VALIDATING…）。<span class="en"><strong>Save timing</strong>: at each key state transition (PARSING→PLANNING→CODING→VALIDATING…).</span></li>
+<li><strong>RTO 目标</strong>：≤30 秒。<span class="en"><strong>RTO target</strong>: ≤30 seconds.</span></li>
 </ul>
-<h3 id="2-5-3-审计链-audit-trail">2.5.3 审计链 Audit Trail</h3>
+<h3 id="2-5-3-审计链-audit-trail">2.5.3 审计链<span class="en">Audit Trail</span></h3>
 <ul>
-<li>表：<code>task_audit_trail</code>，记录每个状态转换、每次 LLM 调用摘要、每条验证结果。</li>
-<li>链式结构：<code>parent_step_id</code> 递归追溯完整推理树。</li>
-<li>存储成本：千次任务约 50MB（相比全量 MVCC 50GB，省 1000 倍）。</li>
-<li>取舍：放弃完整回滚（&lt;1% 场景，改由检查点提供），保留推理链追溯（100% 任务需要）。</li>
+<li>表：<code>task_audit_trail</code>，记录每个状态转换、每次 LLM 调用摘要、每条验证结果。<span class="en">Table: <code>task_audit_trail</code>, records every state transition, each LLM call summary, and every verification result.</span></li>
+<li>链式结构：<code>parent_step_id</code> 递归追溯完整推理树。<span class="en">Chain structure: <code>parent_step_id</code> recursively traces the full reasoning tree.</span></li>
+<li>存储成本：千次任务约 50MB（相比全量 MVCC 50GB，省 1000 倍）。<span class="en">Storage cost: ~50MB per thousand tasks (vs. 50GB for full MVCC — a 1000x savings).</span></li>
+<li>取舍：放弃完整回滚（&lt;1% 场景，改由检查点提供），保留推理链追溯（100% 任务需要）。<span class="en">Trade-off: full rollback is omitted (&lt;1% of scenarios, covered by checkpoints), preserving reasoning chain traceability (needed by 100% of tasks).</span></li>
 </ul>
 <hr>
-<p><a href="README.html">← 返回目录</a> · <a href="03-hallucination-defense.html">下一章：九层防幻觉 →</a></p>
-<p>&lt;/content&gt;</p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="03-hallucination-defense.html">下一章：九层防幻觉 →<span class="en">Next: Hallucination Defense →</span></a></p>
 </main></body>
 </html>

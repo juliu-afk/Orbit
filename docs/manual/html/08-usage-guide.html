@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>05 · 使用说明 · 05 · Usage Guide</title>
+<title>08 · 使用说明 · 05 · Usage Guide</title>
 <style>
 :root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
         --accent:#0969da; --code-bg:#f6f8fa; }
@@ -39,11 +39,11 @@ th .en, td .en { font-size:.8em; }
 </style>
 </head>
 <body><main>
-<h1 id="05-使用说明-05-usage-guide">05 · 使用说明<span class="en">05 · Usage Guide</span></h1>
-<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="04-technical-stack.html">← 上一章：技术方案<span class="en">Prev: Technical Design</span></a></p>
+<h1 id="08-使用说明-05-usage-guide">08 · 使用说明<span class="en">05 · Usage Guide</span></h1>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="07-technical-stack.html">← 上一章：技术方案<span class="en">Prev: Technical Design</span></a></p>
 <blockquote>面向使用者：怎么装、怎么配、怎么跑、怎么用。<span class="en">For users: how to install, configure, run, and use.</span></blockquote>
 <hr>
-<h2 id="5-1-三种启动方式-5-1-three-ways-to-launch">5.1 三种启动方式<span class="en">5.1 Three Ways to Launch</span></h2>
+<h2 id="8-1-三种启动方式-5-1-three-ways-to-launch">8.1 三种启动方式<span class="en">5.1 Three Ways to Launch</span></h2>
 <h3 id="方式-1-双击-exe-推荐-double-click-the-exe-recommended">方式 1：双击 exe（推荐）<span class="en">Double-click the exe (recommended)</span></h3>
 <p>下载 <code>Orbit.exe</code>（约 20MB）→ 双击 → 浏览器自动打开 <code>http://127.0.0.1:18888</code>。<span class="en">Download <code>Orbit.exe</code> (~20MB) → double-click → browser opens <code>http://127.0.0.1:18888</code> automatically.</span></p>
 <p>无需 Docker/Redis/PostgreSQL（内置 SQLite + 前端）。<span class="en">No Docker/Redis/PostgreSQL needed (built-in SQLite + frontend).</span></p>
@@ -84,7 +84,7 @@ make test     # 运行测试</code></pre>
 <tr><td>exe 双击 / Docker<span class="en">exe double-click / Docker</span></td><td><strong>18888</strong></td></tr>
 <tr><td><code>make dev</code> 源码热重载<span class="en"><code>make dev</code> hot-reload from source</span></td><td><strong>8000</strong></td></tr>
 </tbody></table>
-<h2 id="5-2-配置项-5-2-configuration">5.2 配置项<span class="en">5.2 Configuration</span></h2>
+<h2 id="8-2-配置项-5-2-configuration">8.2 配置项<span class="en">5.2 Configuration</span></h2>
 <p>配置走环境变量（<a href="../../.env.example"><code>.env.example</code></a>）。<strong>禁止在 <code>.env</code> 填真实密钥后提交</strong>。<span class="en">Configuration via environment variables (<a href="../../.env.example"><code>.env.example</code></a>). <strong>Never commit real secrets in <code>.env</code></strong>.</span></p>
 <table>
 <thead><tr>
@@ -109,7 +109,7 @@ make test     # 运行测试</code></pre>
 </tbody></table>
 <blockquote>生产还需在 <code>docker-compose.yml</code> 设置 <code>ZAI_API_KEY</code>（智谱）与 <code>POSTGRES_*</code>。<span class="en">For production, also set <code>ZAI_API_KEY</code> (Zhipu) and <code>POSTGRES_*</code> in <code>docker-compose.yml</code>.</span></blockquote>
 <p>其他配置目录 <code>configs/</code>：<code>peak_windows.yaml</code>（高峰时段）、<code>mcp_clients.yaml</code>（外部 MCP 服务器）、<code>k8s/</code>、<code>grafana/</code>、<code>alertmanager/</code>、<code>otel/</code>、<code>logstash/</code>。<span class="en">Other config directories <code>configs/</code>: <code>peak_windows.yaml</code> (peak hours), <code>mcp_clients.yaml</code> (external MCP servers), <code>k8s/</code>, <code>grafana/</code>, <code>alertmanager/</code>, <code>otel/</code>, <code>logstash/</code>.</span></p>
-<h2 id="5-3-cli-命令-5-3-cli">5.3 CLI 命令<span class="en">5.3 CLI</span></h2>
+<h2 id="8-3-cli-命令-5-3-cli">8.3 CLI 命令<span class="en">5.3 CLI</span></h2>
 <p>入口 <code>python -m orbit.cli</code>（<a href="../../src/orbit/cli/"><code>src/orbit/cli/</code></a>）：<span class="en">Entry: <code>python -m orbit.cli</code> (<a href="../../src/orbit/cli/"><code>src/orbit/cli/</code></a>):</span></p>
 <table>
 <thead><tr>
@@ -119,7 +119,7 @@ make test     # 运行测试</code></pre>
 <tr><td><code>orbit init-packages</code></td><td>初始化基础代码包库（写 3 个内置模板到 <code>~/.orbit/base-packages/</code>，覆盖时确认）<span class="en">Initialize base code package library (writes 3 built-in templates to <code>~/.orbit/base-packages/</code>, prompts on overwrite)</span></td></tr>
 <tr><td><code>orbit brief check &lt;path&gt;</code></td><td>检查/生成项目说明书：检查 <code>.orbit/brief.md/.boundaries/.base</code> 是否存在，缺失则用 GLM-5.2 自动生成<span class="en">Check/generate project brief: checks if <code>.orbit/brief.md/.boundaries/.base</code> exist, auto-generates missing ones via GLM-5.2</span></td></tr>
 </tbody></table>
-<h2 id="5-4-前端页面-5-4-frontend-screens">5.4 前端页面<span class="en">5.4 Frontend Screens</span></h2>
+<h2 id="8-4-前端页面-5-4-frontend-screens">8.4 前端页面<span class="en">5.4 Frontend Screens</span></h2>
 <p>前端路由（<a href="../../frontend/src/router/index.ts"><code>frontend/src/router/index.ts</code></a>）：<span class="en">Frontend routes (<a href="../../frontend/src/router/index.ts"><code>frontend/src/router/index.ts</code></a>):</span></p>
 <table>
 <thead><tr>
@@ -133,7 +133,7 @@ make test     # 运行测试</code></pre>
 </tbody></table>
 <p>主工作台 <code>/app</code> 内含组件：TerminalChat（终端风格聊天，<code>$</code> 前缀 + ANSI + 引用回复）、MonacoPanel（代码编辑器）、AgentInfoPanel（Agent LLM 配置 + 指标）、DAGDrawer / TokenChartDrawer / SearchDrawer / TraceDrawer / ConfigDrawer / CodeGraphDrawer（浮层抽屉）、StatusBar（连接态 + 高峰指示灯）、FileTreePanel、CommandPalette（<code>/</code> 触发）、WechatBindingPanel、HITL 人工干预弹窗。<span class="en">Main workspace <code>/app</code> components: TerminalChat (terminal-style chat, <code>$</code> prefix + ANSI + quote reply), MonacoPanel (code editor), AgentInfoPanel (Agent LLM config + metrics), DAGDrawer / TokenChartDrawer / SearchDrawer / TraceDrawer / ConfigDrawer / CodeGraphDrawer (overlay drawers), StatusBar (connection status + peak indicator), FileTreePanel, CommandPalette (<code>/</code> trigger), WechatBindingPanel, HITL human-in-the-loop dialog.</span></p>
 <p>界面：Tailwind CSS v4 + 设计 tokens，Tauri 半透明 Mica 毛玻璃窗口（透明度 15–100% / Blur 0–20px，默认 45%/4px）。<span class="en">UI: Tailwind CSS v4 + design tokens, Tauri translucent Mica glass window (opacity 15–100% / Blur 0–20px, default 45%/4px).</span></p>
-<h2 id="5-5-主用户工作流-5-5-primary-user-workflow">5.5 主用户工作流<span class="en">5.5 Primary User Workflow</span></h2>
+<h2 id="8-5-主用户工作流-5-5-primary-user-workflow">8.5 主用户工作流<span class="en">5.5 Primary User Workflow</span></h2>
 <pre><code>[1] 启动
     BootView 预检（后端/DB/Agent 连通）→ 自动进 TerminalShell 主面板
 
@@ -172,12 +172,12 @@ make test     # 运行测试</code></pre>
 
 [8] 可选：MCP 集成
     configs/mcp_clients.yaml 配置外部 MCP → 启动自动连接注册 → McpView 管理</code></pre>
-<h2 id="5-6-集成通道-5-6-integration-channels">5.6 集成通道<span class="en">5.6 Integration Channels</span></h2>
+<h2 id="8-6-集成通道-5-6-integration-channels">8.6 集成通道<span class="en">5.6 Integration Channels</span></h2>
 <ul>
 <li><strong>微信</strong>：iLink Bot API 双向对话（<code>/api/v1/wechat</code> + WechatBindingPanel），绑定管理 + 配置。<span class="en"><strong>WeChat</strong>: iLink Bot API bidirectional dialog (<code>/api/v1/wechat</code> + WechatBindingPanel), binding management + configuration.</span></li>
 <li><strong>MCP 客户端桥</strong>：JSON-RPC 2.0 over stdio，接外部 MCP 服务器工具。<span class="en"><strong>MCP Client Bridge</strong>: JSON-RPC 2.0 over stdio, connects external MCP server tools.</span></li>
 </ul>
 <hr>
-<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="06-api-reference.html">下一章：API 参考 →<span class="en">Next: API Reference →</span></a></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="09-api-reference.html">下一章：API 参考 →<span class="en">Next: API Reference →</span></a></p>
 </main></body>
 </html>

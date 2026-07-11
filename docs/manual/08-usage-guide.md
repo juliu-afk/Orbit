@@ -1,12 +1,12 @@
-# 05 · 使用说明 || 05 · Usage Guide
+# 08 · 使用说明 || 05 · Usage Guide
 
-[← 返回目录 || Back to index](README.md) · [← 上一章：技术方案 || Prev: Technical Design](04-technical-stack.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：技术方案 || Prev: Technical Design](07-technical-stack.md)
 
 > 面向使用者：怎么装、怎么配、怎么跑、怎么用。 || For users: how to install, configure, run, and use.
 
 ---
 
-## 5.1 三种启动方式 || 5.1 Three Ways to Launch
+## 8.1 三种启动方式 || 5.1 Three Ways to Launch
 
 ### 方式 1：双击 exe（推荐） || Double-click the exe (recommended)
 
@@ -52,7 +52,7 @@ make test     # 运行测试
 | exe 双击 / Docker || exe double-click / Docker | **18888** |
 | `make dev` 源码热重载 || `make dev` hot-reload from source | **8000** |
 
-## 5.2 配置项 || 5.2 Configuration
+## 8.2 配置项 || 5.2 Configuration
 
 配置走环境变量（[`.env.example`](../../.env.example)）。**禁止在 `.env` 填真实密钥后提交**。 || Configuration via environment variables ([`.env.example`](../../.env.example)). **Never commit real secrets in `.env`**.
 
@@ -77,7 +77,7 @@ make test     # 运行测试
 
 其他配置目录 `configs/`：`peak_windows.yaml`（高峰时段）、`mcp_clients.yaml`（外部 MCP 服务器）、`k8s/`、`grafana/`、`alertmanager/`、`otel/`、`logstash/`。 || Other config directories `configs/`: `peak_windows.yaml` (peak hours), `mcp_clients.yaml` (external MCP servers), `k8s/`, `grafana/`, `alertmanager/`, `otel/`, `logstash/`.
 
-## 5.3 CLI 命令 || 5.3 CLI
+## 8.3 CLI 命令 || 5.3 CLI
 
 入口 `python -m orbit.cli`（[`src/orbit/cli/`](../../src/orbit/cli/)）： || Entry: `python -m orbit.cli` ([`src/orbit/cli/`](../../src/orbit/cli/)):
 
@@ -86,7 +86,7 @@ make test     # 运行测试
 | `orbit init-packages` | 初始化基础代码包库（写 3 个内置模板到 `~/.orbit/base-packages/`，覆盖时确认） || Initialize base code package library (writes 3 built-in templates to `~/.orbit/base-packages/`, prompts on overwrite) |
 | `orbit brief check <path>` | 检查/生成项目说明书：检查 `.orbit/brief.md/.boundaries/.base` 是否存在，缺失则用 GLM-5.2 自动生成 || Check/generate project brief: checks if `.orbit/brief.md/.boundaries/.base` exist, auto-generates missing ones via GLM-5.2 |
 
-## 5.4 前端页面 || 5.4 Frontend Screens
+## 8.4 前端页面 || 5.4 Frontend Screens
 
 前端路由（[`frontend/src/router/index.ts`](../../frontend/src/router/index.ts)）： || Frontend routes ([`frontend/src/router/index.ts`](../../frontend/src/router/index.ts)):
 
@@ -100,7 +100,7 @@ make test     # 运行测试
 
 界面：Tailwind CSS v4 + 设计 tokens，Tauri 半透明 Mica 毛玻璃窗口（透明度 15–100% / Blur 0–20px，默认 45%/4px）。 || UI: Tailwind CSS v4 + design tokens, Tauri translucent Mica glass window (opacity 15–100% / Blur 0–20px, default 45%/4px).
 
-## 5.5 主用户工作流 || 5.5 Primary User Workflow
+## 8.5 主用户工作流 || 5.5 Primary User Workflow
 
 ```
 [1] 启动
@@ -143,11 +143,11 @@ make test     # 运行测试
     configs/mcp_clients.yaml 配置外部 MCP → 启动自动连接注册 → McpView 管理
 ```
 
-## 5.6 集成通道 || 5.6 Integration Channels
+## 8.6 集成通道 || 5.6 Integration Channels
 
 - **微信**：iLink Bot API 双向对话（`/api/v1/wechat` + WechatBindingPanel），绑定管理 + 配置。 || **WeChat**: iLink Bot API bidirectional dialog (`/api/v1/wechat` + WechatBindingPanel), binding management + configuration.
 - **MCP 客户端桥**：JSON-RPC 2.0 over stdio，接外部 MCP 服务器工具。 || **MCP Client Bridge**: JSON-RPC 2.0 over stdio, connects external MCP server tools.
 
 ---
 
-[← 返回目录 || Back to index](README.md) · [下一章：API 参考 → || Next: API Reference →](06-api-reference.md)
+[← 返回目录 || Back to index](README.md) · [下一章：API 参考 → || Next: API Reference →](09-api-reference.md)

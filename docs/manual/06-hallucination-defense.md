@@ -1,12 +1,12 @@
-# 03 · 九层防幻觉 || 03 · Hallucination Defense
+# 06 · 九层防幻觉 || 03 · Hallucination Defense
 
-[← 返回目录 || Back to index](README.md) · [← 上一章：整体架构 || Prev: Architecture](02-architecture.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：方法论与理论 || Prev: Methodology & Theory](05-methodology-theory.md)
 
 > Orbit 的验证内核。研究者重点章节。实现见 [`src/orbit/hallucination/`](../../src/orbit/hallucination/) 与 [`src/orbit/compliance/`](../../src/orbit/compliance/)。 || Orbit's verification kernel. Essential reading for researchers. See [`src/orbit/hallucination/`](../../src/orbit/hallucination/) and [`src/orbit/compliance/`](../../src/orbit/compliance/).
 
 ---
 
-## 3.1 为什么需要 9 层 || Why Nine Layers
+## 6.1 为什么需要 9 层 || Why Nine Layers
 
 核心认知——**纯静态分析拦截幻觉的理论上限只有 48.5%–77%**。要把错误率压到 <3%，必须静态 + 动态结合，用"从快到慢"的分层管道：廉价层拦截大多数简单幻觉，昂贵层（沙箱执行）只处理残余高危幻觉。 || Static analysis alone caps at 48.5%–77% interception. To reach <3% error, Orbit combines static + dynamic checks in a "cheap-to-expensive" pipeline — cheap layers catch most simple hallucinations; expensive layers (sandbox execution) handle the residual high-risk ones.
 
@@ -19,7 +19,7 @@
 | L5–L7 高成本层 || L5–L7 High-cost | ~5% 高危幻觉 || ~5% high-risk hallucinations | 沙箱执行换效果 || Sandbox execution for effectiveness |
 | L8–L9 把关层 || L8–L9 Gatekeeping | 配置一致性 + 合规时效性 || Config consistency + compliance timeliness | 零 Token / 异步 || Zero token / async |
 
-## 3.2 四类幻觉与打击策略 || Four Hallucination Types
+## 6.2 四类幻觉与打击策略 || Four Hallucination Types
 
 来源 [`docs/开发计划/00-架构总览.md:514-522`](../开发计划/00-架构总览.md) || Source: [`docs/开发计划/00-架构总览.md:514-522`](../开发计划/00-架构总览.md):
 
@@ -30,7 +30,7 @@
 | **资源幻觉** || Resource | 引用不存在的文件/路径/资源 || References to non-existent files/paths/resources | `include 'config/missing.php'` | L5 + L7 |
 | **逻辑幻觉** || Logic | 算法错误/边界遗漏/并发问题 || Algorithm errors / edge-case omissions / concurrency issues | 循环 `i <= count` 数组越界 || Loop `i <= count` array out-of-bounds | L4 + L5 |
 
-## 3.3 逐层详解 || Layer-by-Layer
+## 6.3 逐层详解 || Layer-by-Layer
 
 | 层 || Layer | 名称 || Name | 技术手段 || Approach | 拦截目标 || Target | 效果数据 || Effectiveness |
 |---|---|---|---|---|---|---|---|---|---|
@@ -46,7 +46,7 @@
 
 > L1–L8 枚举定义见 [`src/orbit/hallucination/schemas.py:15-25`](../../src/orbit/hallucination/schemas.py)；L9 为独立模块 [`src/orbit/compliance/validator.py`](../../src/orbit/compliance/validator.py)，设计见 [`docs/PRD+ADR_Step4.3_L9动态合规验证.md`](../PRD+ADR_Step4.3_L9动态合规验证.md)。 || L1–L8 enum definitions in [`src/orbit/hallucination/schemas.py:15-25`](../../src/orbit/hallucination/schemas.py); L9 is a standalone module at [`src/orbit/compliance/validator.py`](../../src/orbit/compliance/validator.py), see [`docs/PRD+ADR_Step4.3_L9动态合规验证.md`](../PRD+ADR_Step4.3_L9动态合规验证.md) for design.
 
-## 3.4 执行管道 || Execution Pipeline
+## 6.4 执行管道 || Execution Pipeline
 
 **关键**：管道**执行顺序**不等于层编号顺序。实际顺序为"从快到慢"（[`src/orbit/hallucination/pipeline.py:43-52`](../../src/orbit/hallucination/pipeline.py)）： || **Key**: The pipeline **execution order** is NOT the layer number order. The actual order is "cheapest-first" (see [`src/orbit/hallucination/pipeline.py:43-52`](../../src/orbit/hallucination/pipeline.py)):
 
@@ -67,13 +67,17 @@ L1 图谱 → L4 类型 → L3 熵 → L2 追踪 → L6 合约 → L8 配置 →
 
 **L1 图谱** 和 **L7 沙箱** 运行时失败时，管道**立即停止**，不再执行后续层——因为这两层失败意味着代码根本不可信，继续验证无意义（[`pipeline.py:55-58`](../../src/orbit/hallucination/pipeline.py)）。 || When **L1 Graph** or **L7 Sandbox** fails at runtime, the pipeline **halts immediately** and does not execute subsequent layers — failure in these two layers means the code is fundamentally untrustworthy, making further validation meaningless (see [`pipeline.py:55-58`](../../src/orbit/hallucination/pipeline.py)).
 
-## 3.5 设计原理小结 || Design Rationale
+## 6.5 设计原理小结 || Design Rationale
 
 1. **顺序服务于早停**：便宜且高召回的层放前面，一旦发现致命问题即提前终止，省下昂贵层的开销。 || **Order serves early termination**: cheap, high-recall layers go first. Once a fatal problem is detected, the pipeline terminates early, saving the cost of expensive layers.
 2. **静动互补**：L1/L4/L5/L6/L8 静态（确定性、可证明），L2/L3/L7 动态（运行时真值）。静态给出必要条件，动态给出充分验证。 || **Static-dynamic complementarity**: L1/L4/L5/L6/L8 are static (deterministic, provable), L2/L3/L7 are dynamic (runtime ground truth). Static provides necessary conditions, dynamic provides sufficient verification.
 3. **L7 沙箱是最后防线**：能拦截所有类型幻觉，把错误率从 65% 压到 2%，代价是 Docker 执行开销——因此只在 full 验证跑。 || **L7 Sandbox is the last line of defense**: it catches all hallucination types, reducing error rate from 65% to 2%, at the cost of Docker execution overhead — hence it only runs in full validation.
 4. **L9 独立于 L1–L8**：合规是"知识时效"维度，与代码正确性正交，故单独成模块、异步执行、不阻塞主管道。 || **L9 is independent from L1–L8**: compliance is a "knowledge timeliness" dimension orthogonal to code correctness, so it lives as a separate module, runs asynchronously, and does not block the main pipeline.
 
+## 3.6 代码态 vs 设计口径 || Code Reality vs Design Framing
+
+本章按设计口径讲述 **L1–L9**（L9=动态合规，位于 `compliance/`）。代码实现比设计更深：`hallucination/` 下另有 **L9 时序（LTL 模型检查，`l9_temporal.py`）**、**L10 分离逻辑（`l10_separation.py`）**、抽象解释（`abstract_interp.py`）与代数效应追踪（`effect_tracker.py`）。各层背后的学术方法完整映射见 [05 方法论与理论 §5.2.4](05-methodology-theory.md)。 || This chapter follows the design framing of **L1–L9** (L9 = dynamic compliance, in `compliance/`). The code goes deeper: `hallucination/` also ships **L9 temporal (LTL model checking, `l9_temporal.py`)**, **L10 separation logic (`l10_separation.py`)**, abstract interpretation (`abstract_interp.py`), and algebraic-effect tracking (`effect_tracker.py`). For the full academic mapping of each layer see [05 Methodology & Theory §5.2.4](05-methodology-theory.md).
+
 ---
 
-[← 返回目录 || Back to index](README.md) · [下一章：技术方案 → || Next: Technical Design →](04-technical-stack.md)
+[← 返回目录 || Back to index](README.md) · [下一章：技术方案 → || Next: Technical Design →](07-technical-stack.md)

@@ -41,34 +41,54 @@ th .en, td .en { font-size:.8em; }
 <body><main>
 <h1 id="orbit-说明书-orbit-manual">Orbit 说明书<span class="en">Orbit Manual</span></h1>
 <blockquote>轻量级多 Agent 软件开发自循环系统 —— 完整说明书。<span class="en">A lightweight multi-agent, self-looping software development system — the complete manual.</span></blockquote>
-<p>本说明书面向三类读者，用一套带目录的文档覆盖 Orbit 的设计哲学、整体架构、技术方案、使用说明、再开发说明。<span class="en">This manual serves three audiences and covers Orbit's design philosophy, architecture, technical design, usage, and re-development in one indexed document set.</span></p>
+<p>本说明书面向三类读者，用一套带目录的文档覆盖 Orbit 的设计哲学、能力边界、整体架构、端到端流程、方法论与理论、技术方案、使用说明、再开发说明。<span class="en">This manual serves three audiences and covers Orbit's design philosophy, capability boundaries, architecture, end-to-end workflow, methodology &amp; theory, technical design, usage, and re-development in one indexed document set.</span></p>
 <table>
 <thead><tr>
 <th>读者<span class="en">Reader</span></th>
 <th>你想知道<span class="en">What you want</span></th>
 <th>建议路径<span class="en">Suggested path</span></th>
 </tr></thead><tbody>
-<tr><td>使用者<span class="en">User</span></td><td>怎么装、怎么跑、怎么用<span class="en">How to install, run, and use</span></td><td>00 → 05 → 06</td></tr>
-<tr><td>开发者<span class="en">Developer</span></td><td>怎么改、怎么加功能、怎么构建<span class="en">How to modify, extend, and build</span></td><td>00 → 02 → 07 → 06</td></tr>
-<tr><td>研究者<span class="en">Researcher</span></td><td>为什么这么设计、理论依据<span class="en">Why it is designed this way, the rationale</span></td><td>01 → 02 → 03 → 08</td></tr>
+<tr><td>使用者<span class="en">User</span></td><td>怎么装、怎么跑、能做什么<span class="en">How to install, run, and what it can do</span></td><td>00 → 02 → 08 → 09</td></tr>
+<tr><td>开发者<span class="en">Developer</span></td><td>怎么改、流程怎么走、怎么构建<span class="en">How to modify, how the flow works, how to build</span></td><td>00 → 03 → 04 → 10</td></tr>
+<tr><td>研究者<span class="en">Researcher</span></td><td>为什么这么设计、用了什么理论<span class="en">Why it is designed this way, what theory it uses</span></td><td>01 → 03 → 05 → 06 → 11</td></tr>
 </tbody></table>
 <hr>
 <h2 id="目录-table-of-contents">目录<span class="en">Table of Contents</span></h2>
+<h3 id="第一部分-认识-orbit-part-i-understanding-orbit">第一部分 · 认识 Orbit<span class="en">Part I · Understanding Orbit</span></h3>
 <table>
 <thead><tr>
 <th>#</th>
 <th>文档<span class="en">Document</span></th>
 <th>内容<span class="en">Content</span></th>
 </tr></thead><tbody>
-<tr><td>00</td><td><a href="00-overview.html">总览<span class="en">Overview</span></a></td><td>项目定位、核心指标、技术栈全景、读者导航<span class="en">Positioning, key metrics, tech-stack overview, reader navigation</span></td></tr>
-<tr><td>01</td><td><a href="01-design-philosophy.html">设计哲学<span class="en">Design Philosophy</span></a></td><td>为何存在、为何锚定编排层、为何自研调度器、六项哲学、不可妥协项<span class="en">Why it exists, why the orchestration layer, why a self-built scheduler, six principles, non-negotiables</span></td></tr>
-<tr><td>02</td><td><a href="02-architecture.html">整体架构<span class="en">Architecture</span></a></td><td>三层架构、数据流全链路、48 模块地图、五图谱体系、熔断/检查点/审计链<span class="en">Three-layer model, end-to-end data flow, 48-module map, five-graph system, breaker/checkpoint/audit</span></td></tr>
-<tr><td>03</td><td><a href="03-hallucination-defense.html">九层防幻觉<span class="en">Hallucination Defense</span></a></td><td>L1–L9 逐层原理、执行管道、四类幻觉打击策略、效果数据<span class="en">Layer-by-layer L1–L9, execution pipeline, four hallucination types, effectiveness data</span></td></tr>
-<tr><td>04</td><td><a href="04-technical-stack.html">技术方案<span class="en">Technical Design</span></a></td><td>技术栈矩阵、LiteLLM 网关与三层路由、沙箱、存储、可观测性<span class="en">Stack matrix, LiteLLM gateway and 3-tier routing, sandbox, storage, observability</span></td></tr>
-<tr><td>05</td><td><a href="05-usage-guide.html">使用说明<span class="en">Usage Guide</span></a></td><td>三种启动方式、配置项、CLI、前端页面、主用户工作流<span class="en">Three launch modes, configuration, CLI, frontend screens, primary workflow</span></td></tr>
-<tr><td>06</td><td><a href="06-api-reference.html">API 参考<span class="en">API Reference</span></a></td><td>全部路由组、代表端点、WebSocket/SSE 通道<span class="en">All route groups, representative endpoints, WebSocket/SSE channels</span></td></tr>
-<tr><td>07</td><td><a href="07-development-guide.html">再开发说明<span class="en">Development Guide</span></a></td><td>四阶段工作流、模块职责表、测试体系、exe 构建链路、数据库迁移、贡献约定<span class="en">Four-stage workflow, module map, testing, exe build chain, migrations, conventions</span></td></tr>
-<tr><td>08</td><td><a href="08-appendix.html">附录<span class="en">Appendix</span></a></td><td>术语表、核心指标基线、路线图、原始设计文档索引<span class="en">Glossary, metric baselines, roadmap, source-doc index</span></td></tr>
+<tr><td>00</td><td><a href="00-overview.html">总览<span class="en">Overview</span></a></td><td>项目定位、核心指标、技术栈全景、读者导航<span class="en">Positioning, key metrics, tech-stack overview, navigation</span></td></tr>
+<tr><td>01</td><td><a href="01-design-philosophy.html">设计哲学<span class="en">Design Philosophy</span></a></td><td>为何存在、为何锚定编排层、为何自研调度器、六项哲学、不可妥协项<span class="en">Why it exists, why the orchestration layer, why a self-built scheduler</span></td></tr>
+<tr><td>02</td><td><a href="02-capabilities-boundaries.html">能力与边界<span class="en">Capabilities &amp; Boundaries</span></a></td><td>能做什么（6 类能力）+ 能力边界（Non-Goals/前提/理论上限/成熟度缺口）<span class="en">What it can do + boundaries</span></td></tr>
+</tbody></table>
+<h3 id="第二部分-工作原理-part-ii-how-it-works">第二部分 · 工作原理<span class="en">Part II · How It Works</span></h3>
+<table>
+<thead><tr>
+<th>#</th>
+<th>文档<span class="en">Document</span></th>
+<th>内容<span class="en">Content</span></th>
+</tr></thead><tbody>
+<tr><td>03</td><td><a href="03-architecture.html">整体架构<span class="en">Architecture</span></a></td><td>三层架构、数据流、48 模块地图、五图谱、熔断/检查点/审计链<span class="en">Three-layer model, data flow, 48-module map, five graphs</span></td></tr>
+<tr><td>04</td><td><a href="04-workflow.html">端到端流程<span class="en">End-to-End Workflow</span></a></td><td>三种宏观模式、真实状态机、全生命周期 11 阶段、全景时序图<span class="en">Three modes, real state machine, 11-stage lifecycle</span></td></tr>
+<tr><td>05</td><td><a href="05-methodology-theory.html">方法论与理论<span class="en">Methodology &amp; Theory</span></a></td><td>52 个理论挂载点、11 个学术领域、每环节方法论映射<span class="en">52 theory mount-points across 11 fields</span></td></tr>
+<tr><td>06</td><td><a href="06-hallucination-defense.html">九层防幻觉<span class="en">Hallucination Defense</span></a></td><td>L1–L9 逐层原理、执行管道、四类幻觉打击、效果数据<span class="en">Layer-by-layer L1–L9, pipeline, effectiveness</span></td></tr>
+</tbody></table>
+<h3 id="第三部分-使用与扩展-part-iii-use-extend">第三部分 · 使用与扩展<span class="en">Part III · Use &amp; Extend</span></h3>
+<table>
+<thead><tr>
+<th>#</th>
+<th>文档<span class="en">Document</span></th>
+<th>内容<span class="en">Content</span></th>
+</tr></thead><tbody>
+<tr><td>07</td><td><a href="07-technical-stack.html">技术方案<span class="en">Technical Design</span></a></td><td>技术栈矩阵、LiteLLM 网关与三层路由、沙箱、存储、可观测性<span class="en">Stack, gateway, sandbox, storage, observability</span></td></tr>
+<tr><td>08</td><td><a href="08-usage-guide.html">使用说明<span class="en">Usage Guide</span></a></td><td>三种启动方式、配置项、CLI、前端页面、主用户工作流<span class="en">Launch modes, config, CLI, screens, workflow</span></td></tr>
+<tr><td>09</td><td><a href="09-api-reference.html">API 参考<span class="en">API Reference</span></a></td><td>全部路由组、代表端点、WebSocket/SSE 通道<span class="en">All route groups, endpoints, channels</span></td></tr>
+<tr><td>10</td><td><a href="10-development-guide.html">再开发说明<span class="en">Development Guide</span></a></td><td>四阶段工作流、模块职责表、测试体系、exe 构建链路、贡献约定<span class="en">Four-stage workflow, testing, build chain</span></td></tr>
+<tr><td>11</td><td><a href="11-appendix.html">附录<span class="en">Appendix</span></a></td><td>术语表、核心指标基线、路线图、原始设计文档索引<span class="en">Glossary, baselines, roadmap, source-doc index</span></td></tr>
 </tbody></table>
 <hr>
 <h2 id="一句话理解-orbit-orbit-in-one-sentence">一句话理解 Orbit<span class="en">Orbit in One Sentence</span></h2>
@@ -88,14 +108,15 @@ th .en, td .en { font-size:.8em; }
 <ul>
 <li>每个标题、段落、列表项、表格单元格均"中文在上、英文小一号紧贴其下"。<span class="en">Every heading, paragraph, list item, and table cell shows Chinese on top with smaller English directly beneath.</span></li>
 <li>凡涉及具体实现，均标注源文件路径（<code>src/orbit/...</code>）或设计文档，便于回溯核对。<span class="en">Every concrete claim cites a source file (<code>src/orbit/...</code>) or design doc for verification.</span></li>
-<li>数据/指标以撰写时仓库状态为准，随版本演进；以 <a href="../产品路线图.html"><code>docs/产品路线图.md</code></a> 与 <a href="../已实现功能清单.html"><code>docs/已实现功能清单.md</code></a> 为权威更新源。<span class="en">Metrics reflect repo state at writing time; the roadmap and feature-list docs are the authoritative live sources.</span></li>
+<li>数据/指标以撰写时仓库状态为准；以 <a href="../产品路线图.html"><code>docs/产品路线图.md</code></a> 与 <a href="../已实现功能清单.html"><code>docs/已实现功能清单.md</code></a> 为权威更新源。<span class="en">Metrics reflect repo state at writing time; the roadmap and feature-list docs are the authoritative live sources.</span></li>
+<li>HTML 版由 <code>scripts/render_manual.py</code> 从 Markdown 生成，重生成命令：<code>python scripts/render_manual.py</code>。<span class="en">The HTML build is generated from Markdown by <code>scripts/render_manual.py</code>; regenerate with <code>python scripts/render_manual.py</code>.</span></li>
 </ul>
 <h2 id="相关文档-related-docs">相关文档<span class="en">Related Docs</span></h2>
 <ul>
 <li><a href="../../README.html"><code>README.md</code></a> — 项目根 README（快速开始）<span class="en">Root README (quick start)</span></li>
 <li><a href="../../AGENTS.html"><code>AGENTS.md</code></a> — 开发哲学与实现约束全集<span class="en">Full development philosophy and implementation constraints</span></li>
-<li><a href="../charter.html"><code>docs/charter.md</code></a> — 项目章程（度量基线、范围、风险，本项目"宪法"）<span class="en">Project charter (metric baselines, scope, risks — the project's "constitution")</span></li>
-<li><a href="../开发计划_V14.1.html"><code>docs/开发计划_V14.1.md</code></a> — 总体设计（26 章，指向 <code>docs/开发计划/</code> 子文档）<span class="en">Overall design (26 chapters, indexing <code>docs/开发计划/</code> subdocs)</span></li>
+<li><a href="../charter.html"><code>docs/charter.md</code></a> — 项目章程（度量基线、范围、风险 — 本项目"宪法"）<span class="en">Project charter (baselines, scope, risks — the "constitution")</span></li>
+<li><a href="../开发计划_V14.1.html"><code>docs/开发计划_V14.1.md</code></a> — 总体设计（26 章，指向 <code>docs/开发计划/</code> 子文档）<span class="en">Overall design (26 chapters)</span></li>
 <li><a href="../WORKFLOW.html"><code>docs/WORKFLOW.md</code></a> — 四阶段开发流程细则<span class="en">Four-stage development workflow details</span></li>
 <li><a href="../三层架构规范.html"><code>docs/三层架构规范.md</code></a> — 三层边界与静态检查规则<span class="en">Three-layer boundaries and static-check rules</span></li>
 </ul>

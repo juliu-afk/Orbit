@@ -1,19 +1,19 @@
-# 06 · API 参考 || API Reference
+# 09 · API 参考 || API Reference
 
-[← 返回目录 || Back to index](README.md) · [← 上一章：使用说明 || Prev: Usage Guide](05-usage-guide.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：使用说明 || Prev: Usage Guide](08-usage-guide.md)
 
 > 路由注册见 [`src/orbit/api/main.py`](../../src/orbit/api/main.py)（`_ROUTE_MODULES` / `_ROUTE_SPEC`）。交互式文档：运行后访问 `/docs`（Swagger）或 `/redoc`。 || Route registration: see [`src/orbit/api/main.py`](../../src/orbit/api/main.py) (`_ROUTE_MODULES` / `_ROUTE_SPEC`). Interactive docs: visit `/docs` (Swagger) or `/redoc` after startup.
 
 ---
 
-## 6.1 统一约定 || Conventions
+## 9.1 统一约定 || Conventions
 
 - 版本前缀：`/api/v1`（`API_V1_STR`）。 || Version prefix: `/api/v1` (`API_V1_STR`).
 - 鉴权：设置 `ORBIT_AUTH_TOKEN` 后启用 AuthMiddleware；请求带 `Authorization: Bearer <token>`。 || Authentication: enables AuthMiddleware when `ORBIT_AUTH_TOKEN` is set; requests include `Authorization: Bearer <token>`.
 - 自动文档：`/docs`（Swagger UI）、`/redoc`（ReDoc）。 || Auto docs: `/docs` (Swagger UI), `/redoc` (ReDoc).
 - 指标：`/metrics`（Prometheus）。 || Metrics: `/metrics` (Prometheus).
 
-## 6.2 任务与目标 || Tasks & Goals
+## 9.2 任务与目标 || Tasks & Goals
 
 | 前缀 || Prefix | 路由文件 || Route file | 代表端点 || Representative endpoints |
 |---|---|---|
@@ -25,7 +25,7 @@
 | `/api/v1/dream` | `dream.py` | `POST /dream/run` 触发记忆合并 || trigger memory consolidation · `GET /dream/status` |
 | `/api/v1/schedule` | `schedule.py` | `GET /peak-status` · `GET /queue` · `POST /queue/{id}/urgent` · `GET /savings-report` · `POST /reload-config` |
 
-## 6.3 会话与项目 || Sessions & Projects
+## 9.3 会话与项目 || Sessions & Projects
 
 | 前缀 || Prefix | 路由文件 || Route file | 代表端点 || Representative endpoints |
 |---|---|---|
@@ -34,7 +34,7 @@
 | `/api/v1/chat` | `chat.py` | `WebSocket /chat` 自然语言入口（ChatterAgent→意图路由→Chatter/Clarifier）|| natural language entry point (ChatterAgent → intent routing → Chatter/Clarifier) |
 | `/api/v1/agents` | `agent_llm.py` | `GET /agents/{name}/llm` 查询配置 · `POST /agents/{name}/llm/switch` 强制切换模型 || `GET /agents/{name}/llm` query config · `POST /agents/{name}/llm/switch` force model switch |
 
-## 6.4 验证与知识 || Validation & Knowledge
+## 9.4 验证与知识 || Validation & Knowledge
 
 | 前缀 || Prefix | 路由文件 || Route file | 代表端点 || Representative endpoints |
 |---|---|---|
@@ -44,7 +44,7 @@
 | `/api/v1/compliance_check` | `compliance_routes.py` | Diff 合规标注 + 审查清单自动生成 || Diff compliance annotations + auto-generated review checklist |
 | `/api/v1/causal` | `causal_routes.py` | `POST /learn` 学习因果图 · `POST /root-cause` 根因分析 · `GET /graph` · `POST /recommend` || `POST /learn` learn causal graph · `POST /root-cause` root cause analysis · `GET /graph` · `POST /recommend` |
 
-## 6.5 可观测与运维 || Observability & Ops
+## 9.5 可观测与运维 || Observability & Ops
 
 | 前缀 || Prefix | 路由文件 || Route file | 代表端点 || Representative endpoints |
 |---|---|---|
@@ -53,7 +53,7 @@
 | `/api/v1/versioning` | `versioning.py` | `GET /current` · `GET /versions` · `POST /install` |
 | `/projects` | `ponytail_debt.py` | Ponytail 技术债务台账扫描 || Ponytail technical debt ledger scan |
 
-## 6.6 代码与文件 || Code & Files
+## 9.6 代码与文件 || Code & Files
 
 | 前缀 || Prefix | 路由文件 || Route file | 代表端点 || Representative endpoints |
 |---|---|---|
@@ -66,14 +66,14 @@
 | `/api/v1/terminal` | `terminal_routes.py` | 集成终端命令执行 + 输出流（命令白名单）|| Integrated terminal command execution + output stream (command whitelist) |
 | `/api/v1/config` | `config_routes.py` | 配置管理（YAML 编辑 + Git 历史 + 分支 + 冲突解决）|| Configuration management (YAML editing + Git history + branching + conflict resolution) |
 
-## 6.7 集成与窗口 || Integration & Window
+## 9.7 集成与窗口 || Integration & Window
 
 | 前缀 || Prefix | 路由文件 || Route file | 代表端点 || Representative endpoints |
 |---|---|---|
 | `/api/v1/wechat` | `wechat_routes.py` | 微信集成——绑定 + 配置 + iLink Bot API 双向对话 || WeChat integration — binding + configuration + iLink Bot API bidirectional conversation |
 | `/app` | `app_routes.py` | 窗口控制（最小化/最大化/关闭）|| Window control (minimize/maximize/close) |
 
-## 6.8 实时通道 || Real-time Channels
+## 9.8 实时通道 || Real-time Channels
 
 | 通道 || Channel | 路由 || Route | 用途 || Purpose |
 |---|---|---|
@@ -84,4 +84,4 @@
 
 ---
 
-[← 返回目录 || Back to index](README.md) · [下一章：再开发说明 → || Next: Development Guide →](07-development-guide.md)
+[← 返回目录 || Back to index](README.md) · [下一章：再开发说明 → || Next: Development Guide →](10-development-guide.md)

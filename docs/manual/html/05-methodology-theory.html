@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>05 · 方法论与理论映射 · Methodology &amp; Theory Map</title>
+<style>
+:root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
+        --accent:#0969da; --code-bg:#f6f8fa; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg:#e6edf3; --bg:#0d1117; --muted:#8b949e; --border:#30363d;
+          --accent:#4493f8; --code-bg:#161b22; } }
+* { box-sizing: border-box; }
+body { margin:0; color:var(--fg); background:var(--bg);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC",
+       "Microsoft YaHei",Helvetica,Arial,sans-serif; line-height:1.6; }
+main { max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+h1,h2,h3,h4 { line-height:1.25; margin-top:1.6em; }
+h1 { border-bottom:2px solid var(--border); padding-bottom:.3em; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:.25em; }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+code { background:var(--code-bg); padding:.15em .35em; border-radius:6px;
+       font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size:.9em; }
+pre { background:var(--code-bg); padding:1rem; border-radius:8px; overflow-x:auto;
+      border:1px solid var(--border); }
+pre code { background:none; padding:0; }
+blockquote { margin:1em 0; padding:.4em 1em; color:var(--muted);
+             border-left:4px solid var(--border); }
+table { border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto; }
+th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
+th { background:var(--code-bg); }
+hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
+ul { padding-left:1.5em; }
+.en { display:block; font-size:.82em; font-weight:400; color:var(--muted);
+      line-height:1.45; margin-top:.15em; }
+h1 .en, h2 .en, h3 .en, h4 .en { font-size:.6em; margin-top:.2em; }
+th .en, td .en { font-size:.8em; }
+</style>
+</head>
+<body><main>
+<h1 id="05-方法论与理论映射-methodology-theory-map">05 · 方法论与理论映射<span class="en">Methodology &amp; Theory Map</span></h1>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="04-workflow.html">← 上一章：端到端流程<span class="en">Prev: End-to-End Workflow</span></a></p>
+<blockquote>Orbit 每个环节都锚定一个可验证的学术方法，而非拍脑袋。本章系统列出全部 <strong>52 个理论/方法论挂载点</strong>，跨 11 个学术领域。研究者重点章节。每行标注：环节 · 理论(提出者/年) · 一句话 · 源文件。<span class="en">Every Orbit mechanism is anchored to a verifiable academic method, not guesswork. This chapter systematically lists all <strong>52 theory/methodology mount-points</strong> across 11 fields. A key chapter for researchers. Each row: mechanism · theory (author/year) · one-liner · source file.</span></blockquote>
+<hr>
+<h2 id="5-1-全景-11-个学术领域-overview-11-academic-fields">5.1 全景：11 个学术领域<span class="en">Overview: 11 Academic Fields</span></h2>
+<table>
+<thead><tr>
+<th>领域<span class="en">Field</span></th>
+<th>代表方法<span class="en">Representative methods</span></th>
+</tr></thead><tbody>
+<tr><td>强化学习<span class="en">Reinforcement Learning</span></td><td>MCTS · GRPO · Thompson Bandit</td></tr>
+<tr><td>因果推理<span class="en">Causal Inference</span></td><td>Pearl SCM · DoWhy GCM · do-calculus</td></tr>
+<tr><td>形式化方法<span class="en">Formal Methods</span></td><td>Z3 SMT · Hoare Logic · LTL Model Checking · Separation Logic</td></tr>
+<tr><td>信息论<span class="en">Information Theory</span></td><td>Shannon Entropy · Information Bottleneck · Minimum Description Length</td></tr>
+<tr><td>博弈论与机制设计<span class="en">Game Theory &amp; Mechanism Design</span></td><td>VCG · Shapley Value · BFT Consensus</td></tr>
+<tr><td>几何方法<span class="en">Geometric Methods</span></td><td>Information Geometry (Fisher-Rao) · Spectral Graph Theory · Optimal Transport</td></tr>
+<tr><td>控制理论<span class="en">Control Theory</span></td><td>PID Control · Circuit Breaker</td></tr>
+<tr><td>机器学习理论<span class="en">ML Theory</span></td><td>PAC Learning · Differential Privacy</td></tr>
+<tr><td>编程语言理论<span class="en">PL Theory</span></td><td>Abstract Interpretation · Type Systems · Algebraic Effects · Program Slicing</td></tr>
+<tr><td>认知科学<span class="en">Cognitive Science</span></td><td>ReAct · ReflAct · Metacognition · Free Energy Principle</td></tr>
+<tr><td>科学方法<span class="en">Scientific Method</span></td><td>Ablation Study</td></tr>
+</tbody></table>
+<h2 id="5-2-按环节的方法论-methodology-by-mechanism">5.2 按环节的方法论<span class="en">Methodology by Mechanism</span></h2>
+<h3 id="5-2-1-agent-执行层-agent-execution">5.2.1 Agent 执行层<span class="en">Agent Execution</span></h3>
+<table>
+<thead><tr>
+<th>机制<span class="en">Mechanism</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>ReActAgent</td><td>ReAct (Google, 2023)</td><td>Think→Act→Observe 循环，推理与工具调用交替<span class="en">Interleaves reasoning and tool calls</span></td><td><code>agents/react_agent/agent.py</code></td></tr>
+<tr><td>MCTSPlanner</td><td>MCTS + UCB1 (Coulom 2006 / Kocsis-Szepesvári 2006)</td><td>蒙特卡洛树搜索并行探索多推理路径，对标 Tree-of-Thought<span class="en">Parallel path search</span></td><td><code>agents/mcts.py</code></td></tr>
+<tr><td>PreActEngine</td><td>PreAct (ICLR 2025)</td><td>Action 前用双预测器估成功率/风险，高风险则改道减少回滚<span class="en">Predicts risk before acting</span></td><td><code>agents/preact.py</code></td></tr>
+<tr><td>ReflectionEngine</td><td>ReflAct / AgentDebug (2025)</td><td>每步 Observation 后结构化反思，检测目标漂移<span class="en">Structured post-step reflection</span></td><td><code>agents/reflection.py</code></td></tr>
+<tr><td>AgentMDP</td><td>MDP / Bellman (1957)</td><td>将 Agent 循环形式化为有限时域 MDP，算 Bellman gap<span class="en">Formalizes loop as an MDP</span></td><td><code>agents/mdp.py</code></td></tr>
+<tr><td>BisimulationChecker</td><td>Bisimulation (Milner, 1989)</td><td>比较两 LTS 行为等价，判断策略能否无损替换<span class="en">Behavioral equivalence of policies</span></td><td><code>agents/bisim.py</code></td></tr>
+</tbody></table>
+<h3 id="5-2-2-自进化与对齐-self-evolution-alignment">5.2.2 自进化与对齐<span class="en">Self-Evolution &amp; Alignment</span></h3>
+<table>
+<thead><tr>
+<th>机制<span class="en">Mechanism</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>DistillationEngine</td><td>EvolveR (2025)</td><td>从轨迹离线蒸馏可复用策略原则（失败→避免，成功→复用）<span class="en">Offline principle distillation</span></td><td><code>evolution/distill.py</code></td></tr>
+<tr><td>GEPAEngine</td><td>GEPA (ICLR 2026 Oral)</td><td>遗传算法进化 Prompt：变异/交叉 + Pareto 兼顾准确率与 Token<span class="en">Genetic-Pareto prompt evolution</span></td><td><code>evolution/gepa.py</code></td></tr>
+<tr><td>GRPOScorer</td><td>GRPO (Group Relative Policy Optimization)</td><td>对比原则应用前后成功率 delta 调效用 + 自动剪枝<span class="en">Relative scoring + pruning</span></td><td><code>evolution/grpo.py</code></td></tr>
+<tr><td>ScopeMemory</td><td>SCOPE (arXiv 2512.15374)</td><td>双流记忆：战术(临时) + 战略(持久)，3+ 任务复现自动升级<span class="en">Dual-stream memory promotion</span></td><td><code>evolution/scope.py</code></td></tr>
+<tr><td>AnchorGuard</td><td>ANCHOR (Alignment Tipping)</td><td>蒸馏/应用前后注入监督检查点，防自进化触发对齐崩溃<span class="en">Alignment guardrails</span></td><td><code>evolution/anchor.py</code></td></tr>
+<tr><td>PACBound</td><td>PAC Learning (Valiant, 1984)</td><td>泛化误差上界 ε=√((ln</td><td>H</td><td>+ln(1/δ))/2m) 替代硬编码阈值<span class="en">Sample-adaptive threshold</span></td><td><code>evolution/pac_bounds.py</code></td></tr>
+<tr><td>InfoGeometry</td><td>Information Geometry / Fisher-Rao (Amari, 1998)</td><td>Fisher 对角近似下自然梯度，参数化不变的最陡下降<span class="en">Natural-gradient descent</span></td><td><code>evolution/info_geom.py</code></td></tr>
+</tbody></table>
+<h3 id="5-2-3-因果推理-causal-inference">5.2.3 因果推理<span class="en">Causal Inference</span></h3>
+<table>
+<thead><tr>
+<th>机制<span class="en">Mechanism</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>RootCauseAnalyzer</td><td>Pearl Hierarchy / do-calculus + DoWhy GCM (Pearl 2009)</td><td>因果图上 Shapley 对称归因，区分起源节点与继承节点<span class="en">Causal anomaly attribution</span></td><td><code>causal/root_cause.py</code></td></tr>
+<tr><td>CausalModelManager</td><td>SCM / DoWhy Structural Causal Model</td><td>从领域知识建因果 DAG，用可逆 SCM 拟合边权<span class="en">Fits an SCM from traces</span></td><td><code>causal/graph.py</code></td></tr>
+</tbody></table>
+<h3 id="5-2-4-防幻觉-l1-l10-anti-hallucination-l1-l10">5.2.4 防幻觉 L1–L10<span class="en">Anti-Hallucination L1–L10</span></h3>
+<table>
+<thead><tr>
+<th>层<span class="en">Layer</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>L1 图谱<span class="en">Graph</span></td><td>静态分析 / AST 符号解析<span class="en">Static analysis</span></td><td>ast 提符号在 CodeGraph 验存在性<span class="en">Symbol existence</span></td><td><code>hallucination/l1_graph.py</code></td></tr>
+<tr><td>L2 追踪<span class="en">Trace</span></td><td>动态分析 / sys.settrace<span class="en">Dynamic analysis</span></td><td>沙箱注入 settrace 比对调用<span class="en">Runtime call tracing</span></td><td><code>hallucination/l2_dynamic.py</code></td></tr>
+<tr><td>L3 熵<span class="en">Entropy</span></td><td>Shannon Entropy (1948)</td><td>逐 token 归一化熵，超阈判"猜"<span class="en">Per-token entropy</span></td><td><code>hallucination/l3_entropy.py</code></td></tr>
+<tr><td>L4 类型<span class="en">Type</span></td><td>Type Theory / Hindley-Milner</td><td>mypy --strict 类型一致性<span class="en">Static typing</span></td><td><code>hallucination/l4_type.py</code></td></tr>
+<tr><td>L5 Z3</td><td>SMT / Z3 (de Moura-Bjørner 2008) + Hoare Logic</td><td>@formal pre/post 构 Z3 公式求反例<span class="en">SMT proof of contracts</span></td><td><code>hallucination/l5_z3.py</code></td></tr>
+<tr><td>L6 合约<span class="en">Contract</span></td><td>Design-by-Contract (Meyer, 1992)</td><td>prance 解析 OpenAPI 逐端点比对<span class="en">Contract conformance</span></td><td><code>hallucination/l6_contract.py</code></td></tr>
+<tr><td>L7 沙箱<span class="en">Sandbox</span></td><td>运行时验证 / 测试执行<span class="en">Runtime validation</span></td><td>沙箱跑代码 + 断言<span class="en">Sandbox execution</span></td><td><code>hallucination/l7_runtime.py</code></td></tr>
+<tr><td>L8 配置<span class="en">Config</span></td><td>SHA256 指纹比对<span class="en">Fingerprint diff</span></td><td>与黄金基线比对，漂移告警/修复<span class="en">Drift detect</span></td><td><code>hallucination/l8_config.py</code></td></tr>
+<tr><td>L9 时序<span class="en">Temporal</span></td><td>LTL Model Checking (Pnueli, 1977)</td><td>自实现 LTL 检查器验状态机安全性(G)/活性(F)<span class="en">State-machine LTL check</span></td><td><code>hallucination/l9_temporal.py</code></td></tr>
+<tr><td>L10 分离<span class="en">Separation</span></td><td>Separation Logic (Reynolds/O'Hearn, 2002)</td><td>堆所有权 + 别名分析 + Frame 条件<span class="en">Memory-safety check</span></td><td><code>hallucination/l10_separation.py</code></td></tr>
+<tr><td>抽象解释<span class="en">Abstract Interp</span></td><td>Abstract Interpretation / Galois (Cousot 1977)</td><td>分析层间抽象域依赖，L1 失败影响 L4/L7 可靠性<span class="en">Inter-layer soundness</span></td><td><code>hallucination/abstract_interp.py</code></td></tr>
+<tr><td>效应追踪<span class="en">Effect Tracker</span></td><td>Algebraic Effects (Plotkin-Pretnar, 2009)</td><td>AST 分析 async/io/state 效应，检并发竞赛<span class="en">Effect-based race detect</span></td><td><code>hallucination/effect_tracker.py</code></td></tr>
+</tbody></table>
+<blockquote>说明：代码实现到 L10 + 抽象解释/效应追踪，比设计口径"9 层"更深；"9 层防幻觉"是设计层命名，L9=动态合规在 <code>compliance/</code>。详见 <a href="06-hallucination-defense.html">06 九层防幻觉</a>。<span class="en">Note: the code goes beyond the "9-layer" design label — implementing up to L10 plus abstract interpretation and effect tracking; "L9 dynamic compliance" lives in <code>compliance/</code>. See <a href="06-hallucination-defense.html">06 Hallucination Defense</a>.</span></blockquote>
+<h3 id="5-2-5-上下文与压缩-context-compression">5.2.5 上下文与压缩<span class="en">Context &amp; Compression</span></h3>
+<table>
+<thead><tr>
+<th>机制<span class="en">Mechanism</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>CascadePruner</td><td>SWE-Pruner 级联 (mechanical&gt;semantic&gt;LLM)</td><td>4 阶段破坏性递增裁剪，每级检查预算<span class="en">Cascaded pruning</span></td><td><code>compression/cascade.py</code></td></tr>
+<tr><td>IBCompressor</td><td>Information Bottleneck (Tishby, 1999) + 0-1 Knapsack</td><td>min I(X;C)-βI(C;Y)，背包内选最大互信息子集<span class="en">MI-maximizing selection</span></td><td><code>compression/ib_compressor.py</code></td></tr>
+<tr><td>OTMatcher</td><td>Optimal Transport / Sinkhorn (Cuturi, 2013)</td><td>Sinkhorn 正则最优传输，Wasserstein 下最优上下文分配<span class="en">Optimal context assignment</span></td><td><code>context/ot_matcher.py</code></td></tr>
+</tbody></table>
+<h3 id="5-2-6-路由与网关-routing-gateway">5.2.6 路由与网关<span class="en">Routing &amp; Gateway</span></h3>
+<table>
+<thead><tr>
+<th>机制<span class="en">Mechanism</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>RouterAgent</td><td>多准则决策<span class="en">Multi-criteria decision</span></td><td>5 维加权评分输出模型层 Tier 0–3<span class="en">Weighted tier scoring</span></td><td><code>router/agent.py</code></td></tr>
+<tr><td>ThompsonBandit</td><td>Thompson Sampling (Thompson, 1933)</td><td>每臂 Beta 后验采样，遗憾上界 O(√(kT ln T))<span class="en">Bandit model selection</span></td><td><code>router/bandit.py</code></td></tr>
+<tr><td>CircuitBreaker</td><td>Circuit Breaker (Nygard, 2007)</td><td>三态熔断，连续 5 失败/错误率&gt;30% 触发<span class="en">3-state breaker</span></td><td><code>gateway/circuit_breaker.py</code></td></tr>
+<tr><td>RoutingStrategy</td><td>成本-速度-质量权衡<span class="en">Cost-speed-quality</span></td><td>CHEAPEST/FASTEST/BEST_QUALITY 四策略<span class="en">Four routing strategies</span></td><td><code>gateway/routing.py</code></td></tr>
+</tbody></table>
+<h3 id="5-2-7-元认知与自愈-metacognition-self-healing">5.2.7 元认知与自愈<span class="en">Metacognition &amp; Self-Healing</span></h3>
+<table>
+<thead><tr>
+<th>机制<span class="en">Mechanism</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>MonitorAgent</td><td>Metacognitive Monitoring (AgentDebug, 2025)</td><td>独立 Task 消费事件，规则优先 + LLM 兜底，fail-open<span class="en">Secondary monitor agent</span></td><td><code>metacognition/monitor.py</code></td></tr>
+<tr><td>PIDAgentController</td><td>PID Control</td><td>Kp/Ki/Kd 三元控制代替二元 HITL，减 60–80% 严重告警<span class="en">Smooth control correction</span></td><td><code>metacognition/pid_controller.py</code></td></tr>
+<tr><td>FreeEnergyMonitor</td><td>Free Energy Principle (Friston, 2010)</td><td>变分自由能 F=复杂度-精度+惊奇，统一各自进化模块<span class="en">Unifies via ΔF minimization</span></td><td><code>metacognition/free_energy.py</code></td></tr>
+<tr><td>VigilSelfHealer</td><td>VIGIL (2025)</td><td>失败库+诊断+修复三步，修根因而非回滚重试<span class="en">Observe-diagnose-repair</span></td><td><code>metacognition/vigil.py</code></td></tr>
+</tbody></table>
+<h3 id="5-2-8-图谱理论-graph-theory">5.2.8 图谱理论<span class="en">Graph Theory</span></h3>
+<table>
+<thead><tr>
+<th>机制<span class="en">Mechanism</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>SpectralAnalyzer</td><td>Spectral Graph Theory (Chung, 1997)</td><td>图拉普拉斯特征分解，Fiedler 值度量连通性<span class="en">Algebraic connectivity</span></td><td><code>graph/spectral.py</code></td></tr>
+<tr><td>TDAAnalyzer</td><td>Persistent Homology (Edelsbrunner, 2002)</td><td>持续同调 barcode + Betti 数量化拓扑<span class="en">Topological features</span></td><td><code>graph/tda.py</code></td></tr>
+<tr><td>ProgramSlicer</td><td>Program Slicing (Weiser, 1984)</td><td>AST→CFG→DDG→PDG 前向/后向切片<span class="en">Forward/backward slicing</span></td><td><code>graph/engines/slicer.py</code></td></tr>
+</tbody></table>
+<h3 id="5-2-9-博弈论-共识与隐私-game-theory-consensus-privacy">5.2.9 博弈论、共识与隐私<span class="en">Game Theory, Consensus &amp; Privacy</span></h3>
+<table>
+<thead><tr>
+<th>机制<span class="en">Mechanism</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>VCGAllocator</td><td>VCG / Mechanism Design (1961–1973)</td><td>Agent 报价分配子任务，诚实报价为占优策略<span class="en">Truthful task allocation</span></td><td><code>compose/mechanism.py</code></td></tr>
+<tr><td>BFTGuard</td><td>Byzantine Fault Tolerance (Lamport et al., 1982)</td><td>n&gt;3f；关键操作需 quorum=2f+1 共识<span class="en">Byzantine consensus</span></td><td><code>goal/bft.py</code></td></tr>
+<tr><td>ShapleyAttribution</td><td>Shapley Value (Shapley, 1953)</td><td>n≤12 精确、n&gt;12 蒙特卡洛，公平归因边际贡献<span class="en">Fair contribution attribution</span></td><td><code>observability/attribution.py</code></td></tr>
+<tr><td>DPGuard</td><td>Differential Privacy (Dwork, 2006)</td><td>Laplace/Gaussian 机制加噪，ε-δ 防指标泄露<span class="en">Noise-added metrics</span></td><td><code>observability/dp.py</code></td></tr>
+</tbody></table>
+<h3 id="5-2-10-检索-审查与效能-retrieval-review-effectiveness">5.2.10 检索、审查与效能<span class="en">Retrieval, Review &amp; Effectiveness</span></h3>
+<table>
+<thead><tr>
+<th>机制<span class="en">Mechanism</span></th>
+<th>理论<span class="en">Theory</span></th>
+<th>一句话<span class="en">One-liner</span></th>
+<th>源文件<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>FTS + BM25</td><td>BM25 (Robertson-Zaragoza, 2009)</td><td>纯 Python BM25 + FTS5 + CJK bigram，零依赖全文搜索<span class="en">Zero-dep full-text search</span></td><td><code>memory/fts.py</code></td></tr>
+<tr><td>MDLScorer</td><td>Minimum Description Length (Rissanen, 1978)</td><td>gzip 度量复杂度 + 测试惩罚，NSGA-II 式 Pareto 排序<span class="en">Complexity-based ranking</span></td><td><code>review/mdl_scorer.py</code></td></tr>
+<tr><td>AblationContext</td><td>Ablation Study / 受控实验<span class="en">Controlled experiment</span></td><td>临时禁模块测性能下降，ΔF1&lt;0.03 降级<span class="en">Marginal-contribution measure</span></td><td><code>effectiveness/ablation.py</code></td></tr>
+<tr><td>TaskShardingEngine</td><td>MapReduce / Data Parallelism</td><td>按边界切分&gt;8000 字符大任务并发合并<span class="en">Split-execute-merge</span></td><td><code>sharding/engine.py</code></td></tr>
+</tbody></table>
+<h2 id="5-3-为什么用这些理论-why-these-theories">5.3 为什么用这些理论<span class="en">Why These Theories</span></h2>
+<p>理论不是装饰——每一个都服务于四大价值主张之一（见 <a href="01-design-philosophy.html">01 设计哲学</a>）：<span class="en">Theory is not decoration — each serves one of the four value propositions (see <a href="01-design-philosophy.html">01 Design Philosophy</a>):</span></p>
+<table>
+<thead><tr>
+<th>价值<span class="en">Value</span></th>
+<th>支撑理论<span class="en">Backing theories</span></th>
+</tr></thead><tbody>
+<tr><td>编排<span class="en">Orchestrate</span></td><td>MDP · MCTS · VCG 机制设计 · 最优传输 · Thompson Bandit（分配与选择的最优性）<span class="en">optimality of allocation &amp; selection</span></td></tr>
+<tr><td>验证<span class="en">Validate</span></td><td>Z3/Hoare · LTL · 分离逻辑 · 抽象解释 · 类型论 · Shannon 熵（可证明或可量化的正确性）<span class="en">provable or quantifiable correctness</span></td></tr>
+<tr><td>追溯<span class="en">Trace</span></td><td>Pearl 因果 · Shapley 归因 · 差分隐私 · MDL（可解释、可归因、可保护的记录）<span class="en">explainable, attributable, protected records</span></td></tr>
+<tr><td>自进化<span class="en">Self-evolve</span></td><td>EvolveR · GEPA · GRPO · SCOPE · PAC · 信息几何 · 自由能原理（有理论保证的自我改进）<span class="en">self-improvement with theoretical guarantees</span></td></tr>
+</tbody></table>
+<p>核心信念：<strong>用确定性的数学方法约束不确定的 LLM 输出</strong>——这正是 Orbit"治理而非生成"哲学在每个环节的落地。<span class="en">Core belief: <strong>constrain uncertain LLM output with deterministic mathematics</strong> — the concrete embodiment of Orbit's "govern, not generate" philosophy at every step.</span></p>
+<hr>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="06-hallucination-defense.html">下一章：九层防幻觉 →<span class="en">Next: Hallucination Defense →</span></a></p>
+<p>&lt;/content&gt;</p>
+</main></body>
+</html>

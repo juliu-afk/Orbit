@@ -6,9 +6,13 @@ import { useCodeGraphStore } from '@/stores/codegraph'
 const store = useCodeGraphStore()
 const funcName = ref('')
 
+// P2-2: 防抖 300ms——阻止快速点击/连续回车触发冗余请求
+let _debounce: ReturnType<typeof setTimeout> | undefined
 function analyze() {
   const name = funcName.value.trim()
-  if (name) store.fetchTestGaps(name)
+  if (!name) return
+  if (_debounce) clearTimeout(_debounce)
+  _debounce = setTimeout(() => store.fetchTestGaps(name), 300)
 }
 </script>
 
@@ -29,8 +33,9 @@ function analyze() {
       <span class="gaps-func">{{ store.testGaps.function }}</span>
       <span class="gaps-total">{{ store.testGaps.total }} 处空洞</span>
     </div>
+    <!-- P2-1: message 作为横幅提示，不压制表格；两者可共存 -->
     <div v-if="store.testGaps.message" class="gaps-msg">{{ store.testGaps.message }}</div>
-    <table v-else-if="store.testGaps.gaps.length" class="gaps-table">
+    <table v-if="store.testGaps.gaps.length" class="gaps-table">
       <thead>
         <tr><th>参数</th><th>类型</th><th>已覆盖</th><th>缺失用例</th></tr>
       </thead>
@@ -43,7 +48,7 @@ function analyze() {
         </tr>
       </tbody>
     </table>
-    <div v-else class="gaps-empty">该函数无测试覆盖空洞 ✓</div>
+    <div v-else-if="!store.testGaps.message" class="gaps-empty">该函数无测试覆盖空洞 ✓</div>
   </div>
   <div v-else class="gaps-empty">输入函数名分析测试覆盖空洞</div>
 </div>

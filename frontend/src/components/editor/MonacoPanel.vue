@@ -18,13 +18,16 @@ const codegraph = useCodeGraphStore()
 
 // PR2: 打开文件时拉大纲；点击大纲项跳转到对应行
 const gotoLine = ref(0)
+let _revealTick = false
 watch(() => editor.currentFile, (fp) => {
   if (fp && !fp.startsWith('[code]')) codegraph.fetchOutline(fp)
   else codegraph.outline = []
 })
 function onOutlineSelect(line: number) {
-  // 每次 +0.001 触发 watch——同一行连点也能重新 reveal（数值需真实变化）
-  gotoLine.value = line
+  // P1-1 修复：同一行连点也要重新跳转。gotoLine 在 line 与 line+0.5 间交替，
+  // 保证值真实变化触发 watch；MonacoDiffEditor 侧 Math.floor 还原整数行号。
+  _revealTick = !_revealTick
+  gotoLine.value = line + (_revealTick ? 0.5 : 0)
 }
 
 // P1-4 fix: ProblemPanel 点击 → 打开文件 + 激活 Monaco

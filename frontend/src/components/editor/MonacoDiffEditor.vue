@@ -32,8 +32,9 @@ const emit = defineEmits<{
 }>()
 
 // PR2: 大纲点击→跳转到指定行。gotoLine 变化时把 modified 编辑器滚动到该行居中。
+// P1-1: gotoLine 可能带 0.5 小数（上游用于强制同行连点触发 watch），Math.floor 还原整数行号。
 watch(() => props.gotoLine, (line) => {
-  if (line > 0) diffEditor.value?.revealPositionInCenter({ lineNumber: line, column: 1 })
+  if (line > 0) diffEditor.value?.revealPositionInCenter({ lineNumber: Math.floor(line), column: 1 })
 })
 
 const containerRef = ref<HTMLDivElement>()

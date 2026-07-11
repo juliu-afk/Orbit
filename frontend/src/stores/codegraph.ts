@@ -79,23 +79,27 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
 
   // WHY 用原生 fetch 而非 apiGet：outline/impact 端点返回裸数组（非 {code,data} 包装），
   // apiGet 会因 json.code!==0 抛错。这两个端点契约就是裸 list，直接解析。
-  async function fetchOutline(file: string): Promise<void> {
+  // P2-1: 加 10s 超时——后端挂起时 abort，避免请求永久 pending 卡住后续触发。
+  async function _fetchList(url: string): Promise<unknown[]> {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 10000)
     try {
-      const r = await fetch(`/api/v1/codegraph/outline?file=${encodeURIComponent(file)}`)
-      outline.value = r.ok ? await r.json() : []
+      const r = await fetch(url, { signal: ctrl.signal })
+      return r.ok ? await r.json() : []
     } catch {
-      outline.value = []
+      return []
+    } finally {
+      clearTimeout(timer)
     }
+  }
+
+  async function fetchOutline(file: string): Promise<void> {
+    outline.value = (await _fetchList(`/api/v1/codegraph/outline?file=${encodeURIComponent(file)}`)) as OutlineItem[]
   }
 
   async function fetchImpact(symbol: string): Promise<void> {
     impactSymbol.value = symbol
-    try {
-      const r = await fetch(`/api/v1/insights/impact?symbol=${encodeURIComponent(symbol)}`)
-      impact.value = r.ok ? await r.json() : []
-    } catch {
-      impact.value = []
-    }
+    impact.value = (await _fetchList(`/api/v1/insights/impact?symbol=${encodeURIComponent(symbol)}`)) as ImpactNode[]
   }
 
   function setSearchQuery(query: string): void {

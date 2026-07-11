@@ -19,11 +19,17 @@ const store = useCodeGraphStore()
 const building = ref(false)
 
 // PR2: 选中节点 → 拉该符号的影响分析。symbol 取节点 label/name。
+// P2-2: 防抖 300ms——图中快速切换节点时只取最后一次，避免请求洪峰。
+// P2-3: String() 强转比较——节点 id 后端可能是 number，严格 === 会漏匹配。
+let _impactTimer: ReturnType<typeof setTimeout> | undefined
 watch(() => store.selectedNodeId, (id) => {
+  if (_impactTimer) clearTimeout(_impactTimer)
   if (!id) { store.impact = []; return }
-  const node = store.elements.find(e => e.data.id === id)
-  const symbol = (node?.data.label || node?.data.name || '') as string
-  if (symbol) store.fetchImpact(symbol)
+  _impactTimer = setTimeout(() => {
+    const node = store.elements.find(e => String(e.data.id) === String(id))
+    const symbol = (node?.data.label || node?.data.name || '') as string
+    if (symbol) store.fetchImpact(symbol)
+  }, 300)
 })
 
 // 打开抽屉时加载数据

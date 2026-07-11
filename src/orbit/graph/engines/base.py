@@ -65,7 +65,8 @@ class GraphEngineBase:
             if namespace is not None:
                 stmt = stmt.where(model.meta["namespace"].as_string() == namespace)  # type: ignore[attr-defined]
             result = await session.execute(stmt)
-            return result.scalar_one_or_none()
+            # 名称非唯一（如多个 __init__/同名函数），取首个匹配而非在多行时崩溃
+            return result.scalars().first()
 
     async def add_edge(
         self,

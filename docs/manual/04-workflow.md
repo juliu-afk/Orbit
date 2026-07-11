@@ -22,7 +22,7 @@
 IDLE ─▶ PARSING ─▶ SCOPING ─▶ PLANNING ─▶ CODING ─▶ VERIFYING ─▶ DONE
  0%      10%        20%         30%         60%        85%         100%
                     │                                              ▲
-        复杂度<30 走快车道 (FAST_LANE)：跳过 PLANNING 与 VERIFYING ──┘
+        复杂度<30 走快车道 (FAST_LANE)：跳过 SCOPING/PLANNING/VERIFYING ──┘
 终态: DONE / FAILED / CANCELLED
 ```
 
@@ -36,7 +36,7 @@ IDLE ─▶ PARSING ─▶ SCOPING ─▶ PLANNING ─▶ CODING ─▶ VERIFYIN
 | VERIFYING | reviewer | 代码审查与验证 || Review & verify | `review_result` |
 | DONE / FAILED / CANCELLED | — | 终态 || Terminal | 完整产物/错误 || Result/error |
 
-快车道由 `ComplexityScorer` 授权，LLM 无权绕过（`ProcessGuard.authorize_fast_lane()`）。 || The fast lane is authorized only by `ComplexityScorer`; the LLM cannot bypass gates.
+快车道（`FAST_LANE_TRANSITIONS`：PARSING→CODING→DONE）由 `ComplexityScorer` 授权，LLM 无权绕过（`ProcessGuard.authorize_fast_lane()`）。 || The fast lane (`FAST_LANE_TRANSITIONS`: PARSING→CODING→DONE, skipping SCOPING/PLANNING/VERIFYING) is authorized only by `ComplexityScorer`; the LLM cannot bypass gates.
 
 ## 4.3 全生命周期 11 阶段 || The 11 Lifecycle Stages
 

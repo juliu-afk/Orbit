@@ -60,7 +60,7 @@ th .en, td .en { font-size:.8em; }
 <pre><code>IDLE ─▶ PARSING ─▶ SCOPING ─▶ PLANNING ─▶ CODING ─▶ VERIFYING ─▶ DONE
  0%      10%        20%         30%         60%        85%         100%
                     │                                              ▲
-        复杂度&lt;30 走快车道 (FAST_LANE)：跳过 PLANNING 与 VERIFYING ──┘
+        复杂度&lt;30 走快车道 (FAST_LANE)：跳过 SCOPING/PLANNING/VERIFYING ──┘
 终态: DONE / FAILED / CANCELLED</code></pre>
 <table>
 <thead><tr>
@@ -77,7 +77,7 @@ th .en, td .en { font-size:.8em; }
 <tr><td>VERIFYING</td><td>reviewer</td><td>代码审查与验证<span class="en">Review &amp; verify</span></td><td><code>review_result</code></td></tr>
 <tr><td>DONE / FAILED / CANCELLED</td><td>—</td><td>终态<span class="en">Terminal</span></td><td>完整产物/错误<span class="en">Result/error</span></td></tr>
 </tbody></table>
-<p>快车道由 <code>ComplexityScorer</code> 授权，LLM 无权绕过（<code>ProcessGuard.authorize_fast_lane()</code>）。<span class="en">The fast lane is authorized only by <code>ComplexityScorer</code>; the LLM cannot bypass gates.</span></p>
+<p>快车道（<code>FAST_LANE_TRANSITIONS</code>：PARSING→CODING→DONE）由 <code>ComplexityScorer</code> 授权，LLM 无权绕过（<code>ProcessGuard.authorize_fast_lane()</code>）。<span class="en">The fast lane (<code>FAST_LANE_TRANSITIONS</code>: PARSING→CODING→DONE, skipping SCOPING/PLANNING/VERIFYING) is authorized only by <code>ComplexityScorer</code>; the LLM cannot bypass gates.</span></p>
 <h2 id="4-3-全生命周期-11-阶段-the-11-lifecycle-stages">4.3 全生命周期 11 阶段<span class="en">The 11 Lifecycle Stages</span></h2>
 <h3 id="阶段-0-请求入口-stage-0-request-entry">阶段 0：请求入口<span class="en">Stage 0: Request Entry</span></h3>
 <p>四类入口——WebSocket 聊天（<code>chat.py:chat_endpoint</code>）、Goal REST（<code>goal.py:create_goal</code>）、任务 API（<code>tasks.py:create_task</code>）、Loop（<code>loop.py:create_loop</code>）。校验 token/workspace/并发冲突后创建会话或后台任务。<span class="en">Four entries validate token/workspace/concurrency, then create a session or background task.</span></p>

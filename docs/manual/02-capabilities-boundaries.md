@@ -15,7 +15,7 @@
 | 调度器状态机 || Scheduler state machine | 状态机驱动的多 Agent 开发全流程（IDLE→PARSING→SCOPING→PLANNING→CODING→VERIFYING→DONE） || State-machine-driven full multi-agent development flow |
 | DAG 并行执行 || DAG parallel execution | 拓扑排序 + 分层并发 + 检查点恢复 || Topological sort + layered concurrency + checkpoint recovery |
 | Goal 统一入口 || Goal unified intake | 自然语言 / PRD 文件 / 批量目录三态输入，自动清晰度判定 + 三层依赖检测 + 自主 PR 合入 || NL / PRD file / batch directory intake, auto clarity scoring + 3-tier dependency detection + autonomous PR merge |
-| 10 角色 Agent 工厂 || 10-role Agent factory | Architect/Developer/Reviewer/QA/ConfigManager/Clarifier/Chatter/Dream/MCTS/PreAct，按角色路由不同模型 || Roles routed to different models per role |
+| 8 角色 Agent 工厂 || 8-role Agent factory | Architect/Developer/Reviewer/QA/ConfigManager/Clarifier/Chatter/Dream（MCTS/PreAct 是执行引擎，非角色），按角色路由不同模型层 || 8 AgentRole enum members (MCTS/PreAct are engines, not roles), each routed to a model tier |
 | 任务分片 || Task sharding | 大 PRD 按段落边界自动分片 + Semaphore 并发 || Large PRD auto-sharded on paragraph boundaries + semaphore concurrency |
 | 需求澄清 || Requirement clarification | 完整性 + 矛盾检测 + 可行性评分（0–100），多轮生成结构化 PRD || Completeness + contradiction detection + feasibility score, multi-turn structured PRD |
 | 高峰避让调度 || Off-peak scheduling | 按四大厂商高峰时段推迟非紧急任务 + 持久化延迟队列 || Defers non-urgent tasks by vendor peak windows + persistent delay queue |

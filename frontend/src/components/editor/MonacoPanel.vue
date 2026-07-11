@@ -9,6 +9,7 @@ import { useCodeGraphStore } from '@/stores/codegraph'
 import ProblemPanel from '@/components/editor/ProblemPanel.vue'
 import TestPanel from '@/components/editor/TestPanel.vue'
 import MergeConflictPanel from '@/components/editor/MergeConflictPanel.vue'
+import TestGapsPanel from '@/components/editor/TestGapsPanel.vue'
 import OutlinePanel from '@/components/editor/OutlinePanel.vue'
 
 const editor = useEditorStore()
@@ -78,6 +79,9 @@ const activeTab = ref('problems')
       </el-tab-pane>
       <el-tab-pane label="Tests" name="tests">
         <TestPanel @show-error="onTestError" />
+      </el-tab-pane>
+      <el-tab-pane label="Coverage" name="coverage">
+        <TestGapsPanel />
       </el-tab-pane>
       <el-tab-pane label="Conflicts" name="conflicts">
         <MergeConflictPanel @select-file="(path: string) => { editor.openFile(path); shell.openFileReview(path) }" />

@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from orbit.files.service import FileService
 
 router = APIRouter(prefix="/files", tags=["files"])
 _file_service: FileService | None = None
+
+
+class WriteFileRequest(BaseModel):
+    path: str = Field(..., min_length=1, description="工作区相对路径")
+    content: str = Field(..., description="文件全文内容")
 
 
 def set_file_service(svc: FileService) -> None:
@@ -57,3 +63,19 @@ async def diff_file(
     except ValueError as e:
         raise HTTPException(status_code=403, detail=str(e))
     return {"code": 0, "data": result, "message": "ok"}
+
+
+@router.post("/write")
+async def write_file(body: WriteFileRequest):
+    """写文件到工作区（编辑器存盘）。
+
+    WHY: 前端 LightEditor/RulesPanel 存盘依赖此端点。write_file 内部经 _safe_path
+    做路径穿越防护（越界抛 ValueError→403），杜绝写到工作区外。
+    """
+    try:
+        await _svc().write_file(body.path, body.content)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"code": 0, "data": {"path": body.path, "written": True}, "message": "ok"}

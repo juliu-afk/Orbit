@@ -83,7 +83,7 @@ const mockRouterPush = vi.fn()
 
 // Element Plus + child component stubs
 const stubs = {
-  'el-button': { template: '<button class="el-button-stub" @click="$emit(\'click\')"><slot /></button>' },
+  'el-button': { name: 'ElButton', template: '<button class="el-button-stub" @click="$emit(\'click\')"><slot /></button>' },
   'el-icon': { template: '<span class="el-icon-stub"><slot /></span>' },
   'el-tag': { template: '<span class="el-tag-stub"><slot /></span>' },
   'el-empty': { template: '<div class="el-empty-stub"><slot /></div>' },
@@ -95,8 +95,8 @@ const stubs = {
   'el-select': { template: '<select class="el-select-stub"><slot /></select>' },
   'el-option': { template: '<option class="el-option-stub" />' },
   ArrowLeft: { template: '<span class="arrow-left-stub" />' },
-  MonacoDiffEditor: { template: '<div class="monaco-diff-stub" />' },
-  FileTreePanel: { template: '<div class="file-tree-stub" />' },
+  MonacoDiffEditor: { name: 'MonacoDiffEditor', template: '<div class="monaco-diff-stub" />' },
+  FileTreePanel: { name: 'FileTreePanel', template: '<div class="file-tree-stub" />' },
   ProblemPanel: { template: '<div class="problem-panel-stub" />' },
 }
 

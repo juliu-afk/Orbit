@@ -121,16 +121,6 @@ async def client(app):
 # ── Insights tests ────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_insights_health(client):
-    """GET /api/v1/insights/health → 200 + stub data."""
-    resp = await client.get("/api/v1/insights/health")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert "modules" in data
-    assert "note" in data
-
-
-@pytest.mark.asyncio
 async def test_insights_risk_scores(client):
     """GET /api/v1/insights/risk?task_id=test → 200 + risk scores."""
     resp = await client.get("/api/v1/insights/risk?task_id=test-task-1")

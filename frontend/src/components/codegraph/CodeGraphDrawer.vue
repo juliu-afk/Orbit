@@ -36,8 +36,22 @@ watch(() => store.selectedNodeId, (id) => {
 watch(() => props.show, async (visible) => {
   if (visible && session.currentProjectName) {
     await store.fetchGraphData(session.currentProjectName)
+    store.fetchCommits()  // PR10: 加载时间轴 commit 列表
   }
 })
+
+// PR10: 时间轴滑块——index 0 = 当前版本；>0 = 历史 commit（隔离构建，慢）
+const timelineIdx = ref(0)
+async function onTimelineChange(idx: number) {
+  timelineIdx.value = idx
+  if (idx === 0) {
+    store.viewingCommit = ''
+    await store.fetchGraphData(session.currentProjectName || '')
+  } else {
+    const commit = store.commits[idx - 1]
+    if (commit) await store.fetchGraphAt(commit.hash)
+  }
+}
 
 async function buildIndex(): Promise<void> {
   building.value = true
@@ -77,6 +91,22 @@ function onClose(): void {
             {{ store.stats.node_count }} 节点 / {{ store.stats.edge_count }} 边
           </span>
         </div>
+      </div>
+
+      <!-- PR10: 历史时间轴——拖动查看图谱随 git commit 演进（0=当前，>0=历史，隔离构建） -->
+      <div v-if="store.commits.length" class="timeline">
+        <span class="timeline-label">
+          {{ timelineIdx === 0 ? '当前版本' : (store.commits[timelineIdx - 1]?.message || '').slice(0, 40) }}
+        </span>
+        <el-slider
+          :model-value="timelineIdx"
+          :min="0"
+          :max="store.commits.length"
+          :format-tooltip="(v: number) => v === 0 ? '当前' : (store.commits[v - 1]?.hash || '').slice(0, 8)"
+          style="flex:1;margin:0 12px"
+          @change="onTimelineChange"
+        />
+        <span v-if="store.loading && timelineIdx > 0" class="timeline-hint">构建历史图谱中…</span>
       </div>
 
       <!-- 主区域 -->
@@ -139,6 +169,14 @@ function onClose(): void {
   font-size: 11px; color: var(--color-orbit-text-muted);
   white-space: nowrap;
 }
+
+/* PR10 时间轴 */
+.timeline {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 0 4px; font-family: var(--font-mono); font-size: 11px;
+}
+.timeline-label { min-width: 120px; color: var(--color-orbit-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timeline-hint { color: var(--color-orbit-accent); white-space: nowrap; }
 
 /* 主区域——画布+详情 */
 .main-area {

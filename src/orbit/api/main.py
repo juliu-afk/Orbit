@@ -321,6 +321,8 @@ importlib.import_module("orbit.api.routes.git_routes").set_workspace_dir(_ws_dir
 
 importlib.import_module("orbit.api.routes.codegraph_routes").set_code_graph(_code_graph_engine)
 importlib.import_module("orbit.api.routes.codegraph_routes").set_file_service(_file_service)
+# PR10: 历史图谱快照工作区（时间轴按 git commit 隔离建图）
+importlib.import_module("orbit.api.routes.codegraph_routes").set_snapshot_workspace(_ws_dir)
 importlib.import_module("orbit.api.routes.insights_routes").set_code_graph(_code_graph_engine)
 importlib.import_module("orbit.api.routes.insights_routes").set_review_service(_review_service)
 importlib.import_module("orbit.api.routes.compliance_routes").set_file_service(_file_service)

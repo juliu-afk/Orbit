@@ -71,6 +71,10 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
   const impact = ref<ImpactNode[]>([])
   const impactSymbol = ref('')
 
+  // 历史快照时间轴（PR10）
+  const commits = ref<Array<{ hash: string; message: string; author: string; date: string }>>([])
+  const viewingCommit = ref<string>('')  // 空 = 当前版本
+
   // ── 计算 ──
   const nodes = computed(() => elements.value.filter(e => !e.data.id?.toString().startsWith('e:')))
   const edges = computed(() => elements.value.filter(e => e.data.id?.toString().startsWith('e:')))
@@ -94,6 +98,33 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
 
   function selectNode(nodeId: string | null): void {
     selectedNodeId.value = nodeId
+  }
+
+  // PR10: 拉取 git commit 列表（时间轴滑块数据源）
+  async function fetchCommits(): Promise<void> {
+    try {
+      const data = await apiGet<{ commits: Array<{ hash: string; message: string; author: string; date: string }> }>('/api/v1/codegraph/git-commits?limit=50')
+      commits.value = data.commits || []
+    } catch {
+      commits.value = []
+    }
+  }
+
+  // PR10: 切换到指定 commit 的历史图谱（隔离构建，慢，需 loading）
+  async function fetchGraphAt(commit: string): Promise<void> {
+    loading.value = true
+    error.value = null
+    viewingCommit.value = commit
+    try {
+      const data = await apiGet<GraphDataResponse>(`/api/v1/codegraph/graph-data-at?commit=${encodeURIComponent(commit)}`)
+      elements.value = data.elements
+      stats.value = data.stats
+    } catch (e) {
+      error.value = '历史图谱构建失败：' + (e instanceof Error ? e.message : String(e))
+      elements.value = []
+    } finally {
+      loading.value = false
+    }
   }
 
   // PR6: 拉取指定函数的测试覆盖空洞。test-gaps 端点是 {code,data} 包装，apiGet 可直接用。
@@ -161,6 +192,8 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
     outline.value = []
     impact.value = []
     impactSymbol.value = ''
+    commits.value = []
+    viewingCommit.value = ''
   }
 
   return {
@@ -168,8 +201,10 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
     selectedNodeId, searchQuery, activeLayout, visibleEdgeTypes,
     testGaps, testGapsLoading,
     outline, impact, impactSymbol,
+    commits, viewingCommit,
     nodes, edges,
     fetchGraphData, selectNode, setSearchQuery, setLayout, toggleEdgeType, reset,
     fetchTestGaps, fetchOutline, fetchImpact,
+    fetchCommits, fetchGraphAt,
   }
 })

@@ -13,11 +13,50 @@ router = APIRouter(prefix="/codegraph", tags=["codegraph"])
 
 _code_graph = None
 _file_service = None
+_snapshot_mgr = None  # PR10: SnapshotManager，main.py 注入工作区后创建
 
 
 def set_code_graph(engine) -> None:
     global _code_graph
     _code_graph = engine
+
+
+def set_snapshot_workspace(workspace: str) -> None:
+    """PR10: 设置历史快照工作区，惰性创建 SnapshotManager。"""
+    global _snapshot_mgr
+    from orbit.graph.snapshot_manager import SnapshotManager
+
+    _snapshot_mgr = SnapshotManager(workspace)
+
+
+def _to_elements(nodes: list, edges: list) -> list:
+    """节点/边 → Cytoscape elements 格式（graph-data 与 graph-data-at 共用）。"""
+    elements: list[dict] = []
+    for node in nodes:
+        node_id = node.get("id", "")
+        elements.append({
+            "data": {
+                "id": f"code:{node_id}",
+                "label": node.get("name", node_id),
+                "type": node.get("type", "unknown"),
+                "file_path": node.get("file_path", ""),
+                "start_line": node.get("start_line", 0),
+                "symbol_count": node.get("symbol_count", 0),
+                "in_degree": node.get("in_degree", 0),
+                "out_degree": node.get("out_degree", 0),
+            }
+        })
+    for edge in edges:
+        elements.append({
+            "data": {
+                "id": f"e:{edge.get('id', '')}",
+                "source": f"code:{edge.get('source_id', '')}",
+                "target": f"code:{edge.get('target_id', '')}",
+                "type": edge.get("edge_type", "references"),
+                "weight": edge.get("weight", 1),
+            }
+        })
+    return elements
 
 
 def set_file_service(svc) -> None:
@@ -238,14 +277,42 @@ async def get_graph_data(project_id: str = Query(..., min_length=1)):
 
 @router.get("/graph-snapshots")
 async def get_graph_snapshots(project_id: str = Query(..., min_length=1)):
-    """返回 git 历史时间点的图谱快照列表（P1 时间轴）。
+    """返回 git 历史 commit 列表（时间轴快照点）。无 git 仓库时空数组。"""
+    if _snapshot_mgr is None:
+        return {"code": 0, "data": {"snapshots": []}, "message": "ok"}
+    commits = await _snapshot_mgr.list_commits(limit=50)
+    return {"code": 0, "data": {"snapshots": commits}, "message": "ok"}
 
-    无 git 仓库时返回空数组，不报错。
-    """
-    # P1: 依赖 git 仓库——返回空数组给前端示意禁用时间轴
+
+@router.get("/git-commits")
+async def get_git_commits(limit: int = Query(50, ge=1, le=200)):
+    """返回最近 commit 元数据——时间轴滑块数据源。"""
+    if _snapshot_mgr is None:
+        return {"code": 0, "data": {"commits": []}, "message": "ok"}
+    commits = await _snapshot_mgr.list_commits(limit=limit)
+    return {"code": 0, "data": {"commits": commits}, "message": "ok"}
+
+
+@router.get("/graph-data-at")
+async def get_graph_data_at(commit: str = Query(..., min_length=7)):
+    """按 git commit 构建历史图谱，返回 Cytoscape elements（隔离构建，不影响生产图）。"""
+    if _snapshot_mgr is None:
+        raise HTTPException(status_code=503, detail="Snapshot manager not available")
+    try:
+        snap = await _snapshot_mgr.build_at_commit(commit)
+    except (RuntimeError, TimeoutError) as e:
+        raise HTTPException(status_code=500, detail=f"历史图谱构建失败: {e}")
+    elements = _to_elements(snap["nodes"], snap["edges"])
     return {
         "code": 0,
-        "data": {"snapshots": []},
+        "data": {
+            "elements": elements,
+            "stats": {
+                "node_count": len(snap["nodes"]),
+                "edge_count": len(snap["edges"]),
+                "commit": commit,
+            },
+        },
         "message": "ok",
     }
 

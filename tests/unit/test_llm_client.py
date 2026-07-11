@@ -190,14 +190,21 @@ async def test_circuit_opens_by_error_rate():
 
 @pytest.mark.asyncio
 async def test_error_rate_below_min_calls_no_trip():
-    """样本不足时不触发错误率熔断。"""
+    """样本不足时不触发错误率熔断。
+
+    B2-fix: 使用 uuid 唯一 key——避免跨测试 SQLite 持久化污染。
+    _get_state_db() 共享 ~/.orbit/cache/circuit_breaker.db，
+    前次测试的 opened_at 残留会干扰断言。
+    """
+    import uuid
+
     cb = CircuitBreaker(
         failure_threshold=100,
         error_rate_threshold=0.1,
         error_rate_min_calls=10,
         cooldown=1,
     )
-    key = "test/few"
+    key = f"test/few/{uuid.uuid4().hex[:8]}"
     for _ in range(3):
         await cb.record_failure(key)
     state = await cb.get_state(key)

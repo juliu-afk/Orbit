@@ -12,8 +12,9 @@
           <div v-if="opsStore.snapshots.length === 0" class="empty-hint">暂无快照</div>
           <div v-else class="snap-list">
             <div v-for="s in opsStore.snapshots" :key="s.snapshot_id" class="snap-item">
-              <span>{{ s.path }}</span>
-              <span>{{ (s.size_bytes / 1048576).toFixed(1) }} MB</span>
+              <span class="snap-path">{{ s.path }}</span>
+              <span class="snap-size">{{ (s.size_bytes / 1048576).toFixed(1) }} MB</span>
+              <el-button size="small" type="warning" text :loading="restoringId === s.snapshot_id" @click="onRestore(s)">恢复</el-button>
             </div>
           </div>
         </el-card>
@@ -43,10 +44,54 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useOpsStore } from '@/stores/ops'
+import { computed, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useOpsStore, type SnapshotItem } from '@/stores/ops'
 
 const opsStore = useOpsStore()
+const restoringId = ref('')
+
+// db_type → 默认恢复目标路径（按后端约定预填，用户可在弹窗中修改确认）
+const DEFAULT_TARGETS: Record<string, string> = {
+  sqlite: 'data/orbit.db',
+  knowledge: 'data/knowledge.db',
+  checkpoint: 'data/checkpoint.db',
+}
+
+// PR9: 在线恢复——安全性高（覆盖生产数据）。护栏：
+// ① 显式 target 输入让用户确认覆盖对象 ② 二次确认弹窗
+// ③ 后端 Restorer 覆盖前自动备份 .backup 且校验失败自动回滚（双保险）
+async function onRestore(s: SnapshotItem) {
+  const defaultTarget = DEFAULT_TARGETS[s.db_type] || s.path
+  let targetPath: string
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `将从快照恢复到目标文件（会覆盖现有数据）。请确认目标路径：`,
+      '恢复目标',
+      { inputValue: defaultTarget, confirmButtonText: '下一步', cancelButtonText: '取消' },
+    )
+    targetPath = (value || '').trim()
+    if (!targetPath) { ElMessage.warning('目标路径不能为空'); return }
+  } catch { return }  // 用户取消
+
+  try {
+    await ElMessageBox.confirm(
+      `确认用快照 ${s.snapshot_id.slice(0, 8)} 覆盖 ${targetPath}？\n此操作会覆盖现有数据（后端自动备份为 .backup，校验失败自动回滚）。`,
+      '二次确认——危险操作',
+      { confirmButtonText: '确认恢复', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch { return }
+
+  restoringId.value = s.snapshot_id
+  try {
+    await opsStore.restoreSnapshot(s.snapshot_id, targetPath)
+    ElMessage.success(`已恢复到 ${targetPath}`)
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : '恢复失败')
+  } finally {
+    restoringId.value = ''
+  }
+}
 
 function eventLabel(type: string): string {
   const map: Record<string, string> = {
@@ -86,6 +131,11 @@ const renderedSop = computed(() => {
   border-bottom: 1px solid #2a2a4a; color: #c0c0c0; font-size: 14px;
 }
 .empty-hint { text-align: center; padding: 24px; color: #666; font-size: 13px; }
+
+.snap-list { display: flex; flex-direction: column; }
+.snap-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #1a1a3a; font-size: 12px; }
+.snap-path { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c0c0c0; }
+.snap-size { color: #8888aa; white-space: nowrap; }
 
 .timeline-item {
   display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px solid #1a1a3a;

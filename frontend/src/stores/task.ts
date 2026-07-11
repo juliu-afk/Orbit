@@ -5,7 +5,6 @@
  */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { apiPost } from '@/services/api'
 import type { DagNode, NodeStatus } from '@/types/dashboard'
 
 /** vis-network 节点数据格式 */
@@ -94,11 +93,15 @@ export const useTaskStore = defineStore('task', () => {
     hasCodeOutput.value = false
   }
 
-  // PR3: 取消当前运行中任务——调真实调度器 cancel（写 CANCELLED 检查点 + 停止 asyncio 任务）
+  // PR3: 取消当前运行中任务——调真实调度器 cancel（写 CANCELLED 检查点 + 停止 asyncio 任务）。
+  // P2-3: tasks 端点返回裸 TaskStatusResponse(非 {code,data} 包装, apiPost 会抛错)，用原生 fetch；
+  // taskState 用后端响应的真实状态而非硬写 CANCELLED。
   async function cancelCurrentTask(): Promise<void> {
     if (!currentTaskId.value) return
-    await apiPost(`/api/v1/tasks/${currentTaskId.value}/cancel`, {})
-    taskState.value = 'CANCELLED'
+    const r = await fetch(`/api/v1/tasks/${currentTaskId.value}/cancel`, { method: 'POST' })
+    if (!r.ok) throw new Error(`取消失败 (HTTP ${r.status})`)
+    const data = await r.json()
+    taskState.value = data.state || 'CANCELLED'
   }
 
   function reset() {

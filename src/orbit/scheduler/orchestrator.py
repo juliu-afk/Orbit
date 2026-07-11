@@ -115,11 +115,17 @@ class Scheduler:
         """后台启动任务并登记到注册表，返回 asyncio.Task 供追踪/取消。
 
         PR3: 替代裸 asyncio.create_task(run_task)——让运行中任务可按 task_id 取消。
-        完成回调自动从注册表清理，避免泄漏。
+        P1-1 修复：同 task_id 已有运行中任务则直接返回它，避免重复 spawn 污染注册表；
+        done_callback 做身份校验，只清理自己那一条（防误删后来的同 id 任务）。
         """
+        existing = self._active_tasks.get(task_id)
+        if existing is not None and not existing.done():
+            return existing
         task = asyncio.create_task(self.run_task(task_id, prd))
         self._active_tasks[task_id] = task
-        task.add_done_callback(lambda _t: self._active_tasks.pop(task_id, None))
+        task.add_done_callback(
+            lambda t: self._active_tasks.pop(task_id, None) if self._active_tasks.get(task_id) is t else None
+        )
         return task
 
     async def cancel_task(self, task_id: str) -> bool:

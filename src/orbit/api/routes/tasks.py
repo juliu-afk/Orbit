@@ -27,6 +27,7 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 # 任务元数据（session_id/project_name/created_at/prd）——检查点不存这些，单独保留。
 _task_records: dict[str, dict[str, object]] = {}
+_MAX_TASK_RECORDS = 1000  # P2-1: 容量上限，超限淘汰最旧
 _session_registry = SessionRegistry()
 
 _TERMINAL = {TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED}
@@ -76,6 +77,10 @@ def _to_response(task_id: str, ckpt: CheckpointData) -> TaskStatusResponse:
 
 async def create_task_record(scheduler, prd: str, session_id: str = "", project_name: str = "") -> str:
     """建任务元数据 + 写 IDLE 检查点，返回 task_id。route 与 chat.py 共用，避免重复逻辑。"""
+    # P2-1: 内存 dict 加容量上限，超限按插入序淘汰最旧，防长运行泄漏
+    if len(_task_records) >= _MAX_TASK_RECORDS:
+        oldest = next(iter(_task_records))
+        _task_records.pop(oldest, None)
     now = datetime.now(UTC)
     task_id = uuid.uuid4().hex
     _task_records[task_id] = {
@@ -115,10 +120,11 @@ async def create_task(request: Request, req: TaskCreateRequest) -> TaskStatusRes
         session_id = session.session_id
         project_name = session.project_name
 
-    now = datetime.now(UTC)
     # 写记录 + 初始 IDLE 检查点（GET/cancel 据此读真实状态）
     sched = _scheduler(request)
     task_id = await create_task_record(sched, req.prd, session_id, project_name)
+    # P2-2: 用记录里的 created_at，保证与后续 GET 一致（避免两个 now 微秒级偏差）
+    now = _task_records[task_id]["created_at"]
     return TaskStatusResponse(
         task_id=task_id,
         state=TaskState.IDLE,

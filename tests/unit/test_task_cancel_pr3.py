@@ -66,3 +66,18 @@ async def test_spawn_task_registers_and_cleans_up(scheduler):
     await task
     await asyncio.sleep(0)  # 让 done_callback 执行
     assert "s1" not in scheduler._active_tasks
+
+
+@pytest.mark.asyncio
+async def test_spawn_task_duplicate_returns_existing(scheduler):
+    """P1-1: 同 task_id 重复 spawn 返回现有运行中任务，不污染注册表。"""
+    async def _long(task_id, prd):
+        await asyncio.sleep(100)
+
+    scheduler.run_task = _long  # type: ignore[method-assign]
+    t1 = scheduler.spawn_task("dup", "prd")
+    t2 = scheduler.spawn_task("dup", "prd")  # 同 id 重复
+    assert t1 is t2  # 返回同一任务，未新建
+    assert scheduler._active_tasks["dup"] is t1
+    t1.cancel()
+    await asyncio.sleep(0)

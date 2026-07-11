@@ -23,13 +23,19 @@ interface CancellableToken extends monaco.CancellationToken {
 }
 
 const props = withDefaults(defineProps<{
-  original: string; modified: string; language?: string; height?: string; readOnly?: boolean
-}>(), { language: 'python', height: '600px', readOnly: true })
+  original: string; modified: string; language?: string; height?: string; readOnly?: boolean; gotoLine?: number
+}>(), { language: 'python', height: '600px', readOnly: true, gotoLine: 0 })
 
 const emit = defineEmits<{
   (e: 'approve-hunk', hunkIndex: number): void
   (e: 'reject-hunk', hunkIndex: number): void
 }>()
+
+// PR2: 大纲点击→跳转到指定行。gotoLine 变化时把 modified 编辑器滚动到该行居中。
+// P1-1: gotoLine 可能带 0.5 小数（上游用于强制同行连点触发 watch），Math.floor 还原整数行号。
+watch(() => props.gotoLine, (line) => {
+  if (line > 0) diffEditor.value?.revealPositionInCenter({ lineNumber: Math.floor(line), column: 1 })
+})
 
 const containerRef = ref<HTMLDivElement>()
 const diffEditor = shallowRef<monaco.editor.IStandaloneDiffEditor>()

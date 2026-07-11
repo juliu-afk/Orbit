@@ -18,6 +18,22 @@ export interface GraphDataResponse {
   stats: GraphStats
 }
 
+// 大纲项（对应后端 /codegraph/outline，OutlinePanel props）
+export interface OutlineItem {
+  name: string
+  kind: string
+  line: number
+  children?: OutlineItem[]
+}
+
+// 影响节点（对应后端 /insights/impact，ImpactGraph props）
+export interface ImpactNode {
+  name: string
+  file: string
+  level: string
+  callers: string[]
+}
+
 export const useCodeGraphStore = defineStore('codegraph', () => {
   // ── 状态 ──
   const elements = ref<GraphElement[]>([])
@@ -30,6 +46,11 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
   const searchQuery = ref('')
   const activeLayout = ref('cose')            // cose | breadthfirst | concentric
   const visibleEdgeTypes = ref<string[]>([])  // 空 = 全部显示
+
+  // 大纲 / 影响分析（PR2 接线）
+  const outline = ref<OutlineItem[]>([])
+  const impact = ref<ImpactNode[]>([])
+  const impactSymbol = ref('')
 
   // ── 计算 ──
   const nodes = computed(() => elements.value.filter(e => !e.data.id?.toString().startsWith('e:')))
@@ -56,6 +77,31 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
     selectedNodeId.value = nodeId
   }
 
+  // WHY 用原生 fetch 而非 apiGet：outline/impact 端点返回裸数组（非 {code,data} 包装），
+  // apiGet 会因 json.code!==0 抛错。这两个端点契约就是裸 list，直接解析。
+  // P2-1: 加 10s 超时——后端挂起时 abort，避免请求永久 pending 卡住后续触发。
+  async function _fetchList(url: string): Promise<unknown[]> {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 10000)
+    try {
+      const r = await fetch(url, { signal: ctrl.signal })
+      return r.ok ? await r.json() : []
+    } catch {
+      return []
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  async function fetchOutline(file: string): Promise<void> {
+    outline.value = (await _fetchList(`/api/v1/codegraph/outline?file=${encodeURIComponent(file)}`)) as OutlineItem[]
+  }
+
+  async function fetchImpact(symbol: string): Promise<void> {
+    impactSymbol.value = symbol
+    impact.value = (await _fetchList(`/api/v1/insights/impact?symbol=${encodeURIComponent(symbol)}`)) as ImpactNode[]
+  }
+
   function setSearchQuery(query: string): void {
     searchQuery.value = query
   }
@@ -80,12 +126,17 @@ export const useCodeGraphStore = defineStore('codegraph', () => {
     error.value = null
     selectedNodeId.value = null
     searchQuery.value = ''
+    outline.value = []
+    impact.value = []
+    impactSymbol.value = ''
   }
 
   return {
     elements, stats, loading, error,
     selectedNodeId, searchQuery, activeLayout, visibleEdgeTypes,
+    outline, impact, impactSymbol,
     nodes, edges,
     fetchGraphData, selectNode, setSearchQuery, setLayout, toggleEdgeType, reset,
+    fetchOutline, fetchImpact,
   }
 })

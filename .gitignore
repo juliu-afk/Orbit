@@ -57,3 +57,10 @@ backend/build/
 
 # 包管理
 uv.lock
+
+# S2: 生产就绪检查遗漏
+.mypy_cache/
+.ruff_cache/
+.semgrep/
+*.log
+coverage.xml

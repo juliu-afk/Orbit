@@ -11,18 +11,21 @@ import TestPanel from '@/components/editor/TestPanel.vue'
 import MergeConflictPanel from '@/components/editor/MergeConflictPanel.vue'
 import TestGapsPanel from '@/components/editor/TestGapsPanel.vue'
 import OutlinePanel from '@/components/editor/OutlinePanel.vue'
+import BlamePanel from '@/components/editor/BlamePanel.vue'
+import { useBlameStore } from '@/stores/blame'
 
 const editor = useEditorStore()
 const shell = useShellStore()
 const diag = useDiagnosticsStore()
 const codegraph = useCodeGraphStore()
+const blame = useBlameStore()
 
 // PR2: 打开文件时拉大纲；点击大纲项跳转到对应行
 const gotoLine = ref(0)
 let _revealTick = false
 watch(() => editor.currentFile, (fp) => {
-  if (fp && !fp.startsWith('[code]')) codegraph.fetchOutline(fp)
-  else codegraph.outline = []
+  if (fp && !fp.startsWith('[code]')) { codegraph.fetchOutline(fp); blame.fetchBlame(fp) }
+  else { codegraph.outline = []; blame.lines = [] }
 })
 function onOutlineSelect(line: number) {
   // P1-1 修复：同一行连点也要重新跳转。gotoLine 在 line 与 line+0.5 间交替，
@@ -76,6 +79,9 @@ const activeTab = ref('problems')
       </el-tab-pane>
       <el-tab-pane label="Outline" name="outline">
         <OutlinePanel :items="codegraph.outline" @select="onOutlineSelect" />
+      </el-tab-pane>
+      <el-tab-pane label="Blame" name="blame">
+        <BlamePanel />
       </el-tab-pane>
       <el-tab-pane label="Tests" name="tests">
         <TestPanel @show-error="onTestError" />

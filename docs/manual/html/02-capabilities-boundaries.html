@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · 能力与边界 · Capabilities &amp; Boundaries</title>
+<style>
+:root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
+        --accent:#0969da; --code-bg:#f6f8fa; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg:#e6edf3; --bg:#0d1117; --muted:#8b949e; --border:#30363d;
+          --accent:#4493f8; --code-bg:#161b22; } }
+* { box-sizing: border-box; }
+body { margin:0; color:var(--fg); background:var(--bg);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC",
+       "Microsoft YaHei",Helvetica,Arial,sans-serif; line-height:1.6; }
+main { max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+h1,h2,h3,h4 { line-height:1.25; margin-top:1.6em; }
+h1 { border-bottom:2px solid var(--border); padding-bottom:.3em; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:.25em; }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+code { background:var(--code-bg); padding:.15em .35em; border-radius:6px;
+       font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size:.9em; }
+pre { background:var(--code-bg); padding:1rem; border-radius:8px; overflow-x:auto;
+      border:1px solid var(--border); }
+pre code { background:none; padding:0; }
+blockquote { margin:1em 0; padding:.4em 1em; color:var(--muted);
+             border-left:4px solid var(--border); }
+table { border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto; }
+th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
+th { background:var(--code-bg); }
+hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
+ul { padding-left:1.5em; }
+.en { display:block; font-size:.82em; font-weight:400; color:var(--muted);
+      line-height:1.45; margin-top:.15em; }
+h1 .en, h2 .en, h3 .en, h4 .en { font-size:.6em; margin-top:.2em; }
+th .en, td .en { font-size:.8em; }
+</style>
+</head>
+<body><main>
+<h1 id="02-能力与边界-capabilities-boundaries">02 · 能力与边界<span class="en">Capabilities &amp; Boundaries</span></h1>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="01-design-philosophy.html">← 上一章：设计哲学<span class="en">Prev: Design Philosophy</span></a></p>
+<blockquote>本章回答"Orbit 能做什么、不能做什么"。使用者与决策者优先阅读。能力清单来自 <a href="../已实现功能清单.html"><code>docs/已实现功能清单.md</code></a>，边界均引自章程/PRD 的显式声明，非推测。<span class="en">This chapter answers "what Orbit can and cannot do". For users and decision-makers first. The capability list comes from <a href="../已实现功能清单.html"><code>docs/已实现功能清单.md</code></a>; every boundary is cited from explicit statements in the charter/PRDs, not inferred.</span></blockquote>
+<hr>
+<h2 id="2-1-能力清单-capabilities">2.1 能力清单<span class="en">Capabilities</span></h2>
+<h3 id="2-1-1-代码开发编排-development-orchestration">2.1.1 代码开发编排<span class="en">Development Orchestration</span></h3>
+<table>
+<thead><tr>
+<th>能力<span class="en">Capability</span></th>
+<th>描述<span class="en">Description</span></th>
+</tr></thead><tbody>
+<tr><td>调度器状态机<span class="en">Scheduler state machine</span></td><td>状态机驱动的多 Agent 开发全流程（IDLE→PARSING→SCOPING→PLANNING→CODING→VERIFYING→DONE）<span class="en">State-machine-driven full multi-agent development flow</span></td></tr>
+<tr><td>DAG 并行执行<span class="en">DAG parallel execution</span></td><td>拓扑排序 + 分层并发 + 检查点恢复<span class="en">Topological sort + layered concurrency + checkpoint recovery</span></td></tr>
+<tr><td>Goal 统一入口<span class="en">Goal unified intake</span></td><td>自然语言 / PRD 文件 / 批量目录三态输入，自动清晰度判定 + 三层依赖检测 + 自主 PR 合入<span class="en">NL / PRD file / batch directory intake, auto clarity scoring + 3-tier dependency detection + autonomous PR merge</span></td></tr>
+<tr><td>10 角色 Agent 工厂<span class="en">10-role Agent factory</span></td><td>Architect/Developer/Reviewer/QA/ConfigManager/Clarifier/Chatter/Dream/MCTS/PreAct，按角色路由不同模型<span class="en">Roles routed to different models per role</span></td></tr>
+<tr><td>任务分片<span class="en">Task sharding</span></td><td>大 PRD 按段落边界自动分片 + Semaphore 并发<span class="en">Large PRD auto-sharded on paragraph boundaries + semaphore concurrency</span></td></tr>
+<tr><td>需求澄清<span class="en">Requirement clarification</span></td><td>完整性 + 矛盾检测 + 可行性评分（0–100），多轮生成结构化 PRD<span class="en">Completeness + contradiction detection + feasibility score, multi-turn structured PRD</span></td></tr>
+<tr><td>高峰避让调度<span class="en">Off-peak scheduling</span></td><td>按四大厂商高峰时段推迟非紧急任务 + 持久化延迟队列<span class="en">Defers non-urgent tasks by vendor peak windows + persistent delay queue</span></td></tr>
+</tbody></table>
+<h3 id="2-1-2-五图谱记忆-five-graph-memory">2.1.2 五图谱记忆<span class="en">Five-Graph Memory</span></h3>
+<table>
+<thead><tr>
+<th>能力<span class="en">Capability</span></th>
+<th>描述<span class="en">Description</span></th>
+</tr></thead><tbody>
+<tr><td>代码图谱<span class="en">Code graph</span></td><td>Tree-sitter 解析 Python/TypeScript/SQL，调用链 + 继承 + 数据流（Def-Use），增量更新<span class="en">Multi-language parse, call/inheritance/data-flow chains, incremental</span></td></tr>
+<tr><td>数据库图谱<span class="en">DB graph</span></td><td>SQLAlchemy 反射 + 外键关系提取<span class="en">Reflection + foreign-key extraction</span></td></tr>
+<tr><td>配置图谱<span class="en">Config graph</span></td><td>5 种格式 + SHA256 基线 + 漂移检测/自动修复<span class="en">5 formats + SHA256 baseline + drift detection/auto-fix</span></td></tr>
+<tr><td>知识图谱<span class="en">Knowledge graph</span></td><td>外挂领域本体（会计/金融/法律）+ BGE 向量搜索 + TF-IDF 降级 + MCP<span class="en">Domain ontology + vector search + TF-IDF fallback + MCP</span></td></tr>
+<tr><td>元图谱<span class="en">Meta-graph</span></td><td>12 种跨图谱关系 + 影响面分析 + 架构腐化检测<span class="en">12 cross-graph relations + impact analysis + rot detection</span></td></tr>
+<tr><td>12 个 MCP 图谱工具<span class="en">12 MCP graph tools</span></td><td>trace_path / search_code / dead_code / rename_symbol / safe_delete_symbol / type_hierarchy…<span class="en"></span></td></tr>
+<tr><td>历史图快照 + 文件监视<span class="en">History snapshots + file watch</span></td><td>按 git commit 建历史图 + watchdog 增量更新<span class="en">Per-commit history graph + watchdog incremental update</span></td></tr>
+</tbody></table>
+<h3 id="2-1-3-防幻觉验证-anti-hallucination">2.1.3 防幻觉验证<span class="en">Anti-Hallucination</span></h3>
+<table>
+<thead><tr>
+<th>能力<span class="en">Capability</span></th>
+<th>描述<span class="en">Description</span></th>
+</tr></thead><tbody>
+<tr><td>L1–L8 复合验证管道<span class="en">L1–L8 composite pipeline</span></td><td>图谱/追踪/熵/类型/Z3/合约/沙箱/配置，CODING 后自动运行<span class="en">Runs automatically after CODING</span></td></tr>
+<tr><td>L9 动态合规<span class="en">L9 dynamic compliance</span></td><td>规则引擎 + 知识时效性检查<span class="en">Rule engine + knowledge timeliness check</span></td></tr>
+<tr><td>快速/全量两档<span class="en">Quick / full tiers</span></td><td>quick=L1+L4+L3 即时；full=L1–L8 完整<span class="en">quick for instant checks, full for completion</span></td></tr>
+<tr><td>消融实验量化<span class="en">Ablation quantification</span></td><td>20 可消融目标，显式量化各层边际贡献（L1 ΔF1=+0.660）<span class="en">Explicitly quantifies each layer's marginal contribution</span></td></tr>
+</tbody></table>
+<h3 id="2-1-4-可观测与运维-observability-operations">2.1.4 可观测与运维<span class="en">Observability &amp; Operations</span></h3>
+<table>
+<thead><tr>
+<th>能力<span class="en">Capability</span></th>
+<th>描述<span class="en">Description</span></th>
+</tr></thead><tbody>
+<tr><td>驾驶舱实时监控<span class="en">Real-time cockpit</span></td><td>WebSocket 推送 DAG/Token/告警/健康评分<span class="en">Pushes DAG/token/alerts/health</span></td></tr>
+<tr><td>AgentOps 体系<span class="en">AgentOps suite</span></td><td>Prometheus + 审计 + 告警 + 教训库 + Grafana/AlertManager<span class="en">Metrics + audit + alerting + lessons + dashboards</span></td></tr>
+<tr><td>Trace 链路追踪<span class="en">Distributed tracing</span></td><td>7 模块 40+ span，异步批量 flush<span class="en">40+ spans across 7 modules</span></td></tr>
+<tr><td>资源熔断<span class="en">Resource guard</span></td><td>令牌桶 + Token 预算 + 4 级降级 + 三态熔断（毫秒级）<span class="en">Token bucket + budget + 4-level degradation + 3-state breaker</span></td></tr>
+<tr><td>元认知监控 + 自愈<span class="en">Metacognition + self-heal</span></td><td>漂移/重复/延迟触发 + HITL + VIGIL 7 种失败模式自愈<span class="en">Drift/repeat/latency triggers + HITL + VIGIL self-healing</span></td></tr>
+<tr><td>备份/灾难恢复/版本注册<span class="en">Backup / DR / versioning</span></td><td>SQLite 快照 + SHA256 + CLI 恢复(list/verify/recover) + SOP<span class="en">Snapshot + checksum + recovery CLI + SOP</span></td></tr>
+</tbody></table>
+<h3 id="2-1-5-集成渠道-integration-channels">2.1.5 集成渠道<span class="en">Integration Channels</span></h3>
+<table>
+<thead><tr>
+<th>能力<span class="en">Capability</span></th>
+<th>描述<span class="en">Description</span></th>
+</tr></thead><tbody>
+<tr><td>微信通道<span class="en">WeChat channel</span></td><td>iLink Bot API 双向对话（命令/审批/通知）+ QR 绑定<span class="en">Bidirectional chat + QR binding</span></td></tr>
+<tr><td>MCP 客户端桥<span class="en">MCP client bridge</span></td><td>JSON-RPC 2.0 over stdio，连接外部 MCP（如 Serena），工具自动发现<span class="en">Connects external MCP servers, auto tool discovery</span></td></tr>
+<tr><td>MCP Server 对外暴露<span class="en">MCP server</span></td><td>以 MCP 协议暴露 Orbit 内置工具供外部 Agent 调用<span class="en">Exposes Orbit tools to external agents</span></td></tr>
+<tr><td>桌面壳<span class="en">Desktop shell</span></td><td>20MB Tauri 透明窗口，Vue3 驾驶舱 76 组件，Tailwind v4<span class="en">20MB Tauri app, Vue3 cockpit</span></td></tr>
+<tr><td>代码依赖图可视化<span class="en">Dependency graph viz</span></td><td>Cytoscape.js 渲染（3 布局）+ 搜索 + 节点详情<span class="en">Cytoscape rendering + search + node detail</span></td></tr>
+</tbody></table>
+<h3 id="2-1-6-自我进化-self-evolution">2.1.6 自我进化<span class="en">Self-Evolution</span></h3>
+<table>
+<thead><tr>
+<th>能力<span class="en">Capability</span></th>
+<th>描述<span class="en">Description</span></th>
+</tr></thead><tbody>
+<tr><td>GEPA Prompt 进化<span class="en">GEPA prompt evolution</span></td><td>遗传 + 变异 + 交叉 + Pareto 筛选<span class="en">Genetic + mutation + crossover + Pareto</span></td></tr>
+<tr><td>SCOPE 双流记忆<span class="en">SCOPE dual-stream memory</span></td><td>战术（临时）+ 战略（持久）自动升级<span class="en">Tactical + strategic auto-promotion</span></td></tr>
+<tr><td>离线/LLM 蒸馏<span class="en">Offline / LLM distillation</span></td><td>轨迹→策略原则（去重+评分+剪枝）<span class="en">Trajectories → reusable principles</span></td></tr>
+<tr><td>GRPO 评分 + ANCHOR 对齐<span class="en">GRPO scoring + ANCHOR alignment</span></td><td>基线对比动态调效用 + 4 检查点防对齐崩溃<span class="en">Utility tuning + alignment guardrails</span></td></tr>
+<tr><td>ReflAct 反思循环<span class="en">ReflAct reflection loop</span></td><td>每轮 ReAct 后自评 + 漂移自动纠正<span class="en">Self-assessment + drift correction each turn</span></td></tr>
+</tbody></table>
+<hr>
+<h2 id="2-2-能力边界-boundaries">2.2 能力边界<span class="en">Boundaries</span></h2>
+<blockquote>以下每条均有源文件依据，是可验证的明确声明。<span class="en">Each item below is a verifiable, explicitly stated limit with a source.</span></blockquote>
+<h3 id="2-2-1-明确-non-goals-explicit-non-goals">2.2.1 明确 Non-Goals<span class="en">Explicit Non-Goals</span></h3>
+<table>
+<thead><tr>
+<th>边界<span class="en">Boundary</span></th>
+<th>来源<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>时序图谱、多集群联邦留待 V2<span class="en">Time-series graph &amp; multi-cluster federation deferred to V2</span></td><td><code>charter.md:20-21</code></td></tr>
+<tr><td>文档图谱仅设计、未实现代码<span class="en">Document graph is design-only, not implemented</span></td><td><code>CLAUDE.md:52</code>；<code>产品路线图.md:121</code></td></tr>
+<tr><td>防幻觉当前仅支持 Python（JS/TS 需扩展 Tree-sitter + tsc）<span class="en">Anti-hallucination supports Python only</span></td><td><code>PRD+ADR_4阶段.md:35</code></td></tr>
+<tr><td>L5 不验证 IO 密集/复杂循环；L6 不支持 gRPC；L8 不支持 K8s ConfigMap<span class="en">L5/L6/L8 scope limits</span></td><td><code>PRD+ADR_4阶段.md:93</code></td></tr>
+<tr><td>代码图谱不支持 eval/exec/动态导入/控制流分析<span class="en">Code graph excludes dynamic features</span></td><td><code>PRD+ADR_3阶段.md:8</code></td></tr>
+<tr><td>数据库图谱仅关系型（PG/MySQL），不支持 NoSQL；仅单主库<span class="en">DB graph relational only, single primary</span></td><td><code>PRD+ADR_3阶段.md:81,90</code></td></tr>
+<tr><td>配置图谱不支持加密配置（sops）<span class="en">Config graph excludes encrypted configs</span></td><td><code>PRD+ADR_3阶段.md:124</code></td></tr>
+<tr><td>DAG 不支持运行时改拓扑/跨任务依赖；分片不支持跨语言<span class="en">DAG static, sharding single-language</span></td><td><code>PRD+ADR_5阶段.md:8,515</code></td></tr>
+<tr><td>Agent 无状态（对话历史由调度器管理，Agent 间无工具调用链）<span class="en">Agents are stateless</span></td><td><code>PRD+ADR_5阶段.md:102</code></td></tr>
+<tr><td>驾驶舱不含任务管理/历史回放/自定义仪表盘/移动端（均 V2）<span class="en">Cockpit V2 scope-outs</span></td><td><code>PRD+ADR_6阶段.md:660,998</code></td></tr>
+<tr><td>知识图谱不自动演进（人工审核，Agent 只读）<span class="en">Knowledge graph not auto-evolving</span></td><td><code>PRD+ADR_Step3.4:14</code></td></tr>
+<tr><td>自然语言交互仅查询/关联 Issue，不支持关闭等操作<span class="en">NL interaction is read-only on Issues</span></td><td><code>PRD+ADR_自然语言交互与项目上下文.md:39</code></td></tr>
+</tbody></table>
+<h3 id="2-2-2-技术前提依赖-preconditions-dependencies">2.2.2 技术前提依赖<span class="en">Preconditions &amp; Dependencies</span></h3>
+<table>
+<thead><tr>
+<th>依赖<span class="en">Dependency</span></th>
+<th>说明<span class="en">Note</span></th>
+</tr></thead><tbody>
+<tr><td>Docker Engine ≥24</td><td>沙箱强制隔离，禁止宿主机直接执行<span class="en">Sandbox mandatory, no host execution</span></td></tr>
+<tr><td>LiteLLM ≥1.40</td><td>所有 LLM 调用必经网关，禁止直连 provider<span class="en">All LLM calls via gateway</span></td></tr>
+<tr><td>LLM API Key + logprobs</td><td>L3 熵监控依赖 logprobs（部分模型不支持则降级）<span class="en">L3 falls back without logprobs</span></td></tr>
+<tr><td>Redis</td><td>检查点热层；不可用时降级内存模式<span class="en">Degrades to memory if absent</span></td></tr>
+<tr><td>Node.js 22+</td><td>微信通道（cc-weixin via npx），未装则不可用<span class="en">WeChat unavailable without it</span></td></tr>
+<tr><td>PostgreSQL / MySQL</td><td>数据库图谱反射目标<span class="en">DB graph reflection target</span></td></tr>
+<tr><td>Rust 工具链（Tauri）</td><td>桌面壳编译<span class="en">Desktop shell build</span></td></tr>
+<tr><td>SQLite WAL 模式</td><td>图谱并发写串行化<span class="en">Serializes graph concurrent writes</span></td></tr>
+</tbody></table>
+<h3 id="2-2-3-理论上限-theoretical-limits">2.2.3 理论上限<span class="en">Theoretical Limits</span></h3>
+<table>
+<thead><tr>
+<th>上限<span class="en">Limit</span></th>
+<th>数值<span class="en">Value</span></th>
+<th>来源<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>幻觉率门禁（非 0）<span class="en">Hallucination gate (not 0)</span></td><td>&lt;3%</td><td><code>charter.md:8,65</code></td></tr>
+<tr><td>静态分析理论天花板<span class="en">Static-analysis ceiling</span></td><td>48.5–77%</td><td>架构总览 §防幻觉</td></tr>
+<tr><td>调度层延迟<span class="en">Scheduler latency</span></td><td>≤1500ms</td><td><code>charter.md:7</code></td></tr>
+<tr><td>单任务 Token（暂缓硬门禁）<span class="en">Token per task (gate deferred)</span></td><td>≤35</td><td><code>charter.md:67</code></td></tr>
+<tr><td>Agent 循环硬上限<span class="en">Agent loop hard cap</span></td><td>50 轮 + 步骤超时 120/180s<span class="en">50 turns + step timeout</span></td><td><code>已实现功能清单.md:405</code></td></tr>
+<tr><td>请求体上限<span class="en">Request body limit</span></td><td>10MB</td><td><code>api/main.py:154</code></td></tr>
+<tr><td>上下文字段截断<span class="en">Context field truncation</span></td><td>5000 chars/字段<span class="en">per field</span></td><td><code>已实现功能清单.md:322</code></td></tr>
+<tr><td>L5 仅纯数学约束<span class="en">L5 pure-math only</span></td><td>禁外部函数/副作用<span class="en">no external fns/side effects</span></td><td><code>PRD+ADR_4阶段.md:116</code></td></tr>
+</tbody></table>
+<h3 id="2-2-4-当前成熟度缺口-current-maturity-gaps">2.2.4 当前成熟度缺口<span class="en">Current Maturity Gaps</span></h3>
+<table>
+<thead><tr>
+<th>缺口<span class="en">Gap</span></th>
+<th>数据<span class="en">Data</span></th>
+<th>来源<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>测试覆盖率未达门禁<span class="en">Coverage below gate</span></td><td>行 69% / 分支 ~60%，门禁 80%<span class="en">line 69% vs 80% gate</span></td><td><code>已实现功能清单.md:112-122</code></td></tr>
+<tr><td>pytest 未接入 CI<span class="en">pytest not in CI</span></td><td>仅 lint+typecheck 入 CI<span class="en">only lint+typecheck gated</span></td><td><code>已实现功能清单.md:116</code></td></tr>
+<tr><td>部分防幻觉层埋点未全接线<span class="en">Some layers not fully wired</span></td><td>L4/L5/L6/L7 dag/task runner 埋点<span class="en">instrumentation gaps</span></td><td><code>已实现功能清单.md:353</code></td></tr>
+<tr><td>Route 层覆盖率低<span class="en">Low route-layer coverage</span></td><td>28 路由文件均值 43%<span class="en">avg 43%</span></td><td><code>已实现功能清单.md:136</code></td></tr>
+<tr><td>集成测试偏少<span class="en">Few integration tests</span></td><td>15 文件<span class="en">15 files</span></td><td><code>tests/integration/</code></td></tr>
+</tbody></table>
+<h3 id="2-2-5-未实现-仅设计态-not-implemented-design-only">2.2.5 未实现 / 仅设计态<span class="en">Not Implemented / Design-Only</span></h3>
+<table>
+<thead><tr>
+<th>项目<span class="en">Item</span></th>
+<th>状态<span class="en">Status</span></th>
+<th>来源<span class="en">Source</span></th>
+</tr></thead><tbody>
+<tr><td>文档图谱 DocGraph</td><td>仅设计（pgvector+Neo4j 未落码）<span class="en">design-only</span></td><td><code>产品路线图.md:121</code></td></tr>
+<tr><td>渐进式审查 ReviewCheckpoint</td><td>PRD→ADR→代码三列对照未实现<span class="en">not implemented</span></td><td><code>开发计划/11:194</code></td></tr>
+<tr><td>测试↔审查 L4 级联动</td><td>asyncio.Queue 双向推送未实现<span class="en">not implemented</span></td><td><code>开发计划/11:195</code></td></tr>
+<tr><td>代码签名<span class="en">Code signing</span></td><td>SOP + 占位就绪，实际流程未实施<span class="en">placeholder only</span></td><td><code>已实现功能清单.md:496</code></td></tr>
+<tr><td>用户认证系统<span class="en">User auth</span></td><td>MVP 无认证，依赖反向代理 Basic Auth<span class="en">no auth in MVP</span></td><td><code>PRD+ADR_6阶段.md:660</code></td></tr>
+<tr><td>单任务 Token 硬门禁<span class="en">Token hard gate</span></td><td>设计 ≤35，暂缓<span class="en">deferred</span></td><td><code>charter.md:67</code></td></tr>
+</tbody></table>
+<hr>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="03-architecture.html">下一章：整体架构 →<span class="en">Next: Architecture →</span></a></p>
+<p>&lt;/content&gt;</p>
+</main></body>
+</html>

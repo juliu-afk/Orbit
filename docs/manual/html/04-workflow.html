@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 · 端到端流程 · End-to-End Workflow</title>
+<style>
+:root { --fg:#1f2328; --bg:#ffffff; --muted:#656d76; --border:#d0d7de;
+        --accent:#0969da; --code-bg:#f6f8fa; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg:#e6edf3; --bg:#0d1117; --muted:#8b949e; --border:#30363d;
+          --accent:#4493f8; --code-bg:#161b22; } }
+* { box-sizing: border-box; }
+body { margin:0; color:var(--fg); background:var(--bg);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC",
+       "Microsoft YaHei",Helvetica,Arial,sans-serif; line-height:1.6; }
+main { max-width:960px; margin:0 auto; padding:2rem 1.5rem 4rem; }
+h1,h2,h3,h4 { line-height:1.25; margin-top:1.6em; }
+h1 { border-bottom:2px solid var(--border); padding-bottom:.3em; }
+h2 { border-bottom:1px solid var(--border); padding-bottom:.25em; }
+a { color:var(--accent); text-decoration:none; }
+a:hover { text-decoration:underline; }
+code { background:var(--code-bg); padding:.15em .35em; border-radius:6px;
+       font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size:.9em; }
+pre { background:var(--code-bg); padding:1rem; border-radius:8px; overflow-x:auto;
+      border:1px solid var(--border); }
+pre code { background:none; padding:0; }
+blockquote { margin:1em 0; padding:.4em 1em; color:var(--muted);
+             border-left:4px solid var(--border); }
+table { border-collapse:collapse; width:100%; margin:1em 0; display:block; overflow-x:auto; }
+th,td { border:1px solid var(--border); padding:.5em .8em; text-align:left; }
+th { background:var(--code-bg); }
+hr { border:none; border-top:1px solid var(--border); margin:2em 0; }
+ul { padding-left:1.5em; }
+.en { display:block; font-size:.82em; font-weight:400; color:var(--muted);
+      line-height:1.45; margin-top:.15em; }
+h1 .en, h2 .en, h3 .en, h4 .en { font-size:.6em; margin-top:.2em; }
+th .en, td .en { font-size:.8em; }
+</style>
+</head>
+<body><main>
+<h1 id="04-端到端流程-end-to-end-workflow">04 · 端到端流程<span class="en">End-to-End Workflow</span></h1>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="03-architecture.html">← 上一章：整体架构<span class="en">Prev: Architecture</span></a></p>
+<blockquote>本章叙述一个请求从进入到交付的完整生命周期，逐环节标注触发条件、负责模块（源文件）、做什么、产出。与 <a href="03-architecture.html">03 整体架构</a> 的静态数据流互补——这里是动态时序。<span class="en">This chapter narrates the full lifecycle of a request from entry to delivery, annotating each step with its trigger, responsible module (source file), action, and output. It complements the static data flow in <a href="03-architecture.html">03 Architecture</a> with a dynamic timeline.</span></blockquote>
+<hr>
+<h2 id="4-1-三种宏观模式-three-macro-modes">4.1 三种宏观模式<span class="en">Three Macro Modes</span></h2>
+<table>
+<thead><tr>
+<th>模式<span class="en">Mode</span></th>
+<th>入口<span class="en">Entry</span></th>
+<th>编排器<span class="en">Orchestrator</span></th>
+<th>适用<span class="en">When</span></th>
+</tr></thead><tbody>
+<tr><td>Goal 模式<span class="en">Goal mode</span></td><td><code>POST /api/v1/goal</code></td><td><code>MetaOrchestrator</code>（<code>goal/meta_orchestrator.py</code>）</td><td>高层目标含多子任务，自动拆解 + DAG + CritiqueGate + 自主 PR<span class="en">High-level goal, multi-subtask</span></td></tr>
+<tr><td>单任务模式<span class="en">Single-task mode</span></td><td>WebSocket <code>/chat</code> 或 <code>POST /tasks</code></td><td><code>Scheduler</code>→<code>TaskRunner</code>（<code>scheduler/</code>）</td><td>单 PRD 全流水线<span class="en">One PRD, full pipeline</span></td></tr>
+<tr><td>Loop 模式<span class="en">Loop mode</span></td><td><code>POST /api/v1/loop</code></td><td><code>LoopScheduler</code>（<code>loop/scheduler.py</code>）</td><td>定期重复执行同一命令<span class="en">Periodic repetition</span></td></tr>
+</tbody></table>
+<h2 id="4-2-真实状态机-the-real-state-machine">4.2 真实状态机<span class="en">The Real State Machine</span></h2>
+<blockquote>更正：早期文档误写 <code>PARSING→PLANNING→CODING→VALIDATING</code>。真实定义见 <code>scheduler/task_runner/checkpoint.py:23-37</code> 与 <code>api/schemas/task.py</code>。<span class="en">Correction: earlier docs mislabeled the states. The real definition is in <code>scheduler/task_runner/checkpoint.py:23-37</code> and <code>api/schemas/task.py</code>.</span></blockquote>
+<pre><code>IDLE ─▶ PARSING ─▶ SCOPING ─▶ PLANNING ─▶ CODING ─▶ VERIFYING ─▶ DONE
+ 0%      10%        20%         30%         60%        85%         100%
+                    │                                              ▲
+        复杂度&lt;30 走快车道 (FAST_LANE)：跳过 PLANNING 与 VERIFYING ──┘
+终态: DONE / FAILED / CANCELLED</code></pre>
+<table>
+<thead><tr>
+<th>状态<span class="en">State</span></th>
+<th>角色<span class="en">Role</span></th>
+<th>做什么<span class="en">Action</span></th>
+<th>产物<span class="en">Output</span></th>
+</tr></thead><tbody>
+<tr><td>IDLE</td><td>chatter</td><td>初始，建检查点<span class="en">Initial, checkpoint</span></td><td><code>CheckpointData(IDLE)</code></td></tr>
+<tr><td>PARSING</td><td>clarifier</td><td>解析 PRD，提关键词，复杂度评分<span class="en">Parse PRD, keywords, complexity</span></td><td><code>complexity_score, keywords</code></td></tr>
+<tr><td>SCOPING</td><td>规则引擎（非 LLM）<span class="en">rule engine</span></td><td>确定性变更范围分析<span class="en">Deterministic scope analysis</span></td><td><code>scope_analysis</code></td></tr>
+<tr><td>PLANNING</td><td>architect</td><td>系统设计，多方案生成<span class="en">System design, multi-plan</span></td><td><code>design_plan</code></td></tr>
+<tr><td>CODING</td><td>developer</td><td>ReAct 循环实现代码<span class="en">ReAct-loop implementation</span></td><td><code>code_artifact</code></td></tr>
+<tr><td>VERIFYING</td><td>reviewer</td><td>代码审查与验证<span class="en">Review &amp; verify</span></td><td><code>review_result</code></td></tr>
+<tr><td>DONE / FAILED / CANCELLED</td><td>—</td><td>终态<span class="en">Terminal</span></td><td>完整产物/错误<span class="en">Result/error</span></td></tr>
+</tbody></table>
+<p>快车道由 <code>ComplexityScorer</code> 授权，LLM 无权绕过（<code>ProcessGuard.authorize_fast_lane()</code>）。<span class="en">The fast lane is authorized only by <code>ComplexityScorer</code>; the LLM cannot bypass gates.</span></p>
+<h2 id="4-3-全生命周期-11-阶段-the-11-lifecycle-stages">4.3 全生命周期 11 阶段<span class="en">The 11 Lifecycle Stages</span></h2>
+<h3 id="阶段-0-请求入口-stage-0-request-entry">阶段 0：请求入口<span class="en">Stage 0: Request Entry</span></h3>
+<p>四类入口——WebSocket 聊天（<code>chat.py:chat_endpoint</code>）、Goal REST（<code>goal.py:create_goal</code>）、任务 API（<code>tasks.py:create_task</code>）、Loop（<code>loop.py:create_loop</code>）。校验 token/workspace/并发冲突后创建会话或后台任务。<span class="en">Four entries validate token/workspace/concurrency, then create a session or background task.</span></p>
+<h3 id="阶段-1-意图路由与需求澄清-stage-1-intent-routing-clarification">阶段 1：意图路由与需求澄清<span class="en">Stage 1: Intent Routing &amp; Clarification</span></h3>
+<p><code>ChatterAgent</code>（<code>agents/chatter.py</code>）首触判定 <code>intent</code>：<code>chat</code> 直接回复；<code>programming</code> 转 <code>ClarifierAgent</code>（<code>agents/clarifier/agent.py</code>）多轮澄清，经 V1–V5 校验链（V1 字段完整/V2 一致性/V3 矛盾检测/V4 流式熵监控/V5 JSON schema）产出 <code>StructuredPRD</code>。用户 <code>confirm</code> 后建任务并 <code>spawn_task</code>。<span class="en">ChatterAgent routes intent; ClarifierAgent produces a StructuredPRD via the V1–V5 validation chain; on user confirm a task is spawned.</span></p>
+<h3 id="阶段-2-输入智能判定-goal-模式-stage-2-intake-decision-goal-mode">阶段 2：输入智能判定（Goal 模式）<span class="en">Stage 2: Intake Decision (Goal mode)</span></h3>
+<p><code>IntakeRouter.route()</code>（<code>goal/intake_router.py</code>）检测输入形态 + 启发式评分清晰度/拆解度 → <code>IntakeDecision(needs_clarify, needs_decompose, is_batch)</code>。<span class="en">IntakeRouter scores clarity/decomposition and returns an IntakeDecision.</span></p>
+<h3 id="阶段-3-拆解与依赖分析-goal-模式-stage-3-decomposition-dependency-goal-mode">阶段 3：拆解与依赖分析（Goal 模式）<span class="en">Stage 3: Decomposition &amp; Dependency (Goal mode)</span></h3>
+<p>按需澄清 → <code>PreFlightEstimator</code> 预估 → <code>GoalComposeBridge.generate_spec()</code> 生成含 <code>TaskDAG</code> 的 Spec → 用户确认。批量模式经 <code>DependencyAnalyzer.analyze()</code> 分层并发。<span class="en">Optional clarify → estimate → generate a Spec with a TaskDAG → user confirm; batch mode analyzes dependencies and runs layered concurrency.</span></p>
+<h3 id="阶段-4-调度器状态机-stage-4-scheduler-state-machine">阶段 4：调度器状态机<span class="en">Stage 4: Scheduler State Machine</span></h3>
+<p>单任务：<code>Scheduler.spawn_task()</code>→<code>TaskRunner.run_task()</code> 按 §4.2 状态机推进，每轮 <code>_agent_cycle</code>→<code>_run_agent</code>→<code>_transition</code>→<code>_save_checkpoint</code>。Goal 子任务：<code>SubTaskSession.run_full_pipeline()</code> + <code>ProcessGuard</code> 门禁 + 独立 git 分支 <code>goal/{goal_id}/{task_id}</code> 隔离。<span class="en">Single-task advances the state machine per §4.2; Goal subtasks run through ProcessGuard gates in isolated git branches.</span></p>
+<h3 id="阶段-5-agent-执行-stage-5-agent-execution">阶段 5：Agent 执行<span class="en">Stage 5: Agent Execution</span></h3>
+<p><code>AgentFactory.create()</code>（<code>agents/factory.py</code>）按角色建实例并绑定模型层（architect=T3 GLM-5.2，developer=T2 DS V4 Pro 失败升 T3，clarifier/chatter=T1 Flash）。<code>TaskRunner._run_agent</code> 注入能力引擎：ReflectionEngine(ReflAct)、PreActEngine、VigilSelfHealer、MCTSPlanner（仅 architect）。<code>ReActAgent</code> 在 <code>write_file/edit_file</code> 后自动调 <code>validate_quick</code> 快速防幻觉（fail-open）。<span class="en">The factory binds each role to a model tier and injects Reflection/PreAct/VIGIL/MCTS engines; ReActAgent runs quick anti-hallucination after each file write.</span></p>
+<h3 id="阶段-6-批判门禁-goal-模式-stage-6-critique-gate-goal-mode">阶段 6：批判门禁（Goal 模式）<span class="en">Stage 6: Critique Gate (Goal mode)</span></h3>
+<p>CODING 完成后 <code>CritiqueAgent.critique()</code>（<code>goal/critique.py</code>）跨模型族审查（仅看代码产物 + 验证结果，不看生成推理），四维评分（正确性 40%/安全 25%/性能 15%/可维护 20%）。<code>APPROVED</code> 放行 VERIFYING；<code>REJECTED</code> 退回 CODING（最多 2 次）；fail-open。<span class="en">A cross-model CritiqueAgent scores code on four dimensions; approve advances, reject loops back up to twice.</span></p>
+<h3 id="阶段-7-验证-stage-7-verification">阶段 7：验证<span class="en">Stage 7: Verification</span></h3>
+<p><code>ExecutorVerifier</code>（<code>goal/verifier.py</code>）白名单命令 + shell 元字符检测 + 真实子进程执行（可选 Docker）。防幻觉 <code>validate_full</code>（<code>hallucination/pipeline.py</code>）按 L1→L4→L3→L2→L6→L8→L7→L5 顺序运行，L1/L7 致命失败即前向终止。<code>CircuitBreaker</code>（<code>gateway/circuit_breaker.py</code>）在 LLM 调用前后计数，连续 5 次失败或 60s 错误率&gt;30% 熔断。<span class="en">ExecutorVerifier runs whitelisted commands; validate_full runs the layered pipeline with fatal early-stop; the circuit breaker trips on repeated failures.</span></p>
+<h3 id="阶段-8-检查点与回滚-stage-8-checkpoint-rollback">阶段 8：检查点与回滚<span class="en">Stage 8: Checkpoint &amp; Rollback</span></h3>
+<p><code>CheckpointManager</code>（<code>checkpoint/manager.py</code>）双层冷热（Redis TTL=3600s → PG → 内存 → 磁盘），<code>version</code> 乐观锁。<code>resume()</code> 从断点续跑；<code>cancel_task()</code> 写 CANCELLED（version+1 防覆盖）。<span class="en">CheckpointManager persists across four tiers with optimistic versioning; resume continues from the breakpoint.</span></p>
+<h3 id="阶段-9-图谱交互-stage-9-graph-interaction">阶段 9：图谱交互<span class="en">Stage 9: Graph Interaction</span></h3>
+<p><code>CodeGraphEngine</code>（<code>graph/engines/code_graph.py</code>）启动全量 <code>build_index</code>，L1 查符号存在性，Stage2 上下文加载，<code>GraphWatcher</code> 文件变更增量更新。<code>TaskGraph</code>（DAG 节点）、Goal 依赖 DAG、<code>MetaGraph</code>、Git 操作图谱在对应阶段读写。<span class="en">CodeGraphEngine builds/queries symbols with incremental updates on file changes; task/dependency/meta/git graphs are read-written at their stages.</span></p>
+<h3 id="阶段-10-审计与可观测-stage-10-audit-observability">阶段 10：审计与可观测<span class="en">Stage 10: Audit &amp; Observability</span></h3>
+<p><code>AuditLogger</code>（<code>observability/audit.py</code>）记录 component/operation/task_id/status；<code>LessonStore</code> SHA256 哈希链存教训（防篡改）；<code>EventBus</code>（<code>events/bus.py</code>）广播 <code>task:update</code>/<code>token:update</code> 到驾驶舱；<code>TraceCollector</code> 后台 flush span 到 <code>orbit_trace.db</code>。<span class="en">AuditLogger + tamper-proof LessonStore + EventBus broadcast + TraceCollector.</span></p>
+<h3 id="阶段-11-交付-stage-11-delivery">阶段 11：交付<span class="en">Stage 11: Delivery</span></h3>
+<p>Goal：子任务 DONE 后 <code>WorktreeManager</code> 清理，PR 合并门禁 = CritiqueAgent APPROVED + ExecutorVerifier 通过 + RegressionGuard 无回归；每 5 子任务做 <code>AlignmentCheck</code>，连续 3 次失败自动终止。单任务：到 DONE 推 100% 进度，<code>Wiring.on_task_end</code> 记录 + 异步 <code>maybe_distill</code> 周期蒸馏。<span class="en">Goal delivery merges via a three-condition gate with periodic alignment checks; single-task publishes completion and triggers periodic distillation.</span></p>
+<h2 id="4-4-全景时序图-end-to-end-sequence">4.4 全景时序图<span class="en">End-to-End Sequence</span></h2>
+<pre><code>请求(NL/PRD) ─▶ 入口(chat/goal/tasks/loop)
+                 │
+                 ▼
+        意图路由 Chatter ─(programming)▶ Clarifier(V1–V5) ─▶ StructuredPRD
+                 │
+   Goal模式 ─▶ IntakeRouter ─▶ 拆解(Spec+TaskDAG) ─▶ 用户确认
+                 │
+                 ▼
+        调度器状态机  IDLE→PARSING→SCOPING→PLANNING→CODING→VERIFYING→DONE
+                 │            每转换点存 Checkpoint（Redis→PG→内存→磁盘）
+                 ▼
+        Agent 执行(ReAct + Reflection/PreAct/VIGIL/MCTS)
+                 │  write_file 后 validate_quick(L1+L4+L3)
+                 ▼
+        CritiqueGate(跨模型四维评分) ─(reject≤2)▶ 退回 CODING
+                 │(approve)
+                 ▼
+        验证 ExecutorVerifier + validate_full(L1..L8) + CircuitBreaker
+                 │
+                 ▼
+        图谱读写(代码/DAG/元/Git) ── 审计链 task_audit_trail + Trace + EventBus→驾驶舱
+                 │
+                 ▼
+        交付：PR 合并门禁(Critique✓ + Verify✓ + Regression✓) / 报告 / 看板</code></pre>
+<hr>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="05-methodology-theory.html">下一章：方法论与理论 →<span class="en">Next: Methodology &amp; Theory →</span></a></p>
+<p>&lt;/content&gt;</p>
+</main></body>
+</html>

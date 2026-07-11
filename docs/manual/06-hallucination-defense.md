@@ -1,6 +1,6 @@
 # 06 · 九层防幻觉 || 03 · Hallucination Defense
 
-[← 返回目录 || Back to index](README.md) · [← 上一章：整体架构 || Prev: Architecture](03-architecture.md)
+[← 返回目录 || Back to index](README.md) · [← 上一章：方法论与理论 || Prev: Methodology & Theory](05-methodology-theory.md)
 
 > Orbit 的验证内核。研究者重点章节。实现见 [`src/orbit/hallucination/`](../../src/orbit/hallucination/) 与 [`src/orbit/compliance/`](../../src/orbit/compliance/)。 || Orbit's verification kernel. Essential reading for researchers. See [`src/orbit/hallucination/`](../../src/orbit/hallucination/) and [`src/orbit/compliance/`](../../src/orbit/compliance/).
 
@@ -73,6 +73,10 @@ L1 图谱 → L4 类型 → L3 熵 → L2 追踪 → L6 合约 → L8 配置 →
 2. **静动互补**：L1/L4/L5/L6/L8 静态（确定性、可证明），L2/L3/L7 动态（运行时真值）。静态给出必要条件，动态给出充分验证。 || **Static-dynamic complementarity**: L1/L4/L5/L6/L8 are static (deterministic, provable), L2/L3/L7 are dynamic (runtime ground truth). Static provides necessary conditions, dynamic provides sufficient verification.
 3. **L7 沙箱是最后防线**：能拦截所有类型幻觉，把错误率从 65% 压到 2%，代价是 Docker 执行开销——因此只在 full 验证跑。 || **L7 Sandbox is the last line of defense**: it catches all hallucination types, reducing error rate from 65% to 2%, at the cost of Docker execution overhead — hence it only runs in full validation.
 4. **L9 独立于 L1–L8**：合规是"知识时效"维度，与代码正确性正交，故单独成模块、异步执行、不阻塞主管道。 || **L9 is independent from L1–L8**: compliance is a "knowledge timeliness" dimension orthogonal to code correctness, so it lives as a separate module, runs asynchronously, and does not block the main pipeline.
+
+## 3.6 代码态 vs 设计口径 || Code Reality vs Design Framing
+
+本章按设计口径讲述 **L1–L9**（L9=动态合规，位于 `compliance/`）。代码实现比设计更深：`hallucination/` 下另有 **L9 时序（LTL 模型检查，`l9_temporal.py`）**、**L10 分离逻辑（`l10_separation.py`）**、抽象解释（`abstract_interp.py`）与代数效应追踪（`effect_tracker.py`）。各层背后的学术方法完整映射见 [05 方法论与理论 §5.2.4](05-methodology-theory.md)。 || This chapter follows the design framing of **L1–L9** (L9 = dynamic compliance, in `compliance/`). The code goes deeper: `hallucination/` also ships **L9 temporal (LTL model checking, `l9_temporal.py`)**, **L10 separation logic (`l10_separation.py`)**, abstract interpretation (`abstract_interp.py`), and algebraic-effect tracking (`effect_tracker.py`). For the full academic mapping of each layer see [05 Methodology & Theory §5.2.4](05-methodology-theory.md).
 
 ---
 

@@ -40,7 +40,7 @@ th .en, td .en { font-size:.8em; }
 </head>
 <body><main>
 <h1 id="06-九层防幻觉-03-hallucination-defense">06 · 九层防幻觉<span class="en">03 · Hallucination Defense</span></h1>
-<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="03-architecture.html">← 上一章：整体架构<span class="en">Prev: Architecture</span></a></p>
+<p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="05-methodology-theory.html">← 上一章：方法论与理论<span class="en">Prev: Methodology &amp; Theory</span></a></p>
 <blockquote>Orbit 的验证内核。研究者重点章节。实现见 <a href="../../src/orbit/hallucination/"><code>src/orbit/hallucination/</code></a> 与 <a href="../../src/orbit/compliance/"><code>src/orbit/compliance/</code></a>。<span class="en">Orbit's verification kernel. Essential reading for researchers. See <a href="../../src/orbit/hallucination/"><code>src/orbit/hallucination/</code></a> and <a href="../../src/orbit/compliance/"><code>src/orbit/compliance/</code></a>.</span></blockquote>
 <hr>
 <h2 id="6-1-为什么需要-9-层-why-nine-layers">6.1 为什么需要 9 层<span class="en">Why Nine Layers</span></h2>
@@ -115,6 +115,8 @@ th .en, td .en { font-size:.8em; }
 <li><strong>L7 沙箱是最后防线</strong>：能拦截所有类型幻觉，把错误率从 65% 压到 2%，代价是 Docker 执行开销——因此只在 full 验证跑。<span class="en"><strong>L7 Sandbox is the last line of defense</strong>: it catches all hallucination types, reducing error rate from 65% to 2%, at the cost of Docker execution overhead — hence it only runs in full validation.</span></li>
 <li><strong>L9 独立于 L1–L8</strong>：合规是"知识时效"维度，与代码正确性正交，故单独成模块、异步执行、不阻塞主管道。<span class="en"><strong>L9 is independent from L1–L8</strong>: compliance is a "knowledge timeliness" dimension orthogonal to code correctness, so it lives as a separate module, runs asynchronously, and does not block the main pipeline.</span></li>
 </ul>
+<h2 id="3-6-代码态-vs-设计口径-code-reality-vs-design-framing">3.6 代码态 vs 设计口径<span class="en">Code Reality vs Design Framing</span></h2>
+<p>本章按设计口径讲述 <strong>L1–L9</strong>（L9=动态合规，位于 <code>compliance/</code>）。代码实现比设计更深：<code>hallucination/</code> 下另有 <strong>L9 时序（LTL 模型检查，<code>l9_temporal.py</code>）</strong>、<strong>L10 分离逻辑（<code>l10_separation.py</code>）</strong>、抽象解释（<code>abstract_interp.py</code>）与代数效应追踪（<code>effect_tracker.py</code>）。各层背后的学术方法完整映射见 <a href="05-methodology-theory.html">05 方法论与理论 §5.2.4</a>。<span class="en">This chapter follows the design framing of <strong>L1–L9</strong> (L9 = dynamic compliance, in <code>compliance/</code>). The code goes deeper: <code>hallucination/</code> also ships <strong>L9 temporal (LTL model checking, <code>l9_temporal.py</code>)</strong>, <strong>L10 separation logic (<code>l10_separation.py</code>)</strong>, abstract interpretation (<code>abstract_interp.py</code>), and algebraic-effect tracking (<code>effect_tracker.py</code>). For the full academic mapping of each layer see <a href="05-methodology-theory.html">05 Methodology &amp; Theory §5.2.4</a>.</span></p>
 <hr>
 <p><a href="README.html">← 返回目录<span class="en">Back to index</span></a> · <a href="07-technical-stack.html">下一章：技术方案 →<span class="en">Next: Technical Design →</span></a></p>
 </main></body>

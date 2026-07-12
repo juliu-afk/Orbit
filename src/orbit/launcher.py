@@ -37,6 +37,18 @@ except Exception as e:
 def main():
     print(f"Orbit main() starting, cwd={os.getcwd()}", flush=True)
     try:
+        # 阻止 Windows 休眠/屏保——Orbit 长时间跑 Agent 任务期间 PC 不能休眠
+        # SetThreadExecutionState 作用于调用线程，uvicorn 存活期间持续生效，进程退出自动恢复
+        if sys.platform == "win32":
+            import ctypes
+            ES_CONTINUOUS = 0x80000000
+            ES_SYSTEM_REQUIRED = 0x00000001
+            ES_DISPLAY_REQUIRED = 0x00000002
+            ctypes.windll.kernel32.SetThreadExecutionState(
+                ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+            )
+            print("Orbit: 已启用休眠阻止", flush=True)
+
         import uvicorn
         from orbit.api.main import app
         host, port = "0.0.0.0", 18888

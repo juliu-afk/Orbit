@@ -4,7 +4,7 @@ import ctypes, os, subprocess
 from fastapi import APIRouter
 
 router = APIRouter(prefix="/app", tags=["app"])
-SW_MINIMIZE, SW_MAXIMIZE = 6, 3
+SW_MINIMIZE, SW_MAXIMIZE, SW_RESTORE = 6, 3, 9
 
 def _hwnd() -> int | None:
     """查找 Orbit 主窗口句柄——先按标题, 再枚举匹配 PID。"""
@@ -34,8 +34,14 @@ async def minimize():
 
 @router.post("/maximize")
 async def maximize():
+    """最大化/还原切换——已最大化则还原，否则最大化。"""
     h = _hwnd()
-    if h: ctypes.windll.user32.ShowWindow(h, SW_MAXIMIZE)
+    if h:
+        # IsZoomed 判断当前是否最大化，实现真正的切换(而非重复最大化)
+        if ctypes.windll.user32.IsZoomed(h):
+            ctypes.windll.user32.ShowWindow(h, SW_RESTORE)
+        else:
+            ctypes.windll.user32.ShowWindow(h, SW_MAXIMIZE)
     return {"code":0,"data":None,"message":"ok" if h else "no hwnd"}
 
 @router.post("/quit")

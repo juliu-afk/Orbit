@@ -1,5 +1,6 @@
 """PyInstaller 启动入口。"""
 from __future__ import annotations
+import ctypes
 import os, sys
 _exe_dir = os.path.dirname(os.path.abspath(sys.executable))
 _log = open(os.path.join(_exe_dir, "orbit_startup.log"), "w", encoding="utf-8")
@@ -37,6 +38,23 @@ except Exception as e:
 def main():
     print(f"Orbit main() starting, cwd={os.getcwd()}", flush=True)
     try:
+        # 阻止 Windows 休眠/屏保——Orbit 长时间跑 Agent 任务期间 PC 不能休眠
+        # SetThreadExecutionState 作用于调用线程，uvicorn 存活期间持续生效
+        # WHY ES_DISPLAY_REQUIRED: Agent 任务可能数小时，用户需随时看到驾驶舱状态
+        #   关屏会导致用户无法快速判断任务进度，反而需要额外操作唤醒屏幕
+        # Tauri 强杀后端进程(orbit-backend.exe)时线程终止，Windows 自动恢复电源策略
+        if sys.platform == "win32":
+            ES_CONTINUOUS = 0x80000000
+            ES_SYSTEM_REQUIRED = 0x00000001
+            ES_DISPLAY_REQUIRED = 0x00000002
+            prev_state = ctypes.windll.kernel32.SetThreadExecutionState(
+                ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+            )
+            if prev_state == 0:
+                print("Orbit: 休眠阻止设置失败——Windows API 返回 0", flush=True)
+            else:
+                print("Orbit: 已启用休眠阻止", flush=True)
+
         import uvicorn
         from orbit.api.main import app
         host, port = "0.0.0.0", 18888

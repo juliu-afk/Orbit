@@ -34,8 +34,9 @@ export const useSettingsStore = defineStore('settings', () => {
   if (saved.locale && saved.locale !== getCurrentLocale()) setLocale(saved.locale)
   applyTheme(theme.value); applyGlass(); applyPanelWidths()
 
-  watch(() => ({ t: theme.value, fl: fileTreeLeft.value, ar: agentRight.value, go: glassOpacity.value, gb: glassBlur.value, ft: fileTreeWidth.value, rp: rightPanelWidth.value, l: locale.value }), (s) => {
-    save(s as unknown as UserSettings); applyTheme(s.t); applyGlass(); applyPanelWidths(); applyLocale(s.l)
+  // WHY 用 UserSettings 键名——save() 写入 localStorage，键名不匹配则 load() 回退默认值
+  watch(() => ({ theme: theme.value, fileTreeLeft: fileTreeLeft.value, agentRight: agentRight.value, glassOpacity: glassOpacity.value, glassBlur: glassBlur.value, fileTreeWidth: fileTreeWidth.value, rightPanelWidth: rightPanelWidth.value, locale: locale.value }), (s) => {
+    save(s as unknown as UserSettings); applyTheme(s.theme); applyGlass(); applyPanelWidths(); applyLocale(s.locale)
   }, { deep: true })
 
   function resetDefaults() {

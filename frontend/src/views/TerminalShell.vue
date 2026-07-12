@@ -168,13 +168,13 @@ onUnmounted(()=>{ window.removeEventListener("keydown",onKeydown); ws.disconnect
   <NewSessionDialog v-model:visible="showNewDialog" @confirmed="onSessionCreated" />
   <!-- WHY 代码产物抽屉: task:update WS 推送代码 output → 自动弹出展示 -->
   <el-drawer v-model="showCodeDiff" title="Generated Code" direction="rtl" size="520px" @close="handleCloseCodeDiff">
-    <MonacoDiffEditor v-if="task.codeOutput" original="" :modified="task.codeOutput" language="python" height="calc(100vh - 80px)" />
+    <MonacoDiffEditor v-if="task.codeOutput" original="" :modified="task.codeOutput" language="python" height="100%" />
   </el-drawer>
 </div>
 </template>
 
 <style scoped>
-.terminal-shell { display:grid; grid-template-columns:var(--spacing-filetree) 1fr var(--spacing-right-panel); grid-template-rows:1fr var(--spacing-statusbar); grid-template-areas:v-bind(gridAreas()); height:100vh; overflow:hidden }
+.terminal-shell { display:grid; grid-template-columns:var(--spacing-filetree) 1fr var(--spacing-right-panel); grid-template-rows:1fr var(--spacing-statusbar); grid-template-areas:v-bind(gridAreas()); height:100%; overflow:hidden }
 .terminal-shell[data-filetree-collapsed="true"] { grid-template-columns:0 1fr var(--spacing-right-panel) }
 .panel-left{grid-area:filetree;background:var(--color-orbit-glass);backdrop-filter:blur(var(--glass-blur,12px))}.panel-center{grid-area:chat}.panel-right{grid-area:right;background:var(--color-orbit-glass);backdrop-filter:blur(var(--glass-blur,12px))}.panel-bottom{grid-area:statusbar}
 .resize-handle{width:4px;cursor:col-resize;background:transparent;transition:background 0.15s;z-index:10}

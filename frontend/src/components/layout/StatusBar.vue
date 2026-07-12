@@ -90,11 +90,6 @@ function handleSwitch(sessionId: string) {
 
     <span class="status-sep">|</span>
 
-    <button class="status-btn" onclick="navigator.sendBeacon('/api/v1/app/minimize','')">─</button>
-    <button class="status-btn" onclick="navigator.sendBeacon('/api/v1/app/maximize','')">□</button>
-    <button class="status-btn win-close" onclick="navigator.sendBeacon('/api/v1/app/quit','')">✕</button>
-
-    <span class="status-sep">|</span>
 
     <span class="flex items-center gap-1">
       <span class="status-dot" :class="props.connectionStatus"/>{{ connectionLabel }}

@@ -35,9 +35,8 @@ export const useSettingsStore = defineStore('settings', () => {
   applyTheme(theme.value); applyGlass(); applyPanelWidths()
 
   // WHY 用 UserSettings 键名——save() 写入 localStorage，键名不匹配则 load() 回退默认值
-  // P2-1: watch<UserSettings> 泛型消去 as unknown as 双重断言
-  watch<UserSettings>(() => ({ theme: theme.value, fileTreeLeft: fileTreeLeft.value, agentRight: agentRight.value, glassOpacity: glassOpacity.value, glassBlur: glassBlur.value, fileTreeWidth: fileTreeWidth.value, rightPanelWidth: rightPanelWidth.value, locale: locale.value }), (s) => {
-    save(s); applyTheme(s.theme); applyGlass(); applyPanelWidths(); applyLocale(s.locale)
+  watch(() => ({ theme: theme.value, fileTreeLeft: fileTreeLeft.value, agentRight: agentRight.value, glassOpacity: glassOpacity.value, glassBlur: glassBlur.value, fileTreeWidth: fileTreeWidth.value, rightPanelWidth: rightPanelWidth.value, locale: locale.value }), (s) => {
+    save(s as unknown as UserSettings); applyTheme(s.theme); applyGlass(); applyPanelWidths(); applyLocale(s.locale)
   }, { deep: true })
 
   function resetDefaults() {

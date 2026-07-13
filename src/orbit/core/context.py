@@ -35,6 +35,8 @@ class ExecutionContext:
     last_confirm_time: dict[str, float] = field(default_factory=dict)
     # compose 进度推送回调——聊天框流式输出编排进度
     stream_callback: object | None = None
+    # WebSocket 消息发送回调——ToolRegistry confirm_request 用
+    ws_sender: object | None = None
 
 
 # thread-local 存储——每个请求独立
@@ -53,6 +55,7 @@ def set_context(
     session_id: str | None = None,
     confirmed_tools: set[str] | None = None,
     stream_callback: object | None = None,
+    ws_sender: object | None = None,
 ) -> ExecutionContext:
     """部分更新执行上下文——只改传入的字段，其余保留原值。
 
@@ -70,6 +73,8 @@ def set_context(
         ctx.confirmed_tools = confirmed_tools
     if stream_callback is not None:
         ctx.stream_callback = stream_callback
+    if ws_sender is not None:
+        ctx.ws_sender = ws_sender
     return ctx
 
 

@@ -142,6 +142,13 @@ async def chat_endpoint(ws: WebSocket) -> None:
             elif msg_type == "confirm":
                 modified_prd = payload.get("modified_prd")
                 await _handle_confirm(ws, session_id, project_name, modified_prd)
+            elif msg_type == "confirm_response":
+                # 工具确认回路——用户点了允许/拒绝
+                confirm_id = payload.get("confirm_id", "")
+                approved = payload.get("approved", False)
+                remember = payload.get("remember", False)
+                from orbit.tools.registry.core import ToolRegistry
+                ToolRegistry.get_instance().resolve_confirm(confirm_id, approved, remember)
             else:
                 await _send(ws, 1, None, f"未知消息类型: {msg_type}")
 
@@ -352,8 +359,10 @@ async def _handle_chat(
         await _send(ws, 1, None, "输入为空")
         return
 
-    # 注入 ChatMode 到执行上下文——ToolRegistry 工具门禁会读取
-    set_context(chat_mode=chat_mode, session_id=session_id)
+    # 注入 ChatMode + ws_sender 到执行上下文
+    async def _ws_send(msg: str) -> None:
+        await ws.send_text(msg)
+    set_context(chat_mode=chat_mode, session_id=session_id, ws_sender=_ws_send)
 
     # ---- Phase 0: /slash 命令路由（SkillRegistry 动态匹配）----
     if text.strip().startswith("/"):

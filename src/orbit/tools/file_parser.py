@@ -18,7 +18,7 @@ PARSER_SCHEMA = ToolSchema(
         "file_path": {"type": "string", "description": "文件路径"},
     },
     permissions=[ToolPermission.READ],
-    allowed_agents=["qa", "developer", "clarifier", "architect", "reviewer"],
+    allowed_agents=["qa", "developer", "clarifier", "architect", "reviewer", "chatter"],
     timeout_seconds=30,
     is_async=True,
 )

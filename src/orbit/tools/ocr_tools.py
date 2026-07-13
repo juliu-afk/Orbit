@@ -30,7 +30,7 @@ OCR_SCHEMA = ToolSchema(
         "language": {"type": "string", "description": "主要语言（可选，默认 auto=自动检测）"},
     },
     permissions=[ToolPermission.READ],
-    allowed_agents=["qa", "developer", "clarifier", "architect"],
+    allowed_agents=["qa", "developer", "clarifier", "architect", "chatter"],
     timeout_seconds=60,
     is_async=True,
 )

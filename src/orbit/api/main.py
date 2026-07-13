@@ -253,6 +253,10 @@ from orbit.security.permission import PermissionEngine  # noqa: E402
 
 _actor_registry = ActorRegistry()
 _actor_spawn = ActorSpawn(registry=_actor_registry, agent_factory=AgentFactory)
+# Agent 级 subagent 生成能力——注入 ActorSpawn 到 spawn_subagent 工具
+from orbit.tools.subagent import set_actor_spawn  # noqa: E402
+
+set_actor_spawn(_actor_spawn)
 _compose_orchestrator = ComposeOrchestrator(actor_spawn=_actor_spawn)
 _permission_engine = PermissionEngine()
 _actor_watchdog = ActorWatchdog(_actor_registry)

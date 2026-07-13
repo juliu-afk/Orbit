@@ -23,6 +23,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+import structlog
+
+logger = structlog.get_logger("orbit.memory.episodic")
+
 
 class EventImportance(StrEnum):
     CRITICAL = "critical"   # 导致任务失败/回滚的事件
@@ -227,6 +231,122 @@ class EpisodicMemory:
         """获取所有事件（调试用）。"""
         rows = self._db.execute("SELECT * FROM episodic_events ORDER BY timestamp DESC LIMIT 100").fetchall()
         return [_row_to_event(r) for r in rows]
+
+    # ── 自动提取 (V15.2) ──────────────────────────────
+
+    async def auto_extract(
+        self,
+        task_id: str,
+        execution_trajectory: list[dict],
+        llm_client: object = None,
+    ) -> list[EpisodicEvent]:
+        """从执行轨迹自动提取关键事件——无需手动调用 record_event()。
+
+        只在以下情况记录事件（避免噪音）：
+        - 任务失败/异常 → importance=CRITICAL
+        - 不可逆决策（检测 [DECISION] 标记） → importance=HIGH
+        - 工具调用失败后成功 → importance=MEDIUM
+        - 其他 → 跳过
+
+        Args:
+            task_id: 任务 ID
+            execution_trajectory: 执行轨迹 [{turn, action, result, error}, ...]
+            llm_client: LLM 客户端——传入则用 LLM 提炼标题，None 则用启发式规则
+
+        Returns:
+            自动记录的事件列表
+
+        WHY 启发式优先: 大部分关键事件（失败/异常）不需要 LLM 就能检测。
+        LLM 仅用于提炼事件标题——失败时回退到规则生成的标题。
+        """
+        events: list[EpisodicEvent] = []
+        agent_role = ""
+
+        for idx, turn in enumerate(execution_trajectory):
+            if not isinstance(turn, dict):
+                continue
+
+            action = str(turn.get("action", ""))
+            result = str(turn.get("result", ""))
+            error = str(turn.get("error", ""))
+            turn_num = turn.get("turn", 0)
+
+            # 检测失败/异常 → CRITICAL
+            if error or "failed" in result.lower() or "exception" in result.lower():
+                title = f"任务执行异常 (turn {turn_num})"
+                desc = f"Action: {action}\nError: {error or result[:200]}"
+                if llm_client:
+                    try:
+                        title = await self._summarize_event(llm_client, action, error or result)
+                    except Exception:
+                        pass  # LLM 失败→使用默认标题
+
+                event = self.record_event(
+                    task_id=task_id,
+                    title=title,
+                    description=desc[:500],
+                    agent_role=agent_role,
+                    importance=EventImportance.CRITICAL,
+                    outcome="failure",
+                    tags=["auto_extracted", "failure"],
+                )
+                events.append(event)
+                continue
+
+            # 检测 [DECISION] 标记 → HIGH
+            if "[DECISION]" in action or "[DECISION]" in result:
+                event = self.record_event(
+                    task_id=task_id,
+                    title=f"设计决策 (turn {turn_num})",
+                    description=action[:500],
+                    agent_role=agent_role,
+                    importance=EventImportance.HIGH,
+                    outcome="success" if not error else "failure",
+                    tags=["auto_extracted", "decision"],
+                )
+                events.append(event)
+                continue
+
+            # 检测工具调用失败后重试成功 → MEDIUM
+            prev_turn = execution_trajectory[idx - 1] if idx > 0 else {}
+            prev_error = str(prev_turn.get("error", ""))
+            if prev_error and not error and "success" in result.lower():
+                raw = execution_trajectory[i - 1]
+                event = self.record_event(
+                    task_id=task_id,
+                    title=f"重试后成功 (turn {turn_num})",
+                    description=f"失败: {raw.get('error', '')[:200]}\n重试成功",
+                    agent_role=agent_role,
+                    importance=EventImportance.MEDIUM,
+                    outcome="success",
+                    tags=["auto_extracted", "retry"],
+                )
+                events.append(event)
+
+        logger.info(
+            "auto_extract_done",
+            task_id=task_id,
+            trajectory_length=len(execution_trajectory),
+            events_extracted=len(events),
+        )
+        return events
+
+    async def _summarize_event(
+        self, llm_client: object, action: str, result: str
+    ) -> str:
+        """用 LLM 提炼事件标题——失败时返回默认标题。"""
+        prompt = (
+            "用一句话（≤20字）总结以下 Agent 执行异常：\n"
+            f"操作: {action[:200]}\n"
+            f"结果: {result[:200]}\n"
+            "异常原因:"
+        )
+        try:
+            response = await llm_client.generate(prompt)
+            title = str(response).strip()[:50] if response else ""
+            return title or "未命名的执行异常"
+        except Exception:
+            return "未命名的执行异常"
 
     def close(self) -> None:
         self._db.close()

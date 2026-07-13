@@ -61,8 +61,8 @@ class IntakeRouter:
             clarified = await clarifier.clarify(goal)
     """
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, llm_client: object = None) -> None:
+        self._llm = llm_client  # V15.2: 用于 GoalPlanner
 
     async def route(self, goal: GoalSession) -> IntakeDecision:
         """判定输入形态——返回哪些阶段可跳过。

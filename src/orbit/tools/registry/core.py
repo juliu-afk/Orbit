@@ -8,12 +8,16 @@ from __future__ import annotations
 import asyncio
 import ast
 import importlib
+import json as _json
 import threading
 import time
 from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+# ChatMode 门禁信号——需前端确认
+_CONFIRM_SIGNAL = "__CONFIRM_NEEDED__"
 
 import structlog
 
@@ -467,10 +471,8 @@ class ToolRegistry:
 
         Returns: (approved, remember)
         """
-        import asyncio
-        import time as _time
         self._confirm_counter += 1
-        cid = f"confirm_{self._confirm_counter}_{_time.time()}"
+        cid = f"confirm_{self._confirm_counter}_{time.time()}"
 
         # 通过 ws_sender 推送确认请求到客户端
         try:

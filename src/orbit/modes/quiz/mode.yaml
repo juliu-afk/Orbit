@@ -1,0 +1,17 @@
+# quiz/mode.yaml
+# 改动理解测验——Fable 5 方法论: "不理解每一处改动，就不配合并"
+
+name: quiz
+version: 1
+description: "改动理解测验——5 道判断题，全对方可标记完成。仅核心模块改动触发"
+applies_to:
+  - COMPLETING
+behavior:
+  question_strategy: breadth_first
+  max_questions_per_branch: 5
+  require_recommendation: false
+  codebase_first: true
+  auto_upgrade_context: false
+references:
+  - template.html.j2
+  - rubric.md

@@ -89,6 +89,7 @@ class OrbitWiring:
         self._conformal: object | None = None    # V14.2+Theory 方向16: ConformalPredictor
         self._router_agent: object | None = None  # P2-3: RouterAgent 单例缓存
         self._llm_client: object | None = None     # P2-2: LLMClient 单例缓存
+        self._cost_store: object | None = None      # V15.2: CostStore 单例
         self._last_tier: str = ""
         # V14.2+Theory P1+P2: 19模块懒初始化
         self._spectral: object | None = None       # D3: SpectralAnalyzer
@@ -661,10 +662,32 @@ class OrbitWiring:
         if self._llm_client is None:
             try:
                 from orbit.gateway.client import LLMClient
-                self._llm_client = LLMClient()
+                self._llm_client = LLMClient(cost_store=self._get_cost_store())
             except Exception:
                 logger.warning("llm_client_init_failed", exc_info=True)
         return self._llm_client
+
+    def _get_cost_store(self):
+        """V15.2: CostStore 单例——所有 LLMClient 共享。"""
+        if self._cost_store is None:
+            try:
+                from orbit.observability.cost import CostStore
+                self._cost_store = CostStore("data/costs.db")
+            except Exception:
+                logger.warning("cost_store_init_failed", exc_info=True)
+        return self._cost_store
+
+    def set_parent_id(self, parent_id: str | None) -> None:
+        """V15.2: 设置 subagent 的 parent_id——spawn 前调用。"""
+        client = self._get_llm_client()
+        if client:
+            client._current_parent_id = parent_id
+
+    def set_task_id(self, task_id: str) -> None:
+        """V15.2: 设置当前 task_id——task 开始时调用。"""
+        client = self._get_llm_client()
+        if client:
+            client._current_task_id = task_id
 
     def set_model_tier(self, tier: str) -> None:
         """记录最近 RouterAgent 选中的 tier——供 on_task_end 反馈 Bandit。"""

@@ -24,12 +24,12 @@ from orbit.core.config import settings
 from orbit.gateway.adapters import ProviderAdapter
 from orbit.gateway.adapters.anthropic import AnthropicAdapter
 from orbit.gateway.adapters.openai import OpenAIAdapter
-from orbit.gateway.adapters.vision import MultimodalAPIError, VisionAdapter  # V15.1 多模态 P0
+from orbit.gateway.adapters.vision import VisionAdapter  # V15.1 多模态 P0
 from orbit.gateway.circuit_breaker import CircuitBreaker, CircuitOpenError
-from orbit.gateway.multimodal import Tier, TierRouter  # V15.1 多模态 P0
+from orbit.gateway.multimodal import TierRouter  # V15.1 多模态 P0
 from orbit.gateway.routing import RoutingStrategy, select_model
 from orbit.gateway.schemas import LLMRequest, LLMResponse, LLMUsage
-from orbit.gateway.task_router import TaskModelRouter, TaskType
+from orbit.gateway.task_router import TaskModelRouter
 
 logger = structlog.get_logger("orbit.gateway.client")
 
@@ -72,10 +72,17 @@ class LLMClient:
         circuit_breaker=None,
         default_model=MODEL_PRO,
         fallback_model=MODEL_GLM_FALLBACK,
-        resolver=None,  # AgentModelResolver（Step 2.3）
+        resolver=None,
+        cost_store=None,  # V15.2: CostStore 可观测性
     ):
         self.cb = circuit_breaker or CircuitBreaker()
         self.default_model = default_model
+        self.fallback_model = fallback_model
+        self.resolver = resolver
+        self._cost_store = cost_store  # V15.2
+        # V15.2: 成本追踪上下文——由 compose/spawn 设置
+        self._current_task_id: str = ""
+        self._current_parent_id: str | None = None
         self.fallback_model = fallback_model
         self.resolver = resolver  # Step 2.3: 智能路由
         self._usage_log: dict[str, list[LLMUsage]] = {}
@@ -584,12 +591,43 @@ class LLMClient:
         )
         price = PRICES.get(model, {"prompt": 0.0, "completion": 0.0})
         cost = (prompt_t / 1000.0 * price["prompt"]) + (completion_t / 1000.0 * price["completion"])
+
+        # V15.2: 记录成本到 CostStore
+        self._record_cost(model, prompt_t, completion_t, cost)
+
         return LLMUsage(
             prompt_tokens=prompt_t,
             completion_tokens=completion_t,
             total_tokens=total_t,
             cost_usd=round(cost, 6),
         )
+
+    def _record_cost(
+        self, model: str, input_tokens: int, output_tokens: int, recorded_cost: float
+    ) -> None:
+        """V15.2: 写入成本记录——含 parent_id 链，支持递归 subagent 归属。"""
+        if self._cost_store is None:
+            return
+        try:
+            from orbit.observability.cost import CostRecord
+            from orbit.observability.pricing import PricingStore
+
+            pricing = PricingStore.get()
+            api_cost = pricing.compute_cost(model, input_tokens, output_tokens)
+
+            task_id = self._current_task_id or ""
+            record = CostRecord(
+                session_id=task_id,
+                parent_id=self._current_parent_id,
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost_usd=recorded_cost,
+                api_cost_usd=api_cost,
+            )
+            self._cost_store.record(record)
+        except Exception as e:
+            logger.debug("cost_record_failed", error=str(e)[:80])
 
     def _log_usage(self, task_id, usage):
         self._usage_log.setdefault(task_id, []).append(usage)

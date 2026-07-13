@@ -33,7 +33,9 @@ INTENT_SOURCES: dict[SearchIntent, list[str]] = {
 
 # LLM 意图分类 prompt（轻量）
 INTENT_PROMPT = """判断以下查询的意图类型。只返回一个单词。
-类型: code（代码/API/库/编程）/ web（通用信息/新闻/文档）/ academic（论文/学术）/ enterprise（企业/工商/金融）/ mixed（无法判断）
+类型: code（代码/API/库/编程）/ web（通用信息/新闻/文档）/
+      academic（论文/学术）/ enterprise（企业/工商/金融）/
+      mixed（无法判断）
 
 查询: {query}
 意图:"""

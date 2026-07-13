@@ -77,7 +77,10 @@ class CodeSource(SearchSource):
     async def health_check(self) -> bool:
         try:
             client = await self._get_client()
-            resp = await client.get(f"{_GITHUB_API}/search/repositories", params={"q": "test", "per_page": 1})
+            resp = await client.get(
+                f"{_GITHUB_API}/search/repositories",
+                params={"q": "test", "per_page": 1},
+            )
             return resp.status_code < 500
         except Exception:
             return False

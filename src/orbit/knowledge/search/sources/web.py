@@ -28,7 +28,9 @@ class WebSource(SearchSource):
     priority = 20  # 第二优先——AnySearch 之后
 
     def __init__(self, base_url: str | None = None) -> None:
-        self._base_url = (base_url or os.environ.get("SEARXNG_URL", _DEFAULT_SEARXNG_URL)).rstrip("/")
+        self._base_url = (
+            base_url or os.environ.get("SEARXNG_URL", _DEFAULT_SEARXNG_URL)
+        ).rstrip("/")
         self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
@@ -68,7 +70,10 @@ class WebSource(SearchSource):
     async def health_check(self) -> bool:
         try:
             client = await self._get_client()
-            resp = await client.get(f"{self._base_url}/search", params={"q": "test", "format": "json"})
+            resp = await client.get(
+                f"{self._base_url}/search",
+                params={"q": "test", "format": "json"},
+            )
             return resp.status_code < 500
         except Exception:
             return False

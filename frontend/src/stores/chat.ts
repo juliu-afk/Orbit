@@ -56,6 +56,7 @@ export const useChatStore = defineStore('chat', () => {
   const lastPeakPrompt = ref<PeakPromptData | null>(null)
   const pendingGoalText = ref('')
   const lastError = ref<string | null>(null)
+  const pendingConfirm = ref<{id:string;tool_name:string;tool_args:Record<string,unknown>;message:string;allow_remember:boolean}|null>(null)
 
   // chat WS 连接到 /api/v1/chat（非 /ws/dashboard）
   let chatWs: WebSocket | null = null
@@ -127,6 +128,8 @@ export const useChatStore = defineStore('chat', () => {
     }
     lastError.value = null
     const data = resp.data
+
+    if (data.type === 'confirm_request') { pendingConfirm.value={id:data.confirm_id||'',tool_name:data.tool_name||'',tool_args:data.tool_args||{},message:data.message||'',allow_remember:data.allow_remember||false}; return }
 
     if (data.type === 'peak_prompt') { lastPeakPrompt.value = data as unknown as PeakPromptData; return }
       if (data.type === 'task_created') {
@@ -241,6 +244,7 @@ export const useChatStore = defineStore('chat', () => {
     }))
   }
 
+  function sendConfirmResponse(r:{id:string;approved:boolean;remember:boolean}){pendingConfirm.value=null;if(!chatWs||chatWs.readyState!==WebSocket.OPEN)return;chatWs.send(JSON.stringify({type:'confirm_response',confirm_id:r.id,approved:r.approved,remember:r.remember}))}
   function resubmitWithDefer() { lastPeakPrompt.value = null; return fetch('/api/v1/goal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:pendingGoalText.value,defer_to_offpeak:true})}) }
   function resubmitWithUrgent() { lastPeakPrompt.value = null; return fetch('/api/v1/goal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({description:pendingGoalText.value,urgent:true})}) }
   function reset() {
@@ -257,7 +261,8 @@ export const useChatStore = defineStore('chat', () => {
   return {
     messages, candidates, clarificationStatus, structuredPrd,
     missingFields, connecting, crossProjectWarning, lastTaskId, lastPeakPrompt, pendingGoalText, lastError,
+    pendingConfirm,
     connectChatWs, send, handleChatResponse, confirmPrd, confirm, dismissWarning, resubmitWithDefer, resubmitWithUrgent,
-    disconnect, restoreMessages, reset,
+    sendConfirmResponse, disconnect, restoreMessages, reset,
   }
 })

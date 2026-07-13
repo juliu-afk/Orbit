@@ -13,7 +13,7 @@ orbit = "orbit.cli:main"
 [tool.poetry.dependencies]
 python = ">=3.11,<3.14"
 # API 层（Step 1.1）
-fastapi = ">=0.110.0"
+fastapi = ">=0.139.0"
 uvicorn = {extras = ["standard"], version = ">=0.27.1"}
 pydantic = ">=2.6.1"
 python-multipart = ">=0.0.9"

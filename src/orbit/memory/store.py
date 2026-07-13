@@ -45,8 +45,6 @@ class MemoryStore:
         self._resolve_memory_dir()
         # P2-4: 评分缓冲——减少 hit() 高频 IO
         self._score_buffer: dict[str, float] = {}
-        # V15.2: 向量索引——懒加载，首次 search() 时初始化
-        self._vector_index: object | None = None
 
     # ── 读 ─────────────────────────────────────────────
 
@@ -218,38 +216,14 @@ class MemoryStore:
 
     # ── 搜索 ───────────────────────────────────────────
 
-    @property
-    def vector_index(self) -> object | None:
-        """懒加载向量索引——首次访问时尝试初始化 BGE embedder。"""
-        if self._vector_index is None:
-            try:
-                from orbit.knowledge.embedding import BGEEmbeddingGenerator
-                from orbit.memory.vector import MemoryVectorIndex
-
-                embedder = BGEEmbeddingGenerator()
-                self._vector_index = MemoryVectorIndex(embedder)
-                logger.info("vector_index_initialized")
-            except Exception as e:
-                logger.warning("vector_index_init_failed", error=str(e)[:100])
-                self._vector_index = False  # 标记失败，不再重试
-        return self._vector_index if self._vector_index is not False else None
-
     def search(self, query: MemorySearchQuery) -> list[MemorySearchResult]:
-        """在记忆文件中搜索——BM25 + 向量 RRF 混合检索 (V15.2 升级).
-
-        优先使用 BM25 + 向量 RRF 混合检索；
-        向量索引未就绪时回退纯 BM25。
-        """
+        """在记忆文件中搜索——BM25 排序 (5B.4 升级)."""
         from orbit.memory.fts import rank_by_bm25
 
         results: list[MemorySearchResult] = []
         pattern = query.query.lower()
 
-        # ── BM25 关键词搜索（主路径）──
         file_types = [query.file_type] if query.file_type else list(MemoryFileType)
-        bm25_ranked: list[tuple[str, float]] = []  # (para_id, bm25_score)
-        para_map: dict[str, tuple[str, int, str]] = {}  # para_id → (path, line, snippet)
-
         for ft in file_types:
             mem = self.read_file(ft)
             if not mem.body:
@@ -261,52 +235,14 @@ class MemoryStore:
             for doc_id, score in ranked:
                 if score <= 0:
                     continue
-                para_id = f"{mem.path}:{doc_id}"
-                bm25_ranked.append((para_id, score))
                 para = paragraphs[doc_id]
-                para_map[para_id] = (
-                    mem.path,
-                    doc_id + 1,
-                    para[:200] if len(para) > 200 else para,
-                )
-
-        # ── 向量语义搜索（V15.2 新增）──
-        vi = self.vector_index
-        if vi and bm25_ranked:
-            try:
-                vector_ranked = vi.search(query.query, top_k=20)
-            except Exception:
-                vector_ranked = []
-
-            if vector_ranked:
-                # RRF 融合
-                from orbit.memory.vector import rrf_fusion
-
-                fused = rrf_fusion(bm25_ranked, vector_ranked)
-                for para_id, rrf_score in fused:
-                    if para_id in para_map:
-                        path, line, snippet = para_map[para_id]
-                        results.append(
-                            MemorySearchResult(
-                                path=path,
-                                score=round(rrf_score, 4),
-                                snippet=snippet,
-                                line_number=line,
-                            )
-                        )
-                results.sort(key=lambda r: r.score, reverse=True)
-                return results[: query.max_results]
-
-        # ── 回退：纯 BM25（向量索引未就绪或 RRF 结果为空）──
-        for para_id, score in bm25_ranked:
-            if para_id in para_map:
-                path, line, snippet = para_map[para_id]
+                snippet = para[:200] if len(para) > 200 else para
                 results.append(
                     MemorySearchResult(
-                        path=path,
+                        path=mem.path,
                         score=round(score, 4),
                         snippet=snippet,
-                        line_number=line,
+                        line_number=doc_id + 1,
                     )
                 )
         results.sort(key=lambda r: r.score, reverse=True)

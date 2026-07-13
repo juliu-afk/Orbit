@@ -163,7 +163,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /** 发送消息 */
-  function send(text: string, sessionId: string, projectName: string) {
+  function send(text: string, sessionId: string, projectName: string, mode?: string) {
     if (!text.trim()) return
     pendingGoalText.value = text.trim()
     if (!chatWs || chatWs.readyState !== WebSocket.OPEN) {
@@ -183,6 +183,7 @@ export const useChatStore = defineStore('chat', () => {
       text: text.trim(),
       session_id: sessionId,
       project_name: projectName,
+      mode: mode || 'Auto Mode',
     }))
   }
 

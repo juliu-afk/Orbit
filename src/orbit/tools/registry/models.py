@@ -75,6 +75,8 @@ class ToolEntry:
     max_result_chars: int = 10000  # >10K → 截断 (AC6b)
     # P1-7: per-agent 白名单——None=允许全部，[]=拒绝全部
     allowed_agents: list[str] | None = None
+    # ChatMode 门禁: True=写操作（修改文件系统/DB/执行命令），默认 True 安全
+    is_write: bool = True
 
 
 # ── 工具调用追踪 ─────────────────────────────────────────

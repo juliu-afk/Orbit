@@ -21,7 +21,7 @@ python-multipart = ">=0.0.9"
 python-dotenv = ">=1.2.2"
 # ORM（Step 1.2）
 sqlalchemy = ">=2.0.25"
-alembic = ">=1.13.0"
+alembic = ">=1.18.5"
 # DB 驱动：开发用 SQLite，生产用 PostgreSQL
 aiosqlite = ">=0.19.0"
 asyncpg = ">=0.29.0"

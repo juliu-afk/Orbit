@@ -184,12 +184,14 @@ class SkillRegistry:
             if hits == 0:
                 continue
 
-            # 置信度 = 命中率 * 触发词长度因子
-            # 命中所有触发词 → 基础 0.7；部分命中 → 按比例降
-            hit_ratio = hits / len(skill.triggers)
-            # 最长命中触发词 ≥ 3 字 → +0.15；≥ 2 字 → +0.1
-            len_bonus = 0.15 if best_len >= 3 else (0.1 if best_len >= 2 else 0)
-            confidence = min(1.0, hit_ratio * 0.7 + len_bonus + 0.15)
+            # 置信度 = 基础 0.6（任一触发词命中）+ 长度奖励 + 多命中奖励
+            # WHY 基础 0.6: ≥ 默认阈值 0.4-0.7 区间，确保单触发词命中可触发
+            base = 0.6
+            # 最长命中触发词 ≥ 4 字 → +0.2；≥ 2 字 → +0.1
+            len_bonus = 0.2 if best_len >= 4 else (0.1 if best_len >= 2 else 0)
+            # 命中多个触发词 → 每个额外命中 +0.1（最多 +0.3）
+            multi_bonus = min(0.3, (hits - 1) * 0.1)
+            confidence = min(1.0, base + len_bonus + multi_bonus)
 
             results.append(SkillMatchResult(
                 skill=skill,

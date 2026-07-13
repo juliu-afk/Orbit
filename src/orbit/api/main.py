@@ -459,6 +459,15 @@ async def _app_lifespan(app: FastAPI) -> None:
     except Exception:
         logger.exception("mcp_init_failed")
 
+    # P2-2: SkillWatcher startup——监听 SKILL.md 变化，启动热更新
+    try:
+        from orbit.skills.registry import get_skill_registry
+        _skill_registry = get_skill_registry()
+        _skill_registry.start_watcher()
+        logger.info("skill_watcher_started")
+    except Exception:
+        logger.warning("skill_watcher_init_failed", exc_info=True)
+
     # 执行轨迹收集器——由 OrbitWiring 统一管理（Phase F）
     # WHY 不独立创建: wiring 内部已含 TrajectoryCollector + EpisodicMemory + DistillationEngine，
     # 独立创建会导致双实例、双 DB、轨迹数据分裂。
@@ -515,6 +524,13 @@ async def _app_lifespan(app: FastAPI) -> None:
             logger.info("graph_watcher_stopped")
     except Exception:
         logger.warning("graph_watcher_stop_failed", exc_info=True)
+    # P2-2: SkillWatcher shutdown——停文件监视，防残留线程
+    try:
+        from orbit.skills.registry import get_skill_registry
+        get_skill_registry().stop_watcher()
+        logger.info("skill_watcher_stopped")
+    except Exception:
+        logger.warning("skill_watcher_stop_failed", exc_info=True)
     # Trace span 收集器——停止 worker，flush 剩余 span
     # stop_worker 内置幂等检查（_worker_task=None→直接返回），无需 try/except
     from orbit.observability.trace import TraceCollector as _TCShutdown

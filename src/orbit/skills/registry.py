@@ -311,6 +311,15 @@ class SkillRegistry:
 
         # 从 Git 恢复文件内容 → 重新解析
         if skill.path:
+            # P2-1: 路径合法性检查——禁止 .. 穿越 + 限制在工作区内
+            _skill_path = Path(skill.path).resolve()
+            _skills_root = _SKILLS_DEFINITIONS_DIR.resolve()
+            _compose_root = _COMPOSE_SKILLS_DIR.resolve()
+            if ".." in str(skill.path) or (
+                not str(_skill_path).startswith(str(_skills_root))
+                and not str(_skill_path).startswith(str(_compose_root))
+            ):
+                raise RuntimeError(f"Skill 路径非法: {skill.path}")
             try:
                 import subprocess
                 result = subprocess.run(

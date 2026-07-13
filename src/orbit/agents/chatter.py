@@ -39,10 +39,24 @@ _IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".svg"}
 _DOC_EXTS = {".pdf", ".docx", ".xlsx", ".xls", ".pptx", ".csv"}
 _VIDEO_EXTS = {".mp4", ".mov", ".avi", ".webm", ".mkv", ".flv", ".wmv"}
 
-# 视频 URL 模式——YouTube/B站等
+# 视频 URL 模式——常见视频平台 + 直链视频文件
+# P2-1 (PR#297): 覆盖主流平台 + 直链 .mp4/.mov/.webm/.mkv
 _VIDEO_URL_RE = _re.compile(
-    r'https?://(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/|bilibili\.com/video/|'
-    r'vimeo\.com/|dailymotion\.com/video/)[\w\-]+',
+    r'https?://(?:www\.)?(?:'
+    r'youtube\.com/watch\?v=|youtu\.be/|'          # YouTube
+    r'bilibili\.com/video/|'                        # B站
+    r'vimeo\.com/|'                                 # Vimeo
+    r'dailymotion\.com/video/|'                     # Dailymotion
+    r'twitch\.tv/videos/|'                          # Twitch
+    r'tiktok\.com/@[\w.\-]+/video/|'                # TikTok
+    r'(?:x\.com|twitter\.com)/\w+/status/'          # X/Twitter 视频帖
+    r')[\w\-]+',
+    _re.IGNORECASE,
+)
+
+# 直链视频文件 URL（.mp4/.mov/.webm/.mkv 等）
+_VIDEO_FILE_URL_RE = _re.compile(
+    r'https?://\S+\.(?:mp4|mov|webm|mkv|flv|avi|wmv)(?:\?\S*)?(?:#\S*)?',
     _re.IGNORECASE,
 )
 
@@ -173,8 +187,15 @@ def _extract_media_refs(text: str) -> dict[str, list[str]]:
             result["videos"].append(clean)
             seen.add(clean)
 
-    # 层3: 视频 URL
+    # 层3: 视频平台 URL
     for m in _VIDEO_URL_RE.finditer(text):
+        url = m.group(0)
+        if url not in seen:
+            result["videos"].append(url)
+            seen.add(url)
+
+    # 层4: 直链视频文件 URL (.mp4/.mov等)
+    for m in _VIDEO_FILE_URL_RE.finditer(text):
         url = m.group(0)
         if url not in seen:
             result["videos"].append(url)

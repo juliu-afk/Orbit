@@ -35,7 +35,10 @@ async def file_parser(file_path: str) -> dict:
     """
     import asyncio
 
-    path = Path(file_path)
+    # P0 (PR#297): workspace 隔离——防止通过 file_parser 读取工作区外敏感文件
+    from orbit.tools.filesystem import _guard_path
+
+    path = _guard_path(file_path)
     if not path.exists():
         raise FileNotFoundError(f"文件不存在: {file_path}")
 

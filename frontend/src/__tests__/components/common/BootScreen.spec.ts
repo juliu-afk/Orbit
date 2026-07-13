@@ -13,15 +13,23 @@ const mockAutoRepairs = ref(0)
 const mockRetry = vi.fn()
 const mockInstallComponent = vi.fn()
 
+// WHY getter: Vue template 对嵌套对象不自动解包 ref，需显式 .value
 vi.mock('@/stores/preflight', () => ({
   usePreFlightStore: vi.fn(() => ({
-    status: mockStatus,
-    progress: mockProgress,
-    checks: mockChecks,
-    hasFailed: mockHasFailed,
-    errorMessage: mockErrorMessage,
-    repairedItems: mockRepairedItems,
-    autoRepairs: mockAutoRepairs,
+    get status() { return mockStatus.value },
+    set status(v: string) { mockStatus.value = v },
+    get progress() { return mockProgress.value },
+    set progress(v: number) { mockProgress.value = v },
+    get checks() { return mockChecks.value },
+    set checks(v: any[]) { mockChecks.value = v },
+    get hasFailed() { return mockHasFailed.value },
+    set hasFailed(v: boolean) { mockHasFailed.value = v },
+    get errorMessage() { return mockErrorMessage.value },
+    set errorMessage(v: string) { mockErrorMessage.value = v },
+    get repairedItems() { return mockRepairedItems.value },
+    set repairedItems(v: any[]) { mockRepairedItems.value = v },
+    get autoRepairs() { return mockAutoRepairs.value },
+    set autoRepairs(v: number) { mockAutoRepairs.value = v },
     retry: mockRetry,
     installComponent: mockInstallComponent,
     startPolling: vi.fn(),

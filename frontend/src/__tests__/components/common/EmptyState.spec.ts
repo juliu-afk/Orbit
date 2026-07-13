@@ -32,6 +32,8 @@ describe('EmptyState', () => {
       slots: { default: '<button class="action-btn">New</button>' },
       global: { stubs: { 'el-empty': ElEmptyStub } },
     })
+    // EmptyState template 将 slot 传给 <el-empty><slot/></el-empty>
+    // el-empty stub 渲染 <slot/> → action-btn 可见
     expect(wrapper.find('.action-btn').exists()).toBe(true)
     expect(wrapper.find('.action-btn').text()).toBe('New')
   })
@@ -43,7 +45,5 @@ describe('EmptyState', () => {
     })
     const el = wrapper.find('.empty-state')
     expect(el.exists()).toBe(true)
-    // style 通过 scoped CSS 注入, jsdom 不渲染 computed style,
-    // 这里只验证 DOM 结构
   })
 })

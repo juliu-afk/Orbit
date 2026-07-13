@@ -12,5 +12,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // WHY exclude: e2e/ 是 Playwright 测试不是 vitest
+    exclude: ['node_modules', 'e2e'],
   },
 })

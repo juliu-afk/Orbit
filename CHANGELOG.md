@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.49.0] — 2026-07-13
+
+### Added
+- **ChatterAgent 文件引用自动读取** (#297): 用户在聊天中用反引号引用文件路径（如 `src/main.py`）时，自动读取并注入 LLM 上下文。代码文件→read_file，图片→OCR，文档→file_parser，视频 URL→提示 /watch。
+- **斜杠命令** (#297): `/watch <url>` 视频分析、`/ocr <file>` 图片 OCR、`/parse <file>` 文档解析——三条独立 WebSocket 命令通路。
+- **Agent 级 spawn_subagent 工具** (#298): Agent 在 ReAct 循环中可平行 spawn 子 Agent（architect/developer/reviewer/qa）。深度限制 1 层，全局 MAX_CONCURRENT=4 共享。
+- **多媒体工具权限修复** (#297): `file_parser`/`ocr_document`/`watch_video`/`gui_agent` 加入 ROLE_TOOLS——之前因缺失对 Agent 不可见。
+
+### Fixed
+- **OCR/file_parser workspace 隔离** (#297): `ocr_document` + `file_parser` 新增 `_guard_path`，防止通过 OCR 读取工作区外敏感文件并发送到外部 API。
+- **视频 URL 检测覆盖不全** (#297): 扩展 `_VIDEO_URL_RE` + 新增 `_VIDEO_FILE_URL_RE`——覆盖 Twitch/TikTok/X + 直链 .mp4/.mov。
+
 ## [v0.48.0] — 2026-07-13
 
 ### Added

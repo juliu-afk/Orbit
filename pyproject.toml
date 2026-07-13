@@ -28,7 +28,7 @@ asyncpg = ">=0.29.0"
 # Redis（Step 2.2 检查点/缓存）
 redis = ">=5.0.1"
 # LLM 网关（Step 2.1）
-litellm = ">=1.84.0"
+litellm = ">=1.92.0"
 z3-solver = ">=4.12"
 # 序列化（Step 2.2 检查点，PRD 指定 orjson 比 pickle 快且安全）
 orjson = ">=3.9.0"

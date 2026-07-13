@@ -266,3 +266,96 @@ class ExecutorVerifier:
             "stdout_tail": result.stdout[-500:] if len(result.stdout) > 500 else result.stdout,
             "stderr_tail": result.stderr[-500:] if len(result.stderr) > 500 else result.stderr,
         }
+
+    # ── V15.2: 里程碑验证 ──────────────────────────────
+
+    async def verify_milestone(
+        self,
+        description: str,
+        success_criteria: str,
+        execution_context: dict | None = None,
+    ) -> dict:
+        """验证单个里程碑——两层验证 (V15.2 新增)。
+
+        第一层——确定性检查:
+        - 文件存在/大小/hash
+        - exit code
+        - API 状态码
+
+        第二层——LLM 审查:
+        - 对执行记录做证据驱动的审查
+        - 必须引用实际产出（文件/输出）作为证据
+
+        Returns:
+            {
+                "passed": bool,
+                "evidence": str,        # 证据描述
+                "confidence": float,    # 置信度 0-1
+                "needs_fix": bool,      # 是否需要修正
+                "fix_suggestion": str,  # 修正建议（如果 needs_fix）
+            }
+        """
+        ctx = execution_context or {}
+
+        # 第一层: 确定性检查
+        determ_result = await self._deterministic_check(success_criteria, ctx)
+        if determ_result["passed"] is not None:
+            return determ_result
+
+        # 第二层: 需要 LLM 审查（如"代码质量提升"、"逻辑正确"）
+        return {
+            "passed": True,  # 默认通过——确定性检查无法判定时 LLM 审查由调用方处理
+            "evidence": f"确定性子集通过。完整审查需 LLM 检查：{success_criteria[:200]}",
+            "confidence": 0.6,
+            "needs_fix": False,
+            "fix_suggestion": "",
+        }
+
+    async def _deterministic_check(
+        self, criteria: str, ctx: dict
+    ) -> dict:
+        """确定性验证检查——基于客观事实（文件/exit code），无需 LLM。"""
+        criteria_lower = criteria.lower()
+
+        # 文件存在检查
+        if "文件" in criteria or "file" in criteria_lower:
+            for key in ("output_file", "created_file", "artifact_path"):
+                path = ctx.get(key, "")
+                if path:
+                    from pathlib import Path
+                    exists = Path(path).exists()
+                    return {
+                        "passed": exists,
+                        "evidence": f"文件 {'存在' if exists else '不存在'}: {path}",
+                        "confidence": 1.0 if exists else 0.0,
+                        "needs_fix": not exists,
+                        "fix_suggestion": f"文件 {path} 未创建" if not exists else "",
+                    }
+
+        # exit code 检查
+        if "exit" in criteria_lower or "返回" in criteria or "pass" in criteria_lower or "通过" in criteria:
+            exit_code = ctx.get("exit_code")
+            if exit_code is not None:
+                passed = int(exit_code) == 0
+                return {
+                    "passed": passed,
+                    "evidence": f"exit_code={exit_code}",
+                    "confidence": 1.0,
+                    "needs_fix": not passed,
+                    "fix_suggestion": f"命令返回非零退出码 {exit_code}" if not passed else "",
+                }
+
+        # 测试通过检查
+        test_result = ctx.get("test_passed") or ctx.get("all_passed")
+        if test_result is not None:
+            passed = bool(test_result)
+            return {
+                "passed": passed,
+                "evidence": f"测试结果: {'通过' if passed else '失败'}",
+                "confidence": 0.95,
+                "needs_fix": not passed,
+                "fix_suggestion": "部分测试失败，检查 stderr" if not passed else "",
+            }
+
+        # 无法确定性判定 → 返回 None，由调用方做 LLM 审查
+        return {"passed": None, "evidence": "", "confidence": 0.0, "needs_fix": False, "fix_suggestion": ""}

@@ -15,7 +15,7 @@ const mockStopPolling = vi.fn()
 
 vi.mock('@/stores/preflight', () => ({
   usePreFlightStore: vi.fn(() => ({
-    status: mockStatus,
+    get status() { return mockStatus.value },
     startPolling: mockStartPolling,
     stopPolling: mockStopPolling,
   })),
@@ -28,13 +28,12 @@ import BootView from '@/views/BootView.vue'
 describe('BootView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.useRealTimers()  // P1-5: 确保fake timers不泄漏
+    vi.useRealTimers()
     mockStatus.value = 'booting'
   })
 
   it('renders BootScreen component (stubbed by shallowMount)', () => {
     const wrapper = shallowMount(BootView)
-    // shallowMount stubs child components — BootScreen stub should be present
     expect(wrapper.findComponent({ name: 'BootScreen' }).exists()).toBe(true)
   })
 
@@ -59,7 +58,6 @@ describe('BootView', () => {
     shallowMount(BootView)
 
     mockStatus.value = 'passed'
-    // Vue watch 触发后 setTimeout(600ms)
     await vi.advanceTimersByTimeAsync(700)
 
     expect(mockPush).toHaveBeenCalledWith({ name: 'dashboard' })

@@ -40,6 +40,7 @@ const filteredMsgs = computed<ChatMessage[]>(() => {
 })
 
 function scrollBottom() { nextTick(() => { if (messageListRef.value) messageListRef.value.scrollTop = messageListRef.value.scrollHeight }) }
+function onConfirmRespond(r: { id: string; approved: boolean; remember: boolean }) { chat.sendConfirmResponse(r) }
 watch(() => chat.messages.length, () => { scrollBottom(); if (chat.messages.length > 200) enableVS.value = true })
 
 function onSend(text: string) {
@@ -125,6 +126,7 @@ onMounted(() => scrollBottom())
     <InputBox ref="inputRef" @send="onSend" @navigate-history="onNavHistory" />
   </div>
   <ContextMenu v-if="ctxVisible && ctxMsg" :message="ctxMsg" :x="ctxPos.x" :y="ctxPos.y" @close="closeCtx" @copy="onCtxAct('copy')" @quote="onCtxAct('quote')" @open-file="onCtxAct('open-file')" @retry="onCtxAct('retry')" />
+  <ConfirmDialog :request="chat.pendingConfirm" @respond="onConfirmRespond" />
 </div>
 </template>
 

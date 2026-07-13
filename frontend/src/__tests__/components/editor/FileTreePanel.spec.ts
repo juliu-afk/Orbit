@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shallowMount } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import FileTreePanel from '@/components/editor/FileTreePanel.vue'
 
 const mockTreeData = [
@@ -13,12 +13,18 @@ const mockTreeData = [
 ]
 
 function factory(props = {}) {
-  return shallowMount(FileTreePanel, {
+  return mount(FileTreePanel, {
     props: { treeData: [], selectedFile: null, currentProjectPath: '', ...props },
     global: {
       stubs: {
         'el-empty': { template: '<div class="el-empty-stub"><slot /></div>' },
+        'el-tree': { template: '<div class="el-tree-stub"><slot /></div>' },
         'FileTreeProjectBar': { template: '<div class="ft-project-bar-stub" />' },
+        FileTreeNode: {
+          props: ['node', 'depth'],
+          emits: ['select'],
+          template: '<div class="file-tree-node-stub" @click="$emit(\'select\', $props.node)">{{ node.name }}</div>',
+        },
       },
     },
   })
@@ -50,8 +56,9 @@ describe('FileTreePanel', () => {
   it('emits select-file when child FileTreeNode emits select', () => {
     const wrapper = factory({ treeData: mockTreeData })
     const firstStub = wrapper.findAllComponents({ name: 'FileTreeNode' })[0]
-    firstStub.trigger('click')
+    // 触发子组件的 select 事件
+    firstStub.vm.$emit('select', mockTreeData[0])
     expect(wrapper.emitted('select-file')).toBeTruthy()
-    expect(wrapper.emitted('select-file')![0]).toEqual(['/src/app.ts'])
+    expect(wrapper.emitted('select-file')![0]).toEqual([mockTreeData[0]])
   })
 })

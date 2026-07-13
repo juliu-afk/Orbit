@@ -220,9 +220,9 @@ class ToolRegistry:
     # - developer/qa: 全套多媒体
     ROLE_TOOLS: dict[str, set[str]] = {
         "architect": {"read_file", "grep", "glob", "file_parser"},
-        "developer": {"read_file", "write_file", "edit_file", "exec_command", "grep", "glob", "file_parser", "ocr_document", "watch_video", "gui_agent"},
-        "reviewer": {"read_file", "grep", "glob", "file_parser"},
-        "qa": {"read_file", "exec_command", "grep", "glob", "file_parser", "ocr_document", "gui_agent"},
+        "developer": {"read_file", "write_file", "edit_file", "exec_command", "grep", "glob", "file_parser", "ocr_document", "watch_video", "gui_agent", "spawn_subagent"},
+        "reviewer": {"read_file", "grep", "glob", "file_parser", "spawn_subagent"},
+        "qa": {"read_file", "exec_command", "grep", "glob", "file_parser", "ocr_document", "gui_agent", "spawn_subagent"},
         "config_manager": {"read_file", "write_file", "grep", "glob", "file_parser"},
         "clarifier": set(),  # 纯文本交互，无需工具
         "dream": {"read_file", "grep", "glob", "file_parser"},

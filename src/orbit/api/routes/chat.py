@@ -655,20 +655,25 @@ async def _execute_skill(
     from orbit.agents.factory import AgentFactory
     from orbit.agents.base import AgentInput, AgentRole
 
-    agent_role = AgentRole(skill.agent_role) if hasattr(skill, "agent_role") else AgentRole.DEVELOPER
-
-    agent_input = AgentInput(
-        task=user_text,
-        context={
-            "skill_name": skill.name,
-            "skill_body": skill.body,
-            "chat_mode": chat_mode.value,
-            "session_id": session_id,
-        },
-        role=agent_role,
-    )
-
     try:
+        # 解析 AgentRole——skill.agent_role 来自 SKILL.md，可能无效
+        role_str = skill.agent_role if hasattr(skill, "agent_role") else "developer"
+        try:
+            agent_role = AgentRole(role_str)
+        except ValueError:
+            agent_role = AgentRole.DEVELOPER
+
+        agent_input = AgentInput(
+            task=user_text,
+            context={
+                "skill_name": skill.name,
+                "skill_body": skill.body,
+                "chat_mode": chat_mode.value,
+                "session_id": session_id,
+            },
+            role=agent_role,
+        )
+
         agent = AgentFactory.create(agent_role)
         # 注入 Skill body 到 agent——Agent 的 system_prompt 会拼接 skill body
         if hasattr(agent, "_skill_body"):

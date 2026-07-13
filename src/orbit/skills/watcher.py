@@ -52,7 +52,6 @@ class SkillWatcher:
             return
 
         try:
-            from watchdog.events import FileSystemEventHandler
             from watchdog.observers import Observer
         except ImportError:
             logger.warning("watchdog_not_installed——热更新不可用")
@@ -114,26 +113,32 @@ class SkillWatcher:
 class _SkillFileHandler:
     """watchdog 文件事件处理器——把 watchdog 事件转为 _on_change 回调。
 
-    WHY 独立类: watchdog 要求 FileSystemEventHandler 子类。
+    继承 FileSystemEventHandler——watchdog 要求子类实例。
+    动态 import 避免 watchdog 未安装时模块加载失败。
     """
 
-    def __init__(self, registry: SkillRegistry, callback) -> None:
-        from watchdog.events import FileSystemEventHandler
-        self._registry = registry
-        self._callback = callback
+    def __new__(cls, registry: SkillRegistry, callback):
+        """动态继承 FileSystemEventHandler——避免 watchdog 未安装时报错。"""
+        try:
+            from watchdog.events import FileSystemEventHandler
+            # 创建匿名子类——继承 dispatch/on_modified/on_created 默认实现
+            handler_cls = type(
+                "_ConcreteHandler",
+                (FileSystemEventHandler,),
+                {"on_modified": lambda self, event: cls._handle(event, callback),
+                 "on_created": lambda self, event: cls._handle(event, callback)},
+            )
+            return object.__new__(handler_cls)
+        except ImportError:
+            # watchdog 未安装——返回空壳（watcher.start() 会检测并跳过）
+            return object.__new__(cls)
 
-    # 继承 FileSystemEventHandler 的 dispatch 方法
-    def __getattr__(self, name):
-        """动态继承——避免硬编码 import。"""
-        if name in ("dispatch", "on_modified", "on_created"):
-            return self._handle
-        raise AttributeError(name)
-
-    def _handle(self, event) -> None:
-        """处理文件系统事件。"""
+    @staticmethod
+    def _handle(event, callback) -> None:
+        """处理文件系统事件——过滤 .md 文件。"""
         src = getattr(event, "src_path", "")
         if src.endswith(".md"):
-            self._callback(src)
+            callback(src)
 
 
 def _extract_skill_name(file_path: str) -> str:

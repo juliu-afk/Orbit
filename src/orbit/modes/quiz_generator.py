@@ -219,7 +219,7 @@ class QuizGenerator:
             HTML 字符串
         """
         if not questions:
-            return self._render_fallback(task_id)
+            return self.render_fallback(task_id)
 
         # 用 Jinja2 渲染（如果可用）
         if self._template_path and self._template_path.exists():

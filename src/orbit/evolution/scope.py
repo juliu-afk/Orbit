@@ -182,6 +182,24 @@ class ScopeMemory:
         self._db.execute("DELETE FROM tactical_rules WHERE task_id=?", (task_id,))
         self._db.commit()
 
+    # V15.2+Unknown: 从偏离日志注入战术规则（Fable 5 方法论）
+    def add_deviation(self, task_id: str, rule: str) -> None:
+        """将偏离原因作为战术规则加入 SCOPE。
+
+        WHY: 同一偏离模式在 ≥3 个任务中出现 → 自动升级为战略规则。
+        这是 Fable 5 "偏离日志→自我进化"闭环的关键环节。
+        """
+        self.add_tactical(task_id, rule)
+
+    def add_deviations_batch(self, task_id: str, rules: list[str]) -> int:
+        """批量导入偏离战术规则。返回成功添加数。"""
+        count = 0
+        for rule in rules:
+            if rule.strip():
+                self.add_tactical(task_id, rule)
+                count += 1
+        return count
+
     def _upgrade_to_strategic(self, rule: str, source_count: int) -> None:
         """战术规则升级为战略规则。"""
         self.add_strategic(rule, utility=0.5 + source_count * 0.05)

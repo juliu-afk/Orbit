@@ -142,6 +142,14 @@ class ComposeOrchestrator:
 
             try:
                 if self.actor_spawn:
+                    # V15.2: 设置 subagent 成本归属链
+                    try:
+                        from orbit.integration.wiring import get_wiring
+                        get_wiring().set_parent_id(parent_task_id)
+                        get_wiring().set_task_id(task.id)
+                    except Exception:
+                        pass  # wiring 不可用时不影响主流程
+
                     deferred = await self.actor_spawn.spawn(
                         task=task_description,
                         role=task.agent_role,

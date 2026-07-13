@@ -166,6 +166,34 @@ class GEPAEngine:
 
         return pop
 
+    # V15.2+Unknown: 从偏离日志提取 failure_reason（Fable 5 方法论）
+    async def evolve_from_deviations(
+        self, deviation_reasons: list[str],
+        principles: list[StrategyPrinciple] | None = None,
+    ) -> list[StrategyPrinciple]:
+        """从偏离日志中定向进化原则。
+
+        WHY 独立方法: 偏离日志是结构化数据源，每条偏离原因对应一条改进方向，
+        比笼统的 failure_reason 字符串更有针对性。
+
+        Args:
+            deviation_reasons: DeviationLogger.get_failure_reasons() 的输出
+            principles: 待进化原则（默认从 distill 加载 top-20）
+
+        Returns:
+            进化后的原则列表
+        """
+        if not deviation_reasons:
+            return principles or []
+        if principles is None and self._distill is not None:
+            principles = self._distill.top_principles(20)
+        if not principles or len(principles) < 3:
+            return principles or []
+        all_evolved = list(principles)
+        for reason in deviation_reasons[:5]:  # 最多 5 条——防止 token 爆炸
+            all_evolved = await self.evolve_population(all_evolved, failure_reason=reason)
+        return all_evolved
+
     async def _mutate(
         self, principle: StrategyPrinciple, failure_reason: str,
     ) -> list[StrategyPrinciple]:

@@ -60,12 +60,14 @@ class MonitorAgent:
         hitl_manager: HITLManager | None = None,
         triggers: TriggerEngine | None = None,
         pid_controller: object | None = None,  # V14.2+Theory 方向13: PIDAgentController
+        blindspot_scanner: object | None = None,  # V15.2+Unknown: BlindspotScanner
     ) -> None:
         self._goal = goal
         self._hitl = hitl_manager
         self._triggers = triggers or TriggerEngine()
         self._classifier = ErrorClassifier()
         self._pid = pid_controller
+        self._blindspot = blindspot_scanner
 
         # 运行时状态
         self._action_history: list[dict] = []

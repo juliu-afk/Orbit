@@ -311,7 +311,7 @@ class EpisodicMemory:
             prev_turn = execution_trajectory[idx - 1] if idx > 0 else {}
             prev_error = str(prev_turn.get("error", ""))
             if prev_error and not error and "success" in result.lower():
-                raw = execution_trajectory[i - 1]
+                raw = prev_turn
                 event = self.record_event(
                     task_id=task_id,
                     title=f"重试后成功 (turn {turn_num})",

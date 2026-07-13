@@ -45,26 +45,28 @@ class CodeSource(SearchSource):
         return self._client
 
     async def search(self, query: str, max_results: int = 10) -> list[RawSearchItem]:
-        """搜索 GitHub 仓库代码——优先匹配 README 和源码文件。"""
+        """搜索 GitHub 代码——用 /search/code 查源码文件内容。"""
         client = await self._get_client()
         try:
             resp = await client.get(
-                f"{_GITHUB_API}/search/repositories",
-                params={"q": query, "per_page": min(max_results, 10), "sort": "stars"},
+                f"{_GITHUB_API}/search/code",
+                params={"q": query, "per_page": min(max_results, 10)},
             )
             resp.raise_for_status()
             data = resp.json()
-            repos = data.get("items", [])
+            items_raw = data.get("items", [])
 
             items: list[RawSearchItem] = []
-            for r in repos:
+            for r in items_raw:
+                repo_name = r.get("repository", {}).get("full_name", "")
+                path = r.get("path", "")
                 items.append(
                     RawSearchItem(
-                        title=r.get("full_name", ""),
+                        title=f"{repo_name}/{path}",
                         url=r.get("html_url", ""),
-                        snippet=r.get("description", "")[:500],
-                        source_name="github",
-                        relevance_score=r.get("stargazers_count", 0) / 1000.0,
+                        snippet=f"GitHub 代码匹配: {path}",
+                        source_name="github_code",
+                        relevance_score=r.get("score", 0.0),
                     )
                 )
             logger.debug("code_search_done", query=query[:50], count=len(items))
@@ -77,10 +79,7 @@ class CodeSource(SearchSource):
     async def health_check(self) -> bool:
         try:
             client = await self._get_client()
-            resp = await client.get(
-                f"{_GITHUB_API}/search/repositories",
-                params={"q": "test", "per_page": 1},
-            )
+            resp = await client.get(f"{_GITHUB_API}/search/repositories", params={"q": "test", "per_page": 1})
             return resp.status_code < 500
         except Exception:
             return False

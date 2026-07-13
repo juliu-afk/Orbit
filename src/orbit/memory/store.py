@@ -145,6 +145,7 @@ class MemoryStore:
             logger.warning("memory_file_truncated", path=str(self._path_for(file_type)))
 
         self.write_file(file_type, new_body, fm)
+        self._index_entry(str(self._path_for(file_type)), entry)
 
     def _generate_hyde_questions(self, entry: str, llm_client: object | None) -> str:
         """Phase 3: HyDE 假设问答——同步占位（async 版本见下方）。
@@ -215,6 +216,7 @@ class MemoryStore:
             logger.warning("memory_file_truncated", path=str(self._path_for(file_type)))
 
         self.write_file(file_type, new_body, fm)
+        self._index_entry(str(self._path_for(file_type)), entry)
 
     # ── 搜索 ───────────────────────────────────────────
 
@@ -233,6 +235,16 @@ class MemoryStore:
                 logger.warning("vector_index_init_failed", error=str(e)[:100])
                 self._vector_index = False  # 标记失败，不再重试
         return self._vector_index if self._vector_index is not False else None
+
+    def _index_entry(self, path: str, text: str) -> None:
+        """V15.2: 写入后更新向量索引——失败静默，不阻塞写入。"""
+        vi = self.vector_index
+        if vi and text.strip():
+            try:
+                memory_id = f"{path}:{hashlib.sha256(text.encode()).hexdigest()[:12]}"
+                vi.index(memory_id, text)
+            except Exception as e:
+                logger.debug("vector_index_update_failed", error=str(e)[:80])
 
     def search(self, query: MemorySearchQuery) -> list[MemorySearchResult]:
         """在记忆文件中搜索——BM25 + 向量 RRF 混合检索 (V15.2 升级).

@@ -30,7 +30,7 @@ OCR_SCHEMA = ToolSchema(
         "language": {"type": "string", "description": "主要语言（可选，默认 auto=自动检测）"},
     },
     permissions=[ToolPermission.READ],
-    allowed_agents=["qa", "developer", "clarifier", "architect"],
+    allowed_agents=["qa", "developer", "clarifier", "architect", "chatter"],
     timeout_seconds=60,
     is_async=True,
 )
@@ -55,7 +55,10 @@ async def ocr_document(
     Returns:
         {"text": str, "pages": int, "tokens": int, "cost_usd": float}
     """
-    path = Path(file_path)
+    # P0 (PR#297): workspace 隔离——防止通过 OCR 读取工作区外敏感文件
+    from orbit.tools.filesystem import _guard_path
+
+    path = _guard_path(file_path)
     if not path.exists():
         raise FileNotFoundError(f"文件不存在: {file_path}")
 
@@ -70,7 +73,8 @@ async def ocr_document(
         raise ValueError(f"文件过大（{file_size / 1024 / 1024:.1f}MB > 50MB），请压缩或分割后重试")
 
     # 读取 + base64 编码
-    with open(file_path, "rb") as f:
+    # P0 (PR#297): 用 guarded path 而非原始输入——防止路径遍历
+    with open(str(path), "rb") as f:
         data = base64.b64encode(f.read()).decode()
 
     mime = _mime_type(ext)

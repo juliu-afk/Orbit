@@ -23,6 +23,10 @@ from orbit.core.config import settings
 from orbit.projects.registry import ProjectRegistry
 from orbit.sessions.registry import SessionRegistry
 
+import structlog as _structlog
+
+logger = _structlog.get_logger("orbit.chat")
+
 router = APIRouter(prefix="/chat", tags=["chat"])
 import asyncio as _asyncio
 
@@ -206,11 +210,115 @@ def _on_goal_task_done(goal_id: str, task) -> None:
     try:
         task.result()
     except Exception:
-        import structlog
-
-        structlog.get_logger("orbit.chat").error(
+        logger.error(
             "goal_background_failed", goal_id=goal_id, exc_info=True
         )
+
+
+async def _handle_watch_command(ws: WebSocket, text: str) -> None:
+    """/watch <url或路径> [问题] —— 下载视频 → 抽帧 → 多模态分析。"""
+    # 解析参数: /watch <url> [问题]
+    parts = text[6:].strip()  # 去掉 "/watch"
+    if not parts:
+        await _send(ws, 1, None, "用法: /watch <视频URL或本地路径> [问题]")
+        return
+
+    # 分离 URL 和可选问题
+    tokens = parts.split(maxsplit=1)
+    url = tokens[0].strip()
+    question = tokens[1].strip() if len(tokens) > 1 else "请总结这个视频的内容"
+
+    await _send(ws, 0, {"type": "watch_start", "url": url[:120]}, "正在分析视频...")
+
+    try:
+        from orbit.tools.video_tools import watch_video
+
+        result = await watch_video(url=url, question=question)
+        await _send(
+            ws,
+            0,
+            {
+                "type": "watch_result",
+                "url": url[:120],
+                "analysis": result.get("analysis", ""),
+                "frames_count": result.get("frames_count", 0),
+                "captions_available": result.get("captions_available", False),
+                "model": result.get("model", ""),
+                "cost_usd": result.get("cost_usd", 0),
+            },
+        )
+    except Exception as e:
+        logger.warning("watch_command_failed", url=url[:120], error=str(e))
+        await _send(ws, 1, None, f"视频分析失败: {e}")
+
+
+async def _handle_ocr_command(ws: WebSocket, text: str) -> None:
+    """/ocr <文件路径> —— OCR 图片/PDF → Markdown。"""
+    file_path = text[4:].strip()  # 去掉 "/ocr"
+    if not file_path:
+        await _send(ws, 1, None, "用法: /ocr <文件路径>")
+        return
+
+    # 去掉可能的外层引号
+    file_path = file_path.strip().strip('"').strip("'")
+
+    await _send(ws, 0, {"type": "ocr_start", "file": file_path}, "正在 OCR...")
+
+    try:
+        from orbit.tools.ocr_tools import ocr_document
+
+        result = await ocr_document(file_path)
+        await _send(
+            ws,
+            0,
+            {
+                "type": "ocr_result",
+                "file": file_path,
+                "text": result.get("text", ""),
+                "pages": result.get("pages", 0),
+                "tokens": result.get("tokens", 0),
+                "cost_usd": result.get("cost_usd", 0),
+            },
+        )
+    except FileNotFoundError:
+        await _send(ws, 1, None, f"文件不存在: {file_path}")
+    except Exception as e:
+        logger.warning("ocr_command_failed", file=file_path, error=str(e))
+        await _send(ws, 1, None, f"OCR 失败: {e}")
+
+
+async def _handle_parse_command(ws: WebSocket, text: str) -> None:
+    """/parse <文件路径> —— 解析 PDF/Word/Excel/PPT/文本 → Markdown。"""
+    file_path = text[6:].strip()  # 去掉 "/parse"
+    if not file_path:
+        await _send(ws, 1, None, "用法: /parse <文件路径>")
+        return
+
+    # 去掉可能的外层引号
+    file_path = file_path.strip().strip('"').strip("'")
+
+    await _send(ws, 0, {"type": "parse_start", "file": file_path}, "正在解析文档...")
+
+    try:
+        from orbit.tools.file_parser import file_parser
+
+        result = await file_parser(file_path)
+        await _send(
+            ws,
+            0,
+            {
+                "type": "parse_result",
+                "file": file_path,
+                "text": result.get("text", ""),
+                "pages": result.get("pages", 0),
+                "file_type": result.get("file_type", ""),
+            },
+        )
+    except FileNotFoundError:
+        await _send(ws, 1, None, f"文件不存在: {file_path}")
+    except Exception as e:
+        logger.warning("parse_command_failed", file=file_path, error=str(e))
+        await _send(ws, 1, None, f"文档解析失败: {e}")
 
 
 async def _handle_chat(
@@ -224,6 +332,21 @@ async def _handle_chat(
     # /goal 命令族
     if text.strip().startswith("/goal"):
         await _handle_goal_command(ws, text.strip())
+        return
+
+    # /watch 命令——视频理解
+    if text.strip().startswith("/watch"):
+        await _handle_watch_command(ws, text.strip())
+        return
+
+    # /ocr 命令——图片/PDF OCR
+    if text.strip().startswith("/ocr"):
+        await _handle_ocr_command(ws, text.strip())
+        return
+
+    # /parse 命令——文档解析
+    if text.strip().startswith("/parse"):
+        await _handle_parse_command(ws, text.strip())
         return
 
     # 验证 session 存在

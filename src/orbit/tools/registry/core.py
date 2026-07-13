@@ -213,14 +213,20 @@ class ToolRegistry:
 
     # 每个角色可调用的工具——缩小攻击面，减少 prompt 噪音
     # WHY: Clarifier 不需要 shell，Reviewer 不需要 write_file
+    # WHY 多媒体工具按角色分配:
+    # - chatter: read_file(代码)+file_parser(文档)+ocr_document(图片)，
+    #   watch_video 太重不走自动检测，用 /watch 命令
+    # - architect/reviewer/dream: +file_parser 看设计文档
+    # - developer/qa: 全套多媒体
     ROLE_TOOLS: dict[str, set[str]] = {
-        "architect": {"read_file", "grep", "glob"},
-        "developer": {"read_file", "write_file", "edit_file", "exec_command", "grep", "glob"},
-        "reviewer": {"read_file", "grep", "glob"},
-        "qa": {"read_file", "exec_command", "grep", "glob"},
-        "config_manager": {"read_file", "write_file", "grep", "glob"},
+        "architect": {"read_file", "grep", "glob", "file_parser"},
+        "developer": {"read_file", "write_file", "edit_file", "exec_command", "grep", "glob", "file_parser", "ocr_document", "watch_video", "gui_agent"},
+        "reviewer": {"read_file", "grep", "glob", "file_parser"},
+        "qa": {"read_file", "exec_command", "grep", "glob", "file_parser", "ocr_document", "gui_agent"},
+        "config_manager": {"read_file", "write_file", "grep", "glob", "file_parser"},
         "clarifier": set(),  # 纯文本交互，无需工具
-        "dream": {"read_file", "grep", "glob"},
+        "dream": {"read_file", "grep", "glob", "file_parser"},
+        "chatter": {"read_file", "file_parser", "ocr_document"},
     }
 
     # MCP 工具自动授予的角色——这些角色需要代码导航/编辑能力

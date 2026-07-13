@@ -63,7 +63,7 @@ WATCH_VIDEO_SCHEMA = ToolSchema(
         "end": {"type": "string", "description": "结束时间（可选，如 '2:45' 或 '165'）"},
     },
     permissions=[ToolPermission.READ],
-    allowed_agents=["qa", "developer", "clarifier"],
+    allowed_agents=["qa", "developer", "clarifier", "chatter"],
     timeout_seconds=180,  # 下载+抽帧可能慢
     is_async=True,
 )

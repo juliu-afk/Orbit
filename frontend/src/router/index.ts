@@ -10,6 +10,7 @@ const router = createRouter({
     { path: '/app', name: 'app', component: () => import('@/views/TerminalShell.vue') },
     { path: '/mcp', name: 'mcp', component: () => import('@/views/McpView.vue') },
     { path: '/review/:taskId', name: 'review', component: () => import('@/views/ReviewView.vue') },
+    { path: '/skills', name: 'skills', component: () => import('@/views/SkillManager.vue') },
   ],
 })
 

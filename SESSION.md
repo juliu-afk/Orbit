@@ -1,5 +1,33 @@
 # Orbit 开发会话记录
 
+## 2026-07-13 — Agent 工具能力扩展 (2 PR · 全部 MERGED)
+
+### 背景
+用户反馈：Orbit 聊天中不能引用文件路径读取内容、多媒体工具虽已注册但对 Agent 不可见、Agent 缺少自主并行能力。
+
+### 交付
+
+| PR | 内容 | 文件 | 测试 |
+|----|------|------|------|
+| #297 | ChatterAgent 文件引用+多媒体+斜杠命令 | 6改 +481/-17 | AST 全过 |
+| #298 | Agent 级 spawn_subagent 工具 | 3改+1新+5文档 | 20/20 |
+
+### 关键决策
+- 文件读取+多媒体检测在 ChatterAgent 预处理层做——不等 LLM 调用工具，直接注入 prompt
+- spawn_subagent 包装已有 ActorSpawn 为工具——零基础设施改动
+- 深度限制用 ROLE_TOOLS 隐式实现——子 Agent 看不到 spawn_subagent → 自然不可递归
+- 旧 API 工具（ocr/file_parser/watch_video）加 `_guard_path` workspace 隔离——P0 安全修复
+
+### 踩坑
+- 文档 commit 误进 `feat/chat-mode-skill-routing` 分支 → cherry-pick 到正确分支
+- 并发测试需要 `:memory:` SQLite 数据库确保隔离——默认 DB_PATH 有状态污染
+
+### 后续
+- 前端任务树（AC8 延后）
+- spawn_subagent 集成测试（需 LLM mock 框架）
+
+---
+
 ## 2026-07-08~09 — 理论提升空间分析 25 方向全交付 (7 PR · 全部 MERGED)
 
 ### 背景

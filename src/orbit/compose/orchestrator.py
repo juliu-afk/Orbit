@@ -373,6 +373,73 @@ class ComposeOrchestrator:
             review["ponytail_findings"] = ponytail_warnings
         return review
 
+    async def run_skill_chain(
+        self,
+        skills: list[str],
+        user_input: str,
+        stream_callback: object | None = None,
+    ) -> dict[str, Any]:
+        """从聊天框调用的轻量编排入口——不要求用户写 spec YAML。
+
+        自动生成临时 spec → 走已有拓扑排序 + ActorSpawn 调度。
+
+        Args:
+            skills: Skill 名列表，如 ["compose:plan", "compose:implement", "compose:review"]
+            user_input: 用户原始输入——作为任务描述
+            stream_callback: 可选进度回调 async fn(phase, status, message)
+
+        Returns:
+            {"status": "ok|error", "results": [...], "error": "..."}
+        """
+        # 生成临时 spec
+        import time as _time
+        spec_title = f"chain-{'-'.join(skills)}-{_time.time()}"
+        tasks = []
+        for i, skill_name in enumerate(skills):
+            tasks.append(Task(
+                id=f"chain-task-{i}",
+                description=user_input if i == 0 else f"继续执行 {skill_name}",
+                agent_role="developer",
+                skill=skill_name,
+                depends_on=[f"chain-task-{i-1}"] if i > 0 else [],
+            ))
+
+        spec = Spec(
+            title=spec_title,
+            description=user_input,
+            tasks=tasks,
+            language="python",
+            constraints=[],
+        )
+
+        logger.info("run_skill_chain", title=spec_title, skills=skills)
+
+        # 回调通知开始
+        if stream_callback:
+            try:
+                await stream_callback("plan", "running", f"编排链启动: {' → '.join(skills)}")
+            except Exception:
+                pass
+
+        # 走已有 run_spec 管道
+        result = await self.run_spec(
+            spec_text=f"title: {spec_title}\ndescription: {user_input}\ntasks:\n"
+            + "\n".join(
+                f"  - id: chain-task-{i}\n    description: {t.description}\n    skill: {t.skill}"
+                for i, t in enumerate(tasks)
+            ),
+        )
+
+        if stream_callback:
+            status = result.get("status", "error")
+            try:
+                await stream_callback("chain", "done" if status == "ok" else "failed",
+                                       f"编排链完成: {status}")
+            except Exception:
+                pass
+
+        return result
+
     # ── 拓扑排序 ──────────────────────────────────
 
     def _topological_sort(self, tasks: list[Task]) -> list[Task]:

@@ -3,17 +3,21 @@
 ## [v0.49.0] — 2026-07-14
 
 ### Added
-- **聊天框四级权限模式** (#299): Manual / Edit Automatically / Plan / Auto Mode 对标 Claude Code for VS Code。模式状态通过 WebSocket 传后端，ToolRegistry.dispatch() 加四级门禁。
-- **SkillRegistry 通用注册中心** (#299): 扫描 SKILL.md → 斜杠命令动态匹配 + 自然语言自动匹配（≥0.7 置信度直接触发）。新增 Skills CRUD + 版本管理 + 回滚 API。
-- **ComposeOrchestrator.run_skill_chain()** (#299): 聊天框可直接触发多步编排链，不需要写 spec YAML。
-- **Skill 可视化管理面板** (#299): 前端 `/skills` 路由，列表+编辑器+版本历史。
-- **Skill 热更新** (#299): 文件系统 watcher 监听 SKILL.md 变化 → 自动重载。
-- **31 个新模块单元测试** (#299): `test_skills/` 覆盖 registry/match/CRUD/version/context。
+- **ChatterAgent 文件引用自动读取** (#297): 用户在聊天中用反引号引用文件路径时自动读取并注入 LLM 上下文。
+- **斜杠命令** (#297): `/watch <url>` 视频分析、`/ocr <file>` 图片 OCR、`/parse <file>` 文档解析。
+- **Agent 级 spawn_subagent 工具** (#298): Agent 在 ReAct 循环中可平行 spawn 子 Agent，MAX_CONCURRENT=4。
+- **聊天框四级权限模式** (#299): Manual / Edit Automatically / Plan / Auto Mode。
+- **SkillRegistry 通用注册中心** (#299): SKILL.md 自动发现 + 斜杠/自然语言匹配 + CRUD + 版本回滚。
+- **ComposeOrchestrator.run_skill_chain()** (#299): 聊天框直接触发多步编排。
+- **Skill 管理面板** (#299): 前端 `/skills` 可视化编辑 + 热更新。
+
+### Fixed
+- **OCR/file_parser workspace 隔离** (#297): 新增 `_guard_path` 防路径穿越。
+- **视频 URL 检测覆盖不全** (#297): 扩展 Twitch/TikTok/X + 直链。
 
 ### Changed
 - **InputBox 模式按钮**: Ask/Edit/Agent → Manual/Edit Automatically/Plan/Auto Mode
-- **ChatterAgent prompt**: 新增 skill + chain 自然语言匹配规则
-- **ToolRegistry**: dispatch() 加 `_check_mode_gate()` 四级权限门禁
+- **ToolRegistry**: dispatch() 加四级权限门禁
 
 ## [v0.48.0] — 2026-07-13
 

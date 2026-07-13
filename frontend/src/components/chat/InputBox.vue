@@ -4,9 +4,10 @@ import { apiGet } from '@/services/api'
 const emit = defineEmits<{ (e: 'send', text: string): void; (e: 'navigate-history', d: -1 | 1): void }>()
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 const inputText = ref('')
-// UX-1: 交互模式选择——Ask(提问) / Edit(编辑) / Agent(自主执行)
-const MODES = ['Ask', 'Edit', 'Agent'] as const
-const currentMode = ref<string>('Ask')
+// UX-1: 交互模式选择——四级权限（对标 Claude Code for VS Code）
+// Manual=每次确认, Edit Automatically=读放行写首次确认, Plan=只读方案, Auto Mode=全自动
+const MODES = ['Manual', 'Edit Automatically', 'Plan', 'Auto Mode'] as const
+const currentMode = ref<string>('Auto Mode')
 // UX-9: @-mention 自动完成——文件/符号/会话
 const AT_TARGETS = ref<Array<{ name: string; type: 'file'|'symbol'|'session' }>>([])
 const showAtMenu = ref(false)
@@ -81,18 +82,18 @@ function onKey(e: KeyboardEvent) {
 }
 function focus() { inputRef.value?.focus() }
 function setText(text: string) { inputText.value = text; inputRef.value?.focus() }
-defineExpose({ focus, setText })
+defineExpose({ focus, setText, currentMode })
 </script>
 <template>
 <div class="input-box" style="position:relative">
-  <!-- UX-1: 模式选择器——Ask/Edit/Agent -->
+  <!-- UX-1: 模式选择器——Manual/Edit Automatically/Plan/Auto Mode -->
   <div class="mode-bar">
     <button v-for="m in MODES" :key="m" class="mode-btn" :class="{ active: currentMode === m }" @click="currentMode = m">
-      {{ m === 'Ask' ? '💬' : m === 'Edit' ? '✏️' : '🤖' }} {{ m }}
+      {{ m === 'Manual' ? '👆' : m === 'Edit Automatically' ? '✏️' : m === 'Plan' ? '📋' : '🤖' }} {{ m }}
     </button>
   </div>
   <div class="flex items-start gap-2 px-3 py-2">
-    <textarea ref="inputRef" v-model="inputText" class="flex-1 resize-none outline-none" style="background:transparent;border:none;color:var(--color-orbit-text);font-family:var(--font-mono);font-size:13px;line-height:1.6;caret-color:var(--color-orbit-accent)" rows="1" :placeholder="currentMode === 'Ask' ? 'Ask anything...' : currentMode === 'Edit' ? 'Describe the edit...' : '/help...'" @keydown="onKey" />
+    <textarea ref="inputRef" v-model="inputText" class="flex-1 resize-none outline-none" style="background:transparent;border:none;color:var(--color-orbit-text);font-family:var(--font-mono);font-size:13px;line-height:1.6;caret-color:var(--color-orbit-accent)" rows="1" :placeholder="currentMode === 'Manual' ? 'Manual mode — confirm each step...' : currentMode === 'Edit Automatically' ? 'Edit mode — auto-read, confirm-write...' : currentMode === 'Plan' ? 'Plan mode — read-only analysis...' : 'Auto Mode — /help...'" @keydown="onKey" />
   </div>
   <!-- WHY: 斜杠命令补全下拉——自动弹出，Tab/方向键选择，Enter 选中 -->
   <div v-if="showAC && filtered.length > 0" class="ac-dropdown">

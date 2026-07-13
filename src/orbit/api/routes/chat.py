@@ -20,8 +20,11 @@ from orbit.agents.clarifier import ClarifierAgent, StructuredPRD, validate_prd
 from orbit.context.matcher import ContextMatcher
 from orbit.api.dependencies import _verify_token  # P1-3: JWT + static token
 from orbit.core.config import settings
+from orbit.core.context import get_context, set_context
 from orbit.projects.registry import ProjectRegistry
 from orbit.sessions.registry import SessionRegistry
+from orbit.skills.models import ChatMode
+from orbit.skills.registry import get_skill_registry
 
 import structlog as _structlog
 
@@ -127,9 +130,15 @@ async def chat_endpoint(ws: WebSocket) -> None:
             text = payload.get("text", "")
             session_id = payload.get("session_id", "")
             project_name = payload.get("project_name", "")
+            # ChatMode: 从 WebSocket 读取模式，默认 Auto Mode（向后兼容）
+            mode_raw = payload.get("mode", "Auto Mode")
+            try:
+                chat_mode = ChatMode(mode_raw)
+            except ValueError:
+                chat_mode = ChatMode.AUTO
 
             if msg_type == "chat":
-                await _handle_chat(ws, text, session_id, project_name, payload)
+                await _handle_chat(ws, text, session_id, project_name, payload, chat_mode)
             elif msg_type == "confirm":
                 modified_prd = payload.get("modified_prd")
                 await _handle_confirm(ws, session_id, project_name, modified_prd)
@@ -322,32 +331,60 @@ async def _handle_parse_command(ws: WebSocket, text: str) -> None:
 
 
 async def _handle_chat(
-    ws: WebSocket, text: str, session_id: str, project_name: str, payload: dict[str, Any]
+    ws: WebSocket,
+    text: str,
+    session_id: str,
+    project_name: str,
+    payload: dict[str, Any],
+    chat_mode: ChatMode = ChatMode.AUTO,
 ) -> None:
-    """处理用户聊天消息：ChatterAgent 首触 → 意图路由 → ClarifierAgent 澄清。"""
+    """处理用户聊天消息：ChatterAgent 首触 → 意图路由 → Skill/Chain/Clarifier。
+
+    数据流:
+        Phase 0: /slash → SkillRegistry 精确匹配
+        Phase 1: ChatterAgent → chat/skill/chain/programming 四分类
+          - chat → 直接回复
+          - skill → SkillExecutor（单 Skill）
+          - chain → ComposeOrchestrator（多步编排）
+          - programming → ClarifierAgent（需求澄清）
+    """
     if not text.strip():
         await _send(ws, 1, None, "输入为空")
         return
 
-    # /goal 命令族
-    if text.strip().startswith("/goal"):
-        await _handle_goal_command(ws, text.strip())
-        return
+    # 注入 ChatMode 到执行上下文——ToolRegistry 工具门禁会读取
+    set_context(chat_mode=chat_mode, session_id=session_id)
 
-    # /watch 命令——视频理解
-    if text.strip().startswith("/watch"):
-        await _handle_watch_command(ws, text.strip())
-        return
+    # ---- Phase 0: /slash 命令路由（SkillRegistry 动态匹配）----
+    if text.strip().startswith("/"):
+        # 保留已有硬编码命令（向后兼容）
+        if text.strip().startswith("/goal"):
+            await _handle_goal_command(ws, text.strip())
+            return
+        if text.strip().startswith("/watch"):
+            await _handle_watch_command(ws, text.strip())
+            return
+        if text.strip().startswith("/ocr"):
+            await _handle_ocr_command(ws, text.strip())
+            return
+        if text.strip().startswith("/parse"):
+            await _handle_parse_command(ws, text.strip())
+            return
 
-    # /ocr 命令——图片/PDF OCR
-    if text.strip().startswith("/ocr"):
-        await _handle_ocr_command(ws, text.strip())
-        return
+        # NEW: SkillRegistry 动态匹配——新增 Skill 无需改此处代码
+        slash_name = text.strip().split()[0].lstrip("/")  # "/review" → "review"
+        skill_registry = get_skill_registry()
+        skill = skill_registry.find_by_slash(slash_name)
+        if skill is not None:
+            logger.info("skill_slash_match", name=skill.name)
+            await _execute_skill(ws, skill, text, session_id, chat_mode)
+            return
+        # 不是已知命令也不是已知 Skill → 当作普通文本继续 Phase 1
 
-    # /parse 命令——文档解析
-    if text.strip().startswith("/parse"):
-        await _handle_parse_command(ws, text.strip())
-        return
+    # 保留: /mode 命令（ModeTuner 检测）——保持 /mode 不匹配 skill
+    if text.strip().startswith("/mode"):
+        # /mode 由 ChatterAgent 内置的 ModeTuner 处理
+        pass
 
     # 验证 session 存在
     if session_id and _session_registry.get(session_id) is None:
@@ -401,9 +438,56 @@ async def _handle_chat(
     chatter_output = await chatter_agent.execute(chatter_input)
     intent = chatter_output.result.get("_intent", "chat")
     chatter_reply = chatter_output.result.get("reply", "")
+    skill_name = chatter_output.result.get("skill_name", "")
+    skill_confidence = chatter_output.result.get("confidence", 0.0)
+    chain_skills = chatter_output.result.get("skills", [])
 
-    # WHY 意图路由：chat → 直接返回，programming → 转 ClarifierAgent
-    if intent != "programming":
+    # ---- Phase 1 路由：chat | skill | chain | programming ----
+    # WHY 四分类: skill/chain 直接执行，chat 回复，programming 走 ClarifierAgent
+
+    if intent == "skill" and skill_name:
+        # 自然语言匹配到 Skill
+        skill_registry = get_skill_registry()
+        skill = skill_registry.get(skill_name)
+        if skill is not None:
+            # 阈值判断
+            if skill_confidence >= 0.7:
+                # 直接触发
+                logger.info("skill_auto_trigger", name=skill_name, confidence=skill_confidence)
+                await _send(ws, 0, {
+                    "type": "chat",
+                    "reply": f"🔧 启动技能「{skill.description}」...",
+                    "agent_role": "Chatter",
+                })
+                await _execute_skill(ws, skill, text, session_id, chat_mode)
+                return
+            elif skill_confidence >= 0.4:
+                # 提示确认——由前端弹确认框（当前版本简化：告知用户后触发）
+                logger.info("skill_confirm_needed", name=skill_name, confidence=skill_confidence)
+                await _send(ws, 0, {
+                    "type": "chat",
+                    "reply": f"📎 检测到意图「{skill.description}」，置信度 {int(skill_confidence*100)}%。如需执行请确认。",
+                    "agent_role": "Chatter",
+                    "pending_skill": skill_name,
+                    "pending_confidence": skill_confidence,
+                })
+                # 暂不自动执行——等待用户确认后由前端发 confirm_skill
+                _session_registry.add_message(session_id=session_id, role="user", content=text)
+                return
+            # else: < 0.4 → 当作普通 chat
+
+    if intent == "chain" and chain_skills:
+        # 多步编排 → ComposeOrchestrator
+        logger.info("chain_trigger", skills=chain_skills)
+        await _send(ws, 0, {
+            "type": "chat",
+            "reply": f"🔗 启动编排链: {' → '.join(chain_skills)}...",
+            "agent_role": "Chatter",
+        })
+        await _execute_chain(ws, chain_skills, text, session_id, chat_mode)
+        return
+
+    if intent == "chat" or (intent not in ("programming", "skill", "chain")):
         # 普通对话——直接返回 ChatterAgent 回复
         result_data: dict[str, Any] = {
             "type": "chat",
@@ -552,6 +636,122 @@ async def _handle_confirm(
         )
     except Exception as e:
         await _send(ws, 1, None, f"创建任务失败: {e}")
+
+
+# ── Skill 执行 ──────────────────────────────────────
+
+
+async def _execute_skill(
+    ws: WebSocket,
+    skill: object,  # ChatSkill
+    user_text: str,
+    session_id: str,
+    chat_mode: ChatMode,
+) -> None:
+    """执行单个 Skill——创建 Agent 并注入 Skill body 作 system_prompt。
+
+    WHY 独立函数: 单 Skill 和 chain 中每步共用此逻辑。
+    """
+    from orbit.agents.factory import AgentFactory
+    from orbit.agents.base import AgentInput, AgentRole
+
+    try:
+        # 解析 AgentRole——skill.agent_role 来自 SKILL.md，可能无效
+        role_str = skill.agent_role if hasattr(skill, "agent_role") else "developer"
+        try:
+            agent_role = AgentRole(role_str)
+        except ValueError:
+            agent_role = AgentRole.DEVELOPER
+
+        agent_input = AgentInput(
+            task=user_text,
+            context={
+                "skill_name": skill.name,
+                "skill_body": skill.body,
+                "chat_mode": chat_mode.value,
+                "session_id": session_id,
+            },
+            role=agent_role,
+        )
+
+        agent = AgentFactory.create(agent_role)
+        # 注入 Skill body 到 agent——Agent 的 system_prompt 会拼接 skill body
+        if hasattr(agent, "_skill_body"):
+            agent._skill_body = skill.body  # type: ignore[attr-defined]
+
+        output = await agent.execute(agent_input)
+        reply = output.result.get("reply", str(output.result)[:2000])
+
+        await _send(ws, 0, {
+            "type": "chat",
+            "reply": reply,
+            "agent_role": skill.agent_role if hasattr(skill, "agent_role") else "Developer",
+            "skill_name": skill.name,
+        })
+    except Exception as e:
+        logger.error("skill_execute_failed", name=skill.name, error=str(e))
+        await _send(ws, 1, None, f"Skill {skill.name} 执行失败: {e}")
+
+
+async def _execute_chain(
+    ws: WebSocket,
+    skill_names: list[str],
+    user_text: str,
+    session_id: str,
+    chat_mode: ChatMode,
+) -> None:
+    """执行 Skill 编排链——调 ComposeOrchestrator.run_skill_chain()。
+
+    WHY 独立函数: ComposeOrchestrator 需要独立的进度回调通道。
+    """
+    skill_registry = get_skill_registry()
+    try:
+        chain = skill_registry.build_chain(skill_names)
+    except FileNotFoundError as e:
+        await _send(ws, 1, None, str(e))
+        return
+
+    # 流式进度回调——每个阶段完成时推送到聊天框
+    async def progress_callback(phase: str, status: str, message: str) -> None:
+        await _send(ws, 0, {
+            "type": "compose_progress",
+            "phase": phase,
+            "status": status,
+            "message": message,
+        })
+
+    # 尝试通过 ComposeOrchestrator 执行
+    import importlib
+    try:
+        from orbit.api.main import app as _app
+        orch = getattr(_app.state, "compose_orchestrator", None)
+        if orch and hasattr(orch, "run_skill_chain"):
+            result = await orch.run_skill_chain(
+                skills=[s.name for s in chain],
+                user_input=user_text,
+                stream_callback=progress_callback,
+            )
+            await _send(ws, 0, {
+                "type": "chat",
+                "reply": f"编排链完成: {' → '.join(skill_names)}",
+                "agent_role": "Orchestrator",
+                "compose_result": str(result)[:2000] if result else "",
+            })
+            return
+    except Exception as e:
+        logger.warning("compose_chain_fallback", error=str(e))
+
+    # 降级：逐个执行 Skill
+    for skill in chain:
+        await progress_callback(skill.phase, "running", f"执行 {skill.name}...")
+        await _execute_skill(ws, skill, user_text, session_id, chat_mode)
+        await progress_callback(skill.phase, "done", f"{skill.name} 完成")
+
+    await _send(ws, 0, {
+        "type": "chat",
+        "reply": f"编排链执行完毕: {' → '.join(skill_names)}",
+        "agent_role": "Orchestrator",
+    })
 
 
 # ── CONTEXT.md 自动同步 ──────────────────────────────────

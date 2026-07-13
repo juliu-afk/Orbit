@@ -5,14 +5,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import ast
 import importlib
+import json as _json
 import threading
 import time
 from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+# ChatMode 门禁信号——需前端确认
+_CONFIRM_SIGNAL = "__CONFIRM_NEEDED__"
 
 import structlog
 
@@ -112,6 +117,9 @@ class ToolRegistry:
         self._tool_history: dict[str, dict[str, list[ToolCall]]] = {}
         # MCP 客户端连接: server_name -> MCPClientConnection
         self._mcp_connections: dict[str, Any] = {}
+        # 确认回路: confirm_id → (asyncio.Event, result dict)
+        self._pending_confirms: dict[str, tuple[object, dict]] = {}
+        self._confirm_counter: int = 0
 
     # ── 单例 ─────────────────────────────────────────
 
@@ -323,7 +331,33 @@ class ToolRegistry:
         # ChatMode 四级门禁——在 PermissionEngine 之后，工具执行之前
         chat_mode_gate = self._check_mode_gate(name, agent_name)
         if chat_mode_gate is not None:
-            return chat_mode_gate
+            if chat_mode_gate == "__CONFIRM_NEEDED__":
+                # 异步确认回路——等 WebSocket confirm_response
+                session_id = ""
+                try:
+                    from orbit.core.context import get_context
+                    session_id = get_context().session_id
+                except Exception:
+                    pass
+                allow_remember = True  # Edit Automatically 才显示，Manual 不显示
+                try:
+                    from orbit.core.context import get_context
+                    from orbit.skills.models import ChatMode
+                    allow_remember = get_context().chat_mode == ChatMode.EDIT_AUTO
+                except Exception:
+                    pass
+                approved, remember = await self._request_confirm(
+                    name, args, session_id, allow_remember)
+                if not approved:
+                    return f"用户拒绝了工具执行: {name}"
+                if remember:
+                    try:
+                        from orbit.core.context import get_context
+                        get_context().confirmed_tools.add(name)
+                    except Exception:
+                        pass
+            else:
+                return chat_mode_gate
 
         # 新 API 优先
         entry = self._entries.get(name)
@@ -427,33 +461,83 @@ class ToolRegistry:
         entry = self._entries.get(name)
         if entry is not None:
             return entry.is_write
-        # 旧 API 工具: 根据名称判断——shell/exe 类都是写
         write_patterns = ("write", "edit", "delete", "create", "run", "exec",
                           "bash", "shell", "move", "copy", "mkdir", "rm")
         return any(p in name.lower() for p in write_patterns)
 
+    async def _request_confirm(self, name: str, args: dict, session_id: str,
+                                allow_remember: bool) -> tuple[bool, bool]:
+        """发送 confirm_request 并等待用户响应。
+
+        Returns: (approved, remember)
+        """
+        self._confirm_counter += 1
+        cid = f"confirm_{self._confirm_counter}_{time.time()}"
+
+        # 通过 ws_sender 推送确认请求到客户端
+        try:
+            from orbit.core.context import get_context
+            ctx = get_context()
+            sender = ctx.ws_sender
+            if sender and callable(sender):
+                import json as _json
+                await sender(_json.dumps({
+                    "code": 0,
+                    "data": {
+                        "type": "confirm_request",
+                        "confirm_id": cid,
+                        "tool_name": name,
+                        "tool_args": args,
+                        "message": f"即将执行 {name}",
+                        "allow_remember": allow_remember,
+                    },
+                }))
+        except Exception:
+            pass
+
+        # 创建 Event 等待用户响应
+        event = asyncio.Event()
+        result: dict = {"approved": False, "remember": False}
+        self._pending_confirms[cid] = (event, result)
+
+        try:
+            await asyncio.wait_for(event.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            pass  # 超时 → 默认拒绝（result 已是 False）
+        finally:
+            self._pending_confirms.pop(cid, None)
+
+        return result["approved"], result["remember"]
+
+    def resolve_confirm(self, confirm_id: str, approved: bool, remember: bool) -> None:
+        """WebSocket confirm_response 到达时调用——唤醒等待的 _request_confirm。"""
+        entry = self._pending_confirms.get(confirm_id)
+        if entry is None:
+            return
+        event, result = entry
+        result["approved"] = approved
+        result["remember"] = remember
+        event.set()
+
     def _check_mode_gate(self, name: str, agent_name: str) -> str | None:
-        """ChatMode 四级门禁——检查当前模式是否允许此工具调用。
+        """ChatMode 四级门禁——同步检查（不含 WebSocket 确认）。
 
-        Returns:
-            None = 准入（放行）
-            str = 拒绝原因或确认请求
-
-        WHY 四级而非简单二元: Manual 每次确认、Edit 首次确认、
-        Plan 禁止写入、Auto 全放行——对标 Claude Code for VS Code。
+        确认回路由 dispatch() 中的异步 _request_confirm 处理。
+        此方法仅返回 None（放行）或 str（Plan 模式拒绝原因）。
+        Manual/Edit 需要确认时返回确认标记字符串，由调用方处理。
         """
         try:
             from orbit.core.context import get_context
             from orbit.skills.models import ChatMode
             ctx = get_context()
         except ImportError:
-            return None  # 无上下文 → 默认放行
+            return None
 
         mode = ctx.chat_mode
         is_write = self._is_write_tool(name)
 
         if mode == ChatMode.AUTO:
-            return None  # 全自动——放行
+            return None
 
         if mode == ChatMode.PLAN:
             if is_write:
@@ -461,27 +545,21 @@ class ToolRegistry:
                     f"Plan 模式不允许写操作。当前工具 {name} 为写入操作。"
                     "切换到 Manual / Edit Automatically / Auto Mode 后可执行。"
                 )
-            return None  # 读工具放行
+            return None
 
         if mode == ChatMode.MANUAL:
-            # 每次都弹确认——Agent 需等待用户确认
-            # 实现在后续迭代中加 WebSocket 确认回路
-            return f"Manual 模式——{name} 需要用户确认后执行。当前版本需切换到 Auto Mode。"
+            # 标记需要确认——dispatch 层处理异步回路
+            return "__CONFIRM_NEEDED__"
 
         if mode == ChatMode.EDIT_AUTO:
             if not is_write:
-                return None  # 读工具放行
-            # 检查会话级已确认列表
+                return None
             confirmed = ctx.confirmed_tools
             if name in confirmed:
-                return None  # 已记住——放行
-            # 首次写操作——提示确认（后续迭代加 WebSocket 确认回路）
-            return (
-                f"Edit Automatically 模式——{name} 为写入操作，首次需要确认。"
-                "确认后将在此会话中自动放行同类操作。"
-            )
+                return None
+            return "__CONFIRM_NEEDED__"
 
-        return None  # 未知模式 → 默认放行
+        return None
 
     # ── Doom Loop 检测 ────────────────────────────────────
 

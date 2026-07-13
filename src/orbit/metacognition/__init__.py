@@ -19,25 +19,17 @@ from orbit.metacognition.classifier import AgentErrorCategory, ErrorClassifier
 from orbit.metacognition.hitl import HITLManager, HITLRequest, HITLResponse
 from orbit.metacognition.monitor import MonitorAgent
 from orbit.metacognition.triggers import (
-    Alert,
-    AlertType,
-    GoalDriftDetector,
-    LatencyWatchdog,
-    RepetitionDetector,
-    TriggerEngine,
+    Alert, AlertType, GoalDriftDetector,
+    LatencyWatchdog, RepetitionDetector, TriggerEngine,
 )
+# V15.2+Unknown: 盲区扫描（Fable 5 方法论）
+from orbit.metacognition.blindspot import BlindspotScanner, BlindspotReport
 
 __all__ = [
-    "MonitorAgent",
-    "TriggerEngine",
-    "GoalDriftDetector",
-    "RepetitionDetector",
-    "LatencyWatchdog",
-    "Alert",
-    "AlertType",
-    "ErrorClassifier",
-    "AgentErrorCategory",
-    "HITLManager",
-    "HITLRequest",
-    "HITLResponse",
+    "MonitorAgent", "TriggerEngine",
+    "GoalDriftDetector", "RepetitionDetector", "LatencyWatchdog",
+    "Alert", "AlertType",
+    "ErrorClassifier", "AgentErrorCategory",
+    "HITLManager", "HITLRequest", "HITLResponse",
+    "BlindspotScanner", "BlindspotReport",
 ]

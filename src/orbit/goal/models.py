@@ -64,6 +64,12 @@ class GoalSession(BaseModel):
     urgent: bool = Field(False, description="紧急任务——忽略高峰限制")
     target_provider: str = Field("", description="目标 LLM 厂商")
     max_price_multiplier: float = Field(0.0, ge=0.0, description="最高价格倍数，0=不限")
+    # V15.2+Unknown: 测验模式 + 盲区扫描（Fable 5 方法论）
+    quiz_passed: bool = Field(False, description="测验通过——全对方可 task_complete")
+    quiz_enabled: bool | None = Field(None, description="True 强制开启, False 关闭, None 自动")
+    quiz_history: list[dict] = Field(default_factory=list)
+    blindspot_skipped: bool = Field(False, description="用户跳过盲区扫描")
+    blindspot_report: dict | None = Field(None, description="盲区扫描报告缓存")
 
 
 class IntakeDecision(BaseModel):

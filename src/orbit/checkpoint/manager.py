@@ -31,6 +31,8 @@ class CheckpointData(BaseModel):
     retry_count: int = 0
     progress: float = Field(0.0, ge=0.0, le=1.0)
     context: dict[str, Any] = Field(default_factory=dict)
+    # V15.2+Unknown: 偏离日志（Fable 5 方法论）
+    deviation_log: list[dict[str, Any]] = Field(default_factory=list)
     updated_at: float = Field(default_factory=time.time)
     version: int = Field(1, ge=1)
 

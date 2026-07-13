@@ -320,6 +320,11 @@ class ToolRegistry:
             if not perm.check(agent_name, name, path=path, command=command):
                 return f"权限拒绝——{agent_name} 无权执行 {name}"
 
+        # ChatMode 四级门禁——在 PermissionEngine 之后，工具执行之前
+        chat_mode_gate = self._check_mode_gate(name, agent_name)
+        if chat_mode_gate is not None:
+            return chat_mode_gate
+
         # 新 API 优先
         entry = self._entries.get(name)
         if entry is not None:
@@ -411,6 +416,72 @@ class ToolRegistry:
                 safe.append(call)
 
         return safe, serial
+
+    # ── ChatMode 门禁 ────────────────────────────────────
+
+    def _is_write_tool(self, name: str) -> bool:
+        """判断工具是否为写操作——基于 ToolEntry.is_write 标记。
+
+        默认 True（安全默认）——未注册的工具一律视为写操作。
+        """
+        entry = self._entries.get(name)
+        if entry is not None:
+            return entry.is_write
+        # 旧 API 工具: 根据名称判断——shell/exe 类都是写
+        write_patterns = ("write", "edit", "delete", "create", "run", "exec",
+                          "bash", "shell", "move", "copy", "mkdir", "rm")
+        return any(p in name.lower() for p in write_patterns)
+
+    def _check_mode_gate(self, name: str, agent_name: str) -> str | None:
+        """ChatMode 四级门禁——检查当前模式是否允许此工具调用。
+
+        Returns:
+            None = 准入（放行）
+            str = 拒绝原因或确认请求
+
+        WHY 四级而非简单二元: Manual 每次确认、Edit 首次确认、
+        Plan 禁止写入、Auto 全放行——对标 Claude Code for VS Code。
+        """
+        try:
+            from orbit.core.context import get_context
+            from orbit.skills.models import ChatMode
+            ctx = get_context()
+        except ImportError:
+            return None  # 无上下文 → 默认放行
+
+        mode = ctx.chat_mode
+        is_write = self._is_write_tool(name)
+
+        if mode == ChatMode.AUTO:
+            return None  # 全自动——放行
+
+        if mode == ChatMode.PLAN:
+            if is_write:
+                return (
+                    f"Plan 模式不允许写操作。当前工具 {name} 为写入操作。"
+                    "切换到 Manual / Edit Automatically / Auto Mode 后可执行。"
+                )
+            return None  # 读工具放行
+
+        if mode == ChatMode.MANUAL:
+            # 每次都弹确认——Agent 需等待用户确认
+            # 实现在后续迭代中加 WebSocket 确认回路
+            return f"Manual 模式——{name} 需要用户确认后执行。当前版本需切换到 Auto Mode。"
+
+        if mode == ChatMode.EDIT_AUTO:
+            if not is_write:
+                return None  # 读工具放行
+            # 检查会话级已确认列表
+            confirmed = ctx.confirmed_tools
+            if name in confirmed:
+                return None  # 已记住——放行
+            # 首次写操作——提示确认（后续迭代加 WebSocket 确认回路）
+            return (
+                f"Edit Automatically 模式——{name} 为写入操作，首次需要确认。"
+                "确认后将在此会话中自动放行同类操作。"
+            )
+
+        return None  # 未知模式 → 默认放行
 
     # ── Doom Loop 检测 ────────────────────────────────────
 

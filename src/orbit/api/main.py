@@ -93,6 +93,7 @@ _ROUTE_SPEC: dict[str, tuple[str, str, str | None]] = {
     "wechat_routes":    ("orbit.api.routes.wechat_routes", "router", "API_V1_STR"),
     "health":           ("orbit.api.routes.health", "router", None),
     "app_routes":       ("orbit.api.routes.app_routes", "router", "API_V1_STR"),
+    "skills":           ("orbit.api.routes.skills", "router", "API_V1_STR"),
 }
 
 

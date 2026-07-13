@@ -46,7 +46,9 @@ function onSend(text: string) {
   if (!session.currentSessionId) return
   let ft = text
   if (shell.quoteTarget) { ft = `[quote agent> ${shell.quoteTarget.text.slice(0, 60)}...]\n${text}`; shell.setQuoteTarget(null) }
-  chat.send(ft, session.currentSessionId, session.currentProjectName || '')
+  // ChatMode: 从 InputBox 读取当前模式并传给后端
+  const mode = inputRef.value?.currentMode || 'Auto Mode'
+  chat.send(ft, session.currentSessionId, session.currentProjectName || '', mode)
   historyBuf.value.push(text); historyIdx.value = historyBuf.value.length
   scrollBottom()
 }

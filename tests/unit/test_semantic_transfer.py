@@ -43,3 +43,12 @@ class TestSemanticTransfer:
 
     def test_reference_context_empty(self):
         assert SemanticTransfer(MetaGraph(":memory:")).build_reference_context("x") == ""
+
+    def test_reference_context_limit(self):
+        """P3-2: verify 5-result cap when many equivalents exist."""
+        st = SemanticTransfer(MetaGraph(":memory:"))
+        for i in range(8):
+            st.link("ref/x", f"impl/{i}.py", "rust", "python", f"variant {i}")
+        ctx = st.build_reference_context("ref/x", "python")
+        assert "impl/" in ctx
+        assert ctx.count("impl/") <= 5

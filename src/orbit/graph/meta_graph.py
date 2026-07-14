@@ -233,6 +233,7 @@ class MetaGraph:
     # V15.3-P2: cross-language semantic equivalence (Fable 5)
 
     def find_equivalents(self, source_id: str, target_language: str | None = None) -> list[dict]:
+        # P3-1: source_id is internal graph node ID (not user input), LIKE is safe
         import json
         rows = self._get_conn().execute(
             "SELECT * FROM cross_graph_relations WHERE relation='SEMANTICALLY_EQUIVALENT_TO' AND source_id LIKE ?",

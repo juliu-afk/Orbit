@@ -135,7 +135,7 @@ class Sandbox:
         except CommandRejectedError:
             raise
         except Exception as e:
-            logger.debug("shell_safety_check_skipped", error=str(e)[:80])
+            logger.warning("shell_safety_check_skipped", error=str(e)[:80])
 
     def _build_mounts(
         self, host_script: Path, external_paths: list[str] | None = None

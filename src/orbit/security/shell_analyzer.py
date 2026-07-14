@@ -110,7 +110,7 @@ class ShellAnalyzer:
 
                 self._ts_available = True
             except ImportError:
-                logger.info("tree_sitter_bash_not_installed", fallback="heuristic")
+                logger.warning("tree_sitter_bash_not_installed", fallback="heuristic")
 
     def analyze(self, command: str) -> ShellAnalysis:
         """分析 shell 命令——返回安全判定。

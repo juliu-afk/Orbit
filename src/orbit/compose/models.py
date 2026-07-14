@@ -49,6 +49,11 @@ class Spec(BaseModel):
     tasks: list[Task] = Field(default_factory=list, description="子任务列表")
     language: str = Field("python", description="编程语言")
     constraints: list[str] = Field(default_factory=list, description="约束条件")
+    # V15.3+Unknown-P2: prototype-first strategy (Fable 5)
+    strategy: str = Field(
+        default="standard",
+        description="Execution strategy: standard | prototype_first",
+    )
 
 
 class Task(BaseModel):

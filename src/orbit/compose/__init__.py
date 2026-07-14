@@ -7,11 +7,11 @@
 from orbit.compose.models import Skill, Spec, Task
 from orbit.compose.orchestrator import ComposeOrchestrator
 from orbit.compose.parser import ComposeParser
+# V15.3+Unknown-P2: prototype-first strategy (Fable 5)
+from orbit.compose.prototype_first import PrototypeFirstGuide, PrototypeResult, Strategy
 
 __all__ = [
-    "ComposeOrchestrator",
-    "ComposeParser",
-    "Skill",
-    "Spec",
-    "Task",
+    "ComposeOrchestrator", "ComposeParser",
+    "Skill", "Spec", "Task",
+    "PrototypeFirstGuide", "PrototypeResult", "Strategy",
 ]

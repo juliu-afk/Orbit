@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.49.1] — 2026-07-14
+
+### Added
+- **WebSocket 确认回路** (#303): Manual/Edit 模式工具执行前弹确认，5s 超时默认拒绝，Edit 模式支持"本会话记住"。
+- **前端 ConfirmDialog** (#302): 工具确认弹窗 UI 组件。
+
+### Fixed
+- **vitest CI 修复** (#302): BootScreen mock ref getter + e2e 排除 + 4 组件 stub 补齐。
+- **审计闭环** (#307): ConfirmDialog import 断点 + `_CONFIRM_SIGNAL` 常量 + definitions 目录。
+- **LIKE 注入转义** (#309): `config_impact_trace` 防 SQL LIKE 模式注入。
+
 ## [v0.49.0] — 2026-07-14
 
 ### Added

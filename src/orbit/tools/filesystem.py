@@ -25,6 +25,10 @@ def _guard_path(path: str) -> Path:
 
     对标 OpenClaw wrapToolWorkspaceRootGuard():
     拒绝绝对路径越界、../ 穿透、符号链接逃逸。
+    V16.0 Phase C: .env 文件保护——拒绝读取/写入/编辑环境变量文件。
+    """
+    if Path(path).name in (".env", ".env.local", ".env.production", ".env.development"):
+        raise PermissionError(f"安全拒绝：禁止读取/写入环境变量文件 '{path}'")
 
     P1-1 (PR#133): 删除 allow_outside 参数——
     relative_to 是硬安全网，allow_outside 从未真正生效过。

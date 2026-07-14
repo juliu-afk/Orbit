@@ -412,6 +412,22 @@ class ToolRegistry:
             if not perm.check(agent_name, name, path=path, command=command):
                 return f"权限拒绝——{agent_name} 无权执行 {name}"
 
+        # V16.0 Phase C: 危险工具运行时确认
+        _REQUIRE_CONFIRM = {"exec_command", "write_file", "edit_file"}
+        if name in _REQUIRE_CONFIRM and agent_name:
+            try:
+                session_id = ""
+                try:
+                    from orbit.core.context import get_context
+                    session_id = get_context().session_id
+                except Exception:
+                    pass
+                approved, _ = await self._request_confirm(name, args, session_id, agent_name)
+                if not approved:
+                    return "用户拒绝了工具执行"
+            except Exception:
+                pass
+
         # ChatMode 四级门禁——在 PermissionEngine 之后，工具执行之前
         chat_mode_gate = self._check_mode_gate(name, agent_name)
         if chat_mode_gate is not None:

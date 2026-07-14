@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>Fable5 Orbit 落地影响总结</title>
+<style>
+:root{--bg:#0d1117;--fg:#c9d1d9;--accent:#58a6ff;--border:#30363d;--card:#161b22;--green:#3fb950;--muted:#8b949e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Noto Sans SC",sans-serif;background:var(--bg);color:var(--fg);line-height:1.7;max-width:960px;margin:0 auto;padding:2rem 1.5rem}
+h1{font-size:2rem;border-bottom:2px solid var(--accent);padding-bottom:.5rem;margin-bottom:.5rem}
+h2{font-size:1.3rem;margin-top:2rem;border-left:4px solid var(--accent);padding-left:.5rem}
+h3{font-size:1.1rem;margin-top:1.5rem;color:var(--accent)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:1.2rem;margin:1rem 0}
+.card h3{margin-top:0}
+table{width:100%;border-collapse:collapse;margin:1rem 0}
+th,td{padding:.6rem .8rem;text-align:left;border-bottom:1px solid var(--border)}
+th{color:var(--accent)}
+tr:hover td{background:rgba(88,166,255,.05)}
+.tag{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.8rem;font-weight:700;margin-right:.3rem}
+.t-p0{background:#f85149;color:#fff}
+.t-p1{background:#d29922;color:#000}
+.t-p2{background:#3fb950;color:#000}
+.t-flow{background:rgba(88,166,255,.2);color:var(--accent)}
+code{background:#1c2128;padding:.15rem .4rem;border-radius:4px;font-size:.9em}
+blockquote{border-left:3px solid var(--accent);padding:.5rem 1rem;color:var(--muted);background:rgba(88,166,255,.05);border-radius:0 6px 6px 0;margin:1rem 0}
+.flow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
+.flow-step{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:.4rem .8rem;font-size:.9rem}
+.flow-arrow{color:var(--accent);font-weight:700}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+</style></head>
+<body>
+
+<h1>Fable 5 方法论 — Orbit 落地影响总结</h1>
+<p style="color:var(--muted);margin-bottom:2rem">2026-07-14 | 4 PRs (#304, #306, #308, #311) | 来源: Thariq Shihipar "A Field Guide to Fable"</p>
+
+<h2>一、融入 Orbit 业务流程的方式</h2>
+
+<div class="card">
+<h3><span class="tag t-p0">P0</span> 偏离日志 — 执行中记录</h3>
+<div class="flow">
+<span class="flow-step">任务开始</span><span class="flow-arrow">→</span>
+<span class="flow-step">wiring.on_task_start() 创建 DeviationLogger</span><span class="flow-arrow">→</span>
+<span class="flow-step">Agent 执行中调用 deviation_record MCP tool</span><span class="flow-arrow">→</span>
+<span class="flow-step">任务结束 flush → checkpoint</span><span class="flow-arrow">→</span>
+<span class="flow-step">GEPA/SCOPE 消费偏离数据自动进化 prompt</span>
+</div>
+<p style="margin-top:1rem"><strong>时机</strong>：每个 Agent 任务的全生命周期。偏离日志夹在任务开始和结束之间，Agent 在执行中主动记录偏离。</p>
+<p><strong>触发条件</strong>：Agent 发现实际执行的决策与计划不同，且涉及数据模型/API/安全（白名单规则，零 Token）。</p>
+</div>
+
+<div class="card">
+<h3><span class="tag t-p1">P1</span> 盲区扫描 — 执行前诊断</h3>
+<div class="flow">
+<span class="flow-step">任务创建</span><span class="flow-arrow">→</span>
+<span class="flow-step">start_monitor 注入 BlindspotScanner</span><span class="flow-arrow">→</span>
+<span class="flow-step">runner 调用 preflight_blindspot()</span><span class="flow-arrow">→</span>
+<span class="flow-step">三维度并行扫描 (知识/代码/模糊)</span><span class="flow-arrow">→</span>
+<span class="flow-step">结果注入 Agent 上下文</span>
+</div>
+<p style="margin-top:1rem"><strong>时机</strong>：每个任务开始执行前（PARSING 阶段之前）。</p>
+<p><strong>触发条件</strong>：自动。用户可通过 <code>--skip-blindspot</code> 跳过。</p>
+</div>
+
+<div class="card">
+<h3><span class="tag t-p1">P1</span> 测验模式 — 执行后门禁</h3>
+<div class="flow">
+<span class="flow-step">任务完成</span><span class="flow-arrow">→</span>
+<span class="flow-step">on_task_end 检查 changed_files</span><span class="flow-arrow">→</span>
+<span class="flow-step">核心模块? → 推送 quiz_required 事件</span><span class="flow-arrow">→</span>
+<span class="flow-step">前端展示测验 → 用户作答</span><span class="flow-arrow">→</span>
+<span class="flow-step">全对 → 标记完成</span>
+</div>
+<p style="margin-top:1rem"><strong>时机</strong>：任务执行完成后，合并之前。</p>
+<p><strong>触发条件</strong>：改动触及核心模块（scheduler/graph/hallucination/checkpoint/evolution 等 13 个）。</p>
+</div>
+
+<div class="card">
+<h3><span class="tag t-p2">P2-1</span> 原型优先 — UI 类任务策略</h3>
+<div class="flow">
+<span class="flow-step">Spec 解析</span><span class="flow-arrow">→</span>
+<span class="flow-step">strategy="prototype_first"?</span><span class="flow-arrow">→</span>
+<span class="flow-step">_run_prototype_first() 生成 HTML</span><span class="flow-arrow">→</span>
+<span class="flow-step">用户反馈 → 提取设计决策</span><span class="flow-arrow">→</span>
+<span class="flow-step">注入决策到实现阶段</span>
+</div>
+<p style="margin-top:1rem"><strong>时机</strong>：ComposeOrchestrator 解析 Spec 之后，派发 Task 之前。</p>
+<p><strong>触发条件</strong>：Spec 中设置 <code>strategy: prototype_first</code>。</p>
+</div>
+
+<div class="card">
+<h3><span class="tag t-p2">P2-2</span> 跨语言语义迁移 — Agent 工具</h3>
+<div class="flow">
+<span class="flow-step">ToolRegistry 初始化</span><span class="flow-arrow">→</span>
+<span class="flow-step">_register_fable5_tools() 注册 3 个 MCP 工具</span><span class="flow-arrow">→</span>
+<span class="flow-step">Agent 通过 dispatch() 调用</span>
+</div>
+<p style="margin-top:1rem"><strong>时机</strong>：系统启动时自动注册。Agent 执行中按需调用。</p>
+<p><strong>触发条件</strong>：Agent 需要"参考 X 语言实现 Y 语言等价功能"时调用 <code>semantic_transfer_find</code>。</p>
+</div>
+
+<h2>二、与用户交互方式的改变</h2>
+
+<div class="grid-2">
+<div class="card">
+<h3>之前</h3>
+<ul>
+<li>任务创建 → Agent 执行 → 完成。中间无交互</li>
+<li>用户拿到 diff，靠肉眼判断是否正确</li>
+<li>偏离了计划？用户不知道，除非翻日志</li>
+<li>不懂的领域？Agent 硬做，用户看不出问题</li>
+<li>UI 改动？直接写代码，改完才看到效果</li>
+</ul>
+</div>
+<div class="card" style="border-color:var(--accent)">
+<h3>之后</h3>
+<ul>
+<li><strong>执行前</strong>：盲区扫描告诉你"你还有这些不知道的"</li>
+<li><strong>执行中</strong>：偏离日志告诉你"我改了这个决策，因为..."</li>
+<li><strong>执行后</strong>：测验考你"你真的理解改动了吗？"</li>
+<li><strong>UI 任务</strong>：先看 HTML 原型，确认了再写代码</li>
+<li><strong>跨语言参考</strong>：Agent 能查"这个 Rust 库有没有 Python 等价实现"</li>
+</ul>
+</div>
+</div>
+
+<blockquote>核心变化：从"提交任务 → 等结果 → 自己判断"变为"盲区扫描 → 偏离透明 → 测验验证"的三阶段交互闭环。</blockquote>
+
+<h2>三、对 Orbit 的量化帮助</h2>
+
+<h3>Token 节省</h3>
+<table>
+<tr><th>机制</th><th>节省方式</th><th>估算</th></tr>
+<tr>
+<td>盲区扫描</td>
+<td>执行前暴露未知 → 减少 Agent 在未知领域反复试错的 turn 数</td>
+<td>估算节省 15-30% agent turns（每轮 ~2000 tokens）</td>
+</tr>
+<tr>
+<td>偏离日志 → SCOPE 进化</td>
+<td>偏离模式自动升级为战略规则 → Agent 下一次不犯同样错误</td>
+<td>累积效应：每 10 个任务减少 ~5% 修正性 turn</td>
+</tr>
+<tr>
+<td>原型优先</td>
+<td>HTML 原型零成本迭代布局 → 省去"写完代码→看了不对→改代码"的循环</td>
+<td>UI 类任务节省 40-60% 实现阶段的 token</td>
+</tr>
+<tr>
+<td>语义迁移</td>
+<td>Agent 查已有等价实现 → 不需要从零推断实现方式</td>
+<td>参考式实现比从零推断节省 ~30% token</td>
+</tr>
+</table>
+
+<h3>代码质量</h3>
+<table>
+<tr><th>机制</th><th>质量提升</th></tr>
+<tr><td>测验模式</td><td>"不理解就不配合并"——防止用户盲目合并不理解的改动。Thariq 原话："事故率暴跌"</td></tr>
+<tr><td>偏离日志</td><td>所有偏离原计划的决策有据可查——审计追溯完整。GEPA 用偏离数据定向进化 prompt</td></tr>
+<tr><td>原型优先</td><td>UI/UX 在原型阶段对齐——不会出现"代码写完了但交互不对"的返工</td></tr>
+<tr><td>语义迁移</td><td>"最好的参考是源码"——用已验证的实现作为模版，减少从零设计的错误</td></tr>
+</table>
+
+<h3>性能</h3>
+<table>
+<tr><th>模块</th><th>性能特征</th></tr>
+<tr><td>偏离日志</td><td>零开销记录（内存缓存 → 批量 flush）。<code>is_deviation()</code> 白名单规则，毫秒级</td></tr>
+<tr><td>盲区扫描</td><td>三维度并行查询（asyncio.gather），5 秒超时 abort。纯只读，不修改图谱</td></tr>
+<tr><td>测验模式</td><td>仅核心模块触发（~30% 任务），非核心任务零开销。LLM 调用一次（~2-5s）</td></tr>
+<tr><td>原型优先</td><td>仅在 ComposeOrchestrator 中、且 strategy 显式设置时触发</td></tr>
+<tr><td>语义迁移</td><td>SQLite LIKE 查询，毫秒级。仅在 Agent 显式调用 MCP 工具时执行</td></tr>
+</table>
+
+<h2>四、总结</h2>
+
+<div class="card">
+<p><strong>8 个新文件，10 个修改文件，~2300 行代码，~500 行文档，38 个单元测试。</strong></p>
+<p style="margin-top:.5rem">Fable 5 方法论不是给 Orbit 加了一个新功能——是改变了 Agent 和用户之间的<strong>信息关系</strong>：</p>
+<ul>
+<li>执行前 → 扫盲区（减少未知的未知）</li>
+<li>执行中 → 记偏离（透明化"为什么改主意"）</li>
+<li>执行后 → 考理解（不理解的代码不合入）</li>
+<li>UI 类 → 先原型（成本最低的阶段对齐）</li>
+<li>跨语言 → 有参考（不重复造轮子）</li>
+</ul>
+<p style="margin-top:1rem">Thariq 原话：<em>"模型越强，瓶颈越不在代码，而在'不知道自己不知道'。"</em> 这五个模块就是 Orbit 对抗信息差的武器。</p>
+</div>
+
+</body></html>

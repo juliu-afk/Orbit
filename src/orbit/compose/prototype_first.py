@@ -137,7 +137,10 @@ class PrototypeFirstGuide:
             resp = await self._llm.generate(req, task_id="prototype_gen")
             html = resp.content.strip()
             if html.startswith("```"):
-                html = html.split("```html")[1].split("```")[0] if "```html" in html else html.split("```")[1].split("```")[0]
+                # P3-2 fix: guard against non-standard markdown fence formats
+                if html.startswith("```"):
+                    parts = html.split("```html") if "```html" in html else html.split("```")
+                    html = parts[1].split("```")[0] if len(parts) > 1 else html
             result.html = html
         except Exception:
             logger.error("prototype_llm_failed", exc_info=True)

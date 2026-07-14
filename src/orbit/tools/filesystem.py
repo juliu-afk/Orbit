@@ -248,3 +248,9 @@ registry.register_tool(
     handler=edit_file,
     concurrency="serial",
 )
+
+# V15.2: Domain Action 注册——三个文件操作为一个 "file" domain
+# Agent 调用: invoke("file", {"action": "read", "path": "..."})
+registry.register_domain("file", "read", read_file)
+registry.register_domain("file", "write", write_file)
+registry.register_domain("file", "edit", edit_file)

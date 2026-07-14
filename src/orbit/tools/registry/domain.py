@@ -32,6 +32,9 @@ class DomainActionRouter:
 
     WHY: 工具数增长后（Orbit 已 20+ MCP 工具），逐一列出
     消耗 context。Domain Action 将同领域操作收敛为一个 tool。
+
+    V15.2: filesystem 已迁移——read/write/edit → "file" domain
+    TODO(V15.3): graph + agent 域迁移
     """
 
     def __init__(self) -> None:

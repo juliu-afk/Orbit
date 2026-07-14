@@ -120,11 +120,51 @@ class ToolRegistry:
         self._pending_confirms: dict[str, tuple[object, dict]] = {}
         self._confirm_counter: int = 0
         self._register_fable5_tools()
+        self._register_grill_tools()
 
     def _register_fable5_tools(self) -> None:
         try:
             from orbit.tools.registry.fable5_tools import register_fable5_tools
             register_fable5_tools(self)
+        except Exception:
+            pass
+
+    def _register_grill_tools(self) -> None:
+        """V15.3 US2: 注册 Grilling + 上下文查询工具。"""
+        try:
+            from orbit.agents.grill import query_upstream, trace_upstream, request_human_clarification
+
+            for name, handler, desc in [
+                ("query_upstream", query_upstream, "向上游Agent查询信息——含完整上下文"),
+                ("trace_upstream", trace_upstream, "自动溯链上游直到找到答案"),
+                ("request_human_clarification", request_human_clarification, "全链无答案时请求人类协助"),
+            ]:
+                self.register_tool(
+                    name=name,
+                    toolset="grill",
+                    schema={
+                        "name": name,
+                        "description": desc,
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "question": {"type": "string", "description": "具体问题"},
+                                "background": {"type": "string", "description": "当前任务背景"},
+                                "location": {"type": "string", "description": "涉及文件/函数"},
+                                "root_cause": {"type": "string", "description": "根因分析"},
+                                "impact": {"type": "string", "description": "影响面"},
+                                "conflict_detection": {"type": "string", "description": "冲突检测+引用"},
+                                "candidates": {"type": "array", "items": {"type": "string"}},
+                                "constraints": {"type": "array", "items": {"type": "string"}},
+                                "target_agent": {"type": "string", "description": "指定上游Agent"},
+                            },
+                            "required": ["question", "background"],
+                        },
+                    },
+                    handler=handler,
+                    concurrency="safe",
+                )
+                # 对所有 Agent 角色可见——Grilling 是通用能力
         except Exception:
             pass
 

@@ -277,13 +277,29 @@ class PromptBuilder:
         return "\n".join(lines)
 
     def _build_context(self, ctx: dict[str, Any]) -> str:
-        """context 层——项目信息 + 技术栈."""
+        """context 层——项目信息 + 技术栈 + V15.3 跨Agent上下文."""
         project = ctx.get("project", "")
         tech_stack = ctx.get("tech_stack", "")
         code_context = ctx.get("code_context", "")
         env_info = ctx.get("env", {})
 
         parts = ["## 项目上下文"]
+
+        # V15.3 US2: user_goal + handoff_summary——防目标漂移
+        user_goal = ctx.get("user_goal", "")
+        handoff = ctx.get("handoff_summary", "")
+        if user_goal or handoff:
+            parts.append("### 任务上下文")
+            if user_goal:
+                parts.append(f"**用户目标**: {user_goal}")
+            if handoff:
+                parts.append(f"**交接摘要**: {handoff}")
+            parts.append("")
+
+        # V15.3 US1: conversation_history——仅入口Agent注入，下游不收
+        conv_hist = ctx.get("conversation_history", "")
+        if conv_hist and ctx.get("_inject_history"):
+            parts.append(conv_hist)
 
         if project:
             parts.append(f"**项目**: {project}")

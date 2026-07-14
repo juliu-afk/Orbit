@@ -584,7 +584,9 @@ class ChatterAgent(BaseAgent):
         has_dirs = bool(dir_explorations)
 
         if has_files or has_media or has_dirs:
-            parts = [input_data.task, "", "---"]
+            # WHY 从 history_block 开始而非 input_data.task：
+            # 否则对话历史会在文件/目录命中时被静默丢弃——用户第二轮之后每次都"失忆"
+            parts = [history_block + input_data.task, "", "---"]
 
             if files:
                 parts.append("📂 引用的文件内容：")

@@ -503,11 +503,14 @@ async def _handle_chat(
             if skill_confidence >= 0.7:
                 # 直接触发
                 logger.info("skill_auto_trigger", name=skill_name, confidence=skill_confidence)
+                reply_text = f"🔧 启动技能「{skill.description}」..."
                 await _send(ws, 0, {
                     "type": "chat",
-                    "reply": f"🔧 启动技能「{skill.description}」...",
+                    "reply": reply_text,
                     "agent_role": "Chatter",
                 })
+                if session_id:
+                    _session_registry.add_message(session_id=session_id, role="agent", content=reply_text)
                 await _execute_skill(ws, skill, text, session_id, chat_mode)
                 return
             elif skill_confidence >= 0.4:
@@ -528,11 +531,14 @@ async def _handle_chat(
     if intent == "chain" and chain_skills:
         # 多步编排 → ComposeOrchestrator
         logger.info("chain_trigger", skills=chain_skills)
+        reply_text = f"🔗 启动编排链: {' → '.join(chain_skills)}..."
         await _send(ws, 0, {
             "type": "chat",
-            "reply": f"🔗 启动编排链: {' → '.join(chain_skills)}...",
+            "reply": reply_text,
             "agent_role": "Chatter",
         })
+        if session_id:
+            _session_registry.add_message(session_id=session_id, role="agent", content=reply_text)
         await _execute_chain(ws, chain_skills, text, session_id, chat_mode)
         return
 
@@ -712,6 +718,7 @@ async def _handle_confirm(
 
             _sl.get_logger().warning("run_task_trigger_failed", task_id=task_id, error=str(e))
 
+        reply_text = f"已创建任务 {task_id}，进入开发流程。"
         await _send(
             ws,
             0,
@@ -719,9 +726,11 @@ async def _handle_confirm(
                 "type": "task_created",
                 "task_id": task_id,
                 "state": task_resp.state.value,
-                "message": "已创建任务，进入开发流程",
+                "message": reply_text,
             },
         )
+        if session_id:
+            _session_registry.add_message(session_id=session_id, role="agent", content=reply_text)
     except Exception as e:
         await _send(ws, 1, None, f"创建任务失败: {e}")
 

@@ -116,9 +116,17 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
         self._tool_registry = tool_registry
         self._edit_detector = EditStabilityDetector()
 
-    async def run_task(self, task_id: str, prd: str) -> TaskState:
-        """入口——从 IDLE 开始执行完整任务管线."""
+    async def run_task(self, task_id: str, prd: str, **kwargs) -> TaskState:
+        """入口——从 IDLE 开始执行完整任务管线。
+
+        V15.3 kwargs: session_id, user_goal, handoff_summary, conversation_history
+        ——从 chat 交接注入跨 Agent 上下文（US2）。
+        """
         context: dict[str, Any] = {"prd": prd}
+        # V15.3 US2: 跨 Agent 上下文字段
+        for key in ("session_id", "user_goal", "handoff_summary", "conversation_history"):
+            if key in kwargs:
+                context[key] = kwargs[key]
         state = TaskState.IDLE
 
         # 复杂度评分——决定 fast_lane

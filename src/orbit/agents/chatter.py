@@ -276,67 +276,8 @@ def _extract_media_refs(text: str) -> dict[str, list[str]]:
     return result
 
 
-# ── 对话历史构建（token 预算驱动） ──────────────────────
-
-# 对话历史的 token 预算：留足够空间给系统提示 + 文件内容 + 回复
-# 业界标准：历史不应超过上下文窗口的 30-40%，其余留给推理和工具输出
-_CHAT_HISTORY_TOKEN_BUDGET = 8_000   # 8K tokens——够 50-200 条中文短消息
-_CHAT_HISTORY_HARD_CAP = 200          # 安全网：极端情况下的兜底上限
-_CHAT_HISTORY_MSG_TRUNC = 600         # 单条消息截断字符数
-
-
-def _build_history_block(history: list[dict[str, str]]) -> str:
-    """从对话历史构建注入 prompt 的文本块——token 预算驱动。
-
-    策略（业界标准三步）：
-    1. 从最新→最旧累加 token，在预算内保留尽可能多的完整消息
-    2. 超出预算的旧消息标记"已省略"，不静默丢弃
-    3. 单条超长消息截断但保留，不整条删除
-
-    WHY: 不是拍脑袋的 10 条——是 token 预算驱动。
-    短消息几十条全保留，长消息按 token 截断。
-    """
-    if not history:
-        return ""
-
-    from orbit.compression.token_counter import count_tokens
-
-    OVERHEAD_PER_MSG = 15  # **角色:** + 换行等的额外 token
-    OMITTED_MSG = "（…更早的对话已省略…）"
-
-    # 从最新→最旧收集消息，直到 token 预算耗尽
-    kept: list[str] = []
-    token_used = count_tokens(OMITTED_MSG) + 20  # 预留给可能出现的省略标记
-
-    for h in reversed(history[-_CHAT_HISTORY_HARD_CAP:]):
-        role_label = "用户" if h.get("role") == "user" else "Orbit"
-        content = str(h.get("content", ""))
-        # 单条截断——长消息保留开头，标注截断
-        if len(content) > _CHAT_HISTORY_MSG_TRUNC:
-            content = content[:_CHAT_HISTORY_MSG_TRUNC] + "…（已截断）"
-        line = f"**{role_label}:** {content}"
-        line_tokens = count_tokens(line) + OVERHEAD_PER_MSG
-
-        if token_used + line_tokens > _CHAT_HISTORY_TOKEN_BUDGET:
-            # 预算不够——标记省略并停止
-            if not kept:
-                # 连第一条都放不下——至少保留截断版本
-                kept.append(line)
-            break
-
-        kept.append(line)
-        token_used += line_tokens
-
-    # 最新消息在前——反转回时间顺序
-    kept.reverse()
-
-    # 如果截断了旧消息，开头加省略标记
-    n_total = min(len(history), _CHAT_HISTORY_HARD_CAP)
-    if len(kept) < n_total:
-        kept.insert(0, OMITTED_MSG)
-
-    block = "## 对话历史\n\n" + "\n".join(kept) + "\n\n---\n\n"
-    return block
+# _build_history_block + 常量已提取到 orbit.agents.context_util——全 Agent 统一使用
+from orbit.agents.context_util import _build_history_block  # noqa: F401
 
 
 CHATTER_SYSTEM_PROMPT = """你是 Orbit 的通用对话助手（ChatterAgent）。你是用户接触 Orbit 的第一个 Agent。
@@ -615,7 +556,7 @@ class ChatterAgent(BaseAgent):
             if history_block:
                 logger.debug(
                     "chatter_history_injected",
-                    messages=min(len(history), _CHAT_HISTORY_HARD_CAP),
+                    messages=min(len(history), 200),
                 )
 
         # ── 文件路径检测 + 自动读取（代码+多媒体+目录） ──

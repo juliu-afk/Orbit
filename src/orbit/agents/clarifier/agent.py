@@ -189,10 +189,8 @@ class ClarifierAgent(BaseAgent):
             )
 
         if history:
-            hist_text = "\n".join(
-                f"  {m.get('role','user')}: {m.get('content','')}"
-                for m in history[-20:]  # 最近 10 轮 = 20 条消息
-            )
+            from orbit.agents.context_util import _build_history_block
+            hist_text = _build_history_block(history)
             parts.append(f"【对话历史】\n{hist_text}")
 
         if confirmed:

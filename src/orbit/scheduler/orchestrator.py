@@ -108,10 +108,10 @@ class Scheduler:
             fail_fast=fail_fast,
         )
 
-    async def run_task(self, task_id: str, prd: str) -> TaskState:
-        return await self._task_runner.run_task(task_id, prd)
+    async def run_task(self, task_id: str, prd: str, **kwargs) -> TaskState:
+        return await self._task_runner.run_task(task_id, prd, **kwargs)
 
-    def spawn_task(self, task_id: str, prd: str) -> asyncio.Task:
+    def spawn_task(self, task_id: str, prd: str, **kwargs) -> asyncio.Task:
         """后台启动任务并登记到注册表，返回 asyncio.Task 供追踪/取消。
 
         PR3: 替代裸 asyncio.create_task(run_task)——让运行中任务可按 task_id 取消。
@@ -121,7 +121,7 @@ class Scheduler:
         existing = self._active_tasks.get(task_id)
         if existing is not None and not existing.done():
             return existing
-        task = asyncio.create_task(self.run_task(task_id, prd))
+        task = asyncio.create_task(self.run_task(task_id, prd, **kwargs))
         self._active_tasks[task_id] = task
         task.add_done_callback(
             lambda t: self._active_tasks.pop(task_id, None) if self._active_tasks.get(task_id) is t else None

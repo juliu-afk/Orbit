@@ -337,6 +337,43 @@ async def _handle_parse_command(ws: WebSocket, text: str) -> None:
         await _send(ws, 1, None, f"文档解析失败: {e}")
 
 
+async def _handle_compact_command(ws: WebSocket, text: str) -> None:
+    """/compact [可选提示]——手动触发上下文压缩。"""
+    guidance = text[9:].strip()  # "/compact " 之后的文本
+    await _send(ws, 0, {"type": "chat", "reply": "正在压缩上下文…", "agent_role": "System"})
+
+    try:
+        msgs = _session_registry.get_messages(
+            ws.query_params.get("session_id", ""), limit=500
+        ) if ws.query_params.get("session_id") else []
+        if not msgs:
+            await _send(ws, 0, {"type": "chat", "reply": "当前无对话历史可压缩。", "agent_role": "System"})
+            return
+
+        from orbit.compression.compressor import ContextCompressor
+        from orbit.compression.models import CompressionAction
+
+        compressor = ContextCompressor()
+        messages = [{"role": m.role, "content": m.content} for m in msgs]
+        result = await compressor.compress(messages, task_id="compact_manual")
+
+        summary = ""
+        for m in result.compressed_messages if hasattr(result, "compressed_messages") else messages:
+            if m.get("role") == "system" and "上下文压缩" in str(m.get("content", "")):
+                summary = str(m.get("content", ""))
+                break
+
+        reply = f"上下文压缩完成。\n原始: {result.original_tokens} tokens → 压缩后: {result.compressed_tokens} tokens"
+        if guidance:
+            reply += f"\n提示: {guidance}"
+        if summary:
+            reply += f"\n\n{summary[:1000]}"
+        await _send(ws, 0, {"type": "chat", "reply": reply, "agent_role": "System"})
+    except Exception as e:
+        logger.warning("compact_command_failed", error=str(e))
+        await _send(ws, 1, None, f"压缩失败: {e}")
+
+
 async def _handle_chat(
     ws: WebSocket,
     text: str,
@@ -378,6 +415,9 @@ async def _handle_chat(
             return
         if text.strip().startswith("/parse"):
             await _handle_parse_command(ws, text.strip())
+            return
+        if text.strip().startswith("/compact"):
+            await _handle_compact_command(ws, text.strip())
             return
 
         # NEW: SkillRegistry 动态匹配——新增 Skill 无需改此处代码
@@ -625,9 +665,47 @@ async def _handle_confirm(
             _scheduler, prd_text[:5000], session_id=session_id or "", project_name=project_name or ""
         )
 
+        # V15.3 US2: 生成交接摘要 + 提取 user_goal
+        user_goal = prd.goal if hasattr(prd, "goal") else ""
+        handoff_summary = ""
+        try:
+            msgs = _session_registry.get_messages(session_id, limit=100) if session_id else []
+            if msgs:
+                from orbit.agents.context_util import _build_history_block
+                history_block = _build_history_block([
+                    {"role": m.role, "content": m.content} for m in msgs
+                ])
+                # T2 模型生成交接摘要
+                from orbit.compression.compressor import ContextCompressor, SUMMARY_PROMPT_CHAT
+                from orbit.gateway.schemas import LLMRequest
+                from orbit.integration.wiring import get_wiring
+                wiring = get_wiring()
+                if wiring:
+                    llm = wiring._get_llm_client()
+                    if llm:
+                        summary_prompt = SUMMARY_PROMPT_CHAT.format(
+                            conversation=history_block[:4000]
+                        )
+                        req = LLMRequest(
+                            prompt=summary_prompt,
+                            system_prompt="你是一个交接摘要助手。",
+                            temperature=0.3,
+                            max_tokens=500,
+                        )
+                        resp = await llm.generate(req, task_id=task_id)
+                        handoff_summary = (resp.content or "")[:500]
+        except Exception:
+            pass  # fail-open: 摘要失败不阻塞任务创建
+
         try:
             if _scheduler is not None:
-                _scheduler.spawn_task(task_id, prd_text[:5000])
+                _scheduler.spawn_task(
+                    task_id, prd_text[:5000],
+                    session_id=session_id or "",
+                    user_goal=user_goal,
+                    handoff_summary=handoff_summary,
+                    conversation_history=history_block if history_block else "",
+                )
         except Exception as e:
             import structlog as _sl
 

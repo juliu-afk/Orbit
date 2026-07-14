@@ -77,13 +77,31 @@ class CompressionPipeline:
         )
         return messages, self._bytes_removed
 
-    # ── Layer 1: Output Truncation ─────────────────────
+    # ── Layer 1: Output Truncation (工具类型适配) ──────
+
+    # 工具名 → 截断策略映射。未列出的工具使用 default 策略。
+    _TOOL_TRUNC_STRATEGIES: dict[str, str] = {
+        "grep": "grep",
+        "read_file": "read_file",
+        "exec_command": "exec_command",
+        "glob": "passthrough",
+        "ls": "passthrough",
+        "list_files": "passthrough",
+    }
 
     @staticmethod
     def _layer1_truncate(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """截断超长的工具输出——>10K chars → head+tail.
+        """截断超长的工具输出——按工具类型选择策略。
 
-        对标 AC6b: Tool output truncation.
+        WHY 按工具适配: 头尾一刀切对 grep（匹配散落全文）和 pytest（FAILED在中间）
+        会丢失关键信息。不同工具的输出结构不同，截断策略应区别对待。
+
+        策略:
+          grep        → 保留匹配行 Top-50（按行号排序），去重
+          read_file   → 保留 import + 函数/类签名 + docstring（AST提取），去body
+          exec_command → 保留 exit code + stderr + stdout 最后 2K chars
+          glob/ls     → 保留全部（文件列表极少超 10K）
+          default     → head+tail 5K+5K（保持现有）
         """
         MAX_CHARS = 10000
         result: list[dict[str, Any]] = []
@@ -92,18 +110,126 @@ class CompressionPipeline:
                 result.append(msg)
                 continue
             content = msg.get("content", "")
-            if isinstance(content, str) and len(content) > MAX_CHARS:
-                half = MAX_CHARS // 2
-                msg = {
+            if not isinstance(content, str) or len(content) <= MAX_CHARS:
+                result.append(msg)
+                continue
+
+            tool_name = msg.get("name", "") or msg.get("tool_name", "")
+            strategy = CompressionPipeline._TOOL_TRUNC_STRATEGIES.get(
+                tool_name, "default"
+            )
+
+            if strategy == "passthrough":
+                result.append(msg)
+            elif strategy == "grep":
+                result.append(CompressionPipeline._truncate_grep(msg, content))
+            elif strategy == "read_file":
+                result.append(CompressionPipeline._truncate_read_file(msg, content))
+            elif strategy == "exec_command":
+                result.append(CompressionPipeline._truncate_exec_command(msg, content))
+            else:
+                result.append(CompressionPipeline._truncate_default(msg, content))
+
+        return result
+
+    # ── 各工具截断策略 ─────────────────────────────────
+
+    @staticmethod
+    def _truncate_grep(msg: dict[str, Any], content: str) -> dict[str, Any]:
+        """grep: 保留匹配行 Top-50，去重，按行号排序。"""
+        lines = content.split("\n")
+        match_lines = [ln for ln in lines if ":" in ln and not ln.startswith("--")]
+        if len(match_lines) <= 50:
+            return msg
+        # 保留前 25 + 后 25 条匹配（覆盖面最广）
+        kept = match_lines[:25] + match_lines[-25:]
+        deduped = list(dict.fromkeys(kept))  # 保序去重
+        skipped = len(match_lines) - len(deduped)
+        return {
+            **msg,
+            "content": (
+                "\n".join(deduped)
+                + f"\n\n... [grep: 截断 {skipped} 条匹配，保留 Top-50] ..."
+            ),
+        }
+
+    @staticmethod
+    def _truncate_read_file(msg: dict[str, Any], content: str) -> dict[str, Any]:
+        """read_file: 保留 import + 函数/类签名 + docstring，去 body。
+
+        WHY AST: 函数体通常最大但信息密度最低——签名+docstring 足够 Agent 理解接口。
+        """
+        try:
+            import ast
+            tree = ast.parse(content)
+            kept_lines: list[str] = []
+            for node in ast.iter_child_nodes(tree):
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    kept_lines.append(ast.get_source_segment(content, node) or "")
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    sig = ast.get_source_segment(content, node)
+                    if sig:
+                        # 取签名第一行 + docstring（如有）
+                        sig_lines = sig.split("\n")
+                        header = sig_lines[0]
+                        doc = ast.get_docstring(node)
+                        if doc:
+                            kept_lines.append(f"{header}  # {doc[:120]}")
+                        else:
+                            kept_lines.append(header)
+            if kept_lines:
+                return {
                     **msg,
                     "content": (
-                        content[:half]
-                        + f"\n\n... [截断 {len(content) - MAX_CHARS} 字符] ...\n\n"
-                        + content[-half:]
+                        "\n".join(kept_lines[:80])
+                        + f"\n\n... [read_file: AST 提取签名，省略 {len(content)} 字符 body] ..."
                     ),
                 }
-            result.append(msg)
-        return result
+        except SyntaxError:
+            pass
+        return CompressionPipeline._truncate_default(msg, content)
+
+    @staticmethod
+    def _truncate_exec_command(msg: dict[str, Any], content: str) -> dict[str, Any]:
+        """exec_command: 保留 exit code + stderr + stdout 最后 2K chars。
+
+        WHY 最后 2K: 命令输出末尾通常包含结果/错误摘要，比头部更有价值。
+        """
+        lines = content.split("\n")
+        # 检测 pytest/test 输出——保留 FAILED/ERROR 行 + 摘要
+        fail_lines = [
+            ln for ln in lines
+            if any(kw in ln for kw in ("FAILED", "ERROR", "FAIL:", "Error:", "assert"))
+        ]
+        tail = "\n".join(lines[-50:])  # 最后 50 行
+        result_parts = []
+        if fail_lines:
+            result_parts.append("--- 失败用例 ---")
+            result_parts.extend(fail_lines[:20])
+            result_parts.append("")
+        result_parts.append("--- 尾部输出 ---")
+        result_parts.append(tail[-2000:])
+        return {
+            **msg,
+            "content": (
+                "\n".join(result_parts)
+                + f"\n\n... [exec_command: 截断 {len(content)} 字符输出] ..."
+            ),
+        }
+
+    @staticmethod
+    def _truncate_default(msg: dict[str, Any], content: str) -> dict[str, Any]:
+        """默认策略: head+tail 5K+5K（保持现有行为）。"""
+        MAX_CHARS = 10000
+        half = MAX_CHARS // 2
+        return {
+            **msg,
+            "content": (
+                content[:half]
+                + f"\n\n... [截断 {len(content) - MAX_CHARS} 字符] ...\n\n"
+                + content[-half:]
+            ),
+        }
 
     # ── Layer 2: Message Pruning ───────────────────────
 

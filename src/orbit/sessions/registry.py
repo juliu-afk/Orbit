@@ -93,6 +93,38 @@ class SessionRegistry:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(session_id, created_at)"
         )
+        # V15.3: session_summaries — 跨 session 长期记忆（US4）
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS session_summaries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL,
+                summary_text TEXT NOT NULL,
+                key_points TEXT NOT NULL DEFAULT '[]',
+                created_at REAL NOT NULL,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_summaries_session ON session_summaries(session_id)"
+        )
+        # V15.3: grill_log — Grilling 反馈数据（US7）
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS grill_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id TEXT NOT NULL,
+                asking_agent TEXT NOT NULL,
+                answering_agent TEXT NOT NULL,
+                question_hash TEXT NOT NULL,
+                question_json TEXT NOT NULL,
+                answer_text TEXT NOT NULL DEFAULT '',
+                created_at REAL NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_grill_task ON grill_log(task_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_grill_hash ON grill_log(question_hash)")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_grill_dedup ON grill_log(task_id, question_hash)"
+        )
         conn.commit()
 
     # ── Session CRUD ───────────────────────────────────

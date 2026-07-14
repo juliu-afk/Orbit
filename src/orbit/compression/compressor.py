@@ -37,8 +37,8 @@ def _get_summary_model() -> str:
         return "openai/glm-4.7-flash"
 
 
-# 摘要 prompt——保留关键信息
-SUMMARY_PROMPT = (
+# 摘要 prompt——保留关键信息（代码任务用）
+SUMMARY_PROMPT_CODE = (
     "将以下 Agent 对话历史压缩为一段结构化摘要。保留：\n"
     "1. 已做出的决策和理由\n"
     "2. 修改的文件名和行号\n"
@@ -47,6 +47,21 @@ SUMMARY_PROMPT = (
     "压缩后不超过 500 字符。\n\n"
     "对话历史：\n{conversation}"
 )
+
+# 对话场景摘要 prompt（Chatter/Clarifier 用）
+SUMMARY_PROMPT_CHAT = (
+    "将以下对话历史压缩为一段结构化摘要。保留：\n"
+    "1. 用户偏好和习惯（技术栈、编码风格、沟通偏好）\n"
+    "2. 关键决策和选择理由\n"
+    "3. 引用的文件路径和项目上下文\n"
+    "4. 待确认的问题和未解决的模糊点\n"
+    "5. 重要的上下文线索（用户角色、项目背景、约束条件）\n"
+    "压缩后不超过 500 字符。\n\n"
+    "对话历史：\n{conversation}"
+)
+
+# 向后兼容别名
+SUMMARY_PROMPT = SUMMARY_PROMPT_CODE
 
 
 class ContextCompressor:
@@ -146,10 +161,12 @@ class ContextCompressor:
         messages: list[dict[str, Any]],
         task_id: str,
         keep_last_n_turns: int = 3,
+        agent_role: str = "",  # 用于选择对话/代码 prompt
     ) -> list[dict[str, Any]]:
         """使用廉价 LLM 摘要旧轮次——仅保留最后 N 轮完整。
 
         WHY 保留最后 3 轮: LLM 需要最近的上下文才能连贯思考。
+        agent_role ∈ {chatter, clarifier} → 对话 prompt；其他 → 代码 prompt。
         """
         if not self._llm:
             return messages
@@ -189,7 +206,10 @@ class ContextCompressor:
             for m in old_messages
             if m.get("content")
         )
-        summary_prompt = SUMMARY_PROMPT.format(conversation=conversation_text)
+        # 场景自动识别：Chatter/Clarifier → 对话 prompt；其他 → 代码 prompt
+        is_chat = agent_role.lower() in ("chatter", "clarifier")
+        prompt_template = SUMMARY_PROMPT_CHAT if is_chat else SUMMARY_PROMPT_CODE
+        summary_prompt = prompt_template.format(conversation=conversation_text)
 
         try:
             from orbit.gateway.schemas import LLMRequest

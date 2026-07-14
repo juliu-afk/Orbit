@@ -27,6 +27,16 @@ def _decide_test_scope(affected_files: dict) -> str:
     return "unit_integration_e2e"
 
 
+# V15.3 US2: TaskContext 新增跨 Agent 上下文字段
+# 这些字段在 spawn_task 时注入，通过检查点持久化
+_TASK_CTX_NEW_FIELDS = {
+    "conversation_history": "",    # _build_history_block() 输出
+    "handoff_summary": "",         # 交接摘要（T2 模型生成，≤500 tokens）
+    "session_id": "",              # 来源 session（跨 session 检索用）
+    "user_goal": "",               # 用户原始目标（防漂移）
+}
+
+
 class TaskContextMixin:
     async def _run_scoping(self, task_id: str, context: dict[str, Any]) -> str:
         """SCOPING 状态——确定性变更范围分析 (Phase 2 Token节省).

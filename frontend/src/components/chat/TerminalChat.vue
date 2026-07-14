@@ -11,6 +11,7 @@ import QuoteChip from '@/components/chat/QuoteChip.vue'
 import ContextMenu from '@/components/chat/ContextMenu.vue'
 import ChatSessionTabs from '@/components/chat/ChatSessionTabs.vue'
 import SkeletonPanel from '@/components/common/SkeletonPanel.vue'  // UX-6
+import ConfirmDialog from '@/components/chat/ConfirmDialog.vue'
 
 const chat = useChatStore()
 const session = useSessionStore()

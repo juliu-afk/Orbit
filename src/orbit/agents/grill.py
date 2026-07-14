@@ -80,6 +80,7 @@ async def query_upstream(params: dict) -> dict:
     qh = hashlib.md5(grill.question.encode()).hexdigest()
     try:
         from orbit.sessions.registry import SessionRegistry
+
         registry = SessionRegistry()
         conn = registry._get_conn()
         row = conn.execute(
@@ -97,6 +98,7 @@ async def query_upstream(params: dict) -> dict:
 
     try:
         from orbit.integration.wiring import get_wiring
+
         wiring = get_wiring()
         if wiring:
             # 尝试从工件中检索
@@ -165,6 +167,7 @@ async def request_human_clarification(params: dict) -> dict:
     # 检查 HITL 配额
     try:
         from orbit.sessions.registry import SessionRegistry
+
         registry = SessionRegistry()
         conn = registry._get_conn()
         row = conn.execute(
@@ -181,10 +184,7 @@ async def request_human_clarification(params: dict) -> dict:
         pass
 
     # 构建人类可读的请求
-    question_text = (
-        f"**问题**：{grill.question}\n\n"
-        f"**背景**：{grill.background}\n"
-    )
+    question_text = f"**问题**：{grill.question}\n\n" f"**背景**：{grill.background}\n"
     if grill.conflict_detection:
         question_text += f"**⚠️ 冲突/模糊**：{grill.conflict_detection}\n"
     if grill.candidates:
@@ -195,6 +195,7 @@ async def request_human_clarification(params: dict) -> dict:
     # 通过 HITLManager 推送给用户
     try:
         from orbit.metacognition.hitl import HITLManager
+
         hitl = HITLManager()
         hitl.request_clarification(task_id=task_id, question=question_text)
     except Exception as e:

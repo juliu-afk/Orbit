@@ -163,7 +163,8 @@ class ClarifierAgent(BaseAgent):
                 question_strategy=self._question_strategy,
                 max_questions=(
                     self._mode.behavior.max_questions_per_branch
-                    if self._mode is not None and hasattr(self._mode, "behavior") else None
+                    if self._mode is not None and hasattr(self._mode, "behavior")
+                    else None
                 ),
             )
             if "reply" in parsed:
@@ -190,6 +191,7 @@ class ClarifierAgent(BaseAgent):
 
         if history:
             from orbit.agents.context_util import _build_history_block
+
             hist_text = _build_history_block(history)
             parts.append(f"【对话历史】\n{hist_text}")
 
@@ -293,9 +295,7 @@ class ClarifierAgent(BaseAgent):
             mode_rules.append("不给推荐答案——让用户完全自由回答。")
 
         if self._codebase_first:
-            mode_rules.append(
-                "先查代码再问用户。不要问用户能从代码中直接读取的问题。"
-            )
+            mode_rules.append("先查代码再问用户。不要问用户能从代码中直接读取的问题。")
 
         if mode_rules:
             return base + "\n\n" + "\n".join(mode_rules)

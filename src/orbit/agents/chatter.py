@@ -28,9 +28,9 @@ logger = structlog.get_logger("orbit.agents.chatter")
 
 # 常见代码文件扩展名
 _CODE_EXT_RE = _re.compile(
-    r'\.(?:py|tsx?|jsx?|vue|html?|css|scss|less|md|json|ya?ml|toml|cfg|ini|'
-    r'txt|log|sql|sh|bash|ps1|rs|go|java|c|cpp|h|hpp|env\.[a-z]+|'
-    r'git[a-z]*|docker[a-z]*)$',
+    r"\.(?:py|tsx?|jsx?|vue|html?|css|scss|less|md|json|ya?ml|toml|cfg|ini|"
+    r"txt|log|sql|sh|bash|ps1|rs|go|java|c|cpp|h|hpp|env\.[a-z]+|"
+    r"git[a-z]*|docker[a-z]*)$",
     _re.IGNORECASE,
 )
 
@@ -42,21 +42,21 @@ _VIDEO_EXTS = {".mp4", ".mov", ".avi", ".webm", ".mkv", ".flv", ".wmv"}
 # 视频 URL 模式——常见视频平台 + 直链视频文件
 # P2-1 (PR#297): 覆盖主流平台 + 直链 .mp4/.mov/.webm/.mkv
 _VIDEO_URL_RE = _re.compile(
-    r'https?://(?:www\.)?(?:'
-    r'youtube\.com/watch\?v=|youtu\.be/|'          # YouTube
-    r'bilibili\.com/video/|'                        # B站
-    r'vimeo\.com/|'                                 # Vimeo
-    r'dailymotion\.com/video/|'                     # Dailymotion
-    r'twitch\.tv/videos/|'                          # Twitch
-    r'tiktok\.com/@[\w.\-]+/video/|'                # TikTok
-    r'(?:x\.com|twitter\.com)/\w+/status/'          # X/Twitter 视频帖
-    r')[\w\-]+',
+    r"https?://(?:www\.)?(?:"
+    r"youtube\.com/watch\?v=|youtu\.be/|"  # YouTube
+    r"bilibili\.com/video/|"  # B站
+    r"vimeo\.com/|"  # Vimeo
+    r"dailymotion\.com/video/|"  # Dailymotion
+    r"twitch\.tv/videos/|"  # Twitch
+    r"tiktok\.com/@[\w.\-]+/video/|"  # TikTok
+    r"(?:x\.com|twitter\.com)/\w+/status/"  # X/Twitter 视频帖
+    r")[\w\-]+",
     _re.IGNORECASE,
 )
 
 # 直链视频文件 URL（.mp4/.mov/.webm/.mkv 等）
 _VIDEO_FILE_URL_RE = _re.compile(
-    r'https?://\S+\.(?:mp4|mov|webm|mkv|flv|avi|wmv)(?:\?\S*)?(?:#\S*)?',
+    r"https?://\S+\.(?:mp4|mov|webm|mkv|flv|avi|wmv)(?:\?\S*)?(?:#\S*)?",
     _re.IGNORECASE,
 )
 
@@ -84,13 +84,13 @@ def _is_media_file(s: str) -> bool:
 def _clean_path(raw: str) -> str | None:
     """清理路径字符串——去行号后缀、空白、URL 过滤。"""
     # 去行号后缀: :42, :42-51, #L42, #L42-L51
-    cleaned = _re.sub(r'[#:]\d+(?:-\d+)?$', '', raw)
-    cleaned = _re.sub(r'#L\d+(?:-L?\d+)?$', '', cleaned)
+    cleaned = _re.sub(r"[#:]\d+(?:-\d+)?$", "", raw)
+    cleaned = _re.sub(r"#L\d+(?:-L?\d+)?$", "", cleaned)
     cleaned = cleaned.strip()
     if not cleaned:
         return None
     # URL / 纯数字 不算路径
-    if cleaned.startswith(('http://', 'https://')):
+    if cleaned.startswith(("http://", "https://")):
         return None
     if cleaned.isdigit():
         return None
@@ -99,19 +99,19 @@ def _clean_path(raw: str) -> str | None:
 
 def _looks_like_code_file(s: str) -> bool:
     """判断字符串是否像代码文件路径——有分隔符 + 已知扩展名。"""
-    return bool(_CODE_EXT_RE.search(s)) and ('/' in s or '\\' in s)
+    return bool(_CODE_EXT_RE.search(s)) and ("/" in s or "\\" in s)
 
 
 def _looks_like_directory(s: str) -> bool:
     """判断字符串是否像目录路径——有分隔符，且不像代码文件。"""
-    has_sep = '/' in s or '\\' in s
+    has_sep = "/" in s or "\\" in s
     if not has_sep:
         return False
     # 有代码扩展名 → 是文件路径，不是目录
     if _CODE_EXT_RE.search(s):
         return False
     # 纯数字/URL 不算
-    if s.isdigit() or s.startswith(('http://', 'https://')):
+    if s.isdigit() or s.startswith(("http://", "https://")):
         return False
     return True
 
@@ -129,7 +129,7 @@ def _extract_file_paths(text: str) -> list[tuple[str, str]]:
     # 层1: 反引号包裹——用户明确想引用文件
     # WHY: 反引号内放宽要求——有代码扩展名即可，不强制路径分隔符
     # 用户可能写 `main.py` 而非 `src/main.py`
-    for m in _re.finditer(r'`([^`]+)`', text):
+    for m in _re.finditer(r"`([^`]+)`", text):
         raw = m.group(1).strip()
         clean = _clean_path(raw)
         if clean and clean not in seen:
@@ -140,11 +140,7 @@ def _extract_file_paths(text: str) -> list[tuple[str, str]]:
 
     # 层2: 裸路径——仅在无反引号匹配时启用，降低误匹配
     if not found:
-        bare_re = (
-            r'(?:^|[\s(])'
-            r'((?:\w+[/\\])+[\w./\\-]+\.\w{1,10})'
-            r'(?:[\s,;:!?)]|$)'
-        )
+        bare_re = r"(?:^|[\s(])" r"((?:\w+[/\\])+[\w./\\-]+\.\w{1,10})" r"(?:[\s,;:!?)]|$)"
         for m in _re.finditer(bare_re, text):
             raw = m.group(1).strip()
             clean = _clean_path(raw)
@@ -170,7 +166,7 @@ def _extract_directory_refs(text: str) -> list[str]:
     seen: set[str] = set()
 
     # 层1: 反引号包裹
-    for m in _re.finditer(r'`([^`]+)`', text):
+    for m in _re.finditer(r"`([^`]+)`", text):
         raw = m.group(1).strip()
         clean = _clean_path(raw)
         if clean and clean not in seen and _looks_like_directory(clean):
@@ -197,10 +193,10 @@ def _extract_directory_refs(text: str) -> list[str]:
         # 匹配 Windows 绝对路径 D:\... 或 UNC \\...
         # 或 Unix 绝对路径 /home/... 或相对路径 src/.../...
         bare_dir_re = (
-            r'(?:^|[\s(])'
-            r'((?:[A-Za-z]:[/\\]|/|\.{1,2}[/\\])'
-            r'(?:[\w./\\-]+[/\\])+[\w./\\-]*)'
-            r'(?:[\s,;:!?)]|$)'
+            r"(?:^|[\s(])"
+            r"((?:[A-Za-z]:[/\\]|/|\.{1,2}[/\\])"
+            r"(?:[\w./\\-]+[/\\])+[\w./\\-]*)"
+            r"(?:[\s,;:!?)]|$)"
         )
         for m in _re.finditer(bare_dir_re, text):
             raw = m.group(1).strip()
@@ -225,7 +221,7 @@ def _extract_media_refs(text: str) -> dict[str, list[str]]:
     seen: set[str] = set()
 
     # 层1: 反引号包裹
-    for m in _re.finditer(r'`([^`]+)`', text):
+    for m in _re.finditer(r"`([^`]+)`", text):
         raw = m.group(1).strip()
         clean = _clean_path(raw)
         if not clean or clean in seen:
@@ -242,7 +238,7 @@ def _extract_media_refs(text: str) -> dict[str, list[str]]:
 
     # 层2: 裸路径
     for m in _re.finditer(
-        r'(?:^|[\s(])((?:\w+[/\\])*[\w./\\-]+\.\w{2,5})(?:[\s,;:!?)]|$)',
+        r"(?:^|[\s(])((?:\w+[/\\])*[\w./\\-]+\.\w{2,5})(?:[\s,;:!?)]|$)",
         text,
     ):
         raw = m.group(1).strip()
@@ -278,7 +274,6 @@ def _extract_media_refs(text: str) -> dict[str, list[str]]:
 
 # _build_history_block + 常量已提取到 orbit.agents.context_util——全 Agent 统一使用
 from orbit.agents.context_util import _build_history_block
-
 
 CHATTER_SYSTEM_PROMPT = """你是 Orbit 的通用对话助手（ChatterAgent）。你是用户接触 Orbit 的第一个 Agent。
 
@@ -394,11 +389,13 @@ class ChatterAgent(BaseAgent):
                 from orbit.tools.ocr_tools import ocr_document as _ocr
 
                 ocr_result = await _ocr(path)
-                result["ocr_results"].append({
-                    "path": path,
-                    "text": ocr_result.get("text", ""),
-                    "cost_usd": ocr_result.get("cost_usd", 0),
-                })
+                result["ocr_results"].append(
+                    {
+                        "path": path,
+                        "text": ocr_result.get("text", ""),
+                        "cost_usd": ocr_result.get("cost_usd", 0),
+                    }
+                )
                 logger.info("chatter_ocr_done", path=path)
             except FileNotFoundError:
                 logger.info("chatter_media_not_found", path=path, type="image")
@@ -411,11 +408,13 @@ class ChatterAgent(BaseAgent):
                 from orbit.tools.file_parser import file_parser as _parse
 
                 parse_result = await _parse(path)
-                result["parse_results"].append({
-                    "path": path,
-                    "text": parse_result.get("text", ""),
-                    "file_type": parse_result.get("file_type", ""),
-                })
+                result["parse_results"].append(
+                    {
+                        "path": path,
+                        "text": parse_result.get("text", ""),
+                        "file_type": parse_result.get("file_type", ""),
+                    }
+                )
                 logger.info("chatter_parse_done", path=path)
             except FileNotFoundError:
                 logger.info("chatter_media_not_found", path=path, type="doc")
@@ -479,9 +478,15 @@ class ChatterAgent(BaseAgent):
         from pathlib import Path as _Path
 
         KEY_FILES = [
-            "CLAUDE.md", "README.md", "AGENTS.md",
-            "pyproject.toml", "package.json", "Makefile", "Cargo.toml",
-            "docker-compose.yml", "docker-compose.yaml",
+            "CLAUDE.md",
+            "README.md",
+            "AGENTS.md",
+            "pyproject.toml",
+            "package.json",
+            "Makefile",
+            "Cargo.toml",
+            "docker-compose.yml",
+            "docker-compose.yaml",
         ]
         key_file_results: list[dict[str, str]] = []
         for kf in KEY_FILES:
@@ -575,9 +580,7 @@ class ChatterAgent(BaseAgent):
                 dir_explorations.append(explored)
 
         has_files = bool(files)
-        has_media = bool(
-            media["ocr_results"] or media["parse_results"] or media["video_hints"]
-        )
+        has_media = bool(media["ocr_results"] or media["parse_results"] or media["video_hints"])
         has_dirs = bool(dir_explorations)
 
         if has_files or has_media or has_dirs:

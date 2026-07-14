@@ -23,12 +23,12 @@ from orbit.compression.token_counter import count_tokens  # noqa: E402
 
 # ── 上下文参数 ──────────────────────────────────────────
 
-_HISTORY_TOKEN_BUDGET = 16_000    # 对话历史 token 上限（动态 min(16K, 30%剩余窗口)）
-_HISTORY_HARD_CAP = 200           # 安全网：极端情况下的兜底消息数上限
-_HISTORY_MSG_TRUNC = 600          # 单条消息截断字符数
-_USER_MSG_PROTECT_COUNT = 4       # 最近 N 条用户消息 verbatim 保护（原则 5）
+_HISTORY_TOKEN_BUDGET = 16_000  # 对话历史 token 上限（动态 min(16K, 30%剩余窗口)）
+_HISTORY_HARD_CAP = 200  # 安全网：极端情况下的兜底消息数上限
+_HISTORY_MSG_TRUNC = 600  # 单条消息截断字符数
+_USER_MSG_PROTECT_COUNT = 4  # 最近 N 条用户消息 verbatim 保护（原则 5）
 _OMITTED_MSG = "（…更早的对话已省略…）"
-_OVERHEAD_PER_MSG = 15            # "**角色:** " + 换行 的 token 开销
+_OVERHEAD_PER_MSG = 15  # "**角色:** " + 换行 的 token 开销
 
 
 # ── GrillRequest 模型 ───────────────────────────────────
@@ -127,6 +127,7 @@ def _get_bge_model():
     WHY lru_cache: 进程内单例，首次调用加载，后续命中缓存。
     """
     from sentence_transformers import SentenceTransformer
+
     return SentenceTransformer("BAAI/bge-small-zh-v1.5")
 
 
@@ -155,10 +156,10 @@ def _build_history_block_with_relevance(
     relevant: list[dict[str, str]] = []
     try:
         import numpy as np
+
         model = _get_bge_model()
         older_contents = [
-            str(h.get("content", "")) for h in older
-            if len(str(h.get("content", ""))) >= 10
+            str(h.get("content", "")) for h in older if len(str(h.get("content", ""))) >= 10
         ]
         if not older_contents:
             raise ValueError("no_content")
@@ -177,7 +178,9 @@ def _build_history_block_with_relevance(
                     if str(h.get("content", "")) == older_contents[i]:
                         break
                     orig_idx += 1
-                scored.append((float(score), older[orig_idx] if orig_idx < len(older) else older[i]))
+                scored.append(
+                    (float(score), older[orig_idx] if orig_idx < len(older) else older[i])
+                )
         scored.sort(key=lambda x: x[0], reverse=True)
         relevant = [h for _, h in scored[:5]]
     except Exception:

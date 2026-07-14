@@ -374,6 +374,33 @@ async def _handle_compact_command(ws: WebSocket, text: str) -> None:
         await _send(ws, 1, None, f"压缩失败: {e}")
 
 
+async def _generate_session_title(session_id: str, first_message: str) -> None:
+    """V16.0 Phase A: T2模型异步生成会话标题——不阻塞聊天。"""
+    try:
+        from orbit.gateway.schemas import LLMRequest
+        from orbit.integration.wiring import get_wiring
+        wiring = get_wiring()
+        if not wiring:
+            return
+        llm = wiring._get_llm_client()
+        if not llm:
+            return
+        req = LLMRequest(
+            prompt=f"Generate a short title (≤20 chars) for this conversation:\n{first_message[:200]}",
+            system_prompt="You are a title generator. Output ONLY the title, no quotes, no explanation.",
+            temperature=0.3,
+            max_tokens=20,
+        )
+        resp = await llm.generate(req, task_id=f"title_{session_id}")
+        title = (resp.content or "新对话").strip()[:50]
+        conn = _session_registry._get_conn()
+        conn.execute("UPDATE sessions SET title=? WHERE id=?", (title, session_id))
+        conn.commit()
+        logger.info("session_title_generated", session_id=session_id[:8], title=title)
+    except Exception:
+        pass  # fail-open: 标题生成失败不影响主流程
+
+
 async def _handle_chat(
     ws: WebSocket,
     text: str,
@@ -400,6 +427,22 @@ async def _handle_chat(
     async def _ws_send(msg: str) -> None:
         await ws.send_text(msg)
     set_context(chat_mode=chat_mode, session_id=session_id, ws_sender=_ws_send)
+
+    # V16.0 Phase A: 会话锁——同session串行处理
+    lock = None
+    if session_id:
+        lock = _session_registry.get_session_lock(session_id)
+        await lock.acquire()
+
+    # V16.0 Phase A: 自动标题生成——仅首条用户消息触发
+    if session_id:
+        try:
+            msgs = _session_registry.get_messages(session_id, limit=0)  # 取全量判断
+            if len(msgs) <= 1:  # 仅首条用户消息时触发
+                import asyncio as _asyncio
+                _asyncio.create_task(_generate_session_title(session_id, text))
+        except Exception:
+            pass
 
     # ---- Phase 0: /slash 命令路由（SkillRegistry 动态匹配）----
     if text.strip().startswith("/"):
@@ -504,13 +547,14 @@ async def _handle_chat(
                 # 直接触发
                 logger.info("skill_auto_trigger", name=skill_name, confidence=skill_confidence)
                 reply_text = f"🔧 启动技能「{skill.description}」..."
+                if session_id:
+                    _session_registry.add_message(session_id=session_id, role="user", content=text)
+                    _session_registry.add_message(session_id=session_id, role="assistant", content=reply_text, status="sent")
                 await _send(ws, 0, {
                     "type": "chat",
                     "reply": reply_text,
                     "agent_role": "Chatter",
                 })
-                if session_id:
-                    _session_registry.add_message(session_id=session_id, role="agent", content=reply_text)
                 await _execute_skill(ws, skill, text, session_id, chat_mode)
                 return
             elif skill_confidence >= 0.4:
@@ -532,13 +576,14 @@ async def _handle_chat(
         # 多步编排 → ComposeOrchestrator
         logger.info("chain_trigger", skills=chain_skills)
         reply_text = f"🔗 启动编排链: {' → '.join(chain_skills)}..."
+        if session_id:
+            _session_registry.add_message(session_id=session_id, role="user", content=text)
+            _session_registry.add_message(session_id=session_id, role="assistant", content=reply_text, status="sent")
         await _send(ws, 0, {
             "type": "chat",
             "reply": reply_text,
             "agent_role": "Chatter",
         })
-        if session_id:
-            _session_registry.add_message(session_id=session_id, role="agent", content=reply_text)
         await _execute_chain(ws, chain_skills, text, session_id, chat_mode)
         return
 
@@ -552,12 +597,15 @@ async def _handle_chat(
         if candidates:
             result_data["candidates"] = candidates
 
+        # V16.0 Phase A: 先存占位→后发→更新（掉线不丢消息）
+        placeholder_id = None
         if session_id:
             try:
                 _session_registry.add_message(session_id=session_id, role="user", content=text)
-                _session_registry.add_message(
-                    session_id=session_id, role="agent", content=chatter_reply
-                )
+                placeholder_id = _session_registry.add_message(
+                    session_id=session_id, role="assistant", content=chatter_reply,
+                    status="pending",
+                ).id
                 _session_registry.touch(session_id)
             except Exception:
                 pass
@@ -620,8 +668,9 @@ async def _handle_chat(
             _session_registry.add_message(session_id=session_id, role="user", content=text)
             _session_registry.add_message(
                 session_id=session_id,
-                role="agent",
+                role="assistant",
                 content=result_data["reply"],
+                structured_output=_json.dumps(prd_raw) if prd_raw else "",
                 candidates=candidates or None,
             )
             _session_registry.touch(session_id)
@@ -629,6 +678,16 @@ async def _handle_chat(
             pass
 
     await _send(ws, 0, result_data)
+    # V16.0 Phase A: 发送成功→更新占位为 sent
+    if placeholder_id and session_id:
+        try:
+            _session_registry.update_message(placeholder_id, status="sent")
+        except Exception:
+            pass
+
+    # V16.0 Phase A: 释放会话锁
+    if lock:
+        lock.release()
 
 
 async def _handle_confirm(
@@ -730,7 +789,8 @@ async def _handle_confirm(
             },
         )
         if session_id:
-            _session_registry.add_message(session_id=session_id, role="agent", content=reply_text)
+            _session_registry.add_message(session_id=session_id, role="user", content=text)
+            _session_registry.add_message(session_id=session_id, role="assistant", content=reply_text, status="sent")
     except Exception as e:
         await _send(ws, 1, None, f"创建任务失败: {e}")
 

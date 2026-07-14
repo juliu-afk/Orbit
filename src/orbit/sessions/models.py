@@ -36,15 +36,22 @@ class SessionRecord:
 
 @dataclass
 class ChatMessageRecord:
-    """聊天消息记录——归属一个 Session。"""
+    """聊天消息记录——归属一个 Session。
+
+    V16.0 Phase A: role统一assistant + Part粒度 + 工具调用 + 持久化状态
+    """
 
     session_id: str = ""
-    role: str = ""  # user | system | agent
+    role: str = ""  # user | assistant | system (统一为 assistant, 不再用 agent)
     content: str = ""
     candidates: list[dict[str, Any]] = field(default_factory=list)
     cross_project_warning: str | None = None
     created_at: float = 0.0
     id: int | None = None  # DB 自增，插入前为 None
+    # V16.0 Phase A: 消息持久化 + Part粒度 + 结构化输出
+    status: str = "sent"  # pending | sent | error
+    parts: list[dict[str, Any]] = field(default_factory=list)  # [{"type":"text","content":""},{"type":"tool",...}]
+    structured_output: str = ""  # JSON——PRD/其他结构化数据
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -55,4 +62,7 @@ class ChatMessageRecord:
             "candidates": self.candidates,
             "cross_project_warning": self.cross_project_warning,
             "created_at": self.created_at,
+            "status": self.status,
+            "parts": self.parts,
+            "structured_output": self.structured_output,
         }

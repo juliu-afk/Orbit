@@ -181,6 +181,18 @@ class MetaOrchestrator:
             if decision.needs_clarify and self.clarifier:
                 goal = await self._clarify(goal)
 
+            # V15.2: GoalPlanner——生成执行计划（独立于 compose_bridge）
+            if decision.needs_decompose:
+                plan = await self.intake_router.plan_for(
+                    goal.description, goal.constraints
+                )
+                if plan:
+                    logger.info(
+                        "goal_plan_generated",
+                        goal_id=goal.id,
+                        milestones=len(plan.milestones),
+                    )
+
             # 按需拆解
             if decision.needs_decompose and self.compose_bridge:
                 if not goal.spec:

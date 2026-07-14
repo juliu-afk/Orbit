@@ -119,6 +119,14 @@ class ToolRegistry:
         self._domain_router: Any = None
         self._pending_confirms: dict[str, tuple[object, dict]] = {}
         self._confirm_counter: int = 0
+        self._register_fable5_tools()
+
+    def _register_fable5_tools(self) -> None:
+        try:
+            from orbit.tools.registry.fable5_tools import register_fable5_tools
+            register_fable5_tools(self)
+        except Exception:
+            pass
 
     # ── 单例 ─────────────────────────────────────────
 
@@ -333,8 +341,9 @@ class ToolRegistry:
         if self._domain_router is None:
             return []
         schemas = []
-        for domain in self._get_domain_router()._domains:
-            schema = self._get_domain_router().generate_mcp_schema(domain)
+        router = self._get_domain_router()
+        for domain in router.domains():
+            schema = router.generate_mcp_schema(domain)
             if schema:
                 schemas.append(schema)
         return schemas

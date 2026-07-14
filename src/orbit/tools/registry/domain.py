@@ -56,6 +56,10 @@ class DomainActionRouter:
         self._domains[domain][action] = handler
         logger.debug("domain_action_registered", domain=domain, action=action)
 
+    def domains(self) -> list[str]:
+        """返回所有已注册的领域名。"""
+        return list(self._domains.keys())
+
     def unregister(self, domain: str, action: str | None = None) -> None:
         """注销领域或动作——action=None 时移除整个领域。
 

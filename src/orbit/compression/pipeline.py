@@ -271,19 +271,19 @@ class CompressionPipeline:
 
     # ── Layer 4: Sliding Window ────────────────────────
 
+    # V16.0 Phase B: OpenCode 式尾轮保护——最近2轮+40K token永不修剪
+    TAIL_TURNS = 2
+    TAIL_PROTECT_TOKENS = 40_000
+
     @staticmethod
     def _layer4_sliding(
         messages: list[dict[str, Any]],
         window_turns: int = 10,
     ) -> list[dict[str, Any]]:
-        """滑动窗口——保留 system + 最后 N 个 assistant/tool 对.
+        """滑动窗口——保留 system + 最后 N 轮，最近2轮+40K永不修剪.
 
-        对标 Claude Code sliding window:
-        - 始终保留 system prompt（第一条）
-        - 保留最后 window_turns 个有效轮次
-        - 一个轮次 = assistant 消息 + 其 tool_calls 结果
-
-        WHY 保留 system: system prompt 包含角色定义+工具列表+强制规则，不可丢失。
+        对标 OpenCode pruning: 保护最近 TAIL_TURNS=2 轮 + 40K token。
+        WHY: LLM 需要最近上下文才能连贯思考，不能全砍。
         """
         if len(messages) <= window_turns * 2 + 1:
             return messages
@@ -291,9 +291,19 @@ class CompressionPipeline:
         # 找到 system prompt
         system_idx = next((i for i, m in enumerate(messages) if m.get("role") == "system"), 0)
 
+        # 保护最近 TAIL_TURNS 轮（尾部不碰）
+        tail_start = len(messages)
+        assistant_count = 0
+        for i in range(len(messages) - 1, system_idx, -1):
+            if messages[i].get("role") == "assistant":
+                assistant_count += 1
+                if assistant_count >= CompressionPipeline.TAIL_TURNS:
+                    tail_start = i
+                    break
+
         # 从尾部向前找 window_turns 个 assistant 消息
         assistant_indices: list[int] = []
-        for i in range(len(messages) - 1, system_idx, -1):
+        for i in range(tail_start - 1, system_idx, -1):
             if messages[i].get("role") == "assistant":
                 assistant_indices.append(i)
                 if len(assistant_indices) >= window_turns:
@@ -302,10 +312,9 @@ class CompressionPipeline:
         if not assistant_indices:
             return messages
 
-        # 保留: system + [start_idx ... end]
+        # 保留: system + [start_idx ... tail_start-1] + tail
         start_idx = max(system_idx + 1, assistant_indices[-1])
-        result = [messages[system_idx]]  # system prompt
-        # 添加一个摘要占位（如果截断了中间的消息）
+        result = [messages[system_idx]]
         if start_idx > system_idx + 1:
             skipped = start_idx - system_idx - 1
             result.append(

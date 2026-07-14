@@ -93,6 +93,9 @@ class SessionRegistry:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(session_id, created_at)"
         )
+        # V16.0 Phase B: 压缩标记——compacted消息在get_messages时过滤
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN compacted INTEGER DEFAULT 0")
         # V15.3: session_summaries — 跨 session 长期记忆（US4）
         conn.execute("""
             CREATE TABLE IF NOT EXISTS session_summaries (
@@ -275,18 +278,17 @@ class SessionRegistry:
             created_at=now,
         )
 
-    def get_messages(self, session_id: str, limit: int = 50) -> list[ChatMessageRecord]:
-        """获取 Session 的最近 N 条消息。"""
+    def get_messages(self, session_id: str, limit: int = 200) -> list[ChatMessageRecord]:
+        """获取 Session 的最近 N 条消息——V16.0: 过滤已压缩消息。"""
         rows = (
             self._get_conn()
             .execute(
-                "SELECT * FROM chat_messages WHERE session_id=? "
+                "SELECT * FROM chat_messages WHERE session_id=? AND compacted=0 "
                 "ORDER BY created_at DESC LIMIT ?",
                 (session_id, limit),
             )
             .fetchall()
         )
-        # 按时间正序返回（最旧 → 最新）
         return [self._row_to_message(r) for r in reversed(rows)]
 
     # ── Phase 2: FTS5 + Fork ──────────────────────────

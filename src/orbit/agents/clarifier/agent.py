@@ -108,6 +108,28 @@ class ClarifierAgent(BaseAgent):
         prompt = self._build_prompt(user_message, context)
         task_id = str(context.get("task_id", ""))
 
+        # V16.0 Phase B: 压缩触发——每轮 LLM 调前检查溢出
+        try:
+            from orbit.compression.compressor import ContextCompressor
+            from orbit.compression.budget import TokenBudgetTracker
+            tracker = TokenBudgetTracker()
+            estimated = tracker.estimate_tokens([
+                {"role": "system", "content": self.system_prompt()},
+                {"role": "user", "content": prompt},
+            ])
+            tracker.record_usage(estimated)
+            if tracker.usage_ratio >= 0.50:
+                compressor = ContextCompressor(llm_client=self.llm)
+                messages = [
+                    {"role": "system", "content": self.system_prompt()},
+                    {"role": "user", "content": prompt},
+                ]
+                result = await compressor.compress(messages, task_id=task_id)
+                if result.action.value in ("warn", "force"):
+                    logger.info("clarifier_compression_triggered", ratio=tracker.usage_ratio)
+        except Exception:
+            pass  # fail-open: 压缩失败不阻塞
+
         # 调 LLM 网关——chat 端点不直接接触 LLM，只通过 Agent
         try:
             resp = await self.llm.generate(

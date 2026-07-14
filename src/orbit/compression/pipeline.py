@@ -291,15 +291,20 @@ class CompressionPipeline:
         # 找到 system prompt
         system_idx = next((i for i, m in enumerate(messages) if m.get("role") == "system"), 0)
 
-        # 保护最近 TAIL_TURNS 轮（尾部不碰）
+        # V16.0 Phase B: 保护最近 TAIL_TURNS 轮 + TAIL_PROTECT_TOKENS token（尾部不碰）
         tail_start = len(messages)
         assistant_count = 0
+        tail_tokens = 0
+        from orbit.compression.token_counter import count_tokens
         for i in range(len(messages) - 1, system_idx, -1):
+            content = str(messages[i].get("content", ""))
+            tail_tokens += count_tokens(content) + 20
             if messages[i].get("role") == "assistant":
                 assistant_count += 1
-                if assistant_count >= CompressionPipeline.TAIL_TURNS:
-                    tail_start = i
-                    break
+            # 满足两个条件之一即可停止保护：达到轮数 或 达到token量
+            if assistant_count >= CompressionPipeline.TAIL_TURNS and tail_tokens >= CompressionPipeline.TAIL_PROTECT_TOKENS:
+                tail_start = i
+                break
 
         # 从尾部向前找 window_turns 个 assistant 消息
         assistant_indices: list[int] = []

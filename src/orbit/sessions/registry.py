@@ -94,8 +94,10 @@ class SessionRegistry:
             "CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(session_id, created_at)"
         )
         # V16.0 Phase B: 压缩标记——compacted消息在get_messages时过滤
-        with contextlib.suppress(sqlite3.OperationalError):
+        try:
             conn.execute("ALTER TABLE chat_messages ADD COLUMN compacted INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            logger.debug("compacted_column_exists", db_path=self._db_path)
         # V15.3: session_summaries — 跨 session 长期记忆（US4）
         conn.execute("""
             CREATE TABLE IF NOT EXISTS session_summaries (

@@ -87,6 +87,9 @@ class Sandbox:
         if language != "python":
             raise SandboxError(f"MVP 仅支持 python，不支持 {language}")
 
+        # V15.2: Shell 安全分析——执行前扫描危险模式
+        self._check_shell_safety(code)
+
         if not await self.is_available():
             raise SandboxError("Docker 不可用。测试请 mock run()，生产需 Docker Engine")
 
@@ -105,6 +108,34 @@ class Sandbox:
                 host_script.unlink(missing_ok=True)
             except Exception as e:
                 logger.warning("temp_cleanup_failed", path=str(host_script), error=str(e))
+
+    @staticmethod
+    def _check_shell_safety(code: str) -> None:
+        """V15.2: 执行前安全扫描——检测 shell 危险模式。
+
+        只在代码含 shell 命令时触发（检测 subprocess/os.system 调用）。
+        纯 Python 逻辑代码跳过检查。
+        """
+        # 快速路径——无 shell 调用跳过
+        if not any(kw in code for kw in ("subprocess", "os.system", "os.popen", "shell=True")):
+            return
+
+        try:
+            from orbit.security.shell_analyzer import CommandRejectedError, ShellAnalyzer
+
+            analyzer = ShellAnalyzer()
+            result = analyzer.analyze(code)
+            if not result.safe:
+                logger.warning(
+                    "sandbox_code_rejected",
+                    risk_count=len(result.risks),
+                    level=result.risk_level,
+                )
+                raise CommandRejectedError(result.risks)
+        except CommandRejectedError:
+            raise
+        except Exception as e:
+            logger.warning("shell_safety_check_skipped", error=str(e)[:80])
 
     def _build_mounts(
         self, host_script: Path, external_paths: list[str] | None = None

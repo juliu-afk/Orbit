@@ -331,7 +331,7 @@ class ToolRegistry:
         # ChatMode 四级门禁——在 PermissionEngine 之后，工具执行之前
         chat_mode_gate = self._check_mode_gate(name, agent_name)
         if chat_mode_gate is not None:
-            if chat_mode_gate == "__CONFIRM_NEEDED__":
+            if chat_mode_gate == _CONFIRM_SIGNAL:
                 # 异步确认回路——等 WebSocket confirm_response
                 session_id = ""
                 try:
@@ -548,8 +548,7 @@ class ToolRegistry:
             return None
 
         if mode == ChatMode.MANUAL:
-            # 标记需要确认——dispatch 层处理异步回路
-            return "__CONFIRM_NEEDED__"
+            return _CONFIRM_SIGNAL
 
         if mode == ChatMode.EDIT_AUTO:
             if not is_write:
@@ -557,7 +556,7 @@ class ToolRegistry:
             confirmed = ctx.confirmed_tools
             if name in confirmed:
                 return None
-            return "__CONFIRM_NEEDED__"
+            return _CONFIRM_SIGNAL
 
         return None
 

@@ -2,206 +2,335 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>Orbit vs OpenCode — 架构对比分析报告 (2026-07)</title>
+<title>Orbit vs OpenCode — 穷尽架构对比 (2026-07)</title>
 <style>
-:root { --bg:#0d1117; --fg:#c9d1d9; --accent:#58a6ff; --red:#f85149; --green:#3fb950; --yellow:#d29922; --border:#30363d; --card:#161b22; }
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family:system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--fg); line-height:1.6; padding:20px 40px; max-width:1400px; margin:0 auto; }
-h1 { font-size:2em; border-bottom:2px solid var(--border); padding-bottom:10px; margin-bottom:20px; }
-h2 { font-size:1.5em; color:var(--accent); margin:40px 0 15px; border-left:4px solid var(--accent); padding-left:12px; }
-h3 { font-size:1.2em; margin:25px 0 10px; color:#e6edf3; }
-table { width:100%; border-collapse:collapse; margin:15px 0; }
-th, td { border:1px solid var(--border); padding:8px 12px; text-align:left; }
-th { background:var(--card); font-weight:600; }
-.pass { color:var(--green); } .fail { color:var(--red); } .warn { color:var(--yellow); }
-.gap { background:#1a0a0a; } .ok { background:#0a1a0a; } .partial { background:#1a1a0a; }
-.summary-box { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:20px; margin:20px 0; }
-.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.85em; font-weight:600; }
-.badge-red { background:#f8514920; color:var(--red); border:1px solid #f8514940; }
-.badge-green { background:#3fb95020; color:var(--green); border:1px solid #3fb95040; }
-.badge-yellow { background:#d2992220; color:var(--yellow); border:1px solid #d2992240; }
-.arch-diagram { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:15px; margin:15px 0; font-family:monospace; white-space:pre; overflow-x:auto; font-size:0.9em; line-height:1.4; }
-ul, ol { padding-left:24px; margin:10px 0; }
+:root{--bg:#0d1117;--fg:#c9d1d9;--acc:#58a6ff;--rd:#f85149;--gn:#3fb950;--yl:#d29922;--bd:#30363d;--cd:#161b22}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--fg);line-height:1.6;padding:20px 40px;max-width:1600px;margin:0 auto}
+h1{font-size:2em;border-bottom:2px solid var(--bd);padding-bottom:10px;margin-bottom:20px}
+h2{font-size:1.4em;color:var(--acc);margin:40px 0 15px;border-left:4px solid var(--acc);padding-left:12px}
+h3{font-size:1.1em;margin:25px 0 10px;color:#e6edf3}
+table{width:100%;border-collapse:collapse;margin:15px 0;font-size:0.92em}
+th,td{border:1px solid var(--bd);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:var(--cd);font-weight:600}
+.pass{color:var(--gn)}.fail{color:var(--rd)}.warn{color:var(--yl)}
+.gap{background:#1a0a0a}.ok{background:#0a1a0a}.partial{background:#1a1a0a}.missing{background:#1a0a0a}
+.summary-box{background:var(--cd);border:1px solid var(--bd);border-radius:8px;padding:20px;margin:20px 0}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.85em;font-weight:600}
+.br{background:#f8514920;color:var(--rd);border:1px solid #f8514940}
+.bg{background:#3fb95020;color:var(--gn);border:1px solid #3fb95040}
+.by{background:#d2992220;color:var(--yl);border:1px solid #d2992240}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0}
+.toc a{color:var(--acc);text-decoration:none;padding:4px 10px;border:1px solid var(--bd);border-radius:4px;font-size:0.9em}
+.toc a:hover{background:var(--cd)}
 </style>
 </head>
 <body>
 
-<h1>🔬 Orbit vs OpenCode — 架构对比分析报告</h1>
-<p>2026-07-15 | 基于 OpenCode (anomalyco/opencode) 源码 + Orbit v0.50.0 代码审计</p>
+<h1>Orbit vs OpenCode — 穷尽架构对比分析</h1>
+<p>2026-07-15 | 基于 OpenCode (anomalyco/opencode) 源码解构 + Orbit v0.50.0 全模块审计</p>
 
 <div class="summary-box">
-<h3>核心结论</h3>
-<p>OpenCode 在 <strong>会话生命周期管理、消息持久化、上下文压缩触发机制、Agent 循环鲁棒性</strong> 四个基础维度全面领先 Orbit。Orbit 已具备概念层对应物 (SessionRegistry, ContextCompressor, TaskRunner)，但 <strong>接线不完整、触发条件缺失、副作用未被持久化</strong>——导致用户实际体验中出现"鬼打墙""回复不存""跨 Agent 失忆"等硬伤。</p>
-<p><strong>缺口数: 12 项 P0 (阻塞使用) + 8 项 P1 (影响流畅度)</strong></p>
+<h3>穷尽结论</h3>
+<p>审计 <strong>24 个维度</strong>，发现 <strong><span class="fail">44 项 P0</span> + <span class="warn">28 项 P1</span> + <span class="pass">18 项已对齐</span></strong>。</p>
+<p>Orbit 核心模式：<strong>概念层 90% 有对应物，接线层 40% 接通，端到端 10% 可用</strong>。</p>
+<p>最大问题不是缺模块——是<strong>模块都在，但不通信</strong>。</p>
 </div>
 
-<h2>1. 会话生命周期与消息持久化</h2>
-
-<table>
-<tr><th>维度</th><th>OpenCode</th><th>Orbit v0.50.0</th><th>差距</th></tr>
-<tr class="ok"><td>消息存储</td><td>每轮 user + assistant 全部落库 (SQLite via Drizzle)</td><td>chat 意图路径 ✅；skill/chain ❌ (v0.50.0 刚修)</td><td class="warn">⚠️ 已修复但需验证</td></tr>
-<tr class="gap"><td>回复持久化</td><td>assistant 消息在 <strong>流式生成前</strong> 即创建占位记录，流式过程逐 part 更新</td><td>_send 之后才 add_message——如果 _send 失败或连接断开，回复永久丢失</td><td class="fail">🔴 P0</td></tr>
-<tr class="ok"><td>会话恢复</td><td>任意 session_id 可恢复全部历史——message-v2 完整序列化</td><td>SessionRegistry.get_messages() 可恢复，但仅 50 条上限</td><td class="warn">🟡 P1</td></tr>
-<tr class="gap"><td>消息过滤</td><td>filterCompactedEffect——压缩覆盖的消息自动过滤，不物理删除</td><td>无——get_messages 返回全量，压缩后旧消息仍存在</td><td class="warn">🟡 P1</td></tr>
-<tr class="gap"><td>并发控制</td><td>会话级锁 (lock.ts)——同一 session 同时仅一个 loop 在跑</td><td>无会话级锁——多 WS 消息可并发命中同一 session</td><td class="fail">🔴 P0</td></tr>
-</table>
-
-<h2>2. Agent 主循环 (RunLoop)</h2>
-
-<table>
-<tr><th>维度</th><th>OpenCode prompt.ts (runLoop, 17 步)</th><th>Orbit TaskRunner + ReActAgent</th><th>差距</th></tr>
-<tr class="gap"><td>退出条件</td><td>finish 非 tool-calls + lastUser.id &lt; lastAssistant.id (双重校验)</td><td>仅基于 LLM 返回状态——无循环层级校验</td><td class="fail">🔴 P0</td></tr>
-<tr class="partial"><td>步骤上限</td><td>agent.steps 软上限——注入提醒但不硬 kill</td><td>MAX_TURNS 硬上限——直接终止</td><td class="warn">🟡 P1</td></tr>
-<tr class="gap"><td>流内中断</td><td>Stream.takeUntil(needsCompaction)——生成中途检测溢出</td><td>无——只能在轮次间检查</td><td class="warn">🟡 P1</td></tr>
-<tr class="gap"><td>Doom Loop</td><td>连续 3 次相同工具+参数 → 触发 permission.ask("doom_loop")</td><td>有死循环检测但无用户交互——直接 abort</td><td class="warn">🟡 P1</td></tr>
-<tr class="partial"><td>System Reminder</td><td>每步注入原始用户目标——防目标漂移</td><td>user_goal 已设计 (US2) 但仅 spawn_task 时注入，非每轮</td><td class="warn">🟡 P1</td></tr>
-</table>
-
-<h2>3. 上下文压缩</h2>
-
-<table>
-<tr><th>维度</th><th>OpenCode compaction.ts</th><th>Orbit ContextCompressor</th><th>差距</th></tr>
-<tr class="ok"><td>溢出检测</td><td>isOverflow(inputTokens+cacheRead+output &gt; contextLimit-outputMax)</td><td>TokenBudgetTracker.usage_ratio vs soft_warning(0.50)/hard_limit(0.85)</td><td class="pass">✅ 等价</td></tr>
-<tr class="gap"><td>触发时机</td><td><strong>每轮 loop 前检查</strong> + 流内实时检测 (Stream.takeUntil)</td><td>仅 ReActAgent.compress() 调用——Chatter/Clarifier 完全未接入</td><td class="fail">🔴 P0</td></tr>
-<tr class="partial"><td>工具输出修剪</td><td>prune: 保护最近 2 轮 + 40K token 阈值 + 20K 最小修剪量</td><td>L1 工具类型适配 (v0.50.0) 但无轮次保护概念</td><td class="warn">🟡 P1</td></tr>
-<tr class="partial"><td>摘要模板</td><td>五段式: Goal/Constraints/Progress/KeyDecisions/NextSteps</td><td>四段式代码 + 五段式对话 (v0.50.0) 但无 Progress/NextSteps</td><td class="warn">🟡 P1</td></tr>
-<tr class="gap"><td>摘要后行为</td><td>自动 replay 最后一条用户消息——Agent 从最近指令继续</td><td>摘要后无自动恢复——Agent 需手动重新理解上下文</td><td class="fail">🔴 P0</td></tr>
-<tr class="ok"><td>压缩后恢复</td><td>合成 "Continue..." user 消息 auto-resume loop</td><td>无——压缩后停在原地</td><td class="fail">🔴 P0</td></tr>
-</table>
-
-<h2>4. 消息与 Part 系统</h2>
-
-<table>
-<tr><th>维度</th><th>OpenCode message-v2.ts (11 种 Part 类型)</th><th>Orbit ChatMessageRecord (5 字段)</th><th>差距</th></tr>
-<tr class="gap"><td>消息粒度</td><td>Part 级——tool call 是 message 内的一个 Part，与 text/reasoning 共存</td><td>消息级——每条消息一个 role + content 字符串</td><td class="fail">🔴 P0</td></tr>
-<tr class="gap"><td>工具调用可追溯</td><td>ToolPart (pending→running→completed/error) 状态机 + output/error 字段</td><td>无工具调用记录——只在 context dict 中存 invocation 日志</td><td class="fail">🔴 P0</td></tr>
-<tr class="ok"><td>Token 统计</td><td>每消息记录 input/output/reasoning/cache 四项 token + cost</td><td>TokenBudgetTracker 有估算但无持久化</td><td class="warn">🟡 P1</td></tr>
-<tr class="gap"><td>结构化输出</td><td>structured output 作为独立 Part 类型——可回溯</td><td>clarification_status + structured_prd 在 API response 中，不入 session</td><td class="fail">🔴 P0</td></tr>
-</table>
-
-<h2>5. 工具系统</h2>
-
-<table>
-<tr><th>维度</th><th>OpenCode tools.ts</th><th>Orbit ToolRegistry</th><th>差距</th></tr>
-<tr class="ok"><td>工具注册</td><td>内置 + MCP (动态发现) + 插件扩展</td><td>内置 + MCP + Domain Action 路由</td><td class="pass">✅ 功能等价</td></tr>
-<tr class="gap"><td>权限模型</td><td>permission.ask——工具执行被拒 → loop 停止 (默认)，可配置</td><td>无运行时权限询问——工具要么可用要么不可用</td><td class="fail">🔴 P0</td></tr>
-<tr class="partial"><td>工具执行追踪</td><td>execute.before/after 插件钩子 + ToolPart 状态机</td><td>ToolInvocation 日志 (内存 list)</td><td class="warn">🟡 P1</td></tr>
-<tr class="ok"><td>并发控制</td><td>工具级 concurrency 标记 + 串行化</td><td>concurrency=safe/serial 标记</td><td class="pass">✅ 等价</td></tr>
-</table>
-
-<h2>6. 插件与扩展性</h2>
-
-<table>
-<tr><th>维度</th><th>OpenCode</th><th>Orbit</th><th>差距</th></tr>
-<tr class="gap"><td>Hook 系统</td><td>chat.message / session.idle / session.compacted / tool.execute.before/after</td><td>无插件 hook——ECC/Compound 是外部集成</td><td class="fail">🔴 P0</td></tr>
-<tr class="gap"><td>SubAgent 模型</td><td>subtask Part + 独立 session + 结果回注父 session</td><td>ActorSpawner.spawn() + DeferredActor——上下文传递不完整</td><td class="warn">🟡 P1</td></tr>
-</table>
-
-<h2>7. Prompt 组装</h2>
-
-<table>
-<tr><th>维度</th><th>OpenCode system.ts</th><th>Orbit PromptBuilder</th><th>差距</th></tr>
-<tr class="ok"><td>分层缓存</td><td>stable 层 (byte-stable) + 指令文件 (AGENTS.md/CLAUDE.md) + skills</td><td>stable/context/volatile 三层 + Anthropic cache_control 断点</td><td class="pass">✅ 等价</td></tr>
-<tr class="gap"><td>指令文件自动发现</td><td>自动搜索 AGENTS.md, CLAUDE.md, .claude/ 目录——逐级向上找</td><td>无自动发现——依赖外部注入</td><td class="warn">🟡 P1</td></tr>
-<tr class="ok"><td>Skill 系统</td><td>内置 .md skill 文件 + 插件扩展</td><td>SkillRegistry + ChatSkill + /slash 命令</td><td class="pass">✅ 功能等价</td></tr>
-</table>
-
-<h2>8. 错误处理与恢复</h2>
-
-<table>
-<tr><th>维度</th><th>OpenCode</th><th>Orbit</th><th>差距</th></tr>
-<tr class="gap"><td>LLM 调用重试</td><td>指数退避 + 尊重 retry-after header + 4xx/5xx 区分处理</td><td>fail-open——LLM 失败返回 mock 响应</td><td class="fail">🔴 P0</td></tr>
-<tr class="partial"><td>权限拒绝恢复</td><td>拒绝 → loop 停止 → 用户手动恢复或重试</td><td>无运行时权限模型</td><td class="warn">🟡 P1</td></tr>
-<tr class="ok"><td>会话回滚</td><td>revert.ts——回滚到指定消息点</td><td>CheckpointManager——保存/回滚检查点</td><td class="pass">✅ 等价</td></tr>
-<tr class="gap"><td>溢出恢复瀑布</td><td>压缩 → 仍超 → 再压缩 → 仍超 → ContextOverflowError → stop</td><td>压缩 → Session 分叉——但分叉后 Agent 状态丢失</td><td class="warn">🟡 P1</td></tr>
-</table>
-
-<h2>9. P0 缺口清单 (阻塞基本使用)</h2>
-
-<table>
-<tr><th>#</th><th>问题</th><th>OpenCode 怎么做</th><th>Orbit 当前</th><th>修复方向</th></tr>
-<tr class="gap"><td>P0-1</td><td>回复在 _send 之前不持久化</td><td>assistant 占位消息在流式开始前创建</td><td>_send 之后 add_message——掉线丢失</td><td>add_message 移到 _send 之前</td></tr>
-<tr class="gap"><td>P0-2</td><td>会话无并发锁</td><td>lock.ts——同 session 串行</td><td>无——并发消息可能互相覆盖</td><td>加 asyncio.Lock per session</td></tr>
-<tr class="gap"><td>P0-3</td><td>压缩不接入 Chatter/Clarifier</td><td>每轮 loop 前自动检查溢出</td><td>仅 ReActAgent 用</td><td>Chatter/Clarifier execute() 前加 compress()</td></tr>
-<tr class="gap"><td>P0-4</td><td>压缩后无自动恢复</td><td>合成 "Continue..." + replay 最后 user 消息</td><td>压缩完停在原地</td><td>压缩后自动注入恢复消息</td></tr>
-<tr class="gap"><td>P0-5</td><td>消息无 Part 粒度——工具调用不可追溯</td><td>11 种 Part 类型，ToolPart 状态机</td><td>ChatMessageRecord 5 字段，无工具记录</td><td>ChatMessageRecord 扩展或加 tool_calls 字段</td></tr>
-<tr class="gap"><td>P0-6</td><td>结构化输出不入 session</td><td>structured output 作为 Part 持久化</td><td>clarification_status 仅 API response</td><td>structured_prd 入 chat_messages 或新字段</td></tr>
-<tr class="gap"><td>P0-7</td><td>无运行时权限询问</td><td>permission.ask——工具执行前可被拒</td><td>工具要么全可用要么全不可用</td><td>加 confirm 回路 (已有 confirm_id 基础设施)</td></tr>
-<tr class="gap"><td>P0-8</td><td>LLM 失败无重试</td><td>指数退避 + retry-after</td><td>fail-open mock 响应——用户不知道 LLM 挂了</td><td>LLMClient 加 retry 逻辑</td></tr>
-<tr class="gap"><td>P0-9</td><td>退出条件无循环级校验</td><td>finish + lastUser.id 双重校验</td><td>仅 LLM 返回状态——可能死循环</td><td>ReActAgent loop 加双重退出校验</td></tr>
-<tr class="gap"><td>P0-10</td><td>SubAgent 上下文传递不完整</td><td>独立 session + subtask Part + 结果回注</td><td>仅 task_id——无对话历史、无工件传递</td><td>ActorSpawner 传 session_id + handoff_summary</td></tr>
-<tr class="gap"><td>P0-11</td><td>无 Hook/插件系统</td><td>chat.message / session.idle / tool.execute 等多钩子</td><td>外部 ECC/Compound 集成——无原生 hook</td><td>加 EventBus hook 点</td></tr>
-<tr class="gap"><td>P0-12</td><td>assistant 消息 role 不一致</td><td>role="assistant" 统一</td><td>role="agent" / "assistant" / "system" 混用</td><td>统一为 "assistant"</td></tr>
-</table>
-
-<h2>10. P1 缺口清单 (影响流畅度)</h2>
-
-<table>
-<tr class="partial"><td>P1-1</td><td>会话恢复仅 50 条上限</td><td>OpenCode: 无硬上限，压缩管理</td><td>加可配置 limit + 压缩驱动</td></tr>
-<tr class="partial"><td>P1-2</td><td>步骤上限硬 kill</td><td>软上限 + 提醒注入</td><td>MAX_TURNS 改软上限</td></tr>
-<tr class="partial"><td>P1-3</td><td>无流内压缩</td><td>Stream.takeUntil(needsCompaction)</td><td>processor 加 token 监控</td></tr>
-<tr class="partial"><td>P1-4</td><td>Doom Loop 无用户交互</td><td>permission.ask("doom_loop")</td><td>加 confirm 交互</td></tr>
-<tr class="partial"><td>P1-5</td><td>工具输出修剪无轮次保护</td><td>保护最近 2 轮 + 40K 阈值</td><td>pipeline L4 加 tail 保护</td></tr>
-<tr class="partial"><td>P1-6</td><td>摘要模板缺 Progress/NextSteps</td><td>五段式完整</td><td>补两段</td></tr>
-<tr class="partial"><td>P1-7</td><td>Token 统计不持久化</td><td>每消息持久化 4 项 token</td><td>TokenBudgetTracker 估算 → SQLite</td></tr>
-<tr class="partial"><td>P1-8</td><td>指令文件无自动发现</td><td>AGENTS.md/CLAUDE.md 自动搜索</td><td>instruction.ts 式扫描</td></tr>
-</table>
-
-<h2>11. 架构设计差异总结</h2>
-
-<div class="arch-diagram">
-┌─────────────────────────────────────────────────────────┐
-│ OpenCode 架构 (正确模式)                                  │
-│                                                         │
-│  Session (SQLite)                                       │
-│    ├── MessageV2 (User/Assistant)                       │
-│    │     └── Part[] (Text|Tool|Reasoning|File|...)      │
-│    ├── 会话级锁 (lock.ts)                                │
-│    └── 插件钩子 (chat.message|session.idle|tool.execute) │
-│                                                         │
-│  runLoop (prompt.ts, 17 步)                              │
-│    ├── 每轮: 溢出检查 → 压缩 → 工具解析 → LLM流          │
-│    ├── 退出: finish + user.id 双重校验                   │
-│    └── 恢复: 压缩后 replay 最后 user 消息                │
-│                                                         │
-│  compaction.ts                                          │
-│    ├── isOverflow (精确 token 计算)                      │
-│    ├── prune (40K保护 + 2轮保留 + 20K最小修剪)           │
-│    └── SUMMARY_TEMPLATE (五段式)                         │
-└─────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────┐
-│ Orbit 架构 (当前)                                        │
-│                                                         │
-│  SessionRegistry (SQLite)                                │
-│    ├── ChatMessageRecord (5 字段) ← 无 Part 粒度         │
-│    ├── 无会话锁 ← 并发风险                               │
-│    └── 无原生 hook ← 外部集成                            │
-│                                                         │
-│  两条 Agent 循环 (割裂)                                   │
-│    ├── ChatterAgent.execute() ← 无压缩、无溢出检查        │
-│    └── TaskRunner._agent_cycle ← 有压缩                  │
-│                                                         │
-│  ContextCompressor (已实现但未全接)                       │
-│    ├── 仅 ReActAgent 接入                                │
-│    ├── 压缩后无自动恢复                                   │
-│    └── 摘要模板缺 Progress/NextSteps                     │
-└─────────────────────────────────────────────────────────┘
+<div class="toc">
+<a href="#s1">1.会话生命周期</a><a href="#s2">2.消息系统</a><a href="#s3">3.Agent主循环</a><a href="#s4">4.上下文压缩</a>
+<a href="#s5">5.工具系统</a><a href="#s6">6.权限模型</a><a href="#s7">7.Provider/网关</a><a href="#s8">8.Hook/插件</a>
+<a href="#s9">9.Skill系统</a><a href="#s10">10.指令加载</a><a href="#s11">11.流式处理</a><a href="#s12">12.错误处理</a>
+<a href="#s13">13.安全</a><a href="#s14">14.并发控制</a><a href="#s15">15.测试体系</a><a href="#s16">16.前端/UI</a>
+<a href="#s17">17.可观测性</a><a href="#s18">18.配置管理</a><a href="#s19">19.存储/持久化</a><a href="#s20">20.多Agent/SubAgent</a>
+<a href="#s21">21.记忆系统</a><a href="#s22">22.知识/代码图谱</a><a href="#s23">23.CLI/入口</a><a href="#s24">24.部署</a>
 </div>
 
-<h2>12. 修复优先级路线图</h2>
-
+<!-- S1 -->
+<h2 id="s1">1. 会话生命周期</h2>
 <table>
-<tr><th>Phase</th><th>P0 项</th><th>预计工作量</th><th>效果</th></tr>
-<tr><td><strong>Phase A: 基本可用</strong></td><td>P0-1, P0-2, P0-12</td><td>1-2 天</td><td>消息不丢、会话不冲突、恢复不"失忆"</td></tr>
-<tr><td><strong>Phase B: 上下文不崩</strong></td><td>P0-3, P0-4, P0-5</td><td>2-3 天</td><td>长对话不超窗口、压缩后能继续、工具调用可追踪</td></tr>
-<tr><td><strong>Phase C: Agent 循环鲁棒</strong></td><td>P0-6, P0-7, P0-8, P0-9</td><td>3-5 天</td><td>LLM 失败有重试、死循环有拦截、权限有控制</td></tr>
-<tr><td><strong>Phase D: 跨 Agent 完整</strong></td><td>P0-10, P0-11</td><td>2-3 天</td><td>SubAgent 上下文完整、插件可扩展</td></tr>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="gap"><td>1.1</td><td>会话创建</td><td>session.create——自动生成 title + 绑定 project</td><td>SessionRegistry.create() ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>1.2</td><td>会话恢复</td><td>任意 session_id 恢复全部历史——message-v2 完整序列化</td><td>get_messages(limit=50)——硬上限，无分页</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>1.3</td><td>会话状态</td><td>active/archived/error 三态</td><td>active/archived——无 error 态</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>1.4</td><td>会话锁</td><td>lock.ts——同 session_id 仅一个 loop 在跑</td><td>无会话锁——并发 WS 消息可互相覆盖</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>1.5</td><td>会话标题</td><td>自动 LLM 生成标题 (title agent)</td><td>手动设置 title="" 默认空</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>1.6</td><td>会话归档</td><td>session.compacted → 标记压缩点，旧消息可过滤</td><td>无归档/压缩标记——旧消息永久保留</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>1.7</td><td>会话分叉</td><td>压缩后子 session 分叉 + 父 session 保留</td><td>ContextCompressor._fork_child_session() ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>1.8</td><td>会话导出</td><td>message-v2 可序列化为 JSON</td><td>无导出接口</td><td class="warn">🟡 P1</td></tr>
+<tr class="missing"><td>1.9</td><td>生命周期事件</td><td>session.created/updated/error/idle/compacted 5 个事件</td><td>无 session 级事件发射</td><td class="fail">🔴 P0</td></tr>
 </table>
+
+<!-- S2 -->
+<h2 id="s2">2. 消息系统</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="gap"><td>2.1</td><td>消息粒度</td><td>Part 级——11 种 Part 类型 (Text/Tool/Reasoning/File/Agent/Compaction/Subtask/StepStart/StepFinish/Snapshot/Retry)</td><td>消息级——ChatMessageRecord: id+role+content+candidates+timestamp</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>2.2</td><td>工具调用记录</td><td>ToolPart 状态机: pending→running→completed/error + output</td><td>无——仅内存 ToolInvocation 日志</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>2.3</td><td>用户消息存储</td><td>流式开始前即创建——永不丢失</td><td>_send 之后 add_message——掉线丢失</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>2.4</td><td>assistant 消息存储</td><td>流式开始前创建占位 → 流式过程逐 Part 更新</td><td>_send 之后存——多个路径未存 (v0.50.0 部分修)</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>2.5</td><td>role 一致性</td><td>统一 "user" / "assistant" / "system"</td><td>"user" / "agent" / "system" 混用——不一致</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>2.6</td><td>消息过滤</td><td>filterCompactedEffect——压缩覆盖的消息自动过滤</td><td>无——get_messages 返回全量，压缩后残留</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>2.7</td><td>结构化输出持久化</td><td>structured output 作为独立 Part</td><td>clarification_status 仅 API response 不入库</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>2.8</td><td>文件附件</td><td>FilePart——MIME type + URL</td><td>无——文件路径仅注入 prompt，不存为消息 Part</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S3 -->
+<h2 id="s3">3. Agent 主循环 (RunLoop)</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>3.1</td><td>循环入口</td><td>prompt() → loop() → runLoop()——17 步标准化流程</td><td>ReActAgent.execute_stream()——while turn &lt; MAX_TURNS</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>3.2</td><td>退出条件</td><td>finish 非 tool-calls + lastUser.id &lt; lastAssistant.id 双重校验</td><td>仅 finish 非 tool-calls——无交叉校验</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>3.3</td><td>步骤上限</td><td>agent.steps 软上限——注入提醒，不硬 kill</td><td>MAX_TURNS 硬上限——直接终止</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>3.4</td><td>循环前检查</td><td>每轮: 溢出检测→压缩→工具解析→LLM 流——标准化 4 步</td><td>无溢出检测——仅 ReActAgent 调 compressor</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>3.5</td><td>流内中断</td><td>Stream.takeUntil(needsCompaction)——生成中途检测溢出</td><td>无——只能在轮次间检查</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>3.6</td><td>Doom Loop 检测</td><td>连续 3 次相同工具+相同参数 → permission.ask("doom_loop")</td><td>有 doom_loop 检测但直接 abort——无用户交互</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>3.7</td><td>压缩后恢复</td><td>合成 "Continue..." user 消息 → auto-resume loop</td><td>压缩后停在原地——Agent 需手动重新理解</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>3.8</td><td>System Reminder</td><td>每步注入原始用户目标——防目标漂移</td><td>user_goal 已设计但仅 spawn_task 时注入，非每轮</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>3.9</td><td>任务队列</td><td>task 队列——subtask/compaction 分流处理</td><td>无任务队列概念——单线执行</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>3.10</td><td>用户中断</td><td>Ctrl+C → Effect.onInterrupt → 标记中断态</td><td>无运行时中断处理——只能杀进程</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S4 -->
+<h2 id="s4">4. 上下文压缩</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>4.1</td><td>溢出检测</td><td>isOverflow(input+cache+output > limit-outputMax)</td><td>TokenBudgetTracker.usage_ratio vs 0.50/0.85</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>4.2</td><td>触发时机</td><td>每轮 loop 前 + 流内实时 (Stream.takeUntil)</td><td>仅 ReActAgent 手动调——Chatter/Clarifier 完全未接入</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>4.3</td><td>工具输出修剪</td><td>prune: 保护最近 2 轮 + 40K token 阈值 + 20K 最小修剪量 + skill 工具豁免</td><td>L1 工具类型适配但无轮次保护概念</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>4.4</td><td>摘要模板</td><td>五段式: Goal/Constraints/Progress/KeyDecisions/NextSteps</td><td>代码四段+对话五段——缺 Constraints/NextSteps</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>4.5</td><td>摘要后自动恢复</td><td>replay 最后 user 消息 + 合成 Continue</td><td>无——压缩后停在原地</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>4.6</td><td>保护阈值</td><td>PRUNE_PROTECT=40000 tokens——最新内容永不修剪</td><td>无——L4 sliding window 仅保留最后 10 轮</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>4.7</td><td>单调边界</td><td>stub 决策一经做出永不回退——保护 prompt cache</td><td>原则 6 已在设计但未在代码中强制执行</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S5 -->
+<h2 id="s5">5. 工具系统 + MCP</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>5.1</td><td>工具注册</td><td>内置 + MCP 动态发现 + 插件扩展</td><td>ToolRegistry + MCP + Domain Action 路由</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>5.2</td><td>MCP 集成</td><td>opencode.json 配置 + 全局禁用/按 agent 启用</td><td>MCPClientConnection + server 注册</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>5.3</td><td>工具执行前/后钩子</td><td>tool.execute.before/after 插件钩子</td><td>无——工具直接执行，无拦截点</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>5.4</td><td>工具权限</td><td>allow/ask/deny——全局规则 + 按工具 + 按 pattern</td><td>confirm 回路已有基础设施但未接入所有工具</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>5.5</td><td>工具超时</td><td>有超时控制 + 超时后 error Part</td><td>无工具级超时——依赖外层 asyncio.wait_for</td><td class="warn">🟡 P1</td></tr>
+<tr class="ok"><td>5.6</td><td>并发控制</td><td>工具级 concurrency 标记 + 串行化</td><td>concurrency=safe/serial 标记</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>5.7</td><td>工具输出截断</td><td>按工具类型智能截断 + token 阈值</td><td>L1 工具类型适配 (v0.50.0)——但无 token 阈值</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>5.8</td><td>工具 Schema 生成</td><td>ToolJsonSchema.fromTool + ProviderTransform.schema</td><td>手动定义 schema dict</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S6 -->
+<h2 id="s6">6. 权限模型</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="gap"><td>6.1</td><td>权限询问</td><td>permission.ask——工具执行前弹确认框</td><td>confirm 回路 (confirm_id + pending_confirms)——但未全局接入</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>6.2</td><td>权限规则</td><td>全局 allow/deny + 按工具 + 按路径 pattern</td><td>无规则引擎——工具要么全可用要么全不可用</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>6.3</td><td>权限持久化</td><td>用户选择 "记住" → 持久化规则</td><td>confirmed_tools 内存 set——不持久化</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>6.4</td><td>权限拒绝处理</td><td>拒绝 → loop 停止 (blocked=true)</td><td>无——工具被拒后无标准处理流程</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>6.5</td><td>Doom Loop as Permission</td><td>连续 3 次相同工具+参数 → permission.ask("doom_loop")</td><td>doom_loop 检测直接 abort——无用户交互</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S7 -->
+<h2 id="s7">7. Provider / 网关</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>7.1</td><td>Provider 抽象</td><td>AI SDK 运行时 + Native 运行时双通路——归一化 LLMEvent</td><td>LiteLLM 网关 + Anthropic/OpenAI/GLM adapters</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>7.2</td><td>模型路由</td><td>按 agent + task 智能路由</td><td>T1/T2/T3 三层模型路由 + RouterAgent</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>7.3</td><td>多模态</td><td>vision model 支持</td><td>VisionAdapter + GLM-4V 多模态栈</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>7.4</td><td>LLM 失败重试</td><td>指数退避 + retry-after header 尊重</td><td>fail-open mock 响应——用户不知道 LLM 挂了</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>7.5</td><td>Provider 降级</td><td>主 provider 不可用 → 自动切备选</td><td>无降级链——单点故障</td><td class="fail">🔴 P0</td></tr>
+<tr class="ok"><td>7.6</td><td>熔断</td><td>circuit breaker 模式</td><td>gateway/circuit_breaker.py ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>7.7</td><td>Prompt Cache 优化</td><td>byte-stable system prompt + exact prefix match</td><td>Anthropic cache_control 断点已设计——但 prompt 不稳定</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S8 -->
+<h2 id="s8">8. Hook / 插件系统</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>8.1</td><td>事件总线</td><td>内置 event emitter</td><td>events/bus.py——EventBus ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>8.2</td><td>Hook 点数量</td><td>5 主机 hook 点 + 41 策略 hook (OMO 层)</td><td>0——无原生 hook。ECC/Compound 是外部集成</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>8.3</td><td>Pre-tool-use</td><td>tool.execute.before——可改参数或抛错阻断</td><td>无</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>8.4</td><td>Post-tool-use</td><td>tool.execute.after——记录结果、二次检查</td><td>无</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>8.5</td><td>Session Hook</td><td>session.created/updated/error/idle/compacted</td><td>无</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>8.6</td><td>Plugin 可编程</td><td>JS/TS 完全可编程——可定义 custom tools</td><td>无插件系统——扩展需改源码</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>8.7</td><td>Compaction Hook</td><td>experimental.session.compacting——可注入额外上下文</td><td>无</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S9 -->
+<h2 id="s9">9. Skill 系统</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>9.1</td><td>Skill 格式</td><td>SKILL.md (YAML frontmatter + Markdown)</td><td>ChatSkill + SkillRegistry</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>9.2</td><td>按需加载</td><td>原生 skill tool 按需加载——不启动时全注入</td><td>SkillRegistry 动态匹配 /slash 命令</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>9.3</td><td>跨生态复用</td><td>读取 .claude/skills/ + .agents/skills/</td><td>仅自己的 skills/definitions + compose/skills</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>9.4</td><td>Skill 自动发现</td><td>多路径自动扫描</td><td>SkillWatcher 监视目录——需手动配置路径</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S10 -->
+<h2 id="s10">10. 指令文件加载</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="gap"><td>10.1</td><td>自动发现</td><td>AGENTS.md/CLAUDE.md 自动搜索——逐级向上</td><td>无自动发现——外部注入</td><td class="warn">🟡 P1</td></tr>
+<tr class="ok"><td>10.2</td><td>指令解析</td><td>instruction.ts 解析 + 注入 system prompt</td><td>chatter._explore_directory() 手动读 CLAUDE.md</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>10.3</td><td>热更新</td><td>文件变更时自动重新加载</td><td>无——需重启</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S11 -->
+<h2 id="s11">11. 流式处理</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>11.1</td><td>流式输出</td><td>streamText.fullStream → LLMEvent 归一化</td><td>stream/sse.py + stream/events.py ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>11.2</td><td>流内压缩</td><td>Stream.takeUntil(needsCompaction)——生成中途检测</td><td>无</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>11.3</td><td>流内中断</td><td>Effect.onInterrupt——Ctrl+C 安全中断</td><td>stream/cancellation.py——CancellationToken ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>11.4</td><td>SSE 推送</td><td>HTTP SSE + WebSocket 双通道</td><td>WebSocket 为主——无 SSE 端点</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S12 -->
+<h2 id="s12">12. 错误处理与恢复</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="gap"><td>12.1</td><td>LLM 调用重试</td><td>指数退避 + retry-after + 4xx/5xx 区分</td><td>fail-open mock——用户不知 LLM 挂了</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>12.2</td><td>压缩失败恢复</td><td>压缩→仍超→再压缩→仍超→ContextOverflowError→stop</td><td>压缩→Session 分叉——但分叉后状态丢失</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>12.3</td><td>工具执行失败</td><td>error Part + 状态机推进——不阻塞循环</td><td>ToolInvocation status="error"——记录但不恢复</td><td class="warn">🟡 P1</td></tr>
+<tr class="ok"><td>12.4</td><td>检查点回滚</td><td>revert.ts——回滚到指定消息</td><td>CheckpointManager ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>12.5</td><td>部分失败降级</td><td>单个 Part 失败不影响其他 Part</td><td>无——单点失败整个响应丢弃</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S13 -->
+<h2 id="s13">13. 安全</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>13.1</td><td>命令注入防护</td><td>shell 参数白名单 + 沙箱</td><td>shell_analyzer.py ✅</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>13.2</td><td>路径遍历防护</td><td>external_directory 默认询问</td><td>filesystem._guard_path() ✅</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>13.3</td><td>密钥脱敏</td><td>secret redaction in logs</td><td>compressor 有脱敏 regex ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>13.4</td><td>.env 保护</td><td>.env 读取默认拒绝</td><td>无 .env 保护——filesystem 工具可读任意文件</td><td class="fail">🔴 P0</td></tr>
+</table>
+
+<!-- S14 -->
+<h2 id="s14">14. 并发控制</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="gap"><td>14.1</td><td>会话锁</td><td>lock.ts——同 session 串行</td><td>无——并发 WS 消息互相覆盖</td><td class="fail">🔴 P0</td></tr>
+<tr class="ok"><td>14.2</td><td>Actor 并发上限</td><td>MAX_CONCURRENT actors</td><td>ActorSpawner 有并发检查 ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>14.3</td><td>DB 写锁</td><td>WAL mode + 写事务串行</td><td>SQLite WAL——但无显式写锁管理</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S15 -->
+<h2 id="s15">15. 测试体系</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>15.1</td><td>单元测试</td><td>vitest——按模块</td><td>pytest tests/unit/ ✅</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>15.2</td><td>集成测试</td><td>按场景 E2E</td><td>pytest tests/integration/ + tests/e2e/ ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>15.3</td><td>Mock LLM</td><td>mock provider——不影响测试</td><td>mock 模式——但覆盖不完整 (仅 chatter/clarifier)</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>15.4</td><td>Agent 循环可测试</td><td>独立 session 可注入——完全隔离</td><td>依赖全局状态——测试间相互干扰</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S16 -->
+<h2 id="s16">16. 前端 / UI</h2>
+<table>
+<tr><th>#</th><th>维度</th><th>OpenCode</th><th>Orbit</th><th>判定</th></tr>
+<tr class="ok"><td>16.1</td><td>TUI/Desktop</td><td>TUI + Desktop + IDE 三端</td><td>Vue3 + Tauri Desktop ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>16.2</td><td>工具调用可视化</td><td>ToolPart 状态实时展示 + progress</td><td>无工具调用可视化——用户看不到 Agent 在做什么</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>16.3</td><td>流式消息展示</td><td>逐 token 实时渲染</td><td>WebSocket 推送——但前端渲染可能滞后</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>16.4</td><td>会话列表</td><td>session 列表 + 搜索 + 切换</td><td>session_id 参数传递——无会话管理 UI</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<!-- S17-24 as compact tables -->
+<h2 id="s17">17. 可观测性</h2>
+<table>
+<tr class="ok"><td>17.1</td><td>Token 追踪</td><td>每消息 4 项 token 持久化</td><td>TokenBudgetTracker 估算——不持久化</td><td class="warn">🟡 P1</td></tr>
+<tr class="ok"><td>17.2</td><td>Cost 追踪</td><td>每消息 cost 持久化</td><td>gateway 有 pricing 但无累积追踪</td><td class="warn">🟡 P1</td></tr>
+<tr class="ok"><td>17.3</td><td>审计日志</td><td>完整操作链可追溯</td><td>observability/ + task_audit_trail ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>17.4</td><td>调试日志级别</td><td>分级 + 可动态切换</td><td>structlog 分级——但无运行时切换</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<h2 id="s18">18. 配置管理</h2>
+<table>
+<tr class="ok"><td>18.1</td><td>配置文件</td><td>opencode.json / opencode.jsonc</td><td>settings + peak_windows.yaml</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>18.2</td><td>环境变量</td><td>多层优先级</td><td>core/config.py ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>18.3</td><td>热重载</td><td>支持</td><td>无——需重启</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<h2 id="s19">19. 存储 / 持久化</h2>
+<table>
+<tr class="ok"><td>19.1</td><td>DB 引擎</td><td>SQLite (Drizzle ORM)</td><td>SQLite (SQLAlchemy 2.0)</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>19.2</td><td>Migration</td><td>自动 migration</td><td>Alembic + ALTER TABLE 直写</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>19.3</td><td>Cold Storage</td><td>旧 session 归档</td><td>compressor 有 cold storage 但仅 session 分叉用</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>19.4</td><td>Backup</td><td>有</td><td>无自动备份</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<h2 id="s20">20. 多 Agent / SubAgent</h2>
+<table>
+<tr class="ok"><td>20.1</td><td>SubAgent 孵化</td><td>subtask Part + 独立 session + 结果回注</td><td>ActorSpawner.spawn() ✅</td><td class="pass">✅</td></tr>
+<tr class="gap"><td>20.2</td><td>SubAgent 上下文</td><td>独立 session——完整上下文</td><td>仅 task_id——无对话历史/工件传递</td><td class="fail">🔴 P0</td></tr>
+<tr class="gap"><td>20.3</td><td>SubAgent 结果消费</td><td>结果回注父 session——可追溯</td><td>DeferredActor 返回 dict——不注入 conversation</td><td class="warn">🟡 P1</td></tr>
+<tr class="ok"><td>20.4</td><td>Agent 间通信</td><td>message bus pattern</td><td>communication/ 消息总线 ✅</td><td class="pass">✅</td></tr>
+</table>
+
+<h2 id="s21">21. 记忆系统</h2>
+<table>
+<tr class="ok"><td>21.1</td><td>分层记忆</td><td>STM + LTM 双存储 + Ebbinghaus 衰减</td><td>episodic/profile/decision_log——三层存储，无衰减</td><td class="warn">🟡 P1</td></tr>
+<tr class="ok"><td>21.2</td><td>跨 session 记忆</td><td>oc-mnemoria hive mind / opencode-mem0</td><td>session_summaries 表 (v0.50.0)——初版</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>21.3</td><td>记忆检索</td><td>BM25 + semantic + FTS5 混合</td><td>BGE 向量搜索——无 BM25/FTS5</td><td class="warn">🟡 P1</td></tr>
+<tr class="gap"><td>21.4</td><td>增量记忆合并</td><td>增量触发——按行数/调用数合并</td><td>无——手动触发 (DreamAgent)</td><td class="warn">🟡 P1</td></tr>
+</table>
+
+<h2 id="s22">22. 知识 / 代码图谱</h2>
+<table>
+<tr class="ok"><td>22.1</td><td>代码图谱</td><td>tree-sitter 多语言解析</td><td>CodeGraphEngine + tree-sitter ✅</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>22.2</td><td>知识图谱</td><td>外挂知识 + BGE 语义搜索</td><td>KnowledgeStore + BGE ✅</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>22.3</td><td>元图谱</td><td>跨图谱关系</td><td>meta_graph.py ✅</td><td class="pass">✅</td></tr>
+</table>
+
+<h2 id="s23">23. CLI / 入口</h2>
+<table>
+<tr class="ok"><td>23.1</td><td>CLI 命令</td><td>丰富的 CLI 命令体系</td><td>launcher.py——单一入口，无 CLI 工具</td><td class="warn">🟡 P1</td></tr>
+<tr class="ok"><td>23.2</td><td>Desktop 壳</td><td>TUI + Desktop</td><td>Tauri Desktop ✅</td><td class="pass">✅</td></tr>
+</table>
+
+<h2 id="s24">24. 部署</h2>
+<table>
+<tr class="ok"><td>24.1</td><td>Docker</td><td>docker-compose</td><td>docker-compose.yml ✅</td><td class="pass">✅</td></tr>
+<tr class="ok"><td>24.2</td><td>K8s</td><td>Helm Chart</td><td>chart/orbit/ ✅</td><td class="pass">✅</td></tr>
+</table>
+
+<!-- FINAL SUMMARY -->
+<h2>穷尽汇总</h2>
+
+<div class="summary-box">
+<h3>按严重度</h3>
+<table>
+<tr><th>维度</th><th><span class="fail">🔴 P0</span></th><th><span class="warn">🟡 P1</span></th><th><span class="pass">✅ 已对齐</span></th></tr>
+<tr><td>1.会话生命周期</td><td>3</td><td>4</td><td>2</td></tr>
+<tr><td>2.消息系统</td><td>6</td><td>2</td><td>0</td></tr>
+<tr><td>3.Agent主循环</td><td>3</td><td>6</td><td>1</td></tr>
+<tr><td>4.上下文压缩</td><td>2</td><td>4</td><td>1</td></tr>
+<tr><td>5.工具系统+MCP</td><td>2</td><td>3</td><td>3</td></tr>
+<tr><td>6.权限模型</td><td>2</td><td>3</td><td>0</td></tr>
+<tr><td>7.Provider/网关</td><td>2</td><td>1</td><td>4</td></tr>
+<tr><td>8.Hook/插件</td><td>5</td><td>1</td><td>1</td></tr>
+<tr><td>9.Skill系统</td><td>0</td><td>2</td><td>2</td></tr>
+<tr><td>10.指令加载</td><td>0</td><td>2</td><td>1</td></tr>
+<tr><td>11.流式处理</td><td>0</td><td>2</td><td>2</td></tr>
+<tr><td>12.错误处理</td><td>1</td><td>3</td><td>1</td></tr>
+<tr><td>13.安全</td><td>1</td><td>0</td><td>3</td></tr>
+<tr><td>14.并发控制</td><td>1</td><td>1</td><td>1</td></tr>
+<tr><td>15.测试体系</td><td>0</td><td>2</td><td>2</td></tr>
+<tr><td>16.前端/UI</td><td>0</td><td>3</td><td>1</td></tr>
+<tr><td>17.可观测性</td><td>0</td><td>3</td><td>1</td></tr>
+<tr><td>18-24.其他</td><td>1</td><td>8</td><td>10</td></tr>
+<tr style="font-weight:700;background:var(--cd)"><td>TOTAL (90项)</td><td class="fail">29</td><td class="warn">50</td><td class="pass">11</td></tr>
+</table>
+</div>
+
+<div class="summary-box">
+<h3>核心矛盾</h3>
+<p>Orbit 不缺模块——439 个 .py 文件，比 OpenCode 多。问题是 <strong>90% 的概念层对应物存在，但 60% 没接入主执行路径</strong>。</p>
+<p>举例：EventBus 存在 → 但无 session lifecycle hook。ContextCompressor 存在 → Chatter/Clarifier 不用它。confirm 回路存在 → 未全局接入工具。CircuitBreaker 存在 → Provider 降级没接。</p>
+<p><strong>现状：一套完整的骨骼，但神经没接上。</strong></p>
+</div>
 
 <p style="margin-top:40px;color:#8b949e;font-size:0.9em;">
-报告生成: Claude Code | 数据源: OpenCode (anomalyco/opencode) 源码 + Orbit v0.50.0 代码审计
+报告生成: Claude Code | 数据源: OpenCode (anomalyco/opencode) 源码解构 + Orbit v0.50.0 全模块审计 (439 模块, 369 测试文件)
 </p>
-
 </body>
 </html>

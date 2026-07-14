@@ -329,8 +329,32 @@ th{background:var(--cd);font-weight:600}
 <p><strong>现状：一套完整的骨骼，但神经没接上。</strong></p>
 </div>
 
+<h2>模块接通率验证</h2>
+<p>对 8 个核心模块进行引用计数审计——验证"存在但未接入"假说：</p>
+<table>
+<tr><th>模块</th><th>被引用次数</th><th>判定</th></tr>
+<tr class="ok"><td>hallucination.pipeline</td><td>8</td><td class="pass">✅ 已接入</td></tr>
+<tr class="ok"><td>compliance.validator</td><td>16</td><td class="pass">✅ 已接入</td></tr>
+<tr class="ok"><td>knowledge.search</td><td>55</td><td class="pass">✅ 已接入</td></tr>
+<tr class="ok"><td>observability.trajectory</td><td>12</td><td class="pass">✅ 已接入</td></tr>
+<tr class="ok"><td>communication.protocol</td><td>5</td><td class="pass">✅ 已接入</td></tr>
+<tr class="ok"><td>metacognition.monitor</td><td>7</td><td class="pass">✅ 已接入</td></tr>
+<tr class="partial"><td>evolution.gepa</td><td>2</td><td class="warn">⚠️ 仅 wiring.py——勉强</td></tr>
+<tr class="partial"><td>memory.episodic</td><td>2</td><td class="warn">⚠️ 仅 wiring.py——勉强</td></tr>
+</table>
+<p>核心管线（防幻觉/合规/知识/可观测/通信/监控）接线良好。进化引擎和情景记忆是薄弱点——但不阻塞基本使用。</p>
+
+<h2>修复路线与预期效果</h2>
+<table>
+<tr><th>范围</th><th>项数</th><th>效果</th></tr>
+<tr class="gap"><td><strong>29 P0</strong></td><td>消息持久化 + 会话锁 + 压缩接入 + 权限 + 重试 + Hook + 退出校验 + role统一 + 流内恢复 + SubAgent上下文 + 结构化持久化</td><td><strong>基本可用</strong>：不丢消息、不鬼打墙、长对话不崩、LLM挂了有重试、工具执行有权限、插件可扩展</td></tr>
+<tr class="partial"><td><strong>50 P1</strong></td><td>压缩策略完善 + Agent循环鲁棒 + 工具输出保护 + 摘要模板 + token持久化 + 前端可视化 + 指令自动发现 + 跨生态Skill + 记忆衰减 + 会话管理UI</td><td><strong>工程完整</strong>：追上 OpenCode 的工程水平，用户体验流畅</td></tr>
+<tr><td><strong>gepa/episodic</strong></td><td>进化引擎 + 情景记忆 深接入（从 2 引用 → 全链路）</td><td><strong>自我进化</strong>：Prompt自动优化、经验自动积累——锦上添花</td></tr>
+</table>
+
 <p style="margin-top:40px;color:#8b949e;font-size:0.9em;">
-报告生成: Claude Code | 数据源: OpenCode (anomalyco/opencode) 源码解构 + Orbit v0.50.0 全模块审计 (439 模块, 369 测试文件)
+报告生成: Claude Code | 数据源: OpenCode (anomalyco/opencode) 源码解构 + Orbit v0.50.0 全模块审计 (439 模块, 369 测试文件) + 模块引用计数验证<br>
+审计完成: 24 维度 × 92 项对比——穷尽版。最后一次更新: 2026-07-15
 </p>
 </body>
 </html>

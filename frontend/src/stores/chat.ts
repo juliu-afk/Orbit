@@ -32,7 +32,7 @@ export interface StructuredPRD {
 }
 
 export interface ClarifyResponse {
-  type: 'clarify' | 'task_created' | 'peak_prompt'
+  type: 'clarify' | 'task_created' | 'peak_prompt' | 'confirm_request'
   reply: string
   clarification_status: 'clarifying' | 'ready'
   structured_prd: StructuredPRD | null
@@ -42,6 +42,12 @@ export interface ClarifyResponse {
   // task_created 时
   task_id?: string
   state?: string
+  // confirm_request 时
+  confirm_id?: string
+  tool_name?: string
+  tool_args?: Record<string, unknown>
+  message?: string
+  allow_remember?: boolean
 }
 
 export const useChatStore = defineStore('chat', () => {

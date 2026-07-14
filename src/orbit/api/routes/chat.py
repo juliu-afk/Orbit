@@ -434,11 +434,11 @@ async def _handle_chat(
         lock = _session_registry.get_session_lock(session_id)
         await lock.acquire()
 
-    # V16.0 Phase A: 自动标题生成——首次消息异步生成（不阻塞回复）
+    # V16.0 Phase A: 自动标题生成——仅首条用户消息触发
     if session_id:
         try:
-            msgs = _session_registry.get_messages(session_id, limit=2)
-            if len(msgs) <= 2:
+            msgs = _session_registry.get_messages(session_id, limit=0)  # 取全量判断
+            if len(msgs) <= 1:  # 仅首条用户消息时触发
                 import asyncio as _asyncio
                 _asyncio.create_task(_generate_session_title(session_id, text))
         except Exception:

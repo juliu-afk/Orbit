@@ -32,6 +32,7 @@ class RelationType(StrEnum):
     DECIDED_AT = "DECIDED_AT"  # 配置→推理链: 哪个决策定了此配置
     CONNECTS_TO = "CONNECTS_TO"  # 通用关联
     USED_IN = "USED_IN"  # 知识→代码: 知识在哪里使用
+    SEMANTICALLY_EQUIVALENT_TO = "SEMANTICALLY_EQUIVALENT_TO"  # V15.3-P2: 跨语言语义等价
 
 
 @dataclass
@@ -229,7 +230,64 @@ class MetaGraph:
         )
         return row["cnt"] if row else 0
 
+    # V15.3-P2: cross-language semantic equivalence (Fable 5)
+
+    def find_equivalents(self, source_id: str, target_language: str | None = None) -> list[dict]:
+        import json
+        rows = self._get_conn().execute(
+            "SELECT * FROM cross_graph_relations WHERE relation='SEMANTICALLY_EQUIVALENT_TO' AND source_id LIKE ?",
+            (f"%{source_id}%",),
+        ).fetchall()
+        results = []
+        for r in rows:
+            meta = json.loads(r["metadata"] or "{}")
+            lang = meta.get("target_language", meta.get("language", "unknown"))
+            if target_language and lang.lower() != target_language.lower():
+                continue
+            results.append({"source_id": r["source_id"], "target_id": r["target_id"],
+                           "language": lang, "description": meta.get("description", ""),
+                           "created_at": r["created_at"]})
+        return results
+
+    def add_semantic_equivalent(self, source_id: str, target_id: str,
+                                source_language: str = "", target_language: str = "",
+                                description: str = "") -> None:
+        self.add_relation("code", source_id, RelationType.SEMANTICALLY_EQUIVALENT_TO,
+                          "code", target_id,
+                          {"source_language": source_language, "target_language": target_language,
+                           "description": description})
+
     def close(self) -> None:
         if self._conn:
             self._conn.close()
             self._conn = None
+
+
+class SemanticTransfer:
+    """Cross-language semantic transfer (P2 — Fable 5).
+
+    Thariq: "The best reference is source code — even in another language."
+    Link a reference implementation to its re-implementation for future lookups.
+    """
+
+    def __init__(self, meta_graph: MetaGraph | None = None) -> None:
+        self._mg = meta_graph or MetaGraph()
+
+    def link(self, source: str, target: str, source_lang: str = "",
+             target_lang: str = "", description: str = "") -> None:
+        self._mg.add_semantic_equivalent(source, target, source_lang, target_lang, description)
+
+    def find(self, reference: str, target_language: str | None = None) -> list[dict]:
+        return self._mg.find_equivalents(reference, target_language)
+
+    def build_reference_context(self, reference: str, target_language: str = "") -> str:
+        equivalents = self.find(reference, target_language)
+        if not equivalents:
+            return ""
+        lines = ["## Semantic Reference (Fable 5 Cross-Language Transfer)", "",
+                 f"Equivalents of `{reference}`:", ""]
+        for i, eq in enumerate(equivalents[:5], 1):
+            lines.append(f"{i}. **{eq['target_id']}** ({eq['language']})")
+            if eq["description"]:
+                lines.append(f"   - {eq['description']}")
+        return "\n".join(lines)

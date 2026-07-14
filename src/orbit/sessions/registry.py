@@ -118,6 +118,11 @@ class SessionRegistry:
             conn.execute("ALTER TABLE chat_messages ADD COLUMN parts TEXT DEFAULT '[]'")
         with contextlib.suppress(sqlite3.OperationalError):
             conn.execute("ALTER TABLE chat_messages ADD COLUMN structured_output TEXT DEFAULT ''")
+        # V16.0 Phase B: 压缩标记
+        try:
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN compacted INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            logger.debug("compacted_column_exists", db_path=self._db_path)
         # V15.3: session_summaries — 跨 session 长期记忆（US4）
         conn.execute("""
             CREATE TABLE IF NOT EXISTS session_summaries (
@@ -313,18 +318,16 @@ class SessionRegistry:
         )
 
     def get_messages(self, session_id: str, limit: int = 200) -> list[ChatMessageRecord]:
-        """获取会话消息——V16.0: 默认200条安全网，传0=无上限(token预算驱动)。"""
-        """获取 Session 的最近 N 条消息。"""
+        """获取会话消息——V16.0: 默认200条安全网, 过滤已压缩消息。"""
         rows = (
             self._get_conn()
             .execute(
-                "SELECT * FROM chat_messages WHERE session_id=? "
+                "SELECT * FROM chat_messages WHERE session_id=? AND compacted=0 "
                 "ORDER BY created_at DESC LIMIT ?",
                 (session_id, limit),
             )
             .fetchall()
         )
-        # 按时间正序返回（最旧 → 最新）
         return [self._row_to_message(r) for r in reversed(rows)]
 
     # ── Phase 2: FTS5 + Fork ──────────────────────────

@@ -257,6 +257,20 @@ class OrbitWiring:
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
         self._cleanup_monitor(task_id)
 
+    # V15.2 Fable5 P1: blindspot preflight scan
+    async def preflight_blindspot(self, task_id: str, task_desc: str = '',
+                                  task_files: list[str] | None = None) -> object | None:
+        try:
+            from orbit.metacognition.blindspot import BlindspotScanner
+            scanner = BlindspotScanner(
+                knowledge_store=self._get_knowledge_store(),
+                code_graph=self._get_code_graph())
+            return await scanner.scan(
+                task_description=task_desc, task_files=task_files or [], task_id=task_id)
+        except Exception:
+            logger.debug('blindspot_preflight_failed', task_id=task_id, exc_info=True)
+            return None
+
     # V15.2 Fable5 P0: agent deviation recording
     def record_deviation(self, task_id: str, planned: str, actual: str,
                          reason: str, alternatives: list[str] | None = None,

@@ -158,12 +158,13 @@ def _extract_file_paths(text: str) -> list[tuple[str, str]]:
 def _extract_directory_refs(text: str) -> list[str]:
     """从用户消息中提取目录路径引用。
 
-    检测两层:
+    检测三层:
     1. 反引号包裹——如 `D:\\Code-Insight-Financial`
-    2. 裸路径——如 D:\\Project\\src（仅在无反引号匹配时启用）
+    2. 引号包裹——如 "D:\\Code-Insight-Financial" 或 'D:\\Code-Insight-Financial'
+    3. 裸路径——如 D:\\Project\\src（仅在前两层无匹配时启用）
 
-    WHY: 用户引用项目目录时，应自动探索目录结构 + 读取关键文件，
-    而不是回复"我没权限访问"。
+    WHY: 用户引用项目目录时，应自动探索目录结构 + 读取关键文件。
+    大部分用户习惯用双引号而非反引号括路径。
     """
     found: list[str] = []
     seen: set[str] = set()
@@ -175,6 +176,21 @@ def _extract_directory_refs(text: str) -> list[str]:
         if clean and clean not in seen and _looks_like_directory(clean):
             found.append(clean)
             seen.add(clean)
+
+    # 层1.5: 双引号/单引号包裹——用户习惯用 "D:\..." 而非 `D:\...`
+    if not found:
+        for m in _re.finditer(r'"([^"]+)"', text):
+            raw = m.group(1).strip()
+            clean = _clean_path(raw)
+            if clean and clean not in seen and _looks_like_directory(clean):
+                found.append(clean)
+                seen.add(clean)
+        for m in _re.finditer(r"'([^']+)'", text):
+            raw = m.group(1).strip()
+            clean = _clean_path(raw)
+            if clean and clean not in seen and _looks_like_directory(clean):
+                found.append(clean)
+                seen.add(clean)
 
     # 层2: 裸路径——Windows 盘符或 Unix 绝对/相对路径
     if not found:
@@ -524,11 +540,28 @@ class ChatterAgent(BaseAgent):
 
         from orbit.gateway.schemas import LLMRequest
 
+        # ── 对话历史注入 ──
+        # WHY: ChatterAgent 无状态——每次 execute() 只看到当前消息。
+        # 必须把 SessionRegistry 积累的历史注入 prompt，否则 LLM 每轮像失忆。
+        # chat.py:_handle_chat 已把 history 放进 context，此处注入。
+        history = input_data.context.get("history", []) or []
+        history_block = ""
+        if history:
+            history_lines = ["## 对话历史", ""]
+            for h in history[-10:]:  # 最近 10 条——防撑爆 prompt
+                role_label = "用户" if h.get("role") == "user" else "Orbit"
+                content = str(h.get("content", ""))[:500]  # 每条截断
+                history_lines.append(f"**{role_label}:** {content}")
+                history_lines.append("")
+            history_lines.append("---")
+            history_lines.append("")
+            history_block = "\n".join(history_lines)
+
         # ── 文件路径检测 + 自动读取（代码+多媒体+目录） ──
         # WHY: 用户引用文件/目录路径时自动读取内容注入 LLM 上下文。
         # 代码→read_file, 图片→OCR, 文档→file_parser, 视频→提示/watch,
         # 目录→listdir+关键文件读取
-        enriched_prompt = input_data.task
+        enriched_prompt = history_block + input_data.task
         files = await self._read_referenced_files(input_data.task)
         media = await self._process_media_files(input_data.task)
         # 目录探索——用户引用项目目录时自动列结构+读关键文件

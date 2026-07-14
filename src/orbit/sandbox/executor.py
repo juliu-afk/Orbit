@@ -29,13 +29,32 @@ MAX_READONLY_MOUNTS = 5  # Session PR #2: 最多挂载 5 个只读项目路径
 class SandboxError(Exception):
     """沙箱执行错误基类。"""
 
+    def __init__(self, message: str, structured: dict | None = None) -> None:
+        super().__init__(message)
+        # V15.2: 结构化错误信息——AI 可基于此自动修正
+        self.structured = structured or {}
+
 
 class SandboxTimeoutError(SandboxError):
     """执行超时。"""
 
 
 class SandboxExecutionError(SandboxError):
-    """代码执行失败（非零退出码）。"""
+    """代码执行失败（非零退出码）。
+
+    V15.2: 自动解析 stderr 提取结构化错误信息。
+    """
+
+    def __init__(
+        self,
+        message: str,
+        exit_code: int = 1,
+        stderr: str = "",
+    ) -> None:
+        structured = _parse_error_stderr(stderr)
+        super().__init__(message, structured)
+        self.exit_code = exit_code
+        self.stderr = stderr
 
 
 class Sandbox:
@@ -264,3 +283,90 @@ def _to_docker_path(host_path: str) -> str:
         rest = host_path[2:].replace("\\", "/")
         return f"//{drive}{rest}"
     return host_path
+
+
+# ── V15.2: 结构化错误解析 ──────────────────────────────
+
+
+def _parse_error_stderr(stderr: str) -> dict:
+    """从 stderr 提取结构化错误信息——AI 修正闭环。
+
+    返回: {"error_type": str, "line": int|None, "col": int|None, "message": str,
+            "fix_suggestion": str, "raw": str}
+    """
+    import re
+
+    result: dict = {
+        "error_type": "unknown",
+        "line": None,
+        "col": None,
+        "message": "",
+        "fix_suggestion": "",
+        "raw": stderr[:500] if stderr else "",
+    }
+
+    if not stderr:
+        return result
+
+    # Python traceback: File "xxx", line N, in yyy
+    tb_match = re.search(
+        r'File "([^"]+)", line (\d+)(?:, in (\w+))?', stderr
+    )
+    if tb_match:
+        result["line"] = int(tb_match.group(2))
+        result["error_type"] = "python_traceback"
+
+    # Python 错误类型: TypeError/NameError/...
+    err_match = re.search(
+        r'(TypeError|NameError|ValueError|AttributeError|KeyError|'
+        r'IndexError|ImportError|ModuleNotFoundError|SyntaxError|'
+        r'ZeroDivisionError|FileNotFoundError|PermissionError|'
+        r'RuntimeError|OSError)(?:: (.+))?',
+        stderr,
+    )
+    if err_match:
+        result["error_type"] = err_match.group(1)
+        result["message"] = err_match.group(3) or err_match.group(2) or ""
+
+    # SyntaxError: 额外提取行列
+    syntax_match = re.search(r'SyntaxError:.*line (\d+)', stderr)
+    if syntax_match:
+        result["error_type"] = "SyntaxError"
+        result["line"] = int(syntax_match.group(1))
+
+    # ESLint/TS 格式: path:line:col: error ...
+    eslint_match = re.search(
+        r'(.+?):(\d+):(\d+):\s*(error|warning)\s+(.+)', stderr
+    )
+    if eslint_match:
+        result["error_type"] = eslint_match.group(4)
+        result["line"] = int(eslint_match.group(2))
+        result["col"] = int(eslint_match.group(3))
+        result["message"] = eslint_match.group(5)
+
+    # 生成修正建议
+    if result["error_type"] != "unknown":
+        result["fix_suggestion"] = _suggest_fix(result["error_type"], result["message"])
+
+    return result
+
+
+def _suggest_fix(error_type: str, message: str) -> str:
+    """根据错误类型生成修复建议——供 AI 修正循环使用。"""
+    suggestions = {
+        "ImportError": "检查 import 路径是否正确，确保模块已安装（pip install）",
+        "ModuleNotFoundError": "缺少依赖——运行 pip install 安装对应包",
+        "NameError": "变量或函数名未定义——检查拼写或定义顺序",
+        "TypeError": "类型不匹配——检查参数类型或返回值类型",
+        "AttributeError": "对象没有该属性——检查对象类型或方法名拼写",
+        "KeyError": "字典键不存在——检查键名拼写或用 .get() 安全访问",
+        "IndexError": "列表索引越界——检查索引范围或列表长度",
+        "FileNotFoundError": "文件路径错误——检查文件是否存在",
+        "SyntaxError": "语法错误——检查第 {line} 行附近的语法",
+        "ZeroDivisionError": "除以零——检查分母是否为零",
+        "PermissionError": "权限不足——检查文件权限或是否被占用",
+    }
+    suggestion = suggestions.get(error_type, "检查错误信息并修正对应代码")
+    if "{line}" in suggestion:
+        suggestion = suggestion.format(line="?")
+    return f"{suggestion}. 原始错误: {message[:100]}" if message else suggestion

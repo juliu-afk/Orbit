@@ -673,11 +673,35 @@ class ToolRegistry:
         """调用工具——权限检查 + 限流检查 + 执行 + 审计."""
         start = time.time()
 
+        # V15.2: Domain Action 路由——检查是否为领域调用
+        if self._domain_router and self._domain_router.has_domain(name):
+            try:
+                result = asyncio.run(self._domain_router.dispatch(name, params))
+                inv = ToolInvocation(
+                    tool_name=name,
+                    params=params,
+                    agent=agent_name,
+                    result=str(result)[:200],
+                    elapsed_ms=int((time.time() - start) * 1000),
+                    status="ok",
+                )
+                self._invocations.append(inv)
+                return result
+            except ValueError as e:
+                raise ToolNotFoundError(f"领域 '{name}' 动作无效: {e}") from e
+            except Exception as e:
+                inv = ToolInvocation(
+                    tool_name=name, params=params, agent=agent_name,
+                    result=str(e)[:200],
+                    elapsed_ms=int((time.time() - start) * 1000),
+                    status="error",
+                )
+                self._invocations.append(inv)
+                raise
+
         # 新 API 路径
         entry = self._entries.get(name)
         if entry is not None:
-            import asyncio
-
             try:
                 # 安全执行 async handler——兼容同步和异步调用上下文
                 try:

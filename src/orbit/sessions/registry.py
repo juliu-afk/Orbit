@@ -37,6 +37,24 @@ class SessionRegistry:
     def __init__(self, db_path: str = DEFAULT_DB_PATH) -> None:
         self._db_path = db_path
         self._conn: sqlite3.Connection | None = None
+        self._locks: dict[str, object] = {}  # V16.0 Phase A: 会话级并发锁
+
+    def get_session_lock(self, session_id: str) -> object:
+        """V16.0 Phase A: 会话级锁——同session串行处理消息。"""
+        import asyncio
+        if session_id not in self._locks:
+            self._locks[session_id] = asyncio.Lock()
+        return self._locks[session_id]
+
+    def update_message(self, msg_id: int, **kwargs) -> None:
+        """V16.0 Phase A: 更新消息——占位→已发送, 或更新content/status。"""
+        conn = self._get_conn()
+        sets = ", ".join(f"{k}=?" for k in kwargs)
+        conn.execute(
+            f"UPDATE chat_messages SET {sets} WHERE id=?",
+            (*kwargs.values(), msg_id),
+        )
+        conn.commit()
 
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
@@ -93,6 +111,13 @@ class SessionRegistry:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(session_id, created_at)"
         )
+        # V16.0 Phase A: 消息持久化——status + parts + structured_output
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN status TEXT DEFAULT 'sent'")
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN parts TEXT DEFAULT '[]'")
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN structured_output TEXT DEFAULT ''")
         # V15.3: session_summaries — 跨 session 长期记忆（US4）
         conn.execute("""
             CREATE TABLE IF NOT EXISTS session_summaries (
@@ -246,14 +271,23 @@ class SessionRegistry:
         content: str,
         candidates: list[dict[str, Any]] | None = None,
         cross_project_warning: str | None = None,
+        status: str = "sent",
+        parts: list[dict[str, Any]] | None = None,
+        structured_output: str = "",
     ) -> ChatMessageRecord:
-        """添加一条聊天消息。返回带自增 ID 的 ChatMessageRecord。"""
+        """添加一条聊天消息——V16.0: role统一为assistant, 返回自增ID。
+
+        status: "pending"(占位) | "sent"(已送达) | "error"(发送失败)
+        """
+        # V16.0 Phase A: role统一——agent→assistant
+        if role == "agent":
+            role = "assistant"
         conn = self._get_conn()
         now = time.time()
         cursor = conn.execute(
             "INSERT INTO chat_messages "
-            "(session_id, role, content, candidates, cross_project_warning, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "(session_id, role, content, candidates, cross_project_warning, created_at, status, parts, structured_output) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 session_id,
                 role,
@@ -261,6 +295,9 @@ class SessionRegistry:
                 json.dumps(candidates or []),
                 cross_project_warning,
                 now,
+                status,
+                json.dumps(parts or []),
+                structured_output,
             ),
         )
         conn.commit()
@@ -275,7 +312,8 @@ class SessionRegistry:
             created_at=now,
         )
 
-    def get_messages(self, session_id: str, limit: int = 50) -> list[ChatMessageRecord]:
+    def get_messages(self, session_id: str, limit: int = 200) -> list[ChatMessageRecord]:
+        """获取会话消息——V16.0: 默认200条安全网，传0=无上限(token预算驱动)。"""
         """获取 Session 的最近 N 条消息。"""
         rows = (
             self._get_conn()

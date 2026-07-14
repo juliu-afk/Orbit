@@ -416,7 +416,7 @@ async def _handle_chat(
         if text.strip().startswith("/parse"):
             await _handle_parse_command(ws, text.strip())
             return
-        if text.strip().startswith("/compact"):
+        if text.strip().startswith("/compact ") or text.strip() == "/compact":
             await _handle_compact_command(ws, text.strip())
             return
 
@@ -668,6 +668,7 @@ async def _handle_confirm(
         # V15.3 US2: 生成交接摘要 + 提取 user_goal
         user_goal = prd.goal if hasattr(prd, "goal") else ""
         handoff_summary = ""
+        history_block = ""  # 初始化——即使 session 无历史也不报 NameError
         try:
             msgs = _session_registry.get_messages(session_id, limit=100) if session_id else []
             if msgs:

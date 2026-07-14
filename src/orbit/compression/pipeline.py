@@ -136,10 +136,15 @@ class CompressionPipeline:
 
     @staticmethod
     def _truncate_grep(msg: dict[str, Any], content: str) -> dict[str, Any]:
-        """grep: 保留匹配行 Top-50，去重，按行号排序。"""
+        """grep: 保留匹配行 Top-50，去重，按行号排序。
+
+        WHY 二次检查: match_lines <= 50 但 content 仍可能超 MAX_CHARS——
+        非匹配行（注释、空行、分隔符）占了空间。此时仍需截断。
+        """
+        MAX_CHARS = 10000
         lines = content.split("\n")
         match_lines = [ln for ln in lines if ":" in ln and not ln.startswith("--")]
-        if len(match_lines) <= 50:
+        if len(match_lines) <= 50 and len(content) <= MAX_CHARS:
             return msg
         # 保留前 25 + 后 25 条匹配（覆盖面最广）
         kept = match_lines[:25] + match_lines[-25:]

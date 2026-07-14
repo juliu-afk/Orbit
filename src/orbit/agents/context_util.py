@@ -13,9 +13,13 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+# 延迟导入——避免循环依赖
+from orbit.compression.token_counter import count_tokens  # noqa: E402
 
 # ── 上下文参数 ──────────────────────────────────────────
 
@@ -68,8 +72,6 @@ def _build_history_block(history: list[dict[str, str]]) -> str:
     if not history:
         return ""
 
-    from orbit.compression.token_counter import count_tokens
-
     kept: list[str] = []
     token_used = count_tokens(_OMITTED_MSG) + 20
 
@@ -118,6 +120,16 @@ def _build_history_block(history: list[dict[str, str]]) -> str:
     return "## 对话历史\n\n" + "\n".join(kept) + "\n\n---\n\n"
 
 
+@lru_cache(maxsize=1)
+def _get_bge_model():
+    """缓存 BGE 模型——避免每次调用重新加载 ~100MB 模型文件。
+
+    WHY lru_cache: 进程内单例，首次调用加载，后续命中缓存。
+    """
+    from sentence_transformers import SentenceTransformer
+    return SentenceTransformer("BAAI/bge-small-zh-v1.5")
+
+
 def _build_history_block_with_relevance(
     history: list[dict[str, str]],
     current_query: str,
@@ -142,23 +154,32 @@ def _build_history_block_with_relevance(
     # BGE 相关性检索
     relevant: list[dict[str, str]] = []
     try:
-        from sentence_transformers import SentenceTransformer
         import numpy as np
+        model = _get_bge_model()
+        older_contents = [
+            str(h.get("content", "")) for h in older
+            if len(str(h.get("content", ""))) >= 10
+        ]
+        if not older_contents:
+            raise ValueError("no_content")
 
-        model = SentenceTransformer("BAAI/bge-small-zh-v1.5")
         query_emb = model.encode(current_query, normalize_embeddings=True)
+        # 批量编码——每消息单独 encode 会浪费 ~30MB 重新加载
+        content_embs = model.encode(older_contents, normalize_embeddings=True)
+        scores = np.dot(content_embs, query_emb)  # shape: (N,)
 
         scored = []
-        for h in older:
-            content = str(h.get("content", ""))
-            if len(content) < 10:
-                continue
-            emb = model.encode(content, normalize_embeddings=True)
-            score = float(np.dot(query_emb, emb))
-            if score > 0.5:  # 相关性阈值
-                scored.append((score, h))
+        for i, score in enumerate(scores):
+            if float(score) > 0.5:  # 相关性阈值
+                # 找到对应的原始 history 条目
+                orig_idx = 0
+                for h in older:
+                    if str(h.get("content", "")) == older_contents[i]:
+                        break
+                    orig_idx += 1
+                scored.append((float(score), older[orig_idx] if orig_idx < len(older) else older[i]))
         scored.sort(key=lambda x: x[0], reverse=True)
-        relevant = [h for _, h in scored[:5]]  # Top-5
+        relevant = [h for _, h in scored[:5]]
     except Exception:
         # fail-open: BGE 不可用 → 回退纯时间序
         return _build_history_block(history)

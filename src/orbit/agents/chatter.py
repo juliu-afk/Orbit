@@ -277,7 +277,7 @@ def _extract_media_refs(text: str) -> dict[str, list[str]]:
 
 
 # _build_history_block + 常量已提取到 orbit.agents.context_util——全 Agent 统一使用
-from orbit.agents.context_util import _build_history_block  # noqa: F401
+from orbit.agents.context_util import _build_history_block
 
 
 CHATTER_SYSTEM_PROMPT = """你是 Orbit 的通用对话助手（ChatterAgent）。你是用户接触 Orbit 的第一个 Agent。

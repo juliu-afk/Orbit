@@ -197,8 +197,9 @@ async def request_human_clarification(params: dict) -> dict:
         from orbit.metacognition.hitl import HITLManager
         hitl = HITLManager()
         hitl.request_clarification(task_id=task_id, question=question_text)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("human_escalation_hitl_failed", task_id=task_id, error=str(e))
+        # HITL 推送失败——但仍记录 Grill 并返回 "pending"，Agent 继续执行
 
     await _record_grill(task_id, params.get("_agent_role", "unknown"), "human", grill.question, "")
     return {

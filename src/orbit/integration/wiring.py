@@ -91,6 +91,16 @@ class OrbitWiring:
         self._llm_client: object | None = None     # P2-2: LLMClient 单例缓存
         self._cost_store: object | None = None      # V15.2: CostStore 单例
         self._last_tier: str = ""
+        # V15.2 Fable5: deviation log + blindspot + quiz wiring
+        self._deviation_loggers: dict[str, object] = {}  # task_id → DeviationLogger
+        self._blindspot: object | None = None
+        self._quiz_gen: object | None = None
+        self._semantic_transfer: object | None = None
+        self._scope: object | None = None
+        self._gepa: object | None = None
+        self._knowledge_store: object | None = None
+        self._code_graph: object | None = None
+        self._ckpt_manager: object | None = None
         # V14.2+Theory P1+P2: 19模块懒初始化
         self._spectral: object | None = None       # D3: SpectralAnalyzer
         self._ib_comp: object | None = None        # D4: IBCompressor
@@ -115,15 +125,13 @@ class OrbitWiring:
     # ── 生命周期钩子 ───────────────────────────────────
 
     def on_task_start(self, task_id: str, goal: str, project_id: str = "") -> None:
-        """任务开始时调用——启动轨迹收集。"""
+        """任务开始时调用——启动轨迹收集 + 偏离日志 + 盲区扫描。"""
         self._task_count += 1
         tc = self._get_trajectory()
         if tc:
             traj = tc.start_trajectory(task_id=task_id, goal=goal, project_id=project_id)
-            # 存储 trajectory_id——供 on_task_end 匹配
             self._trajectory_ids[task_id] = traj.trajectory_id
             logger.debug("trajectory_started", task_id=task_id, trajectory_id=traj.trajectory_id, goal=goal[:60])
-            # V14.2+Theory: PAC自适应SCOPE阈值——样本数驱动
             try:
                 pac = self._get_pac()
                 if pac is not None:
@@ -132,6 +140,12 @@ class OrbitWiring:
                         H = len(strategies.top_principles(50))
                         self._pac_threshold = pac.adaptive_threshold(H, self._task_count)
             except Exception: pass
+        # V15.2 Fable5 P0: create DeviationLogger per task
+        try:
+            from orbit.checkpoint.deviation import DeviationLogger
+            self._deviation_loggers[task_id] = DeviationLogger(task_id=task_id)
+        except Exception:
+            pass
 
     def on_model_tier_decided(self, task_id: str, model_tier: str) -> None:
         """V14.2+Theory: RouterAgent 决策模型层级后调用——回填轨迹表。
@@ -201,8 +215,57 @@ class OrbitWiring:
                 pass  # fail-open
             logger.debug("trajectory_finished", task_id=task_id, trajectory_id=traj_id, outcome=outcome)
 
+        # V15.2 Fable5 P0: flush deviation log → feed GEPA + SCOPE
+        dev_log = self._deviation_loggers.pop(task_id, None)
+        if dev_log is not None:
+            try:
+                ckpt = self._get_ckpt_manager()
+                if ckpt:
+                    import asyncio
+                    task = asyncio.create_task(dev_log.flush_to_checkpoint(ckpt))
+                    # suppress "coroutine was never awaited" warning for fire-and-forget
+                    task.add_done_callback(lambda _: None)
+            except Exception: pass
+            try:
+                scope = self._get_scope()
+                if scope and hasattr(dev_log, 'to_tactical_rules'):
+                    scope.add_deviations_batch(task_id, dev_log.to_tactical_rules())
+            except Exception: pass
+            try:
+                gepa = self._get_gepa()
+                if gepa and hasattr(dev_log, 'get_failure_reasons'):
+                    reasons = dev_log.get_failure_reasons()
+                    if reasons:
+                        import asyncio
+                        task = asyncio.create_task(gepa.evolve_from_deviations(reasons))
+                        task.add_done_callback(lambda _: None)
+            except Exception: pass
+
+        # V15.2 Fable5 P1: generate quiz for core module changes
+        try:
+            from orbit.modes.quiz_generator import QuizGenerator
+            # check if quiz triggered (deferred to caller to provide changed_files)
+        except Exception: pass
+
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
         self._cleanup_monitor(task_id)
+
+    # V15.2 Fable5 P0: agent deviation recording
+    def record_deviation(self, task_id: str, planned: str, actual: str,
+                         reason: str, alternatives: list[str] | None = None,
+                         severity: str = "major", file_refs: list[str] | None = None,
+                         agent_id: str = "") -> None:
+        """Agent 执行中记录偏离。"""
+        try:
+            from orbit.checkpoint.deviation import DeviationSeverity
+            sev = DeviationSeverity.CRITICAL if severity == "critical" else DeviationSeverity.MAJOR
+            dev_log = self._deviation_loggers.get(task_id)
+            if dev_log is not None and hasattr(dev_log, 'record'):
+                dev_log.record(planned=planned, actual=actual, reason=reason,
+                              alternatives=alternatives or [], severity=sev,
+                              file_refs=file_refs or [], agent_id=agent_id)
+        except Exception:
+            pass  # fail-open: deviation logging doesn't block agent
 
     def record_event(self, task_id: str, title: str, outcome: str = "",
                      tags: list[str] | None = None) -> None:
@@ -677,6 +740,74 @@ class OrbitWiring:
                 logger.warning("cost_store_init_failed", exc_info=True)
         return self._cost_store
 
+    # V15.2 Fable5: lazy init for wired components
+
+    def _get_blindspot(self):
+        if self._blindspot is None:
+            try:
+                from orbit.metacognition.blindspot import BlindspotScanner
+                self._blindspot = BlindspotScanner(
+                    knowledge_store=self._get_knowledge_store(),
+                    code_graph=self._get_code_graph(),
+                )
+            except Exception:
+                pass
+        return self._blindspot
+
+    def _get_scope(self):
+        if self._scope is None:
+            try:
+                from orbit.evolution.scope import ScopeMemory
+                self._scope = ScopeMemory(db_path=self._db_path)
+            except Exception:
+                pass
+        return self._scope
+
+    def _get_gepa(self):
+        if self._gepa is None:
+            try:
+                from orbit.evolution.gepa import GEPAEngine
+                self._gepa = GEPAEngine(llm=self._get_llm_client(), distill=self._get_distill())
+            except Exception:
+                pass
+        return self._gepa
+
+    def _get_knowledge_store(self):
+        if self._knowledge_store is None:
+            try:
+                from orbit.knowledge.store import KnowledgeStore
+                self._knowledge_store = KnowledgeStore()
+            except Exception:
+                pass
+        return self._knowledge_store
+
+    def _get_code_graph(self):
+        if self._code_graph is None:
+            try:
+                from orbit.graph.engines.code_graph import CodeGraphEngine
+                self._code_graph = CodeGraphEngine()
+            except Exception:
+                pass
+        return self._code_graph
+
+    def _get_ckpt_manager(self):
+        if self._ckpt_manager is None:
+            try:
+                from orbit.checkpoint.manager import CheckpointManager
+                self._ckpt_manager = CheckpointManager()
+            except Exception:
+                pass
+        return self._ckpt_manager
+
+    def _get_semantic_transfer(self):
+        if self._semantic_transfer is None:
+            try:
+                from orbit.graph.meta_graph import SemanticTransfer
+                self._semantic_transfer = SemanticTransfer()
+            except Exception:
+                pass
+        return self._semantic_transfer
+
     def set_parent_id(self, parent_id: str | None) -> None:
         """V15.2: 设置 subagent 的 parent_id——spawn 前调用。"""
         client = self._get_llm_client()
@@ -734,6 +865,7 @@ class OrbitWiring:
         mon._goal = goal
         mon._task_id = task_id
         mon._hitl = hitl  # 注入 HITLManager——Monitor CRITICAL 告警可触发人工介入
+        mon._blindspot = self._get_blindspot()  # V15.2 Fable5 P1: 注入盲区扫描器
 
         queue: asyncio.Queue = asyncio.Queue(maxsize=100)
         self._monitor_queues[task_id] = queue

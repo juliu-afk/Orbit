@@ -79,7 +79,12 @@ class ComposeOrchestrator:
             "compose_run_spec",
             title=spec.title,
             task_count=len(spec.tasks),
+            strategy=spec.strategy,
         )
+
+        # V15.2 Fable5 P2-1: prototype-first routing
+        if spec.strategy == "prototype_first":
+            return await self._run_prototype_first(spec)
 
         # Phase 4 AC-B4: 创建 Worktree 隔离工作区
         wt_record = None
@@ -234,6 +239,53 @@ class ComposeOrchestrator:
             logger.info("brief_generated", project_path=str(project_path))
         except Exception as e:
             logger.warning("brief_ensure_failed", error=str(e))
+
+    # V15.2 Fable5 P2-1: prototype-first execution path
+
+    async def _run_prototype_first(self, spec: Spec) -> dict[str, Any]:
+        """Execute spec with prototype-first strategy.
+
+        Generate standalone HTML → collect feedback → extract design decisions.
+        The design context is injected into the implementation phase.
+        """
+        try:
+            from orbit.compose.prototype_first import PrototypeFirstGuide
+        except ImportError:
+            return {"status": "error", "error": "PrototypeFirstGuide not available"}
+
+        guide = PrototypeFirstGuide(llm=getattr(self, '_llm', None))
+        proto = await guide.generate_prototype(spec.description)
+
+        if not spec.tasks:
+            return {
+                "status": "prototype_ready",
+                "html": proto.html,
+                "message": "Prototype generated. Provide feedback to continue to implementation.",
+            }
+
+        # If tasks are specified, inject design context and proceed
+        design_ctx = guide.get_design_context()
+        if design_ctx:
+            logger.info("prototype_design_context", title=spec.title, len=len(design_ctx))
+
+        # Fall through to standard task execution with design context injected
+        return await self._run_tasks_with_context(spec, design_ctx)
+
+    async def _run_tasks_with_context(self, spec: Spec, design_context: str) -> dict[str, Any]:
+        """Execute tasks with prototype-derived design context injected."""
+        results = {}
+        for task in self._topological_sort(spec.tasks):
+            if design_context:
+                task.description = f"{task.description}\n\n{design_context}"
+            try:
+                desc = f"[{task.id}] {task.description}"
+                deferred = self.actor_spawn.spawn(task=desc, role=task.agent_role)
+                result = await deferred.result(timeout=600)
+                results[task.id] = {"status": "ok", "result": str(result)}
+            except Exception as e:
+                results[task.id] = {"status": "error", "error": str(e)}
+        all_ok = all(r.get("status") == "ok" for r in results.values())
+        return {"status": "ok" if all_ok else "partial", "tasks": results}
 
     async def _spec_review(self, spec: Spec) -> dict[str, Any]:
         """方案审查门禁——检查 spec 完整性。"""

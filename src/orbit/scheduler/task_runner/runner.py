@@ -171,6 +171,15 @@ class TaskRunner(TaskContextMixin, TaskCheckpointMixin):
                     )
                 except Exception:
                     pass
+                # V15.2 Fable5 P1: blindspot preflight
+                try:
+                    blindspot_report = await w.preflight_blindspot(
+                        task_id, task_desc=prd[:500],
+                        task_files=context.get("changed_files", []))
+                    if blindspot_report is not None:
+                        context["blindspot_report"] = blindspot_report
+                except Exception:
+                    pass
         except Exception:
             pass
 

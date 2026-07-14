@@ -17,6 +17,15 @@ import structlog
 logger = structlog.get_logger("orbit.meta_graph")
 
 
+def _escape_like(value: str) -> str:
+    """转义 LIKE 模式中的特殊字符——防 SQL 注入。
+
+    WHY: LIKE 的 % _ \ 有特殊含义，用户输入的 source_id/config_key
+    可能含这些字符，直接拼入 LIKE 模式会导致意外匹配或注入。
+    """
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class RelationType(StrEnum):
     """跨图谱关系类型。"""
 
@@ -162,7 +171,7 @@ class MetaGraph:
             self._get_conn()
             .execute(
                 "SELECT * FROM cross_graph_relations WHERE source_type='config' AND source_id LIKE ?",
-                (f"%{config_key}%",),
+                (f"%{_escape_like(config_key)}%",),
             )
             .fetchall()
         )

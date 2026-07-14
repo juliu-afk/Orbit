@@ -132,6 +132,26 @@ class IntakeRouter:
         )
         return result
 
+    # ── V15.2: 目标规划 ──────────────────────────────
+
+    async def plan_for(self, description: str, constraints: list[str] | None = None):
+        """摄入后生成执行计划——连接 GoalPlanner。
+
+        调用时机: IntakeRouter.route() 判定 needs_decompose=True 后，
+        由 compose_bridge 或 meta_orchestrator 调用。
+
+        Returns:
+            ExecutionPlan | None——LLM 不可用时返回 None（降级默认线性规划）
+        """
+        try:
+            from orbit.goal.planner import GoalPlanner
+
+            planner = GoalPlanner(self._llm)
+            return await planner.plan(description, constraints)
+        except Exception as e:
+            logger.warning("planner_unavailable", error=str(e)[:80])
+            return None
+
     # ── 内部 ──────────────────────────────────────────
 
     @staticmethod

@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 import ast
 import importlib
-import json as _json
 import threading
 import time
 from collections import deque
@@ -23,7 +22,6 @@ import structlog
 
 from orbit.tools.models import ToolInvocation, ToolSchema
 from orbit.tools.registry.models import (
-    DoomLoopError,
     PermissionError,
     RateLimitError,
     ToolCall,
@@ -31,7 +29,6 @@ from orbit.tools.registry.models import (
     ToolEntry,
     ToolHandler,
     ToolNotFoundError,
-    WorkspaceViolationError,
 )
 
 logger = structlog.get_logger("orbit.tools")
@@ -118,8 +115,18 @@ class ToolRegistry:
         # MCP 客户端连接: server_name -> MCPClientConnection
         self._mcp_connections: dict[str, Any] = {}
         # 确认回路: confirm_id → (asyncio.Event, result dict)
+        # V15.2: Domain Action 路由器——领域分组，减少 context bloat
+        self._domain_router: Any = None
         self._pending_confirms: dict[str, tuple[object, dict]] = {}
         self._confirm_counter: int = 0
+        self._register_fable5_tools()
+
+    def _register_fable5_tools(self) -> None:
+        try:
+            from orbit.tools.registry.fable5_tools import register_fable5_tools
+            register_fable5_tools(self)
+        except Exception:
+            pass
 
     # ── 单例 ─────────────────────────────────────────
 
@@ -302,6 +309,43 @@ class ToolRegistry:
                 schemas.append(schema.parameters)
             seen.add(name)
 
+        return schemas
+
+    # ── V15.2: Domain Action 路由器 ────────────────────
+
+    def _get_domain_router(self):
+        """懒初始化 DomainActionRouter——首次 register_domain 时创建。"""
+        if self._domain_router is None:
+            from orbit.tools.registry.domain import DomainActionRouter
+            self._domain_router = DomainActionRouter()
+        return self._domain_router
+
+    def register_domain(
+        self, domain: str, action: str, handler: Any
+    ) -> None:
+        """V15.2: 注册领域动作——减少 context bloat。
+
+        将同类工具收敛为单个 MCP tool，通过 action 参数路由。
+        与 register() 互补——已有独立工具保持兼容，新工具可用 domain 分组。
+
+        Usage:
+            registry.register_domain("file", "read", read_handler)
+            registry.register_domain("file", "write", write_handler)
+            # → MCP 只暴露一个 "file" tool，action enum: ["read", "write"]
+        """
+        router = self._get_domain_router()
+        router.register(domain, action, handler)
+
+    def get_domain_schemas(self) -> list[dict]:
+        """返回所有领域工具的 MCP schema——混入 list_tools 输出。"""
+        if self._domain_router is None:
+            return []
+        schemas = []
+        router = self._get_domain_router()
+        for domain in router.domains():
+            schema = router.generate_mcp_schema(domain)
+            if schema:
+                schemas.append(schema)
         return schemas
 
     # ── 工具分发 (ReAct 循环核心) ──────────────────────────

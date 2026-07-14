@@ -101,6 +101,7 @@ class OrbitWiring:
         self._knowledge_store: object | None = None
         self._code_graph: object | None = None
         self._ckpt_manager: object | None = None
+        self._task_files: dict[str, list[str]] = {}
         # V14.2+Theory P1+P2: 19模块懒初始化
         self._spectral: object | None = None       # D3: SpectralAnalyzer
         self._ib_comp: object | None = None        # D4: IBCompressor
@@ -241,10 +242,16 @@ class OrbitWiring:
                         task.add_done_callback(lambda _: None)
             except Exception: pass
 
-        # V15.2 Fable5 P1: generate quiz for core module changes
+        # V15.2 Fable5 P1: quiz trigger for core module changes
         try:
+            changed_files = self._task_files.pop(task_id, [])
             from orbit.modes.quiz_generator import QuizGenerator
-            # check if quiz triggered (deferred to caller to provide changed_files)
+            if QuizGenerator.should_trigger(changed_files) and self._event_bus:
+                from orbit.events.schemas import DashboardEvent
+                self._event_bus.publish(DashboardEvent(
+                    type="quiz_required", task_id=task_id,
+                    payload={"task_id": task_id, "changed_files": changed_files},
+                ))
         except Exception: pass
 
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列

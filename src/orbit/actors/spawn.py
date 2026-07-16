@@ -173,8 +173,8 @@ class ActorSpawn:
                         f"[{m.role}] {m.content[:200]}" for m in msgs[-20:]
                     )
                     logger.debug("subagent_context_injected", session_id=sid[:8], messages=len(msgs))
-            except Exception:
-                pass  # fail-open: SubAgent 上下文注入失败不阻塞 spawn
+            except Exception as e:
+                logger.warning("subagent_context_inject_failed", error=str(e)[:200])
 
         input_data = AgentInput(
             task=task,

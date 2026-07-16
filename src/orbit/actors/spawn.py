@@ -160,19 +160,21 @@ class ActorSpawn:
         # Phase 4 AC-B4: 注入 worktree 路径到上下文
         if workspace_path:
             ctx["workspace_path"] = workspace_path
-        # V16.0 Phase D: SubAgent上下文——注入session_id+handoff_summary防上下文断裂
-        if "session_id" not in ctx and parent_task_id:
+        # V16.0 Phase D: SubAgent上下文——注入conversation_history防上下文断裂
+        # WHY: 调用方通过 context={"session_id": ...} 明确传递，不依赖 parent_task_id
+        sid = ctx.get("session_id", "")
+        if sid:
             try:
                 from orbit.sessions.registry import SessionRegistry
                 sr = SessionRegistry()
-                msgs = sr.get_messages(parent_task_id, limit=100) if parent_task_id else []
+                msgs = sr.get_messages(sid, limit=100)
                 if msgs:
                     ctx["conversation_history"] = "\n".join(
                         f"[{m.role}] {m.content[:200]}" for m in msgs[-20:]
                     )
-                    ctx["session_id"] = parent_task_id
-            except Exception:
-                pass  # fail-open: SubAgent 上下文注入失败不阻塞 spawn
+                    logger.debug("subagent_context_injected", session_id=sid[:8], messages=len(msgs))
+            except Exception as e:
+                logger.warning("subagent_context_inject_failed", error=str(e)[:200])
 
         input_data = AgentInput(
             task=task,

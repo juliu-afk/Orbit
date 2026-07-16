@@ -428,4 +428,9 @@ class SessionRegistry:
             candidates=_json_list(row["candidates"]),
             cross_project_warning=row["cross_project_warning"] or None,
             created_at=row["created_at"] or 0.0,
+            status=row["status"] if "status" in row.keys() else "sent",
+            parts=_json_list(row["parts"]) if "parts" in row.keys() else [],
+            structured_output=row["structured_output"] if "structured_output" in row.keys() else "",
+            input_tokens=row["input_tokens"] if "input_tokens" in row.keys() else 0,
+            output_tokens=row["output_tokens"] if "output_tokens" in row.keys() else 0,
         )

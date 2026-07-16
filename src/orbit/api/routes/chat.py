@@ -681,7 +681,8 @@ async def _handle_chat(
     # V16.0 Phase A: 发送成功→更新占位为 sent
     if placeholder_id and session_id:
         try:
-            _session_registry.update_message(placeholder_id, status="sent")
+            _session_registry.update_message(placeholder_id, status="sent",
+                input_tokens=0, output_tokens=0)
         except Exception:
             pass
 

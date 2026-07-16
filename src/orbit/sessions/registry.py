@@ -123,6 +123,11 @@ class SessionRegistry:
             conn.execute("ALTER TABLE chat_messages ADD COLUMN compacted INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             logger.debug("compacted_column_exists", db_path=self._db_path)
+        # V16.0 Phase E: Token追踪
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN input_tokens INTEGER DEFAULT 0")
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN output_tokens INTEGER DEFAULT 0")
         # V15.3: session_summaries — 跨 session 长期记忆（US4）
         conn.execute("""
             CREATE TABLE IF NOT EXISTS session_summaries (

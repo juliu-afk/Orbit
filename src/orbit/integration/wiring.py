@@ -248,7 +248,7 @@ class OrbitWiring:
 
         # V16.0 Phase F: Grill Pattern → GEPA/SCOPE 反馈进化
         try:
-            import sqlite3, json as _json
+            import sqlite3
             conn = sqlite3.connect(self._db_path)
             rows = conn.execute(
                 "SELECT asking_agent, answering_agent, COUNT(*) as cnt "
@@ -257,17 +257,24 @@ class OrbitWiring:
             ).fetchall()
             if rows:
                 gepa = self._get_gepa()
-                if gepa:
-                    patterns = [f"{r[0]}→{r[1]}: {r[2]}次" for r in rows]
-                    asyncio.create_task(gepa.evolve_from_deviations(
-                        [f"Grill模式: {p}" for p in patterns]
-                    )).add_done_callback(lambda _: None)
                 scope = self._get_scope()
+                patterns = [f"{r[0]}→{r[1]}: {r[2]}次" for r in rows]
+                if gepa:
+                    task = asyncio.create_task(
+                        gepa.evolve_from_deviations([f"Grill模式: {p}" for p in patterns])
+                    )
+                    task.add_done_callback(
+                        lambda t: logger.warning("gepa_evolve_failed", error=str(t.exception()))
+                        if t.exception() else None
+                    )
                 if scope:
-                    scope.add_deviations_batch(task_id,
-                        [f"Agent {r[0]} 频繁向 {r[1]} 查询——上下文模板缺字段" for r in rows])
+                    scope.add_deviations_batch(
+                        task_id,
+                        [f"Agent {r[0]} 频繁向 {r[1]} 查询——上下文模板缺字段" for r in rows],
+                    )
             conn.close()
-        except Exception: pass
+        except Exception as e:
+            logger.warning("grill_pattern_extract_failed", task_id=task_id, error=str(e)[:200])
 
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
         self._cleanup_monitor(task_id)

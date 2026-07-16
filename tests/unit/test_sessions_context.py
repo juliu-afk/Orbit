@@ -20,3 +20,21 @@ class TestPromptPonytail:
     def test_rules(self):
         from orbit.prompt.ponytail_rules import PONYTAIL_RULES
         assert isinstance(PONYTAIL_RULES, (dict, list))
+
+class TestTokenFields:
+    """V16.0 Phase E: Token持久化字段测试。"""
+
+    def test_chat_message_has_token_fields(self):
+        from orbit.sessions.models import ChatMessageRecord
+        r = ChatMessageRecord()
+        assert hasattr(r, "input_tokens")
+        assert hasattr(r, "output_tokens")
+        assert r.input_tokens == 0
+        assert r.output_tokens == 0
+
+    def test_token_fields_in_to_dict(self):
+        from orbit.sessions.models import ChatMessageRecord
+        r = ChatMessageRecord(input_tokens=1500, output_tokens=500)
+        d = r.to_dict()
+        assert d["input_tokens"] == 1500
+        assert d["output_tokens"] == 500

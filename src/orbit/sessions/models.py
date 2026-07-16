@@ -52,6 +52,9 @@ class ChatMessageRecord:
     status: str = "sent"  # pending | sent | error
     parts: list[dict[str, Any]] = field(default_factory=list)  # [{"type":"text","content":""},{"type":"tool",...}]
     structured_output: str = ""  # JSON——PRD/其他结构化数据
+    # V16.0 Phase E: Token追踪
+    input_tokens: int = 0
+    output_tokens: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -65,4 +68,6 @@ class ChatMessageRecord:
             "status": self.status,
             "parts": self.parts,
             "structured_output": self.structured_output,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
         }

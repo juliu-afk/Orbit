@@ -123,6 +123,11 @@ class SessionRegistry:
             conn.execute("ALTER TABLE chat_messages ADD COLUMN compacted INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             logger.debug("compacted_column_exists", db_path=self._db_path)
+        # V16.0 Phase E: Token追踪
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN input_tokens INTEGER DEFAULT 0")
+        with contextlib.suppress(sqlite3.OperationalError):
+            conn.execute("ALTER TABLE chat_messages ADD COLUMN output_tokens INTEGER DEFAULT 0")
         # V15.3: session_summaries — 跨 session 长期记忆（US4）
         conn.execute("""
             CREATE TABLE IF NOT EXISTS session_summaries (
@@ -423,4 +428,9 @@ class SessionRegistry:
             candidates=_json_list(row["candidates"]),
             cross_project_warning=row["cross_project_warning"] or None,
             created_at=row["created_at"] or 0.0,
+            status=row["status"] if "status" in row.keys() else "sent",
+            parts=_json_list(row["parts"]) if "parts" in row.keys() else [],
+            structured_output=row["structured_output"] if "structured_output" in row.keys() else "",
+            input_tokens=row["input_tokens"] if "input_tokens" in row.keys() else 0,
+            output_tokens=row["output_tokens"] if "output_tokens" in row.keys() else 0,
         )

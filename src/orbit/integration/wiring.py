@@ -255,10 +255,10 @@ class OrbitWiring:
                 "FROM grill_log WHERE task_id=? GROUP BY 1,2 HAVING cnt>=3",
                 (task_id,),
             ).fetchall()
-            if rows:
+            patterns = [f"{r[0]}→{r[1]}: {r[2]}次" for r in rows]
+            if patterns:
                 gepa = self._get_gepa()
                 scope = self._get_scope()
-                patterns = [f"{r[0]}→{r[1]}: {r[2]}次" for r in rows]
                 if gepa:
                     task = asyncio.create_task(
                         gepa.evolve_from_deviations([f"Grill模式: {p}" for p in patterns])

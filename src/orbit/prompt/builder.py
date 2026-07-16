@@ -425,6 +425,14 @@ class PromptBuilder:
             for c in constraints:
                 parts.append(f"- {c}")
 
+        # V16.0 Phase C: System Reminder——每轮注入原始用户目标防漂移
+        user_goal = ctx.get("user_goal", "")
+        if user_goal:
+            parts.append(
+                f"\n<system-reminder>\n用户原始目标: {user_goal}\n"
+                "请确保当前操作与上述目标一致。\n</system-reminder>"
+            )
+
         # token 预算提示（如果设置了）
         budget = ctx.get("token_budget", 0)
         if budget:

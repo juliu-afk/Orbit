@@ -270,28 +270,42 @@ class LLMClient:
             input_summary=f"model={model[:32]} agent={agent_name[:32]}",
             metadata={"model": model, "agent": agent_name, "source": model_source},
         )
-        try:
-            resp = await self._call_with_circuit(model, req, task_id, model_source)
-            TraceCollector.end_span(
-                llm_span, status=SpanStatus.OK,
-                output_summary=f"tokens={resp.usage.total_tokens if resp.usage else '?'}",
-                duration_ms=(time.monotonic() - _t0) * 1000,
-            )
-            return resp
-        except CircuitOpenError:
-            logger.warning("primary_circuit_open", model=model)
-        except Exception as e:
-            # 区分 API 错误（可重试/降级）vs 代码 bug（不应重试）
-            if isinstance(e, (TimeoutError, asyncio.TimeoutError)) or _is_api_error(e):
-                logger.warning("primary_api_error", model=model, error=str(e)[:200])
-            else:
-                logger.critical("primary_unexpected_error", model=model, exc_info=True)
+        # V16.0 Phase C: 指数退避重试——最多3次, 初始1s, 倍增
+        MAX_RETRIES = 3
+        RETRY_BASE_DELAY = 1.0
+        retryable_errors = (TimeoutError, asyncio.TimeoutError, ConnectionError, OSError)
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                resp = await self._call_with_circuit(model, req, task_id, model_source)
                 TraceCollector.end_span(
-                    llm_span, status=SpanStatus.ERROR,
-                    output_summary=str(e)[:256],
+                    llm_span, status=SpanStatus.OK,
+                    output_summary=f"tokens={resp.usage.total_tokens if resp.usage else '?'}",
                     duration_ms=(time.monotonic() - _t0) * 1000,
                 )
-                raise
+                if attempt > 0:
+                    logger.info("llm_retry_success", model=model, attempt=attempt)
+                return resp
+            except CircuitOpenError:
+                logger.warning("primary_circuit_open", model=model)
+                break
+            except Exception as e:
+                # 区分 API 错误（可重试/降级）vs 代码 bug（不应重试）
+                if isinstance(e, retryable_errors) or _is_api_error(e):
+                    if attempt < MAX_RETRIES:
+                        delay = RETRY_BASE_DELAY * (2 ** attempt)
+                        logger.warning("llm_retry", model=model, attempt=attempt+1, delay=delay, error=str(e)[:200])
+                        await asyncio.sleep(delay)
+                        continue
+                    logger.warning("primary_api_error_exhausted", model=model, attempts=MAX_RETRIES)
+                else:
+                    logger.critical("primary_unexpected_error", model=model, exc_info=True)
+                    TraceCollector.end_span(
+                        llm_span, status=SpanStatus.ERROR,
+                        output_summary=str(e)[:256],
+                        duration_ms=(time.monotonic() - _t0) * 1000,
+                    )
+                    raise
+                break
         try:
             logger.info("fallback_to_glm47flash", original=model)
             resp = await self._call_with_circuit(self.fallback_model, req, task_id, "fallback")

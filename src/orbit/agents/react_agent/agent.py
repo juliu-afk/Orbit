@@ -380,6 +380,15 @@ class ReActAgent(BaseAgent):
                                         agent=self.role.value,
                                         tool=tool_name,
                                     )
+                                    # V16.0 Phase C: 尝试用户确认
+                                    try:
+                                        approved, _ = await self.tools._request_confirm(
+                                            "doom_loop", {"tool": tool_name, "args": tool_args},
+                                            input_data.context.get("session_id", ""), self.role.value)
+                                        if approved:
+                                            self.tools.clear_loop_record(agent_key)
+                                    except Exception:
+                                        pass
                                     # 注入完整消息对到历史——assistant(tool_calls) + tool(warning)
                                     # WHY 必须先 assistant: 否则 provider 拒绝孤儿 tool 消息
                                     messages.append(

@@ -778,6 +778,16 @@ async def _handle_confirm(
 
             _sl.get_logger().warning("run_task_trigger_failed", task_id=task_id, error=str(e))
 
+        # V16.0 Phase F: 记录情景记忆——供GEPA进化
+        try:
+            from orbit.memory.episodic import EpisodicMemory
+            em = EpisodicMemory()
+            em.record_event(title="任务创建", outcome="task_created",
+                          tags=["prd_confirmed", project_name or ""],
+                          details={"task_id": task_id, "session_id": session_id})
+        except Exception:
+            pass
+
         reply_text = f"已创建任务 {task_id}，进入开发流程。"
         await _send(
             ws,

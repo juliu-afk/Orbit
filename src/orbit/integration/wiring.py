@@ -244,7 +244,29 @@ class OrbitWiring:
         # V15.2 Fable5 P1: generate quiz for core module changes
         try:
             from orbit.modes.quiz_generator import QuizGenerator
-            # check if quiz triggered (deferred to caller to provide changed_files)
+        except Exception: pass
+
+        # V16.0 Phase F: Grill Pattern → GEPA/SCOPE 反馈进化
+        try:
+            import sqlite3, json as _json
+            conn = sqlite3.connect(self._db_path)
+            rows = conn.execute(
+                "SELECT asking_agent, answering_agent, COUNT(*) as cnt "
+                "FROM grill_log WHERE task_id=? GROUP BY 1,2 HAVING cnt>=3",
+                (task_id,),
+            ).fetchall()
+            if rows:
+                gepa = self._get_gepa()
+                if gepa:
+                    patterns = [f"{r[0]}→{r[1]}: {r[2]}次" for r in rows]
+                    asyncio.create_task(gepa.evolve_from_deviations(
+                        [f"Grill模式: {p}" for p in patterns]
+                    )).add_done_callback(lambda _: None)
+                scope = self._get_scope()
+                if scope:
+                    scope.add_deviations_batch(task_id,
+                        [f"Agent {r[0]} 频繁向 {r[1]} 查询——上下文模板缺字段" for r in rows])
+            conn.close()
         except Exception: pass
 
         # 清理 Monitor 资源——发送结束信号 + 取消 Task + 删队列
